@@ -1,0 +1,75 @@
+import React, { useState, useEffect } from 'react';
+import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import PluginStoreCard from './PluginStoreCard';
+
+export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess }) {
+    const [catalog, setCatalog] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [installingPluginId, setInstallingPluginId] = useState(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const fetchCatalog = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch('/api/plugins/catalog');
+                if (!response.ok) throw new Error('Failed to fetch catalog');
+                const data = await response.json();
+                setCatalog(data);
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить каталог плагинов.' });
+            }
+            setIsLoading(false);
+        };
+        fetchCatalog();
+    }, [toast]);
+
+    const handleInstall = async (repoUrl, pluginId) => {
+        setInstallingPluginId(pluginId);
+        try {
+            const response = await fetch('/api/plugins/install/github', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repoUrl }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unknown error');
+            toast({ title: 'Успех!', description: `Плагин "${data.name}" успешно установлен.` });
+            onInstallSuccess();
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка установки', description: error.message });
+        }
+        setInstallingPluginId(null);
+    };
+
+    const installedPluginNames = new Set(installedPlugins.map(p => p.name));
+
+    return (
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle>Обзор официальных плагинов</DialogTitle>
+                <DialogDescription>
+                    Выберите плагин для установки. Он будет загружен из официального репозитория GitHub.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow overflow-y-auto pr-4">
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-full">Загрузка каталога...</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {catalog.map(plugin => (
+                            <PluginStoreCard 
+                                key={plugin.id}
+                                plugin={plugin}
+                                isInstalled={installedPluginNames.has(plugin.name)}
+                                isInstalling={installingPluginId === plugin.id}
+                                onInstall={(repoUrl) => handleInstall(repoUrl, plugin.id)}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </DialogContent>
+    );
+}

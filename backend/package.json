@@ -1,0 +1,34 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+  "start": "node src/server.js",
+  "dev": "nodemon",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "express": "^4.19.2",
+    "mineflayer": "^4.20.1",
+    "multer": "^2.0.1",
+    "pidusage": "^3.0.2",
+    "prisma": "^5.14.0",
+    "semver": "^7.6.2",
+    "socket.io": "^4.7.5",
+    "socks": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.2",
+    "prisma": "^5.14.0"
+  }
+}

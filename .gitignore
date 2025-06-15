@@ -1,0 +1,56 @@
+
+.idea/
+.vscode/
+*.suo
+*.sw?
+.DS_Store
+
+
+.env
+.env.*
+!.env.example
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+x.js
+com.txt
+
+node_modules/
+
+# ===================================================================
+# Backend
+# ===================================================================
+
+
+/backend/prisma/generated/
+/backend/prisma/client/
+
+/backend/prisma/*.db
+/backend/prisma/*.db-journal
+/backend/prisma/*.db-wal
+/backend/prisma/*.db-shm
+
+/backend/storage/
+
+/backend/prisma/migrations/
+
+# ===================================================================
+# Frontend
+# ===================================================================
+
+/frontend/dist/
+/frontend/dist-ssr/
+
+/frontend/*.local
+
+/plugins
+
+plug.md
+/.blockmine/
+
+stats-server/
+blockmine-proxy/

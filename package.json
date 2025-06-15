@@ -1,0 +1,39 @@
+
+{
+  "name": "blockmine",
+  "version": "1.2.0",
+  "description": "Мощная панель управления ботами для Майнкрафта.",
+  "author": "merka",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blockmineJS/blockmine.git"
+  },
+  "bin": {
+    "blockmine": "backend/cli.js"
+  },
+  "keywords": [
+    "minecraft",
+    "bot",
+    "mineflayer",
+    "dashboard",
+    "panel",
+    "automation"
+  ],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "postinstall": "npm install --workspaces --ignore-scripts && prisma generate --schema=./backend/prisma/schema.prisma",
+    "build": "npm run build --workspace=frontend",
+    "prepublishOnly": "npm run build && prisma generate --schema=./backend/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "prisma": "^5.14.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

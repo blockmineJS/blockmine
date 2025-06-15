@@ -1,0 +1,8 @@
+{
+  "watch": ["src/"],
+  "ext": "js,mjs,cjs,json",
+  "ignore": ["storage/", "prisma/dev.db", "prisma/dev.db-journal"],
+  "exec": "node src/server.js",
+  "signal": "SIGINT",
+  "delay": 1500
+}

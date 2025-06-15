@@ -1,0 +1,138 @@
+// backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Server {
+  id      Int    @id @default(autoincrement())
+  name    String @unique
+  host    String
+  port    Int    @default(25565)
+  version String
+  bots    Bot[]
+}
+
+model Bot {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String?
+  prefix   String? @default("@")
+  note     String?
+  owners   String? @default("")
+
+  server   Server @relation(fields: [serverId], references: [id])
+  serverId Int
+
+  proxyHost     String?
+  proxyPort     Int?
+  proxyUsername String?
+  proxyPassword String?
+
+  installedPlugins InstalledPlugin[]
+  users            User[]
+  groups           Group[]
+  permissions      Permission[]
+  commands         Command[] 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model InstalledPlugin {
+  id          Int     @id @default(autoincrement())
+  botId       Int
+  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name        String
+  version     String
+  description String?
+  sourceType  String
+  sourceUri   String?
+  path        String
+  isEnabled   Boolean @default(true)
+
+  manifest String?
+  settings String? @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@unique([botId, name])
+}
+
+model Command {
+  id        Int     @id @default(autoincrement())
+  botId     Int
+  bot       Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name      String
+  isEnabled Boolean @default(true)
+  cooldown  Int     @default(0)
+  aliases   String  @default("[]") // Храним как джсон строку
+  description String?
+  owner     String?
+  permissionId Int? 
+  permission   Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
+  allowedChatTypes String  @default("[\"chat\", \"private\"]") 
+
+  @@unique([botId, name])
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String
+  isBlacklisted Boolean   @default(false)
+  botId         Int
+  bot           Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  groups        UserGroup[]
+
+  @@unique([botId, username])
+}
+
+model Group {
+  id          Int             @id @default(autoincrement())
+  name        String
+  owner       String          @default("system")
+  botId       Int
+  bot         Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  permissions GroupPermission[]
+  users       UserGroup[]
+
+  @@unique([botId, name])
+}
+
+model Permission {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  owner       String          @default("system")
+  botId       Int
+  bot         Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  groups      GroupPermission[]
+  commands    Command[] 
+
+  @@unique([botId, name])
+}
+
+
+model UserGroup {
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  Int
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId Int
+
+  @@id([userId, groupId])
+}
+
+model GroupPermission {
+  group        Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId      Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int
+
+  @@id([groupId, permissionId])
+}
