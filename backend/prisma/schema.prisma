@@ -1,5 +1,3 @@
-// backend/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -135,4 +133,19 @@ model GroupPermission {
   permissionId Int
 
   @@id([groupId, permissionId])
+}
+
+
+
+model ScheduledTask {
+  id           Int        @id @default(autoincrement())
+  name         String
+  cronPattern  String
+  action       String
+  targetBotIds String // джсон массив ID ботов или "ALL"
+  payload      String?    @default("{}") // джсон для доп данных, например, команды
+  isEnabled    Boolean    @default(true)
+  lastRun      DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }

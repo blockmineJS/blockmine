@@ -4,7 +4,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { PlusCircle, Server, LayoutDashboard, Upload, Github } from 'lucide-react';
+import { PlusCircle, Server, LayoutDashboard, Upload, Github, Clock } from 'lucide-react';
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
 import BotForm from "@/components/BotForm";
@@ -21,6 +21,7 @@ export default function Layout() {
     const appVersion = useAppStore((state) => state.appVersion);
     const connectSocket = useAppStore((state) => state.connectSocket);
     const fetchInitialData = useAppStore((state) => state.fetchInitialData);
+    const { fetchTasks } = useAppStore();
     const createBot = useAppStore((state) => state.createBot);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -30,7 +31,8 @@ export default function Layout() {
     useEffect(() => {
         connectSocket();
         fetchInitialData();
-    }, [connectSocket, fetchInitialData]);
+        fetchTasks();
+    }, [connectSocket, fetchInitialData, fetchTasks]);
     
     const handleCreateBot = async (botData) => {
         setIsSaving(true);
@@ -56,7 +58,7 @@ export default function Layout() {
 
     return (
         <ResizablePanelGroup direction="horizontal" className="min-h-screen w-full items-stretch">
-            <ResizablePanel defaultSize={10} minSize={10} maxSize={40}>
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
                 <div className="flex flex-col h-full p-2">
                     <div className="p-2 mb-2">
                         <h2 className="text-lg font-semibold tracking-tight">Панель</h2>
@@ -72,6 +74,16 @@ export default function Layout() {
                         >
                             <LayoutDashboard className="h-4 w-4" />
                             Дашборд
+                        </NavLink>
+                        
+                        <NavLink
+                            to="/tasks"
+                            className={({ isActive }) =>
+                                cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent", isActive ? "bg-accent" : "transparent")
+                            }
+                        >
+                            <Clock className="h-4 w-4" />
+                            Планировщик
                         </NavLink>
                         
                         <Separator className="my-2" />
@@ -119,13 +131,13 @@ export default function Layout() {
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="h-[90vh] flex flex-col">
-    <BotForm 
-        servers={servers} 
-        onFormSubmit={handleCreateBot} 
-        isSaving={isSaving}
-        isCreation={true} 
-    />
-</DialogContent>
+                                    <BotForm 
+                                        servers={servers} 
+                                        onFormSubmit={handleCreateBot} 
+                                        isSaving={isSaving}
+                                        isCreation={true} 
+                                    />
+                                </DialogContent>
                             </Dialog>
 
                             <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>

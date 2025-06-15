@@ -2,22 +2,15 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
-
-const DATA_DIR = path.join(os.homedir(), '.blockmine');
-if (!fs.existsSync(DATA_DIR)) {
-    console.log(`[Server] Создание папки для данных: ${DATA_DIR}`);
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-process.env.DATABASE_URL = `file:${path.join(DATA_DIR, 'blockmine.db')}`;
 
 const { initializeSocket } = require('./real-time/socketHandler');
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
 const permissionsRoutes = require('./api/routes/permissions');
+const taskRoutes = require('./api/routes/tasks');
 const BotManager = require('./core/BotManager');
+const TaskScheduler = require('./core/TaskScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,8 +21,10 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
 
-const frontendPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
-const rootPath = path.join(__dirname, '..', '..');
+
+const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
+const rootPath = path.resolve(__dirname, '..', '..');
+
 
 app.get('/api/version', async (req, res) => {
     try {
@@ -43,27 +38,35 @@ app.get('/api/version', async (req, res) => {
     }
 });
 
+app.use('/api/tasks', taskRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/permissions', permissionsRoutes);
 
+
+
 app.use(express.static(frontendPath));
 
 app.get(/^(?!\/api).*/, (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
-        if (err && !res.headersSent) {
-            console.error(`Ошибка при отправке index.html для пути ${req.path}:`, err);
-            res.status(500).send("Не удалось загрузить приложение.");
-        }
-    });
+    const indexPath = path.join(frontendPath, 'index.html');
+    
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        console.error(`Критическая ошибка: файл index.html не найден по пути ${indexPath}`);
+        res.status(404).send(
+            '<h1>Файлы фронтенда не найдены!1!!!!111</h1>'
+        );
+    }
 });
 
 async function startServer() {
     return new Promise((resolve) => {
-        server.listen(PORT, () => {
+        server.listen(PORT, async () => {
             console.log(`Backend сервер успешно запущен на http://localhost:${PORT}`);
             console.log(`Панель управления доступна по адресу: http://localhost:${PORT}`);
+            await TaskScheduler.initialize();
             resolve(server);
         });
     });
@@ -102,4 +105,3 @@ module.exports = { startServer, app, server };
 if (require.main === module) {
     startServer();
 }
-

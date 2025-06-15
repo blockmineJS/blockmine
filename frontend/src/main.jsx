@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/toaster";
 import ManagementPage from './pages/ManagementPage';
 import DashboardPage from './pages/DashboardPage';
 import PluginDetailPage from './pages/PluginDetailPage';
+import TasksPage from './pages/TasksPage';
 
 const router = createBrowserRouter([
   {
@@ -35,6 +36,10 @@ const router = createBrowserRouter([
       {
         path: "servers",
         element: <ServersPage />,
+      },
+      {
+        path: "tasks",
+        element: <TasksPage />,
       },
     ]
   },

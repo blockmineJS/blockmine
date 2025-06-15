@@ -28,6 +28,9 @@ const DATA_DIR = path.join(os.homedir(), '.blockmine');
 if (TELEMETRY_ENABLED && STATS_SERVER_URL) {
     const idPath = path.join(DATA_DIR, '.instance_id');
     try {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
         instanceId = fs.readFileSync(idPath, 'utf-8');
     } catch (e) {
         instanceId = uuidv4();
@@ -348,6 +351,11 @@ class BotManager {
     
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
+                
+                if (typeChat === 'global') {
+                    return;
+                }
+
                 this._sendThrottledWarning(
                     botConfig.id, 
                     username, 

@@ -40,3 +40,4 @@ plug.md
 
 stats-server/
 blockmine-proxy/
+migration_lock.toml

@@ -1,5 +1,5 @@
 const path = require('path');
-const fs = require('fs/promises');
+const fse = require('fs-extra');
 const os = require('os');
 const { PrismaClient } = require('@prisma/client');
 const AdmZip = require('adm-zip');
@@ -42,13 +42,13 @@ class PluginManager {
     }
 
     async ensureBaseDirExists() {
-        await fs.mkdir(PLUGINS_BASE_DIR, { recursive: true }).catch(console.error);
+        await fse.mkdir(PLUGINS_BASE_DIR, { recursive: true }).catch(console.error);
     }
 
     async installFromLocalPath(botId, directoryPath) {
         const newPlugin = await this.registerPlugin(botId, directoryPath, 'LOCAL', directoryPath);
         try {
-            const packageJson = JSON.parse(await fs.readFile(path.join(directoryPath, 'package.json'), 'utf-8'));
+            const packageJson = JSON.parse(await fse.readFile(path.join(directoryPath, 'package.json'), 'utf-8'));
             reportPluginDownload(packageJson.name);
         } catch(e) {
             console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
@@ -58,7 +58,7 @@ class PluginManager {
 
     async installFromGithub(botId, repoUrl, prismaClient = prisma) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
-        await fs.mkdir(botPluginsDir, { recursive: true });
+        await fse.mkdir(botPluginsDir, { recursive: true });
 
         const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
         if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
@@ -88,13 +88,21 @@ class PluginManager {
             const repoName = path.basename(repoPath);
             const localPath = path.join(botPluginsDir, repoName);
             
+            if (await fse.pathExists(localPath)) {
+                await fse.remove(localPath);
+            }
+            const tempExtractPath = path.join(botPluginsDir, rootFolderName);
+            if (await fse.pathExists(tempExtractPath)) {
+                await fse.remove(tempExtractPath);
+            }
+            
             zip.extractAllTo(botPluginsDir, true);
             
-            await fs.rename(path.join(botPluginsDir, rootFolderName), localPath);
+            await fse.move(tempExtractPath, localPath, { overwrite: true });
 
             const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
             
-            const packageJson = JSON.parse(await fs.readFile(path.join(localPath, 'package.json'), 'utf-8'));
+            const packageJson = JSON.parse(await fse.readFile(path.join(localPath, 'package.json'), 'utf-8'));
             reportPluginDownload(packageJson.name);
             
             return newPlugin;
@@ -112,7 +120,7 @@ class PluginManager {
         const packageJsonPath = path.join(directoryPath, 'package.json');
         let packageJson;
         try {
-            packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
+            packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
         } catch (e) {
             throw new Error(`Не удалось прочитать или распарсить package.json в плагине по пути: ${directoryPath}`);
         }
@@ -138,29 +146,67 @@ class PluginManager {
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin) throw new Error('Плагин не найден');
 
+        const pluginOwnerId = `plugin:${plugin.name}`;
+        console.log(`[PluginManager] Начало удаления плагина ${plugin.name} (ID: ${plugin.id}) и его ресурсов.`);
+        console.log(`[PluginManager] Идентификатор владельца для очистки: ${pluginOwnerId}`);
+
         try {
             const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
             const mainFile = manifest.main || 'index.js';
             const entryPointPath = path.join(plugin.path, mainFile);
             
-            await fs.access(entryPointPath); 
-            const pluginModule = require(entryPointPath);
+            if (await fse.pathExists(entryPointPath)) {
+                if (require.cache[require.resolve(entryPointPath)]) {
+                    delete require.cache[require.resolve(entryPointPath)];
+                }
+                
+                const pluginModule = require(entryPointPath);
 
-            if (pluginModule && typeof pluginModule.onUnload === 'function') {
-                console.log(`[PluginManager] Вызов хука onUnload для плагина ${plugin.name}...`);
-                await pluginModule.onUnload({ botId: plugin.botId, prisma });
-                console.log(`[PluginManager] Хук onUnload для ${plugin.name} успешно выполнен.`);
+                if (pluginModule && typeof pluginModule.onUnload === 'function') {
+                    console.log(`[PluginManager] Вызов хука onUnload для плагина ${plugin.name}...`);
+                    await pluginModule.onUnload({ botId: plugin.botId, prisma });
+                    console.log(`[PluginManager] Хук onUnload для ${plugin.name} успешно выполнен.`);
+                }
+            } else {
+                 console.warn(`[PluginManager] Главный файл плагина ${entryPointPath} не найден. Хук onUnload пропущен.`);
             }
         } catch (error) {
             console.error(`[PluginManager] Ошибка при выполнении хука onUnload для плагина ${plugin.name}:`, error);
         }
 
-        if (plugin.sourceType === 'GITHUB' || plugin.sourceType === 'IMPORTED') {
-            await fs.rm(plugin.path, { recursive: true, force: true }).catch(err => {
-                console.error(`Не удалось удалить папку плагина ${plugin.path}:`, err);
+        try {
+            await prisma.$transaction(async (tx) => {
+                const deletedCommands = await tx.command.deleteMany({
+                    where: { botId: plugin.botId, owner: pluginOwnerId },
+                });
+                if (deletedCommands.count > 0) console.log(`[DB Cleanup] Удалено команд: ${deletedCommands.count}`);
+
+                const deletedPermissions = await tx.permission.deleteMany({
+                    where: { botId: plugin.botId, owner: pluginOwnerId },
+                });
+                 if (deletedPermissions.count > 0) console.log(`[DB Cleanup] Удалено прав: ${deletedPermissions.count}`);
+
+                const deletedGroups = await tx.group.deleteMany({
+                    where: { botId: plugin.botId, owner: pluginOwnerId },
+                });
+                if (deletedGroups.count > 0) console.log(`[DB Cleanup] Удалено групп: ${deletedGroups.count}`);
+
+                await tx.installedPlugin.delete({ where: { id: pluginId } });
+                console.log(`[DB Cleanup] Запись о плагине ${plugin.name} удалена.`);
             });
+        } catch (dbError) {
+             console.error(`[PluginManager] Ошибка при очистке БД для плагина ${plugin.name}:`, dbError);
+             throw new Error('Ошибка при удалении данных плагина из БД. Файлы не были удалены.');
         }
-        await prisma.installedPlugin.delete({ where: { id: pluginId } });
+
+        if (plugin.sourceType === 'GITHUB' || plugin.sourceType === 'IMPORTED') {
+            try {
+                await fse.remove(plugin.path);
+                console.log(`[PluginManager] Папка плагина ${plugin.path} успешно удалена.`);
+            } catch (fileError) {
+                console.error(`Не удалось удалить папку плагина ${plugin.path}:`, fileError);
+            }
+        }
     }
 
     async checkForUpdates(botId, catalog) {
