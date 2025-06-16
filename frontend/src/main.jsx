@@ -15,13 +15,29 @@ import ManagementPage from './pages/ManagementPage';
 import DashboardPage from './pages/DashboardPage';
 import PluginDetailPage from './pages/PluginDetailPage';
 import TasksPage from './pages/TasksPage';
+import LoginPage from './pages/LoginPage';
+import SetupPage from './pages/SetupPage';
+import RequireAuth from './components/RequireAuth';
+
+const originalFetch = window.fetch;
+window.fetch = (input, init = {}) => {
+  if (typeof input === 'string' && input.startsWith('/api')) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      init.headers = { ...(init.headers || {}), Authorization: `Bearer ${token}` };
+    }
+  }
+  return originalFetch(input, init);
+};
 
 const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
+  { path: '/setup', element: <SetupPage /> },
   {
-    path: "/",
-    element: <Layout />,
+    path: '/',
+    element: <RequireAuth><Layout /></RequireAuth>,
     children: [
-      { index: true, element: <DashboardPage /> }, 
+      { index: true, element: <DashboardPage /> },
       {
         path: "bots/:botId",
         element: <BotView />,

@@ -21,6 +21,16 @@ const loginValidation = [
     body('password').isString()
 ];
 
+router.get('/needs-setup', async (req, res) => {
+    try {
+        const count = await prisma.panelUser.count();
+        res.json({ setupNeeded: count === 0 });
+    } catch (error) {
+        console.error('Failed to check setup state:', error);
+        res.status(500).json({ error: 'Could not check setup state' });
+    }
+});
+
 router.post('/setup', setupValidation, async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
