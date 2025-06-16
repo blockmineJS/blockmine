@@ -3,10 +3,12 @@ const { Server } = require('socket.io');
 let io;
 
 function initializeSocket(httpServer) {
+    const origin = process.env.CLIENT_ORIGIN || '*';
     io = new Server(httpServer, {
         cors: {
-            origin: "http://localhost:5173",
-            methods: ["GET", "POST"]
+            origin,
+            methods: ["GET", "POST"],
+            credentials: true
         }
     });
 

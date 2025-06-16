@@ -12,7 +12,8 @@ export const createCoreSlice = (set, get) => ({
 
     connectSocket: () => {
         if (get().socket) return;
-        const socket = io('http://localhost:3001');
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const socket = io(baseUrl);
         socket.on('connect', () => console.log('Socket.IO подключен:', socket.id));
         socket.on('disconnect', () => console.log('Socket.IO отключен'));
         socket.on('bot:status', ({ botId, status, message }) => {

@@ -4,7 +4,8 @@ import { io } from 'socket.io-client';
 import BotCard from './components/BotCard';
 import BotForm from './components/BotForm';
 
-const socket = io('http://localhost:3001');
+const API_URL = import.meta.env.VITE_API_URL || '';
+const socket = io(API_URL);
 
 function App() {
   const [bots, setBots] = useState([]);

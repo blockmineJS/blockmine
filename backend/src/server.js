@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs');
 
 const { initializeSocket } = require('./real-time/socketHandler');
+const cors = require('cors');
+const authRoutes = require('./api/routes/auth');
+const authMiddleware = require('./middleware/auth');
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
@@ -19,7 +22,11 @@ initializeSocket(server);
 
 const PORT = process.env.PORT || 3001;
 
+app.use(cors());
 app.use(express.json());
+
+app.use('/api', authRoutes);
+app.use(authMiddleware);
 
 
 const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
@@ -63,9 +70,9 @@ app.get(/^(?!\/api).*/, (req, res) => {
 
 async function startServer() {
     return new Promise((resolve) => {
-        server.listen(PORT, async () => {
-            console.log(`Backend сервер успешно запущен на http://localhost:${PORT}`);
-            console.log(`Панель управления доступна по адресу: http://localhost:${PORT}`);
+    server.listen(PORT, async () => {
+            console.log(`Backend сервер успешно запущен на порту ${PORT}`);
+            console.log(`Панель управления доступна по адресу: http://<host>:${PORT}`);
             await TaskScheduler.initialize();
             resolve(server);
         });
