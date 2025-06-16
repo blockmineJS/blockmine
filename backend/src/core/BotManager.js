@@ -411,6 +411,7 @@ class BotManager {
         }
     }
 
+
     async handleCommandRegistration(botId, commandConfig) {
         try {
             let permissionId = null;
@@ -431,7 +432,10 @@ class BotManager {
                 permissionId = permission.id;
             }
     
-            const data = {
+
+            const createData = {
+                botId,
+                name: commandConfig.name,
                 description: commandConfig.description,
                 aliases: JSON.stringify(commandConfig.aliases || []),
                 owner: commandConfig.owner,
@@ -439,16 +443,19 @@ class BotManager {
                 allowedChatTypes: JSON.stringify(commandConfig.allowedChatTypes || []),
                 cooldown: commandConfig.cooldown || 0,
             };
-    
+
+            const updateData = {
+                description: commandConfig.description,
+                owner: commandConfig.owner,
+            };
+
             await prisma.command.upsert({
                 where: { botId_name: { botId, name: commandConfig.name } },
-                update: data,
-                create: {
-                    botId,
-                    name: commandConfig.name,
-                    ...data
-                }
+                update: updateData,
+                create: createData,
             });
+
+
         } catch (error) {
             console.error(`[BotManager] Ошибка при регистрации команды '${commandConfig.name}':`, error);
         }

@@ -73,7 +73,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                         <TableRow>
                             <TableHead className="w-[80px]">Статус</TableHead>
                             <TableHead>Команда</TableHead>
-                            <TableHead>Псевдонимы</TableHead>
+                            <TableHead>Алиасы</TableHead>
                             <TableHead>Типы чатов</TableHead>
                             <TableHead>Право</TableHead>
                             <TableHead className="w-[100px]">Кулдаун</TableHead>
@@ -111,7 +111,10 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                         </TableCell>
                                         <TableCell className="font-medium">
                                             {command.name}
-                                            <div className="text-xs text-muted-foreground">{command.owner}</div>
+                                            <div className="text-xs text-muted-foreground max-w-[250px] truncate" title={command.description}>
+                                                {command.description}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground font-mono pt-1">{command.owner}</div>
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-wrap gap-1 max-w-[150px]">
