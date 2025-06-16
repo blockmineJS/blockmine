@@ -2,8 +2,10 @@ const { Server } = require('socket.io');
 
 let io;
 
+const DEFAULT_CORS_ORIGIN = '*';
+
 function initializeSocket(httpServer) {
-    const origin = process.env.CLIENT_ORIGIN || '*';
+    const origin = process.env.CLIENT_ORIGIN || DEFAULT_CORS_ORIGIN; // Allow all origins if not specified
     io = new Server(httpServer, {
         cors: {
             origin,

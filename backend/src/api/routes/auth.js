@@ -3,29 +3,62 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'blockmine-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+}
 
-router.post('/setup', async (req, res) => {
-    const count = await prisma.panelUser.count();
-    if (count > 0) return res.status(400).json({ error: 'Setup already completed' });
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await prisma.panelUser.create({ data: { username, passwordHash, permissions: JSON.stringify(['*']) } });
-    const token = jwt.sign({ id: user.id }, JWT_SECRET);
-    res.json({ token });
+const setupValidation = [
+    body('username').isString().isLength({ min: 3, max: 50 }),
+    body('password').isString().isLength({ min: 8, max: 128 })
+];
+
+const loginValidation = [
+    body('username').isString(),
+    body('password').isString()
+];
+
+router.post('/setup', setupValidation, async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        const user = await prisma.$transaction(async (tx) => {
+            const count = await tx.panelUser.count();
+            if (count > 0) {
+                throw new Error('Setup already completed');
+            }
+            const { username, password } = req.body;
+            const passwordHash = await bcrypt.hash(password, 10);
+            return tx.panelUser.create({ data: { username, passwordHash, permissions: JSON.stringify(['*']) } });
+        });
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
+        res.json({ token });
+    } catch (error) {
+        if (error.message === 'Setup already completed') {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Setup failed:', error);
+        return res.status(500).json({ error: 'Setup failed' });
+    }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginValidation, async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
     const user = await prisma.panelUser.findUnique({ where: { username } });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ id: user.id }, JWT_SECRET);
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token });
 });
 

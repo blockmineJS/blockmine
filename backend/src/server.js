@@ -22,11 +22,16 @@ initializeSocket(server);
 
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173'];
+app.use(cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 
-app.use('/api', authRoutes);
-app.use(authMiddleware);
+app.use('/api/auth', authRoutes); // auth routes should be public
+app.use('/api', authMiddleware); // protect other API routes
 
 
 const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
