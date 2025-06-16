@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
     DialogContent,
@@ -58,8 +57,12 @@ function CommandOverviewTab({ command }) {
                 </div>
             )}
             <div>
-                <Label>Источник (плагин)</Label>
-                <Input value={command.owner} readOnly className="font-mono mt-1 bg-muted" />
+                <Label>Источник</Label>
+                <div className="mt-1">
+                    <Badge variant={command.owner === 'system' ? 'secondary' : 'default'} className="text-sm">
+                        {command.owner.replace('plugin:', '')}
+                    </Badge>
+                </div>
             </div>
         </div>
     );

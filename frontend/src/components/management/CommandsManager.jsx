@@ -70,6 +70,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                         <TableRow>
                             <TableHead className="w-[80px]">Статус</TableHead>
                             <TableHead>Команда</TableHead>
+                            <TableHead>Источник</TableHead>
                             <TableHead>Алиасы</TableHead>
                             <TableHead>Типы чатов</TableHead>
                             <TableHead>Право</TableHead>
@@ -78,7 +79,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={6} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="text-center">Загрузка...</TableCell></TableRow>
                         ) : (
                             commands.map(command => (
                                 <TableRow key={command.id} onClick={() => handleOpenModal(command)} className="cursor-pointer">
@@ -87,10 +88,14 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                     </TableCell>
                                     <TableCell className="font-medium">
                                         {command.name}
-                                        <div className="text-xs text-muted-foreground max-w-[250px] truncate" title={command.description}>
+                                        <div className="text-xs text-muted-foreground max-w-[200px] truncate" title={command.description}>
                                             {command.description}
                                         </div>
-                                        <div className="text-xs text-muted-foreground font-mono pt-1">{command.owner}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={command.owner === 'system' ? 'secondary' : 'default'}>
+                                            {command.owner.replace('plugin:', '')}
+                                        </Badge>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1 max-w-[150px]">
