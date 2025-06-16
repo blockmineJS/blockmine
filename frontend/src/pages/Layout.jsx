@@ -22,6 +22,7 @@ export default function Layout() {
     const connectSocket = useAppStore((state) => state.connectSocket);
     const fetchInitialData = useAppStore((state) => state.fetchInitialData);
     const { fetchTasks } = useAppStore();
+    const token = useAuthStore(state => state.token);
     const createBot = useAppStore((state) => state.createBot);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -29,10 +30,11 @@ export default function Layout() {
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
+        if (!token) return;
         connectSocket();
         fetchInitialData();
         fetchTasks();
-    }, [connectSocket, fetchInitialData, fetchTasks]);
+    }, [connectSocket, fetchInitialData, fetchTasks, token]);
     
     const handleCreateBot = async (botData) => {
         setIsSaving(true);

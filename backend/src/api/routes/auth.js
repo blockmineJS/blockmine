@@ -26,6 +26,10 @@ router.get('/needs-setup', async (req, res) => {
         const count = await prisma.panelUser.count();
         res.json({ setupNeeded: count === 0 });
     } catch (error) {
+        if (error.code === 'P2021') {
+            // PanelUser table does not exist yet (old installation)
+            return res.json({ setupNeeded: true });
+        }
         console.error('Failed to check setup state:', error);
         res.status(500).json({ error: 'Could not check setup state' });
     }
