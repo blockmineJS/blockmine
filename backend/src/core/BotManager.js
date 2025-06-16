@@ -78,7 +78,7 @@ class BotManager {
             return config;
         } catch (error) {
             console.error(`[BotManager] Failed to cache configuration for bot ${botId}:`, error);
-            return null;
+            throw new Error(`Failed to load/cache bot configuration for botId ${botId}: ${error.message}`);
         }
     }
 
@@ -378,30 +378,34 @@ class BotManager {
             let botConfigCache = this.botConfigs.get(botId);
             if (!botConfigCache) {
                 botConfigCache = await this.loadConfigForBot(botId);
-                if (!botConfigCache) {
-                    throw new Error(`Не удалось загрузить конфигурацию для бота ${botId}`);
-                }
             }
             
             const user = await RealUserService.getUser(username, botId, botConfig);
-    
-            if (user.isBlacklisted) return;
+            const child = this.bots.get(botId);
+            if (!child) return;
+
+            if (user.isBlacklisted) {
+                child.send({ type: 'handle_blacklist', commandName, username, typeChat });
+                return;
+            }
             
             const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
             const dbCommand = botConfigCache.commands.get(mainCommandName);
             
-            if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) return;
+            if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
+                return;
+            }
     
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
                 if (typeChat === 'global') return;
-                this._sendThrottledWarning(botId, username, `wrong_chat:${dbCommand.name}:${typeChat}`, `Команду ${dbCommand.name} нельзя использовать в этом типе чата.`, typeChat);
+                child.send({ type: 'handle_wrong_chat', commandName: dbCommand.name, username, typeChat });
                 return;
             }
             
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
             if (permission && !user.hasPermission(permission.name)) {
-                this._sendThrottledWarning(botId, username, `no_permission:${dbCommand.name}`, `У вас нет прав для выполнения команды ${dbCommand.name}.`, typeChat);
+                child.send({ type: 'handle_permission_error', commandName: dbCommand.name, username, typeChat });
                 return;
             }
     
@@ -414,20 +418,22 @@ class BotManager {
     
                 if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
                     const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    this._sendThrottledWarning(botId, username, `cooldown:${dbCommand.name}`, `Команду ${dbCommand.name} можно будет использовать через ${timeLeft} сек.`, typeChat);
+                    child.send({ type: 'handle_cooldown', commandName: dbCommand.name, username, typeChat, timeLeft });
                     return;
                 }
                 cooldowns.set(cooldownKey, now);
             }
 
-            const child = this.bots.get(botId);
-            if (child) {
-                child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
-            }
+            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
 
         } catch (error) {
-            console.error(`[BotManager] Ошибка валидации команды ${commandName}:`, error);
-            this.sendMessageToBot(botConfig.id, `Произошла внутренняя ошибка при выполнении команды.`, 'private', username);
+            console.error(`[BotManager] Command validation error for botId: ${botId}`, {
+                command: commandName,
+                user: username,
+                error: error.message,
+                stack: error.stack
+            });
+            this.sendMessageToBot(botId, `Произошла внутренняя ошибка при выполнении команды.`, 'private', username);
         }
     }
 

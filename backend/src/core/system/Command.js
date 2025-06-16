@@ -19,17 +19,6 @@ class Command {
         this.allowedChatTypes = allowedChatTypes;
     }
 
-    onInvalidArguments(bot, typeChat, user, error) {
-        bot.api.sendMessage(typeChat, `Ошибка: ${error.message}`, user.username);
-        
-        const usage = this.args.map(arg => {
-            const part = arg.required ? `<${arg.description}>` : `[${arg.description}]`;
-            return part;
-        }).join(' ');
-
-        bot.api.sendMessage(typeChat, `Использование: ${bot.config.prefix}${this.name} ${usage}`, user.username);
-    }
-
     onInsufficientPermissions(bot, typeChat, user) {
         bot.api.sendMessage(typeChat, `У вас нет прав для выполнения команды ${this.name}.`, user.username);
     }
