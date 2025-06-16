@@ -8,6 +8,7 @@ const PluginManager = require('../../core/PluginManager');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
 
+
 const multer = require('multer');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
@@ -536,6 +537,8 @@ router.put('/:botId/commands/:commandId', async (req, res) => {
             data: dataToUpdate,
         });
 
+        BotManager.invalidateConfigCache(botId);
+
         res.json(updatedCommand);
     } catch (error) {
         console.error(`[API Error] /commands/:commandId PUT:`, error);
@@ -557,6 +560,10 @@ router.post('/:botId/groups', async (req, res) => {
                 permissions: { create: (permissionIds || []).map(id => ({ permissionId: id })) }
             }
         });
+
+        BotManager.invalidateConfigCache(botId);
+
+
         res.status(201).json(newGroup);
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ error: 'Группа с таким именем уже существует для этого бота.' });
@@ -590,6 +597,8 @@ router.put('/:botId/groups/:groupId', async (req, res) => {
             BotManager.invalidateUserCache(botId, user.username);
         }
 
+        BotManager.invalidateConfigCache(botId);
+
         res.status(200).send();
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ error: 'Группа с таким именем уже существует для этого бота.' });
@@ -599,12 +608,16 @@ router.put('/:botId/groups/:groupId', async (req, res) => {
 
 router.delete('/:botId/groups/:groupId', async (req, res) => {
     try {
+        const botId = parseInt(req.params.botId, 10);
         const groupId = parseInt(req.params.groupId);
         const group = await prisma.group.findUnique({ where: { id: groupId } });
         if (group && group.owner !== 'admin') {
             return res.status(403).json({ error: `Нельзя удалить группу с источником "${group.owner}".` });
         }
         await prisma.group.delete({ where: { id: groupId } });
+        BotManager.invalidateConfigCache(botId);
+
+
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить группу.' }); }
 });
@@ -617,6 +630,9 @@ router.post('/:botId/permissions', async (req, res) => {
         const newPermission = await prisma.permission.create({
             data: { name, description, botId, owner: 'admin' }
         });
+
+        BotManager.invalidateConfigCache(botId);
+        
         res.status(201).json(newPermission);
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ error: 'Право с таким именем уже существует для этого бота.' });
