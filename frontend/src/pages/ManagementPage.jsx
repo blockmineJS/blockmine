@@ -5,7 +5,11 @@ import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
+
 import CommandsManager from '@/components/management/CommandsManager';
+import UsersManager from '@/components/management/UsersManager';
+import GroupsManager from '@/components/management/GroupsManager';
+import PermissionsManager from '@/components/management/PermissionsManager';
 
 export default function ManagementPage() {
     const { botId } = useParams();
@@ -45,17 +49,38 @@ export default function ManagementPage() {
                         Настройте пользователей, группы, права и команды для бота {bot?.username}.
                     </CardDescription>
                     <TabsList className="mt-2">
-                        <TabsTrigger value="users" disabled>Пользователи</TabsTrigger>
-                        <TabsTrigger value="groups" disabled>Группы</TabsTrigger>
-                        <TabsTrigger value="permissions" disabled>Права</TabsTrigger>
+                        <TabsTrigger value="users">Пользователи</TabsTrigger>
+                        <TabsTrigger value="groups">Группы</TabsTrigger>
+                        <TabsTrigger value="permissions">Права</TabsTrigger>
                         <TabsTrigger value="commands">Команды</TabsTrigger>
                     </TabsList>
                 </CardHeader>
+
                 <TabsContent value="users" className="flex-grow min-h-0">
+                    <UsersManager 
+                        users={managementData.users} 
+                        groups={managementData.groups}
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData}
+                    />
                 </TabsContent>
                 <TabsContent value="groups" className="flex-grow min-h-0">
+                    <GroupsManager 
+                        groups={managementData.groups} 
+                        allPermissions={managementData.permissions}
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData} 
+                    />
                 </TabsContent>
                  <TabsContent value="permissions" className="flex-grow min-h-0">
+                    <PermissionsManager 
+                        permissions={managementData.permissions} 
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData}
+                    />
                 </TabsContent>
                 <TabsContent value="commands" className="flex-grow min-h-0">
                     <CommandsManager
