@@ -382,7 +382,11 @@ class BotManager {
             
             const user = await RealUserService.getUser(username, botId, botConfig);
             const child = this.bots.get(botId);
-            if (!child) return;
+            
+            if (!child) {
+                console.warn(`[BotManager] No running bot process found for botId: ${botId} during command validation. Aborting.`);
+                return;
+            }
 
             if (user.isBlacklisted) {
                 child.send({ type: 'handle_blacklist', commandName, username, typeChat });
@@ -398,7 +402,9 @@ class BotManager {
     
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') return;
+                if (typeChat === 'global') {
+                    return;
+                }
                 child.send({ type: 'handle_wrong_chat', commandName: dbCommand.name, username, typeChat });
                 return;
             }
