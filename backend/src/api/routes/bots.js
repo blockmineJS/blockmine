@@ -494,7 +494,7 @@ router.get('/:botId/management-data', async (req, res) => {
                 aliases: JSON.parse(cmd.aliases || '[]'),
                 allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]')
             };
-        }).filter(cmd => templatesMap.has(cmd.name));
+        })
 
         const [groups, users, allPermissions] = await Promise.all([
             prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),

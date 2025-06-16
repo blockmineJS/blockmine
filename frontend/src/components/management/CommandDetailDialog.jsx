@@ -19,9 +19,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DynamicInputList from './DynamicInputList';
 import { Save, Loader2 } from 'lucide-react';
 
+/**
+ * Типы владельцев команд, используемые для различения системных команд и команд от плагинов.
+ */
+const OWNER_TYPES = {
+  SYSTEM: 'system'
+};
+
 function CommandOverviewTab({ command }) {
     const usageString = `@${command.name} ${command.args?.map(arg => arg.required ? `<${arg.name}>` : `[${arg.name}]`).join(' ') || ''}`;
     
+    const ownerName = command.owner ? command.owner.replace('plugin:', '') : '';
+
     return (
         <div className="space-y-6">
             <div>
@@ -58,8 +67,12 @@ function CommandOverviewTab({ command }) {
                 </div>
             )}
             <div>
-                <Label>Источник (плагин)</Label>
-                <Input value={command.owner} readOnly className="font-mono mt-1 bg-muted" />
+                <Label>Источник</Label>
+                <div className="mt-1">
+                    <Badge variant={command.owner === OWNER_TYPES.SYSTEM ? 'secondary' : 'default'} className="text-sm">
+                        {ownerName}
+                    </Badge>
+                </div>
             </div>
         </div>
     );
