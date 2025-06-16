@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     DialogContent,
     DialogHeader,
@@ -18,9 +19,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DynamicInputList from './DynamicInputList';
 import { Save, Loader2 } from 'lucide-react';
 
+const OWNER_TYPES = {
+  SYSTEM: 'system'
+};
+
 function CommandOverviewTab({ command }) {
     const usageString = `@${command.name} ${command.args?.map(arg => arg.required ? `<${arg.name}>` : `[${arg.name}]`).join(' ') || ''}`;
     
+    const ownerName = useMemo(() => {
+        if (!command.owner) return '';
+        return command.owner.replace('plugin:', '');
+    }, [command.owner]);
+
     return (
         <div className="space-y-6">
             <div>
@@ -59,8 +69,8 @@ function CommandOverviewTab({ command }) {
             <div>
                 <Label>Источник</Label>
                 <div className="mt-1">
-                    <Badge variant={command.owner === 'system' ? 'secondary' : 'default'} className="text-sm">
-                        {command.owner.replace('plugin:', '')}
+                    <Badge variant={command.owner === OWNER_TYPES.SYSTEM ? 'secondary' : 'default'} className="text-sm">
+                        {ownerName}
                     </Badge>
                 </div>
             </div>

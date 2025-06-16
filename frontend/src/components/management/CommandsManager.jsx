@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,6 +7,10 @@ import { Dialog } from "@/components/ui/dialog";
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
+
+const OWNER_TYPES = {
+  SYSTEM: 'system'
+};
 
 export default function CommandsManager({ commands = [], allPermissions = [], botId, isLoading, onDataChange }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -93,7 +98,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={command.owner === 'system' ? 'secondary' : 'default'}>
+                                        <Badge variant={command.owner === OWNER_TYPES.SYSTEM ? 'secondary' : 'default'}>
                                             {command.owner.replace('plugin:', '')}
                                         </Badge>
                                     </TableCell>
