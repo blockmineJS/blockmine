@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/blockmineJS/blockmine/main/image/logo.png" alt="BlockMine Logo" width="150">
+  <img src="./image/logo.png" alt="BlockMine Logo" width="150">
   <h1>BlockMine</h1>
   <p>
     <strong>Мощная и удобная панель управления для ваших Minecraft-ботов на базе Mineflayer.</strong>
