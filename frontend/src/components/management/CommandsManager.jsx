@@ -8,6 +8,10 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
 
+/**
+ * Типы владельцев команд, используемые для различения системных команд и команд от плагинов.
+ * Системные команды могут иметь особую обработку в UI.
+ */
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };

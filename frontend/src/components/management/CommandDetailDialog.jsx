@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     DialogContent,
     DialogHeader,
@@ -19,6 +19,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DynamicInputList from './DynamicInputList';
 import { Save, Loader2 } from 'lucide-react';
 
+/**
+ * Типы владельцев команд, используемые для различения системных команд и команд от плагинов.
+ */
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };
@@ -26,10 +29,7 @@ const OWNER_TYPES = {
 function CommandOverviewTab({ command }) {
     const usageString = `@${command.name} ${command.args?.map(arg => arg.required ? `<${arg.name}>` : `[${arg.name}]`).join(' ') || ''}`;
     
-    const ownerName = useMemo(() => {
-        if (!command.owner) return '';
-        return command.owner.replace('plugin:', '');
-    }, [command.owner]);
+    const ownerName = command.owner ? command.owner.replace('plugin:', '') : '';
 
     return (
         <div className="space-y-6">
