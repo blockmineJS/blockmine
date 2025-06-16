@@ -1,4 +1,3 @@
-
 const { fork } = require('child_process');
 const path = require('path');
 const { getIO } = require('../real-time/socketHandler');
@@ -43,7 +42,8 @@ class BotManager {
         this.bots = new Map();
         this.logCache = new Map();
         this.resourceUsage = new Map();
-        
+        this.botConfigs = new Map();
+
         setInterval(() => this.updateAllResourceUsage(), 5000);
         
 
@@ -52,6 +52,42 @@ class BotManager {
         }
     }
 
+    async loadConfigForBot(botId) {
+        console.log(`[BotManager] Caching configuration for bot ID ${botId}...`);
+        try {
+            const [commands, permissions] = await Promise.all([
+                prisma.command.findMany({ where: { botId } }),
+                prisma.permission.findMany({ where: { botId } }),
+            ]);
+            
+            const config = {
+                commands: new Map(commands.map(cmd => [cmd.name, cmd])),
+                permissionsById: new Map(permissions.map(p => [p.id, p])),
+                commandAliases: new Map()
+            };
+
+            for (const cmd of commands) {
+                const aliases = JSON.parse(cmd.aliases || '[]');
+                for (const alias of aliases) {
+                    config.commandAliases.set(alias, cmd.name);
+                }
+            }
+
+            this.botConfigs.set(botId, config);
+            console.log(`[BotManager] Configuration for bot ID ${botId} cached successfully.`);
+            return config;
+        } catch (error) {
+            console.error(`[BotManager] Failed to cache configuration for bot ${botId}:`, error);
+            throw new Error(`Failed to load/cache bot configuration for botId ${botId}: ${error.message}`);
+        }
+    }
+
+    invalidateConfigCache(botId) {
+        if (this.botConfigs.has(botId)) {
+            this.botConfigs.delete(botId);
+            console.log(`[BotManager] Invalidated config cache for bot ID ${botId}. It will be reloaded on next command.`);
+        }
+    }
 
     triggerHeartbeat() {
         if (this.heartbeatDebounceTimer) {
@@ -260,6 +296,7 @@ class BotManager {
         }
 
         await this._syncSystemPermissions(botConfig.id);
+        await this.loadConfigForBot(botConfig.id);
 
         this.logCache.set(botConfig.id, []);
         this.emitStatusUpdate(botConfig.id, 'starting', '');
@@ -319,6 +356,7 @@ class BotManager {
             const botId = botConfig.id;
             this.bots.delete(botId);
             this.resourceUsage.delete(botId);
+            this.botConfigs.delete(botId);
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
         });
@@ -334,80 +372,74 @@ class BotManager {
 
     async handleCommandValidation(botConfig, message) {
         const { commandName, username, args, typeChat } = message;
-        
-        try {
-            const user = await RealUserService.getUser(username, botConfig.id, botConfig);
-    
-            if (user.isBlacklisted) return;
-            
-            const dbCommand = await prisma.command.findFirst({
-                where: {
-                    botId: botConfig.id,
-                    OR: [ { name: commandName }, { aliases: { contains: `"${commandName}"` } } ]
-                }
-            });
-            
-            if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) return;
-    
-            const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
-            if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                
-                if (typeChat === 'global') {
-                    return;
-                }
+        const botId = botConfig.id;
 
-                this._sendThrottledWarning(
-                    botConfig.id, 
-                    username, 
-                    `wrong_chat:${dbCommand.name}:${typeChat}`,
-                    `Команду ${dbCommand.name} нельзя использовать в этом типе чата.`,
-                    typeChat
-                );
+        try {
+            let botConfigCache = this.botConfigs.get(botId);
+            if (!botConfigCache) {
+                botConfigCache = await this.loadConfigForBot(botId);
+            }
+            
+            const user = await RealUserService.getUser(username, botId, botConfig);
+            const child = this.bots.get(botId);
+            
+            if (!child) {
+                console.warn(`[BotManager] No running bot process found for botId: ${botId} during command validation. Aborting.`);
+                return;
+            }
+
+            if (user.isBlacklisted) {
+                child.send({ type: 'handle_blacklist', commandName, username, typeChat });
                 return;
             }
             
-            const permission = dbCommand.permissionId ? await prisma.permission.findUnique({ where: { id: dbCommand.permissionId } }) : null;
+            const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
+            const dbCommand = botConfigCache.commands.get(mainCommandName);
+            
+            if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
+                return;
+            }
+    
+            const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
+            if (!allowedTypes.includes(typeChat) && !user.isOwner) {
+                if (typeChat === 'global') {
+                    return;
+                }
+                child.send({ type: 'handle_wrong_chat', commandName: dbCommand.name, username, typeChat });
+                return;
+            }
+            
+            const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
             if (permission && !user.hasPermission(permission.name)) {
-                this._sendThrottledWarning(
-                    botConfig.id,
-                    username,
-                    `no_permission:${dbCommand.name}`,
-                    `У вас нет прав для выполнения команды ${dbCommand.name}.`,
-                    typeChat
-                );
+                child.send({ type: 'handle_permission_error', commandName: dbCommand.name, username, typeChat });
                 return;
             }
     
             const domain = (permission?.name || '').split('.')[0] || 'user';
             const bypassCooldownPermission = `${domain}.cooldown.bypass`;
             if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
-                const cooldownKey = `${botConfig.id}:${dbCommand.name}:${user.id}`;
+                const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
                 const now = Date.now();
                 const lastUsed = cooldowns.get(cooldownKey);
     
                 if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
                     const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    
-                    this._sendThrottledWarning(
-                        botConfig.id,
-                        username,
-                        `cooldown:${dbCommand.name}`,
-                        `Команду ${dbCommand.name} можно будет использовать через ${timeLeft} сек.`,
-                        typeChat
-                    );
+                    child.send({ type: 'handle_cooldown', commandName: dbCommand.name, username, typeChat, timeLeft });
                     return;
                 }
                 cooldowns.set(cooldownKey, now);
             }
 
-            const child = this.bots.get(botConfig.id);
-            if (child) {
-                child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
-            }
+            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
 
         } catch (error) {
-            console.error(`[BotManager] Ошибка валидации команды ${commandName}:`, error);
-            this.sendMessageToBot(botConfig.id, `Произошла внутренняя ошибка при выполнении команды.`, 'private', username);
+            console.error(`[BotManager] Command validation error for botId: ${botId}`, {
+                command: commandName,
+                user: username,
+                error: error.message,
+                stack: error.stack
+            });
+            this.sendMessageToBot(botId, `Произошла внутренняя ошибка при выполнении команды.`, 'private', username);
         }
     }
 
@@ -455,6 +487,7 @@ class BotManager {
                 create: createData,
             });
 
+            this.invalidateConfigCache(botId);
 
         } catch (error) {
             console.error(`[BotManager] Ошибка при регистрации команды '${commandConfig.name}':`, error);
@@ -465,6 +498,7 @@ class BotManager {
         const child = this.bots.get(botId);
         if (child) {
             child.send({ type: 'stop' });
+            this.botConfigs.delete(botId);
             return { success: true };
         }
         return { success: false, message: 'Бот не найден или уже остановлен' };
