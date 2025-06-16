@@ -50,7 +50,7 @@ function handleIncomingCommand(type, username, message) {
                 if (argDef.type === 'number') {
                     const numValue = parseFloat(value);
                     if (isNaN(numValue)) {
-                        bot.api.sendMessage(type, `Ошибка: Неверный тип аргумента "${argDef.description}". Ожидалось число.`, username);
+                        bot.api.sendMessage(type, `Ошибка: Аргумент "${argDef.description}" должен быть числом.`, username);
                         return;
                     }
                     value = numValue;
@@ -61,7 +61,12 @@ function handleIncomingCommand(type, username, message) {
 
             if (processedArgs[argDef.name] === undefined) {
                 if (argDef.required) {
+                    const usage = commandInstance.args.map(arg => {
+                        return arg.required ? `<${arg.description}>` : `[${arg.description}]`;
+                    }).join(' ');
+
                     bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description}`, username);
+                    bot.api.sendMessage(type, `Использование: ${bot.config.prefix}${commandInstance.name} ${usage}`, username);
                     return;
                 }
                 if (argDef.default !== undefined) {
@@ -266,6 +271,34 @@ process.on('message', async (message) => {
             commandInstance.handler(bot, typeChat, fakeUser, args).catch(e => {
                 sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
             });
+        }
+    } else if (message.type === 'invalidate_user_cache') {
+        if (message.username && bot && bot.config) {
+            UserService.clearCache(message.username, bot.config.id);
+        }
+    } else if (message.type === 'handle_permission_error') {
+        const { commandName, username, typeChat } = message;
+        const commandInstance = bot.commands.get(commandName);
+        if (commandInstance) {
+            commandInstance.onInsufficientPermissions(bot, typeChat, { username });
+        }
+    } else if (message.type === 'handle_wrong_chat') {
+        const { commandName, username, typeChat } = message;
+        const commandInstance = bot.commands.get(commandName);
+        if (commandInstance) {
+            commandInstance.onWrongChatType(bot, typeChat, { username });
+        }
+    } else if (message.type === 'handle_cooldown') {
+        const { commandName, username, typeChat, timeLeft } = message;
+        const commandInstance = bot.commands.get(commandName);
+        if (commandInstance) {
+            commandInstance.onCooldown(bot, typeChat, { username }, timeLeft);
+        }
+    } else if (message.type === 'handle_blacklist') {
+        const { commandName, username, typeChat } = message;
+        const commandInstance = bot.commands.get(commandName);
+        if (commandInstance) {
+            commandInstance.onBlacklisted(bot, typeChat, { username });
         }
     } else if (message.type === 'invalidate_user_cache') {
         if (message.username && bot && bot.config) {
