@@ -26,13 +26,14 @@ class CommandManager {
                     const commandInstance = new CommandClass();
                     const config = {
                         name: commandInstance.name,
-                        argsCount: commandInstance.argsCount,
-                        permissions: commandInstance.permissions,
-                        cooldown: commandInstance.cooldown,
-                        isActive: commandInstance.isActive,
                         description: commandInstance.description || '',
                         aliases: commandInstance.aliases || [],
                         owner: commandInstance.owner || 'system',
+                        permissions: commandInstance.permissions,
+                        allowedChatTypes: commandInstance.allowedChatTypes || ['chat', 'private'],
+                        cooldown: commandInstance.cooldown || 0,
+                        args: commandInstance.args || [],
+                        isActive: commandInstance.isActive !== undefined ? commandInstance.isActive : true,
                     };
 
                     if (config.name) {

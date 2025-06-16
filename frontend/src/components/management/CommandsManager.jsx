@@ -1,14 +1,11 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Dialog } from "@/components/ui/dialog";
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Edit } from 'lucide-react';
-import CommandEditDialog from './CommandEditDialog';
+import CommandDetailDialog from './CommandDetailDialog';
 
 export default function CommandsManager({ commands = [], allPermissions = [], botId, isLoading, onDataChange }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,7 +62,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
         <Card className="h-full flex flex-col">
             <CardHeader>
                 <CardTitle>Команды</CardTitle>
-                <CardDescription>Список всех команд, доступных боту. Управляйте их состоянием и настройками.</CardDescription>
+                <CardDescription>Список всех команд, доступных боту. Кликните на строку для просмотра деталей и настроек.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
                 <Table>
@@ -77,83 +74,55 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                             <TableHead>Типы чатов</TableHead>
                             <TableHead>Право</TableHead>
                             <TableHead className="w-[100px]">Кулдаун</TableHead>
-                            <TableHead className="text-right w-[100px]">Действия</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={7} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="text-center">Загрузка...</TableCell></TableRow>
                         ) : (
-                            commands.map(command => {
-                                let aliases = [];
-                                let allowedTypes = [];
-
-                                try {
-                                    aliases = Array.isArray(command.aliases) 
-                                        ? command.aliases 
-                                        : JSON.parse(command.aliases || '[]');
-                                } catch (e) {
-                                    console.error(`Ошибка парсинга aliases для команды ${command.name}:`, command.aliases);
-                                }
-
-                                try {
-                                    allowedTypes = Array.isArray(command.allowedChatTypes) 
-                                        ? command.allowedChatTypes 
-                                        : JSON.parse(command.allowedChatTypes || '[]');
-                                } catch (e) {
-                                    console.error(`Ошибка парсинга allowedChatTypes для команды ${command.name}:`, command.allowedChatTypes);
-                                }
-
-                                return (
-                                    <TableRow key={command.id}>
-                                        <TableCell>
-                                            <Switch checked={command.isEnabled} onCheckedChange={(checked) => handleToggle(command, checked)} />
-                                        </TableCell>
-                                        <TableCell className="font-medium">
-                                            {command.name}
-                                            <div className="text-xs text-muted-foreground max-w-[250px] truncate" title={command.description}>
-                                                {command.description}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground font-mono pt-1">{command.owner}</div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                                {aliases.map(alias => <Badge key={alias} variant="secondary">{alias}</Badge>)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                                {allowedTypes.map(type => <Badge key={type} variant="outline">{type}</Badge>)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs">
-                                            {allPermissions.find(p => p.id === command.permissionId)?.name || <span className="text-muted-foreground">Нет</span>}
-                                        </TableCell>
-                                        <TableCell>
-                                            {command.cooldown} сек.
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" onClick={() => handleOpenModal(command)}>
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })
+                            commands.map(command => (
+                                <TableRow key={command.id} onClick={() => handleOpenModal(command)} className="cursor-pointer">
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        <Switch checked={command.isEnabled} onCheckedChange={(checked) => handleToggle(command, checked)} />
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                        {command.name}
+                                        <div className="text-xs text-muted-foreground max-w-[250px] truncate" title={command.description}>
+                                            {command.description}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground font-mono pt-1">{command.owner}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                            {command.aliases.map(alias => <Badge key={alias} variant="secondary">{alias}</Badge>)}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                            {command.allowedChatTypes.map(type => <Badge key={type} variant="outline">{type}</Badge>)}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                        {allPermissions.find(p => p.id === command.permissionId)?.name || <span className="text-muted-foreground">Нет</span>}
+                                    </TableCell>
+                                    <TableCell>
+                                        {command.cooldown} сек.
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         )}
                     </TableBody>
                 </Table>
             </CardContent>
-             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                {editingCommand && (
-                    <CommandEditDialog 
-                        command={editingCommand}
-                        allPermissions={allPermissions}
-                        onSubmit={handleSubmit}
-                        onCancel={handleCloseModal}
-                        isSaving={isSaving}
-                    />
-                )}
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <CommandDetailDialog
+                    open={isModalOpen}
+                    onOpenChange={setIsModalOpen}
+                    command={editingCommand}
+                    allPermissions={allPermissions}
+                    onSubmit={handleSubmit}
+                    isSaving={isSaving}
+                />
             </Dialog>
         </Card>
     );

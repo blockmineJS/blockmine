@@ -443,70 +443,64 @@ router.get('/:botId/management-data', async (req, res) => {
         const botId = parseInt(req.params.botId);
         
         const commandTemplates = commandManager.getCommandTemplates();
-        let permissions = await prisma.permission.findMany({ where: { botId } });
+        const templatesMap = new Map(commandTemplates.map(t => [t.name, t]));
+
+        let dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+
+        const dbCommandNames = new Set(dbCommands.map(cmd => cmd.name));
+        const commandsToCreate = [];
 
         for (const template of commandTemplates) {
-            const exists = await prisma.command.findUnique({
-                where: { botId_name: { botId, name: template.name } }
-            });
-
-            if (!exists) {
+            if (!dbCommandNames.has(template.name)) {
                 let permissionId = null;
                 if (template.permissions) {
-                    let requiredPermission = permissions.find(p => p.name === template.permissions);
-                    if (!requiredPermission) {
-                        requiredPermission = await prisma.permission.create({
-                            data: {
-                                botId,
-                                name: template.permissions,
-                                description: `Авто-создано для команды ${template.name}`,
-                                owner: template.owner || 'system',
-                            }
-                        });
-                        permissions.push(requiredPermission);
-                    }
-                    permissionId = requiredPermission.id;
+                    const permission = await prisma.permission.upsert({
+                        where: { botId_name: { botId, name: template.permissions } },
+                        update: { description: `Авто-создано для команды ${template.name}` },
+                        create: {
+                            botId,
+                            name: template.permissions,
+                            description: `Авто-создано для команды ${template.name}`,
+                            owner: template.owner || 'system',
+                        }
+                    });
+                    permissionId = permission.id;
                 }
 
-                await prisma.command.create({
-                    data: {
-                        botId,
-                        name: template.name,
-                        isEnabled: template.isActive !== undefined ? template.isActive : true,
-                        cooldown: template.cooldown || 0,
-                        aliases: JSON.stringify(template.aliases || []),
-                        description: template.description,
-                        owner: template.owner,
-                        permissionId: permissionId,
-                        allowedChatTypes: JSON.stringify(template.allowedChatTypes || ['chat', 'private']),
-                    }
+                commandsToCreate.push({
+                    botId,
+                    name: template.name,
+                    isEnabled: template.isActive,
+                    cooldown: template.cooldown,
+                    aliases: JSON.stringify(template.aliases),
+                    description: template.description,
+                    owner: template.owner,
+                    permissionId: permissionId,
+                    allowedChatTypes: JSON.stringify(template.allowedChatTypes),
                 });
             }
         }
-        
-        const [groups, users, dbCommands, allPermissions] = await Promise.all([
-            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
-            prisma.user.findMany({ where: { botId }, include: { groups: { include: { group: true } } }, orderBy: { username: 'asc' } }),
-            prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] }),
-            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
-        ]);
+
+        if (commandsToCreate.length > 0) {
+            await prisma.command.createMany({ data: commandsToCreate });
+            dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+        }
 
         const finalCommands = dbCommands.map(cmd => {
-            try {
-                return {
-                    ...cmd,
-                    aliases: JSON.parse(cmd.aliases || '[]'),
-                    allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]')
-                };
-            } catch (e) {
-                console.error(`Ошибка парсинга JSON для команды ${cmd.name} (ID: ${cmd.id})`, e);
-                return {
-                    ...cmd,
-                    aliases: [],
-                    allowedChatTypes: []
-                };
-            }
-        });
+            const template = templatesMap.get(cmd.name);
+            return {
+                ...cmd,
+                args: template ? template.args : [],
+                aliases: JSON.parse(cmd.aliases || '[]'),
+                allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]')
+            };
+        }).filter(cmd => templatesMap.has(cmd.name));
+
+        const [groups, users, allPermissions] = await Promise.all([
+            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
+            prisma.user.findMany({ where: { botId }, include: { groups: { include: { group: true } } }, orderBy: { username: 'asc' } }),
+            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
+        ]);
 
         res.json({ groups, permissions: allPermissions, users, commands: finalCommands });
         

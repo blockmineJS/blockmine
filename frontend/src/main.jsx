@@ -1,3 +1,4 @@
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
@@ -29,7 +30,7 @@ const router = createBrowserRouter([
           { path: "console", element: <ConsoleTab /> },
           { path: "plugins", element: <PluginsTab /> },
           { path: "settings", element: <ConfigurationPage /> },
-          { path: "management", element: <ManagementPage /> }, 
+          { path: "management", element: <ManagementPage /> },
           { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
         ]
       },
