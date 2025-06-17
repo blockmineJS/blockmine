@@ -1,5 +1,5 @@
-import { toast } from '@/hooks/use-toast';
 import { io } from 'socket.io-client';
+import { apiHelper } from '@/lib/api';
 
 export const createCoreSlice = (set, get) => ({
     socket: null,
@@ -11,43 +11,49 @@ export const createCoreSlice = (set, get) => ({
     appVersion: '',
 
     connectSocket: () => {
-        if (get().socket) return;
-        const socket = io('http://localhost:3001');
-        socket.on('connect', () => console.log('Socket.IO подключен:', socket.id));
-        socket.on('disconnect', () => console.log('Socket.IO отключен'));
-        socket.on('bot:status', ({ botId, status, message }) => {
+        if (get().socket) {
+            get().socket.disconnect();
+        }
+        const token = get().token;
+        if (!token) {
+            console.log("[Socket] Подключение отложено: нет токена.");
+            return;
+        }
+        const newSocket = io('http://localhost:3001', {
+            auth: { token }
+        });
+        newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
+        newSocket.on('disconnect', () => console.log('Socket.IO отключен'));
+        newSocket.on('bot:status', ({ botId, status, message }) => {
             set(state => { state.botStatuses[botId] = status; });
             if (message) get().appendLog(botId, `[SYSTEM] ${message}`);
         });
-        socket.on('bot:log', ({ botId, log }) => get().appendLog(botId, log));
-        socket.on('bots:usage', (usageData) => {
+        newSocket.on('bot:log', ({ botId, log }) => get().appendLog(botId, log));
+        newSocket.on('bots:usage', (usageData) => {
             const usageMap = usageData.reduce((acc, usage) => ({ ...acc, [usage.botId]: usage }), {});
             set({ resourceUsage: usageMap });
         });
-        set({ socket });
+        set({ socket: newSocket });
     },
 
     fetchInitialData: async () => {
         try {
-            const [botsRes, serversRes, stateRes, versionRes] = await Promise.all([
-                fetch('/api/bots'), fetch('/api/servers'), fetch('/api/bots/state'), fetch('/api/version')
+            const [botsData, serversData, stateData, versionData] = await Promise.all([
+                apiHelper('/api/bots'),
+                apiHelper('/api/servers'),
+                apiHelper('/api/bots/state'),
+                apiHelper('/api/version')
             ]);
-            const botsData = await botsRes.json();
-            const serversData = await serversRes.json();
-            const stateData = await stateRes.json();
-            if (!botsRes.ok || !Array.isArray(botsData)) throw new Error(botsData.error || 'Ошибка загрузки ботов');
-            if (!serversRes.ok || !Array.isArray(serversData)) throw new Error(serversData.error || 'Ошибка загрузки серверов');
-            let version = '';
-            if (versionRes.ok) version = (await versionRes.json()).version;
+            
             set(state => {
-                state.bots = botsData;
-                state.servers = serversData;
+                state.bots = botsData || [];
+                state.servers = serversData || [];
                 state.botStatuses = stateData.statuses || {};
                 state.botLogs = stateData.logs || {};
-                state.appVersion = version;
+                state.appVersion = versionData.version || '';
             });
         } catch (error) {
-             toast({ variant: 'destructive', title: 'Ошибка сети', description: error.message });
+             console.error("Не удалось загрузить начальные данные:", error.message);
              set(state => { state.bots = []; state.servers = []; });
         }
     },
@@ -55,7 +61,7 @@ export const createCoreSlice = (set, get) => ({
     appendLog: (botId, log) => {
         set(state => {
             const currentLogs = state.botLogs[botId] || [];
-            state.botLogs[botId] = [...currentLogs, log].slice(-200);
+            state.botLogs[botId] = [...currentLogs, log].slice(-200); 
         });
     },
 });

@@ -3,12 +3,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
+
+const config = require('./src/config.js'); 
 const { startServer } = require('./src/server.js');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
 process.env.DATABASE_URL = `file:${path.join(DATA_DIR, 'blockmine.db')}`;
 
 function runCommand(command) {

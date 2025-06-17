@@ -4,11 +4,14 @@ const { getIO } = require('../real-time/socketHandler');
 const { PrismaClient } = require('@prisma/client');
 const pidusage = require('pidusage');
 const DependencyService = require('./DependencyService');
+const config = require('../config');
 
 const fs = require('fs');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const { decrypt } = require('./utils/crypto');
+
 
 const RealPermissionManager = require('./PermissionManager');
 const RealUserService = require('./UserService');
@@ -19,23 +22,10 @@ const warningCache = new Map();
 const WARNING_COOLDOWN = 10 * 1000;
 
 
-const TELEMETRY_ENABLED = 'true';
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 let instanceId = null;
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 
-if (TELEMETRY_ENABLED && STATS_SERVER_URL) {
-    const idPath = path.join(DATA_DIR, '.instance_id');
-    try {
-        if (!fs.existsSync(DATA_DIR)) {
-            fs.mkdirSync(DATA_DIR, { recursive: true });
-        }
-        instanceId = fs.readFileSync(idPath, 'utf-8');
-    } catch (e) {
-        instanceId = uuidv4();
-        fs.writeFileSync(idPath, instanceId, 'utf-8');
-    }
-}
 
 class BotManager {
     constructor() {
@@ -47,7 +37,7 @@ class BotManager {
         setInterval(() => this.updateAllResourceUsage(), 5000);
         
 
-        if (TELEMETRY_ENABLED && STATS_SERVER_URL) {
+        if (config.telemetry?.enabled) {
             setInterval(() => this.sendHeartbeat(), 5 * 60 * 1000);
         }
     }
@@ -90,6 +80,8 @@ class BotManager {
     }
 
     triggerHeartbeat() {
+        if (!config.telemetry?.enabled) return;
+
         if (this.heartbeatDebounceTimer) {
             clearTimeout(this.heartbeatDebounceTimer);
         }
@@ -112,6 +104,8 @@ class BotManager {
 
 
     async sendHeartbeat() {
+        if (!config.telemetry?.enabled) return;
+
         if (!instanceId) return;
 
         try {
@@ -325,7 +319,15 @@ class BotManager {
             return { success: false, message: 'Критические ошибки в зависимостях плагинов.' };
         }
         
-        const fullBotConfig = { ...botConfig, plugins: sortedPlugins };
+        const decryptedConfig = { ...botConfig };
+        if (decryptedConfig.password) {
+            decryptedConfig.password = decrypt(decryptedConfig.password);
+        }
+        if (decryptedConfig.proxyPassword) {
+            decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
+        }
+
+        const fullBotConfig = { ...decryptedConfig, plugins: sortedPlugins };
         
         const botProcessPath = path.resolve(__dirname, 'BotProcess.js');
         const child = fork(botProcessPath, [], { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });

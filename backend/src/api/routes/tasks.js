@@ -2,17 +2,20 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const TaskScheduler = require('../../core/TaskScheduler');
+const { authenticate, authorize } = require('../middleware/auth');
 
 const { CronExpressionParser } = require('cron-parser');
 
 const prisma = new PrismaClient();
+
+router.use(authenticate);
 
 const normalizeCronPattern = (pattern) => {
     if (typeof pattern !== 'string') return '* * * * *';
     return pattern.replace(/\*\/1/g, '*').trim();
 };
 
-router.get('/', async (req, res) => {
+router.get('/', authorize('task:list'), async (req, res) => {
     try {
         const tasks = await prisma.scheduledTask.findMany({ orderBy: { createdAt: 'desc' } });
         const normalizedTasks = tasks.map(task => ({
@@ -26,7 +29,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authorize('task:create'), async (req, res) => {
     try {
         const taskData = { ...req.body, cronPattern: normalizeCronPattern(req.body.cronPattern) };
         const newTask = await prisma.scheduledTask.create({ data: taskData });
@@ -38,7 +41,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorize('task:edit'), async (req, res) => {
     const taskId = parseInt(req.params.id, 10);
     try {
         const { id, createdAt, updatedAt, lastRun, ...dataToUpdate } = req.body;
@@ -59,7 +62,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('task:delete'), async (req, res) => {
     const taskId = parseInt(req.params.id, 10);
     try {
         await prisma.scheduledTask.delete({ where: { id: taskId } });
@@ -72,7 +75,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 
-router.post('/describe', (req, res) => {
+router.post('/describe', authorize('task:list'), (req, res) => {
     const { pattern } = req.body;
 
     if (!pattern) {
