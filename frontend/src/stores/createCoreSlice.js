@@ -20,7 +20,7 @@ export const createCoreSlice = (set, get) => ({
             return;
         }
         
-        const newSocket = io({
+        const newSocket = io('http://localhost:3001', {
             auth: { token }
         });
 
