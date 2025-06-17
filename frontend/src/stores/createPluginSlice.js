@@ -24,15 +24,18 @@ export const createPluginSlice = (set, get) => ({
         set({ isCatalogLoading: true });
         
         try {
-            const [catalogData, statsData] = await Promise.all([
-                apiHelper('/api/plugins/catalog'),
-                fetch('http://185.65.200.184:3000/api/stats').then(res => {
-                    if (!res.ok) throw new Error('Статистика недоступна');
-                    return res.json();
-                })
-            ]);
-
-            const statsMap = new Map((statsData?.plugins || []).map(p => [p.pluginName, p.downloadCount]));
+            const catalogData = await apiHelper('/api/plugins/catalog');
+            
+            let statsMap = new Map();
+            try {
+                const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    statsMap = new Map((statsData?.plugins || []).map(p => [p.pluginName, p.downloadCount]));
+                }
+            } catch (statsError) {
+                console.warn("Не удалось загрузить статистику скачиваний плагинов:", statsError.message);
+            }
 
             const enrichedCatalog = (catalogData || []).map(plugin => ({
                 ...plugin,
@@ -41,14 +44,8 @@ export const createPluginSlice = (set, get) => ({
 
             set({ pluginCatalog: enrichedCatalog, isCatalogLoading: false });
         } catch (error) {
-            console.error("Не удалось загрузить каталог плагинов или статистику:", error.message);
-            try {
-                const catalogData = await apiHelper('/api/plugins/catalog');
-                const plainCatalog = (catalogData || []).map(plugin => ({...plugin, downloads: 0 }));
-                set({ pluginCatalog: plainCatalog, isCatalogLoading: false });
-            } catch (catalogError) {
-                 set({ pluginCatalog: [], isCatalogLoading: false });
-            }
+            console.error("Не удалось загрузить каталог плагинов:", error.message);
+            set({ pluginCatalog: [], isCatalogLoading: false });
         }
     },
 
@@ -65,10 +62,12 @@ export const createPluginSlice = (set, get) => ({
                     manifest = {};
                 }
                 
+                const catalogPlugin = get().pluginCatalog.find(cat_p => cat_p.name === p.name);
+                
                 return {
                     ...p,
                     manifest,
-                    author: manifest.author || 'Локальный',
+                    author: catalogPlugin?.author || manifest.author || 'Неизвестный автор',
                     description: p.description || manifest.description || 'Нет описания',
                 };
             });
