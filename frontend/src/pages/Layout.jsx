@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -171,7 +170,7 @@ export default function Layout() {
                         </SheetContent>
                     </Sheet>
                 </header>
-                <main className="flex-1 overflow-auto">
+                <main className="flex-1 overflow-y-auto min-h-0">
                     <Outlet />
                 </main>
             </div>
@@ -179,14 +178,13 @@ export default function Layout() {
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal" className="min-h-screen w-full items-stretch">
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={25}>
+        <div className="grid grid-cols-[280px_1fr] h-screen">
+            <aside className="border-r">
                 {sidebarContent}
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={80}>
+            </aside>
+            <main className="overflow-y-auto">
                 <Outlet />
-            </ResizablePanel>
-        </ResizablePanelGroup>
+            </main>
+        </div>
     );
 }

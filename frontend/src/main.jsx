@@ -1,6 +1,6 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import './index.css';
 
 import { useAppStore } from '@/stores/appStore';
@@ -80,9 +80,10 @@ const router = createBrowserRouter([
         path: "bots/:botId",
         element: <BotView />,
         children: [
-            { index: true, element: <ConsoleTab /> },
+            { index: true, element: <Navigate to="console" replace /> },
             { path: "console", element: <ConsoleTab /> },
             { path: "plugins", element: <PluginsTab /> },
+            { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
             { path: "settings", element: <ConfigurationPage /> },
             { 
               path: "management", 
@@ -92,7 +93,6 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
               )
             },
-            { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
         ]
       },
       {

@@ -16,7 +16,9 @@ const ansiConverter = new AnsiToHtml({
 
 export default function ConsoleTab() {
     const { botId } = useParams();
-    const { bots, botLogs, botStatuses } = useAppStore();
+    const bots = useAppStore(state => state.bots);
+    const botLogs = useAppStore(state => state.botLogs);
+    const botStatuses = useAppStore(state => state.botStatuses);
     
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
     const logs = useMemo(() => botLogs[botId] || [], [botLogs, botId]);
@@ -57,24 +59,24 @@ export default function ConsoleTab() {
     };
 
     return (
-        <div className="h-full w-full relative bg-background rounded-lg border border-border">
+        <div className="flex flex-col h-full w-full bg-background rounded-lg border border-border">
             <div
                 ref={viewportRef}
                 onScroll={handleScroll}
-                className="absolute top-0 left-0 right-0 bottom-14 p-4 overflow-y-auto font-mono text-sm bg-black rounded-t-lg"
+                className="flex-1 p-4 overflow-y-auto font-mono text-sm bg-black"
             >
                 <div className="space-y-1">
                     {logs.map((log, index) => (
                         <div 
                             key={`${index}-${log.substring(0, 10)}`}
                             dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(log) }}
-                            className="leading-relaxed whitespace-pre-wrap break-words"
+                            className="leading-relaxed whitespace-pre-wrap break-all"
                         />
                     ))}
                 </div>
             </div>
             
-            <form onSubmit={handleSendCommand} className="absolute bottom-0 left-0 right-0 h-14 flex items-center gap-2 p-2 bg-muted/50 border-t border-border rounded-b-lg">
+            <form onSubmit={handleSendCommand} className="flex-shrink-0 flex items-center gap-2 p-2 bg-muted/50 border-t border-border">
                 <Input
                     type="text"
                     placeholder={status === 'running' ? `Отправить как ${bot?.username}...` : 'Запустите бота, чтобы отправлять сообщения'}
