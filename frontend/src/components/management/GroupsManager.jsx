@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import GroupFormDialog from '@/components/GroupFormDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { apiHelper } from '@/lib/api';
 
 export default function GroupsManager({ groups, allPermissions, botId, isLoading, onDataChange }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,17 +41,13 @@ export default function GroupsManager({ groups, allPermissions, botId, isLoading
         const method = isEdit ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
+            await apiHelper(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(groupData),
-            });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-            toast({ title: "Успех!", description: `Группа успешно ${isEdit ? 'обновлена' : 'создана'}.` });
+            }, `Группа успешно ${isEdit ? 'обновлена' : 'создана'}.`);
             handleCloseModal();
             onDataChange();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         setIsSaving(false);
     };
@@ -58,12 +55,9 @@ export default function GroupsManager({ groups, allPermissions, botId, isLoading
     const confirmDelete = async () => {
         if (!groupToDelete) return;
         try {
-            const response = await fetch(`/api/bots/${groupToDelete.botId}/groups/${groupToDelete.id}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-            toast({ title: "Успех!", description: "Группа удалена." });
+            await apiHelper(`/api/bots/${groupToDelete.botId}/groups/${groupToDelete.id}`, { method: 'DELETE' }, "Группа удалена.");
             onDataChange();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
     };
 

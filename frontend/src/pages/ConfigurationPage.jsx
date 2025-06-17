@@ -8,6 +8,7 @@ import { Save, Loader2 } from 'lucide-react';
 import BotForm from "@/components/BotForm";
 import PluginSettingsForm from '@/components/PluginSettingsForm';
 import { useAppStore } from '@/stores/appStore';
+import { apiHelper } from '@/lib/api';
 
 export default function ConfigurationPage() {
     const { botId } = useParams();
@@ -24,9 +25,7 @@ export default function ConfigurationPage() {
     const fetchAllSettings = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/bots/${botId}/settings/all`);
-            if (!response.ok) throw new Error('Не удалось загрузить настройки');
-            const data = await response.json();
+            const data = await apiHelper(`/api/bots/${botId}/settings/all`);
             setAllSettings(data);
             setChanges({});
         } catch (error) {
@@ -59,28 +58,23 @@ export default function ConfigurationPage() {
         try {
             if (changes.bot) {
                 const dataToSend = { ...changes.bot };
-                
                 if (Array.isArray(dataToSend.owners)) {
                     dataToSend.owners = dataToSend.owners.join(',');
                 }
-                
                 if (!dataToSend.password) delete dataToSend.password;
                 if (!dataToSend.proxyPassword) delete dataToSend.proxyPassword;
                 
-                const response = await fetch(`/api/bots/${botId}`, {
+                await apiHelper(`/api/bots/${botId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dataToSend),
                 });
-                if (!response.ok) throw new Error('Не удалось сохранить настройки бота');
             }
             
             if (changes.plugins) {
                  await Promise.all(
                     Object.entries(changes.plugins).map(([pluginId, settings]) => 
-                        fetch(`/api/bots/${botId}/plugins/${pluginId}`, {
+                        apiHelper(`/api/bots/${botId}/plugins/${pluginId}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ settings }),
                         })
                     )

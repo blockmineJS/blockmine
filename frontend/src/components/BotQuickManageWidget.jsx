@@ -6,26 +6,27 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Play, Square, MoreHorizontal, RefreshCw, Settings, Terminal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { apiHelper } from '@/lib/api';
 
-export default function BotQuickManageWidget({ bots, botStatuses, onBotChange }) {
+export default function BotQuickManageWidget({ bots, botStatuses }) {
     const { toast } = useToast();
     const navigate = useNavigate();
 
-    const handleAction = async (botId, action) => {
+    const handleAction = async (bot, action) => {
         if (action === 'restart') {
-            await fetch(`/api/bots/${botId}/stop`, { method: 'POST' });
-            setTimeout(() => {
-                fetch(`/api/bots/${botId}/start`, { method: 'POST' });
-                toast({ title: "Команда отправлена", description: `Бот ${botId} перезапускается.` });
-            }, 2000);
+            try {
+                await apiHelper(`/api/bots/${bot.id}/stop`, { method: 'POST' });
+                setTimeout(async () => {
+                    await apiHelper(`/api/bots/${bot.id}/start`, { method: 'POST' });
+                    toast({ title: "Команда отправлена", description: `Бот ${bot.username} перезапускается.` });
+                }, 2000);
+            } catch (error) {
+            }
             return;
         }
         try {
-            const response = await fetch(`/api/bots/${botId}/${action}`, { method: 'POST' });
-            if (!response.ok) throw new Error(`Failed to ${action} bot`);
-            toast({ title: "Успех!", description: `Команда ${action} отправлена боту.` });
+            await apiHelper(`/api/bots/${bot.id}/${action}`, { method: 'POST' }, `Команда ${action} отправлена боту.`);
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: `Не удалось выполнить действие ${action}.` });
         }
     };
 
@@ -63,9 +64,9 @@ export default function BotQuickManageWidget({ bots, botStatuses, onBotChange })
                                                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem disabled={isRunning} onClick={() => handleAction(bot.id, 'start')}><Play className="mr-2"/>Запустить</DropdownMenuItem>
-                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot.id, 'stop')} className="text-destructive"><Square className="mr-2"/>Остановить</DropdownMenuItem>
-                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot.id, 'restart')}><RefreshCw className="mr-2"/>Перезапустить</DropdownMenuItem>
+                                                    <DropdownMenuItem disabled={isRunning} onClick={() => handleAction(bot, 'start')}><Play className="mr-2"/>Запустить</DropdownMenuItem>
+                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'stop')} className="text-destructive"><Square className="mr-2"/>Остановить</DropdownMenuItem>
+                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'restart')}><RefreshCw className="mr-2"/>Перезапустить</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/console`)}><Terminal className="mr-2"/>Консоль</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/settings`)}><Settings className="mr-2"/>Настройки</DropdownMenuItem>
                                                 </DropdownMenuContent>

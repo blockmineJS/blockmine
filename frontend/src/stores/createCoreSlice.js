@@ -19,9 +19,11 @@ export const createCoreSlice = (set, get) => ({
             console.log("[Socket] Подключение отложено: нет токена.");
             return;
         }
-        const newSocket = io('http://localhost:3001', {
+        
+        const newSocket = io({
             auth: { token }
         });
+
         newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
         newSocket.on('disconnect', () => console.log('Socket.IO отключен'));
         newSocket.on('bot:status', ({ botId, status, message }) => {

@@ -20,12 +20,9 @@ import PluginDetailPage from './pages/PluginDetailPage';
 import ServersPage from './pages/ServersPage';
 import TasksPage from './pages/TasksPage';
 import AdminPage from './pages/AdminPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
-/**
- * Компонент-обертка, который управляет отображением контента 
- * напрямую на основе глобального состояния.
- */
-function App() {
+function AppWrapper() {
     const { 
         isAuthenticated, 
         needsSetup, 
@@ -73,34 +70,56 @@ function App() {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />,
+    element: <AppWrapper />,
     children: [
-      { index: true, element: <DashboardPage /> }, 
+      {
+        index: true,
+        element: <DashboardPage />,
+      },
       {
         path: "bots/:botId",
         element: <BotView />,
         children: [
-          { index: true, element: <ConsoleTab /> },
-          { path: "console", element: <ConsoleTab /> },
-          { path: "plugins", element: <PluginsTab /> },
-          { path: "settings", element: <ConfigurationPage /> },
-          { path: "management", element: <ManagementPage /> },
-          { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
+            { index: true, element: <ConsoleTab /> },
+            { path: "console", element: <ConsoleTab /> },
+            { path: "plugins", element: <PluginsTab /> },
+            { path: "settings", element: <ConfigurationPage /> },
+            { 
+              path: "management", 
+              element: (
+                <ProtectedRoute requiredPermission="management:view">
+                  <ManagementPage />
+                </ProtectedRoute>
+              )
+            },
+            { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
         ]
       },
       {
         path: "servers",
-        element: <ServersPage />,
+        element: (
+          <ProtectedRoute requiredPermission="server:list">
+            <ServersPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "tasks",
-        element: <TasksPage />,
+        element: (
+          <ProtectedRoute requiredPermission="task:list">
+            <TasksPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "admin",
-        element: <AdminPage />,
+        element: (
+          <ProtectedRoute requiredPermission="panel:user:list">
+            <AdminPage />
+          </ProtectedRoute>
+        ),
       },
-    ]
+    ],
   },
 ]);
 

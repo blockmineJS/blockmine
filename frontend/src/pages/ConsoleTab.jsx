@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Send } from 'lucide-react';
 import AnsiToHtml from 'ansi-to-html';
 import { useAppStore } from '@/stores/appStore';
+import { apiHelper } from '@/lib/api';
 
 const ansiConverter = new AnsiToHtml({
     fg: '#e5e7eb',
@@ -45,15 +46,13 @@ export default function ConsoleTab() {
         if (!command.trim() || !bot || status !== 'running') return;
         
         try {
-            await fetch(`/api/bots/${bot.id}/chat`, {
+            await apiHelper(`/api/bots/${bot.id}/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: command }),
             });
             setCommand('');
             setIsUserScrolledUp(false);
         } catch (error) {
-            console.error("Ошибка отправки команды:", error);
         }
     };
 

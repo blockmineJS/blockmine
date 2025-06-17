@@ -8,6 +8,7 @@ import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import ServerForm from '@/components/ServerForm';
 import { useAppStore } from '@/stores/appStore';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { apiHelper } from '@/lib/api';
 
 export default function ServersPage() {
     const servers = useAppStore((state) => state.servers);
@@ -52,18 +53,14 @@ export default function ServersPage() {
         const method = isEdit ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
+            await apiHelper(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(serverData),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Произошла ошибка');
-            toast({ title: "Успех!", description: `Сервер успешно ${isEdit ? 'обновлен' : 'создан'}.` });
+            }, `Сервер успешно ${isEdit ? 'обновлен' : 'создан'}.`);
+            
             handleCloseModal();
             await fetchInitialData();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         setIsSaving(false);
     };
@@ -71,15 +68,9 @@ export default function ServersPage() {
     const handleConfirmDelete = async () => {
         if (!serverToDelete) return;
         try {
-            const response = await fetch(`/api/servers/${serverToDelete.id}`, { method: 'DELETE' });
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Произошла ошибка при удалении');
-            }
-            toast({ title: "Успех!", description: "Сервер удален." });
+            await apiHelper(`/api/servers/${serverToDelete.id}`, { method: 'DELETE' }, "Сервер удален.");
             await fetchInitialData();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
     };
     

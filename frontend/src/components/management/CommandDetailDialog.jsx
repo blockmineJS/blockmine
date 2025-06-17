@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
     DialogContent,
@@ -19,9 +18,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DynamicInputList from './DynamicInputList';
 import { Save, Loader2 } from 'lucide-react';
 
-/**
- * Типы владельцев команд, используемые для различения системных команд и команд от плагинов.
- */
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };
@@ -114,7 +110,7 @@ function CommandSettingsTab({ formData, onValueChange, allPermissions }) {
 }
 
 
-export default function CommandDetailDialog({ open, onOpenChange, command, allPermissions = [], onSubmit, isSaving }) {
+export default function CommandDetailDialog({ command, allPermissions = [], onSubmit, isSaving, onCancel }) {
     const [formData, setFormData] = useState(null);
 
     useEffect(() => {
@@ -165,7 +161,7 @@ export default function CommandDetailDialog({ open, onOpenChange, command, allPe
             
             <DialogFooter className="mt-auto pt-4 border-t">
                 <form id="command-edit-form" onSubmit={handleSubmit}>
-                    <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Закрыть</Button>
+                    <Button type="button" variant="ghost" onClick={onCancel}>Закрыть</Button>
                     <Button type="submit" disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Сохранить настройки

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
+import { apiHelper } from '@/lib/api';
 
 function PermissionForm({ onSubmit, onCancel, isSaving }) {
     const [name, setName] = useState('');
@@ -52,17 +53,14 @@ export default function PermissionsManager({ permissions, botId, isLoading, onDa
     const handleSubmit = async (permissionData) => {
         setIsSaving(true);
         try {
-            const response = await fetch(`/api/bots/${botId}/permissions`, {
+            await apiHelper(`/api/bots/${botId}/permissions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(permissionData),
-            });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-            toast({ title: "Успех!", description: "Новое право успешно создано." });
+            }, "Новое право успешно создано.");
+            
             setIsModalOpen(false);
             onDataChange();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         setIsSaving(false);
     };

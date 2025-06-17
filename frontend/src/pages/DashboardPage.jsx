@@ -11,13 +11,13 @@ import ImportBotDialog from '@/components/ImportBotDialog';
 import { useAppStore } from '@/stores/appStore';
 
 export default function DashboardPage() {
-    const bots = useAppStore((state) => state.bots);
-    const botStatuses = useAppStore((state) => state.botStatuses);
-    const resourceUsage = useAppStore((state) => state.resourceUsage);
-    
-    const fetchInitialData = useAppStore((state) => state.fetchInitialData);
-    const startAllBots = useAppStore((state) => state.startAllBots);
-    const stopAllBots = useAppStore((state) => state.stopAllBots);
+    const bots = useAppStore(state => state.bots);
+    const botStatuses = useAppStore(state => state.botStatuses);
+    const resourceUsage = useAppStore(state => state.resourceUsage);
+    const fetchInitialData = useAppStore(state => state.fetchInitialData);
+    const startAllBots = useAppStore(state => state.startAllBots);
+    const stopAllBots = useAppStore(state => state.stopAllBots);
+    const hasPermission = useAppStore(state => state.hasPermission);
     
     const { toast } = useToast();
     const navigate = useNavigate();
@@ -52,21 +52,27 @@ export default function DashboardPage() {
 
     return (
         <div className="flex flex-col h-full w-full p-4 gap-4 overflow-y-auto">
-            <header className="flex items-center justify-between shrink-0">
+            <header className="flex flex-col md:flex-row items-start md:items-center justify-between shrink-0 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold">Дашборд</h1>
                     <p className="text-muted-foreground">Общая сводка по вашей системе.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline"><Upload className="mr-2"/>Импорт</Button>
-                        </DialogTrigger>
-                        <ImportBotDialog onImportSuccess={handleImportSuccess} onCancel={() => setIsImportModalOpen(false)} />
-                    </Dialog>
+                    {hasPermission('bot:import') && (
+                        <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline"><Upload className="mr-2"/>Импорт</Button>
+                            </DialogTrigger>
+                            <ImportBotDialog onImportSuccess={handleImportSuccess} onCancel={() => setIsImportModalOpen(false)} />
+                        </Dialog>
+                    )}
 
-                    <Button onClick={() => handleMassAction('start')}><Play className="mr-2"/>Запустить всех</Button>
-                    <Button variant="destructive" onClick={() => handleMassAction('stop')}><Square className="mr-2"/>Остановить всех</Button>
+                    {hasPermission('bot:start_stop') && (
+                        <>
+                            <Button onClick={() => handleMassAction('start')}><Play className="mr-2"/>Запустить всех</Button>
+                            <Button variant="destructive" onClick={() => handleMassAction('stop')}><Square className="mr-2"/>Остановить всех</Button>
+                        </>
+                    )}
                 </div>
             </header>
             
