@@ -19,13 +19,24 @@ export const createCoreSlice = (set, get) => ({
             console.log("[Socket] Подключение отложено: нет токена.");
             return;
         }
+
+        const isDevelopment = process.env.NODE_ENV === 'development';
         
-        const newSocket = io('http://localhost:3001', {
-            auth: { token }
+        const socketUrl = isDevelopment ? 'http://localhost:3001' : window.location.origin;
+
+        console.log(`[Socket] Попытка подключения к: ${socketUrl}`);
+
+        const newSocket = io(socketUrl, {
+            auth: { token },
+            transports: ['websocket'], 
+        });
+        
+        newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
+        newSocket.on('disconnect', (reason) => console.log('Socket.IO отключен:', reason));
+        newSocket.on('connect_error', (err) => {
+            console.error(`[Socket] Ошибка подключения: ${err.message}`);
         });
 
-        newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
-        newSocket.on('disconnect', () => console.log('Socket.IO отключен'));
         newSocket.on('bot:status', ({ botId, status, message }) => {
             set(state => { state.botStatuses[botId] = status; });
             if (message) get().appendLog(botId, `[SYSTEM] ${message}`);
