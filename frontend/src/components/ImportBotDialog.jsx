@@ -1,5 +1,3 @@
-// frontend/src/components/ImportBotDialog.jsx
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -7,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload } from 'lucide-react';
+import { apiHelper } from '@/lib/api';
 
 export default function ImportBotDialog({ onImportSuccess, onCancel }) {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -27,24 +26,20 @@ export default function ImportBotDialog({ onImportSuccess, onCancel }) {
 
         setIsImporting(true);
         const formData = new FormData();
-        formData.append('botFile', selectedFile);
+        formData.append('file', selectedFile);
 
         try {
-            const response = await fetch('/api/bots/import', {
+            const data = await apiHelper('/api/bots/import', {
                 method: 'POST',
                 body: formData,
-            });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || 'Произошла неизвестная ошибка');
-            }
+                headers: {
+                    'Content-Type': undefined 
+                }
+            }, `Бот успешно импортирован.`);
             
-            toast({ title: 'Успех!', description: `Бот "${data.username}" успешно импортирован.` });
             onImportSuccess(data);
 
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка импорта', description: error.message });
         } finally {
             setIsImporting(false);
         }

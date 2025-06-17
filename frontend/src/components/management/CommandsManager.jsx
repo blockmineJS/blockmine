@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,11 +6,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
+import { apiHelper } from '@/lib/api';
 
-/**
- * Типы владельцев команд, используемые для различения системных команд и команд от плагинов.
- * Системные команды могут иметь особую обработку в UI.
- */
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };
@@ -33,18 +29,14 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     };
 
     const updateCommand = async (commandId, data) => {
-        const url = `/api/bots/${botId}/commands/${commandId}`;
         try {
-            const response = await fetch(url, {
+            await apiHelper(`/api/bots/${botId}/commands/${commandId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
             onDataChange();
             return true;
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
             return false;
         }
     };
@@ -130,8 +122,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
             </CardContent>
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <CommandDetailDialog
-                    open={isModalOpen}
-                    onOpenChange={setIsModalOpen}
+                    onCancel={handleCloseModal}
                     command={editingCommand}
                     allPermissions={allPermissions}
                     onSubmit={handleSubmit}

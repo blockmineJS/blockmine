@@ -7,6 +7,12 @@ export const createAuthSlice = (set, get) => ({
     needsSetup: false,
     authInitialized: false,
 
+    hasPermission: (permission) => {
+        if (!permission) return true;
+        const userPermissions = get().user?.permissions || [];
+        return userPermissions.includes('*') || userPermissions.includes(permission);
+    },
+
     initializeAuth: async () => {
         try {
             const status = await apiHelper('/api/auth/status');
@@ -25,8 +31,10 @@ export const createAuthSlice = (set, get) => ({
             }
         } catch (error) {
             console.error("Auth initialization failed:", error.message);
+            if (error.message.includes('Невалидный токен') || error.message.includes('Нет токена')) {
+                 localStorage.removeItem('authToken');
+            }
             set({ isAuthenticated: false, token: null, user: null });
-            localStorage.removeItem('authToken');
         } finally {
             set({ authInitialized: true });
         }
