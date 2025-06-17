@@ -1,8 +1,8 @@
-
 const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const config = require('./config'); 
 const { initializeSocket } = require('./real-time/socketHandler');
@@ -20,8 +20,7 @@ const panelRoutes = require('./api/routes/panel');
 const app = express();
 const server = http.createServer(app);
 
-const corsOrigin = config.server.allowExternalAccess ? '*' : 'http://localhost:5173';
-initializeSocket(server, corsOrigin); 
+initializeSocket(server); 
 
 const PORT = config.server.port;
 const HOST = config.server.host;
@@ -72,12 +71,25 @@ app.get(/^(?!\/api).*/, (req, res) => {
 async function startServer() {
     return new Promise((resolve) => {
         server.listen(PORT, HOST, async () => {
-            console.log(`Backend сервер успешно запущен на http://${HOST}:${PORT}`);
-            if (!config.server.allowExternalAccess) {
-                console.log(`Панель управления доступна по адресу: http://localhost:${PORT}`);
+            console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);
+            
+            if (HOST === '0.0.0.0') {
+                const networkInterfaces = os.networkInterfaces();
+                console.log('Панель управления доступна по следующим адресам:');
+                console.log(`  - Локально: http://localhost:${PORT}`);
+                Object.keys(networkInterfaces).forEach(ifaceName => {
+                    networkInterfaces[ifaceName].forEach(iface => {
+                        if (iface.family === 'IPv4' && !iface.internal) {
+                            console.log(`  - В сети: http://${iface.address}:${PORT}`);
+                        }
+                    });
+                });
+                console.log('  - А также по вашему внешнему IP адресу.');
+
             } else {
-                console.warn(`[Security] ВНИМАНИЕ: Включен внешний доступ. Панель доступна по IP адресу сервера.`);
+                console.log(`Панель управления доступна по адресу: http://localhost:${PORT}`);
             }
+            
             await TaskScheduler.initialize();
             resolve(server);
         });
