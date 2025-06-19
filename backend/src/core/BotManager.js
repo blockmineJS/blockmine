@@ -5,7 +5,6 @@ const { PrismaClient } = require('@prisma/client');
 const pidusage = require('pidusage');
 const DependencyService = require('./DependencyService');
 const config = require('../config');
-
 const fs = require('fs');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
@@ -35,8 +34,6 @@ class BotManager {
         this.botConfigs = new Map();
 
         setInterval(() => this.updateAllResourceUsage(), 5000);
-        
-
         if (config.telemetry?.enabled) {
             setInterval(() => this.sendHeartbeat(), 5 * 60 * 1000);
         }
@@ -49,13 +46,11 @@ class BotManager {
                 prisma.command.findMany({ where: { botId } }),
                 prisma.permission.findMany({ where: { botId } }),
             ]);
-            
             const config = {
                 commands: new Map(commands.map(cmd => [cmd.name, cmd])),
                 permissionsById: new Map(permissions.map(p => [p.id, p])),
                 commandAliases: new Map()
             };
-
             for (const cmd of commands) {
                 const aliases = JSON.parse(cmd.aliases || '[]');
                 for (const alias of aliases) {
@@ -81,7 +76,6 @@ class BotManager {
 
     triggerHeartbeat() {
         if (!config.telemetry?.enabled) return;
-
         if (this.heartbeatDebounceTimer) {
             clearTimeout(this.heartbeatDebounceTimer);
         }
@@ -105,7 +99,6 @@ class BotManager {
 
     async sendHeartbeat() {
         if (!config.telemetry?.enabled) return;
-
         if (!instanceId) return;
 
         try {
@@ -131,7 +124,6 @@ class BotManager {
                 return;
             }
             const { challenge, difficulty, prefix } = await challengeRes.json();
-
             let nonce = 0;
             let hash = '';
             do {
@@ -150,7 +142,6 @@ class BotManager {
                     nonce: nonce
                 })
             });
-
         } catch (error) {
             console.error(`[Telemetry] Не удалось отправить heartbeat: ${error.message}`);
         }
@@ -170,7 +161,6 @@ class BotManager {
           "User": ["user.say"],
           "Admin": ["admin.*", "admin.cooldown.bypass", "user.cooldown.bypass", "user.*"]
         };
-        
         console.log(`[Permission Sync] Синхронизация системных прав для бота ID ${botId}...`);
 
         for (const perm of systemPermissions) {
@@ -218,7 +208,6 @@ class BotManager {
 
         const pids = Array.from(this.bots.values()).map(child => child.pid).filter(Boolean);
         if (pids.length === 0) return;
-        
         try {
             const stats = await pidusage(pids);
             const usageData = [];
@@ -237,7 +226,6 @@ class BotManager {
                 }
             }
             getIO().emit('bots:usage', usageData);
-
         } catch (error) {
         }
     }
@@ -291,18 +279,15 @@ class BotManager {
 
         await this._syncSystemPermissions(botConfig.id);
         await this.loadConfigForBot(botConfig.id);
-
         this.logCache.set(botConfig.id, []);
         this.emitStatusUpdate(botConfig.id, 'starting', '');
 
         const allPluginsForBot = await prisma.installedPlugin.findMany({
             where: { botId: botConfig.id },
         });
-
         const enabledPlugins = allPluginsForBot.filter(p => p.isEnabled);
 
         const { sortedPlugins, pluginInfo, hasCriticalIssues } = DependencyService.resolveDependencies(enabledPlugins, allPluginsForBot);
-
         if (hasCriticalIssues) {
             this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями:');
             for (const plugin of Object.values(pluginInfo)) {
@@ -328,20 +313,16 @@ class BotManager {
         }
 
         const fullBotConfig = { ...decryptedConfig, plugins: sortedPlugins };
-        
         const botProcessPath = path.resolve(__dirname, 'BotProcess.js');
         const child = fork(botProcessPath, [], { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
 
         child.botConfig = botConfig;
-
         child.on('error', (err) => {
             this.appendLog(botConfig.id, `[PROCESS FATAL] КРИТИЧЕСКАЯ ОШИБКА ПРОЦЕССА: ${err.stack}`);
         });
-
         child.stderr.on('data', (data) => {
             this.appendLog(botConfig.id, `[STDERR] ${data.toString()}`);
         });
-
         child.on('message', async (message) => {
             if (message.type === 'log') {
                 this.appendLog(botConfig.id, message.content);
@@ -351,9 +332,48 @@ class BotManager {
                 await this.handleCommandValidation(botConfig, message);
             } else if (message.type === 'register_command') {
                 await this.handleCommandRegistration(botConfig.id, message.commandConfig);
+            } else if (message.type === 'request_user_action') {
+                const { requestId, payload } = message;
+                const { targetUsername, action, data } = payload;
+                const botId = botConfig.id;
+            
+                try {
+                    const targetUser = await RealUserService.getUser(targetUsername, botId);
+                    let replyPayload = {};
+            
+                    switch (action) {
+                        case 'toggle_blacklist': {
+                            const isCurrentlyBlacklisted = targetUser.isBlacklisted;
+                            await targetUser.setBlacklist(!isCurrentlyBlacklisted);
+                            replyPayload.newStatus = !isCurrentlyBlacklisted; 
+                            break;
+                        }
+            
+                        case 'toggle_group': {
+                            if (!data.groupName) throw new Error('Название группы не указано.');
+                            const hasGroup = targetUser.hasGroup(data.groupName);
+                            if (hasGroup) {
+                                await targetUser.removeGroup(data.groupName);
+                                replyPayload.actionTaken = 'removed'; 
+                            } else {
+                                await targetUser.addGroup(data.groupName);
+                                replyPayload.actionTaken = 'added'; 
+                            }
+                            break;
+                        }
+            
+                        default:
+                            throw new Error(`Неизвестное действие: ${action}`);
+                    }
+            
+                    child.send({ type: 'user_action_response', requestId, payload: replyPayload });
+            
+                } catch (error) {
+                    console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
+                    child.send({ type: 'user_action_response', requestId, error: error.message });
+                }
             }
         });
-
         child.on('exit', (code, signal) => {
             const botId = botConfig.id;
             this.bots.delete(botId);
@@ -362,7 +382,6 @@ class BotManager {
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
         });
-
         this.bots.set(botConfig.id, child);
         child.send({ type: 'start', config: fullBotConfig });
 
@@ -433,7 +452,6 @@ class BotManager {
             }
 
             child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
-
         } catch (error) {
             console.error(`[BotManager] Command validation error for botId: ${botId}`, {
                 command: commandName,
@@ -477,18 +495,15 @@ class BotManager {
                 allowedChatTypes: JSON.stringify(commandConfig.allowedChatTypes || []),
                 cooldown: commandConfig.cooldown || 0,
             };
-
             const updateData = {
                 description: commandConfig.description,
                 owner: commandConfig.owner,
             };
-
             await prisma.command.upsert({
                 where: { botId_name: { botId, name: commandConfig.name } },
                 update: updateData,
                 create: createData,
             });
-
             this.invalidateConfigCache(botId);
 
         } catch (error) {
