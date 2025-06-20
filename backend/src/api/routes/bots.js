@@ -1,5 +1,4 @@
 const express = require('express');
-const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 const fs = require('fs/promises');
@@ -7,7 +6,8 @@ const BotManager = require('../../core/BotManager');
 const PluginManager = require('../../core/PluginManager');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
-
+const { authenticate, authorize } = require('../middleware/auth');
+const { encrypt } = require('../../core/utils/crypto');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -15,6 +15,12 @@ const AdmZip = require('adm-zip');
 
 const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
+
+
+const router = express.Router();
+
+
+router.use(authenticate);
 
 async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     const initialData = {
@@ -53,7 +59,7 @@ async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
 }
 
 
-router.get('/', async (req, res) => {
+router.get('/', authorize('bot:list'), async (req, res) => {
     try {
         const bots = await prisma.bot.findMany({ include: { server: true }, orderBy: { createdAt: 'asc' } });
         res.json(bots);
@@ -63,19 +69,28 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.get('/state', (req, res) => {
+router.get('/state', authorize('bot:list'), (req, res) => {
     try {
         const state = BotManager.getFullState();
         res.json(state);
     } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authorize('bot:create'), async (req, res) => {
     try {
         const { username, password, prefix, serverId, note } = req.body;
         if (!username || !serverId) return res.status(400).json({ error: 'Имя и сервер обязательны' });
+        
+        const data = { 
+            username, 
+            prefix, 
+            note, 
+            serverId: parseInt(serverId, 10),
+            password: password ? encrypt(password) : null 
+        };
+
         const newBot = await prisma.bot.create({
-            data: { username, password, prefix, note, serverId: parseInt(serverId, 10) },
+            data: data,
             include: { server: true }
         });
         await setupDefaultPermissionsForBot(newBot.id);
@@ -87,7 +102,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorize('bot:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         
@@ -106,8 +121,12 @@ router.put('/:id', async (req, res) => {
         };
 
         if (password) {
-            dataToUpdate.password = password;
+            dataToUpdate.password = encrypt(password);
         }
+        if (proxyPassword) {
+            dataToUpdate.proxyPassword = encrypt(proxyPassword);
+        }
+
         if (proxyPassword) {
             dataToUpdate.proxyPassword = proxyPassword;
         }
@@ -135,7 +154,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('bot:delete'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         if (BotManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
@@ -145,7 +164,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
@@ -155,13 +174,13 @@ router.post('/:id/start', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Ошибка при запуске бота: ' + error.message }); }
 });
 
-router.post('/:id/stop', (req, res) => {
+router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
     const botId = parseInt(req.params.id, 10);
     const result = BotManager.stopBot(botId);
     res.json(result);
 });
 
-router.post('/:id/chat', (req, res) => {
+router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const { message } = req.body;
@@ -172,7 +191,7 @@ router.post('/:id/chat', (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
-router.get('/:id/export', async (req, res) => {
+router.get('/:id/export', authorize('bot:export'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const {
@@ -231,7 +250,7 @@ router.get('/:id/export', async (req, res) => {
                     await fs.access(plugin.path);
                     archive.directory(plugin.path, `plugins/${pluginFolderName}`);
                 } catch (error) {
-                    console.warn(`[Export] Папка плагина ${plugin.name} по пути ${plugin.path} не найдена, пропускаем.`);
+                    console.warn(`[Export] Директория плагина ${plugin.name} (${plugin.path}) не найдена, пропускаем.`);
                 }
             }
         }
@@ -239,13 +258,15 @@ router.get('/:id/export', async (req, res) => {
         await archive.finalize();
 
     } catch (error) {
-        console.error("[API Error] /export GET:", error);
-        res.status(500).json({ error: 'Не удалось экспортировать бота' });
+        console.error("Bot export error:", error);
+        res.status(500).json({ error: 'Не удалось экспортировать бота.' });
     }
 });
 
-router.post('/import', upload.single('botFile'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'Файл не был загружен' });
+router.post('/import', upload.single('file'), authorize('bot:import'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send('Файл не загружен.');
+    }
     if (path.extname(req.file.originalname).toLowerCase() !== '.zip') return res.status(400).json({ error: 'Неверный формат файла. Ожидался ZIP-архив.' });
     
     const zip = new AdmZip(req.file.buffer);
@@ -358,7 +379,7 @@ router.post('/import', upload.single('botFile'), async (req, res) => {
 });
 
 
-router.get('/:botId/plugins', async (req, res) => {
+router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const plugins = await prisma.installedPlugin.findMany({ where: { botId } });
@@ -366,7 +387,7 @@ router.get('/:botId/plugins', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
-router.post('/:botId/plugins/install/github', async (req, res) => {
+router.post('/:botId/plugins/install/github', authorize('plugin:install'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const { repoUrl } = req.body;
@@ -375,7 +396,7 @@ router.post('/:botId/plugins/install/github', async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/:botId/plugins/register/local', async (req, res) => {
+router.post('/:botId/plugins/register/local', authorize('plugin:install'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const { path } = req.body;
@@ -384,7 +405,7 @@ router.post('/:botId/plugins/register/local', async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.delete('/:botId/plugins/:pluginId', async (req, res) => {
+router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         await PluginManager.deletePlugin(pluginId);
@@ -392,7 +413,7 @@ router.delete('/:botId/plugins/:pluginId', async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.get('/:botId/plugins/:pluginId/settings', async (req, res) => {
+router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
@@ -425,7 +446,7 @@ router.get('/:botId/plugins/:pluginId/settings', async (req, res) => {
     }
 });
 
-router.put('/:botId/plugins/:pluginId', async (req, res) => {
+router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { isEnabled, settings } = req.body;
@@ -439,7 +460,7 @@ router.put('/:botId/plugins/:pluginId', async (req, res) => {
 });
 
 
-router.get('/:botId/management-data', async (req, res) => {
+router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         
@@ -511,7 +532,7 @@ router.get('/:botId/management-data', async (req, res) => {
     }
 });
 
-router.put('/:botId/commands/:commandId', async (req, res) => {
+router.put('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
     try {
         const commandId = parseInt(req.params.commandId, 10);
         const botId = parseInt(req.params.botId, 10);
@@ -546,7 +567,7 @@ router.put('/:botId/commands/:commandId', async (req, res) => {
     }
 });
 
-router.post('/:botId/groups', async (req, res) => {
+router.post('/:botId/groups', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const { name, permissionIds } = req.body;
@@ -571,7 +592,7 @@ router.post('/:botId/groups', async (req, res) => {
     }
 });
 
-router.put('/:botId/groups/:groupId', async (req, res) => {
+router.put('/:botId/groups/:groupId', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const groupId = parseInt(req.params.groupId);
@@ -606,7 +627,7 @@ router.put('/:botId/groups/:groupId', async (req, res) => {
     }
 });
 
-router.delete('/:botId/groups/:groupId', async (req, res) => {
+router.delete('/:botId/groups/:groupId', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const groupId = parseInt(req.params.groupId);
@@ -622,7 +643,7 @@ router.delete('/:botId/groups/:groupId', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить группу.' }); }
 });
 
-router.post('/:botId/permissions', async (req, res) => {
+router.post('/:botId/permissions', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const { name, description } = req.body;
@@ -640,7 +661,7 @@ router.post('/:botId/permissions', async (req, res) => {
     }
 });
 
-router.put('/:botId/users/:userId', async (req, res) => {
+router.put('/:botId/users/:userId', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const userId = parseInt(req.params.userId, 10);
@@ -677,7 +698,7 @@ router.put('/:botId/users/:userId', async (req, res) => {
 });
 
 
-router.post('/start-all', async (req, res) => {
+router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на запуск всех ботов.');
         const allBots = await prisma.bot.findMany({ include: { server: true } });
@@ -695,7 +716,7 @@ router.post('/start-all', async (req, res) => {
     }
 });
 
-router.post('/stop-all', (req, res) => {
+router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
     try {
         console.log('[API] Получен запрос на остановку всех ботов.');
         const botIds = Array.from(BotManager.bots.keys());
@@ -712,7 +733,7 @@ router.post('/stop-all', (req, res) => {
 });
 
 
-router.get('/:id/settings/all', async (req, res) => {
+router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
 

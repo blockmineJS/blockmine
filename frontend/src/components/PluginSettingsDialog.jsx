@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Edit, Save, Code } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-
+import { apiHelper } from '@/lib/api';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -148,9 +148,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         const fetchSettings = async () => {
             setSettings(null);
             try {
-                const res = await fetch(`/api/bots/${bot.id}/plugins/${plugin.id}/settings`);
-                if (!res.ok) throw new Error('Не удалось загрузить настройки');
-                const data = await res.json();
+                const data = await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/settings`);
                 setSettings(data);
             } catch (error) {
                 toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
@@ -166,16 +164,14 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
 
     const handleSave = async () => {
         try {
-            await fetch(`/api/bots/${bot.id}/plugins/${plugin.id}`, {
+            await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ settings }),
-            });
-            toast({ title: 'Успех!', description: 'Настройки плагина сохранены.' });
+            }, 'Настройки плагина сохранены.');
+            
             onSaveSuccess();
             onOpenChange(false);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить настройки.' });
         }
     };
 

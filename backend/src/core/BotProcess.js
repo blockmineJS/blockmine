@@ -1,7 +1,7 @@
-
 const mineflayer = require('mineflayer');
 const { SocksClient } = require('socks');
 const EventEmitter = require('events');
+const { v4: uuidv4 } = require('uuid');
 const { loadCommands } = require('./system/CommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
@@ -12,6 +12,7 @@ const UserService = require('./ipc/UserService.stub.js');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
 
 let bot = null;
+const pendingRequests = new Map(); 
 
 function sendLog(content) {
     if (process.send) {
@@ -29,8 +30,8 @@ function handleIncomingCommand(type, username, message) {
     const commandName = commandParts.shift().toLowerCase();
     const restOfMessage = commandParts.join(' ');
 
-    const commandInstance = bot.commands.get(commandName) || 
-                            Array.from(bot.commands.values()).find(cmd => cmd.aliases.includes(commandName));
+    const commandInstance = bot.commands.get(commandName) ||
+    Array.from(bot.commands.values()).find(cmd => cmd.aliases.includes(commandName));
 
     if (!commandInstance) return;
 
@@ -90,7 +91,17 @@ function handleIncomingCommand(type, username, message) {
 }
 
 process.on('message', async (message) => {
-    if (message.type === 'start') {
+    if (message.type === 'user_action_response') {
+        if (pendingRequests.has(message.requestId)) {
+            const { resolve, reject } = pendingRequests.get(message.requestId);
+            if (message.error) {
+                reject(new Error(message.error));
+            } else {
+                resolve(message.payload);
+            }
+            pendingRequests.delete(message.requestId);
+        }
+    } else if (message.type === 'start') {
         const config = message.config;
         sendLog(`[System] Получена команда на запуск бота ${config.username}...`);
         try {
@@ -130,18 +141,17 @@ process.on('message', async (message) => {
                 }
            } else {
                 sendLog(`[System] Прокси не настроен, используется прямое подключение.`);
-           }
+            }
 
             bot = mineflayer.createBot(botOptions);
 
             bot.events = new EventEmitter();
-            bot.events.setMaxListeners(30); 
+            bot.events.setMaxListeners(30);
             bot.config = config;
             bot.sendLog = sendLog;
             bot.messageQueue = new MessageQueue(bot);
 
             const installedPluginNames = config.plugins.map(p => p.name);
-
             bot.api = {
                 Command: Command,
                 events: bot.events,
@@ -172,17 +182,43 @@ process.on('message', async (message) => {
                         });
                     }
                     sendLog(`[API] Команда "${commandInstance.name}" от плагина "${commandInstance.owner}" зарегистрирована в процессе.`);
+                },
+                performUserAction: (username, action, data = {}) => {
+                    return new Promise((resolve, reject) => {
+                        const requestId = uuidv4();
+                        pendingRequests.set(requestId, { resolve, reject });
+        
+                        if (process.send) {
+                            process.send({
+                                type: 'request_user_action',
+                                requestId,
+                                payload: {
+                                    targetUsername: username,
+                                    action,
+                                    data
+                                }
+                            });
+                        } else {
+                            reject(new Error('IPC channel is not available.'));
+                        }
+        
+                        setTimeout(() => {
+                            if (pendingRequests.has(requestId)) {
+                                reject(new Error('Request to main process timed out.'));
+                                pendingRequests.delete(requestId);
+                            }
+                        }, 5000);
+                    });
                 }
             };
 
             bot.commands = await loadCommands();
-
             if (process.send) {
                 for (const cmd of bot.commands.values()) {
                     process.send({
                         type: 'register_command',
                         commandConfig: {
-                            name: cmd.name,
+                             name: cmd.name,
                             description: cmd.description,
                             aliases: cmd.aliases,
                             owner: cmd.owner,
@@ -207,7 +243,6 @@ process.on('message', async (message) => {
                     handleIncomingCommand(type, username, message);
                 }
             });
-            
             bot.on('message', (jsonMsg) => {
                 const ansiMessage = jsonMsg.toAnsi();
                 if (ansiMessage.trim()) {
@@ -218,39 +253,32 @@ process.on('message', async (message) => {
                 const rawMessageText = jsonMsg.toString();
                 bot.events.emit('core:raw_message', rawMessageText, jsonMsg);
             });
-            
             bot.on('chat', (username, message) => {
                 if (messageHandledByCustomParser) {
                     return;
                 }
                 handleIncomingCommand('chat', username, message);
             });
-
             bot.on('login', () => {
                 sendLog('[Event: login] Успешно залогинился!');
                 if (process.send) {
                     process.send({ type: 'status', status: 'running' });
                 }
             });
-
             bot.on('spawn', () => {
                 sendLog('[Event: spawn] Бот заспавнился в мире. Полностью готов к работе!');
             });
-            
             bot.on('kicked', (reason) => {
                 let reasonText;
                 try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
                 sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
                 process.exit(0);
             });
-
             bot.on('error', (err) => sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`));
-
             bot.on('end', (reason) => {
                 sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
                 process.exit(0);
             });
-
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
