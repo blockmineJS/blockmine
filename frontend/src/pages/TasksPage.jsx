@@ -9,6 +9,7 @@ import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import TaskForm from '@/components/TaskForm';
 import { useAppStore } from '@/stores/appStore';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { apiHelper } from '@/lib/api';
 
 const cronInfoCache = new Map();
 
@@ -29,15 +30,10 @@ const CronInfo = ({ pattern, isEnabled }) => {
             }
 
             try {
-                const response = await fetch('/api/tasks/describe', {
+                const data = await apiHelper('/api/tasks/describe', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pattern }),
                 });
-                if (!response.ok) {
-                    throw new Error('Ошибка ответа сервера');
-                }
-                const data = await response.json();
                 const newDisplay = { nextRun: data.next, human: data.human };
                 
                 cronInfoCache.set(cacheKey, newDisplay);

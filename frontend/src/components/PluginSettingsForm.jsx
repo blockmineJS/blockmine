@@ -1,13 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Edit } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import Editor from '@monaco-editor/react';
+
+function JsonEditorDialog({ initialValue, onSave, onCancel }) {
+    const [jsonString, setJsonString] = useState('');
+    
+    useEffect(() => {
+        try {
+            const formatted = JSON.stringify(initialValue, null, 2);
+            setJsonString(formatted);
+        } catch {
+            setJsonString(Array.isArray(initialValue) ? '[]' : '{}');
+        }
+    }, [initialValue]);
+
+    const handleSave = () => {
+        try {
+            const parsed = JSON.parse(jsonString);
+            onSave(parsed);
+        } catch (e) {
+            alert('Ошибка: Невалидный JSON. Проверьте синтаксис.');
+        }
+    };
+    
+    return (
+        <DialogContent className="max-w-3xl">
+            <DialogHeader>
+                <DialogTitle>Редактор конфигурации JSON</DialogTitle>
+                <DialogDescription>
+                    Внесите изменения и сохраните. Редактор подсветит синтаксические ошибки.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 relative">
+                <Editor
+                    height="60vh"
+                    language="json"
+                    value={jsonString}
+                    onChange={(value) => setJsonString(value || '')}
+                    theme="vs-dark"
+                    options={{
+                        minimap: { enabled: false },
+                        fontSize: 14,
+                        wordWrap: 'on',
+                        automaticLayout: true,
+                    }}
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button onClick={handleSave}>Применить и сохранить</Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+}
+
 
 function SettingField({ settingKey, config, value, onChange }) {
     const id = `${settingKey}-${Math.random()}`;
+    const [isJsonEditorOpen, setIsJsonEditorOpen] = useState(false);
 
     switch (config.type) {
         case 'string':
@@ -49,8 +105,19 @@ function SettingField({ settingKey, config, value, onChange }) {
              return (
                 <div className="space-y-2">
                     <Label>{config.label}</Label>
-                    <Textarea value={JSON.stringify(value, null, 2)} rows={5} readOnly className="font-mono bg-muted"/>
-                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                         <p className="text-sm text-muted-foreground">{config.description}</p>
+                         <Dialog open={isJsonEditorOpen} onOpenChange={setIsJsonEditorOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Редактировать</Button>
+                            </DialogTrigger>
+                            <JsonEditorDialog 
+                                initialValue={value}
+                                onSave={(newValue) => { onChange(settingKey, newValue); setIsJsonEditorOpen(false); }}
+                                onCancel={() => setIsJsonEditorOpen(false)}
+                            />
+                        </Dialog>
+                    </div>
                 </div>
             );
         default:

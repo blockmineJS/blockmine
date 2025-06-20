@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Edit, ArrowUpDown } from 'lucide-react';
 import UserEditDialog from './UserEditDialog';
+import { apiHelper } from '@/lib/api';
 
 export default function UsersManager({ users, groups, botId, isLoading, onDataChange }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,17 +63,14 @@ export default function UsersManager({ users, groups, botId, isLoading, onDataCh
         if (!editingUser) return;
         setIsSaving(true);
         try {
-            const response = await fetch(`/api/bots/${botId}/users/${editingUser.id}`, {
+            await apiHelper(`/api/bots/${botId}/users/${editingUser.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData),
-            });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-            toast({ title: "Успех!", description: `Данные пользователя ${editingUser.username} обновлены.` });
+            }, `Данные пользователя ${editingUser.username} обновлены.`);
+            
             handleCloseModal();
             onDataChange();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         setIsSaving(false);
     };

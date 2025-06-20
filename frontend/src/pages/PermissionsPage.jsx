@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import GroupFormDialog from '@/components/GroupFormDialog';
+import { apiHelper } from '@/lib/api';
 
 function GroupsManager({ allPermissions, onDataChange }) {
     const [groups, setGroups] = useState([]);
@@ -20,13 +21,12 @@ function GroupsManager({ allPermissions, onDataChange }) {
     const fetchGroups = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('/api/permissions/groups');
-            setGroups(await response.json());
+            const data = await apiHelper('/api/permissions/groups');
+            setGroups(data);
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: "Не удалось загрузить группы." });
         }
         setIsLoading(false);
-    }, [toast]);
+    }, []);
 
     useEffect(() => {
         fetchGroups();
@@ -49,18 +49,15 @@ function GroupsManager({ allPermissions, onDataChange }) {
         const method = isEdit ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
+            await apiHelper(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(groupData),
-            });
-            if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-            toast({ title: "Успех!", description: `Группа успешно ${isEdit ? 'обновлена' : 'создана'}.` });
+            }, `Группа успешно ${isEdit ? 'обновлена' : 'создана'}.`);
+
             handleCloseModal();
             fetchGroups();
             onDataChange();
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         setIsSaving(false);
     };
@@ -72,13 +69,10 @@ function GroupsManager({ allPermissions, onDataChange }) {
         }
         if (window.confirm(`Вы уверены, что хотите удалить группу "${group.name}"?`)) {
             try {
-                const response = await fetch(`/api/permissions/groups/${group.id}`, { method: 'DELETE' });
-                if (!response.ok) throw new Error((await response.json()).error || 'Server Error');
-                toast({ title: "Успех!", description: "Группа удалена." });
+                await apiHelper(`/api/permissions/groups/${group.id}`, { method: 'DELETE' }, "Группа удалена.");
                 fetchGroups();
                 onDataChange();
             } catch (error) {
-                toast({ variant: "destructive", title: "Ошибка", description: error.message });
             }
         }
     };
@@ -172,18 +166,16 @@ function PermissionsManager({ allPermissions, isLoading }) {
 export default function PermissionsPage() {
     const [allPermissions, setAllPermissions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { toast } = useToast();
 
     const fetchAllPermissions = useCallback(async () => {
         setIsLoading(true);
          try {
-            const response = await fetch('/api/permissions/all');
-            setAllPermissions(await response.json());
+            const data = await apiHelper('/api/permissions/all');
+            setAllPermissions(data);
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка", description: "Не удалось загрузить список прав." });
         }
         setIsLoading(false);
-    }, [toast]);
+    }, []);
 
     useEffect(() => {
         fetchAllPermissions();

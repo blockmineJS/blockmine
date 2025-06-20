@@ -36,8 +36,6 @@ node_modules/
 
 /backend/storage/
 
-/backend/prisma/migrations/
-migration_lock.toml
 
 # ===================================================================
 # Frontend
