@@ -24,6 +24,26 @@ const WARNING_COOLDOWN = 10 * 1000;
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 let instanceId = null;
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
+const INSTANCE_ID_PATH = path.join(DATA_DIR, '.instance_id');
+
+function getInstanceId() {
+    if (instanceId) return instanceId;
+    try {
+        if (fs.existsSync(INSTANCE_ID_PATH)) {
+            instanceId = fs.readFileSync(INSTANCE_ID_PATH, 'utf-8');
+        } else {
+            instanceId = uuidv4();
+            if (!fs.existsSync(DATA_DIR)) {
+                fs.mkdirSync(DATA_DIR, { recursive: true });
+            }
+            fs.writeFileSync(INSTANCE_ID_PATH, instanceId, 'utf-8');
+        }
+    } catch (error) {
+        console.error('[Telemetry] Ошибка при загрузке/создании Instance ID:', error);
+        return null;
+    }
+    return instanceId;
+}
 
 
 class BotManager {
@@ -32,6 +52,8 @@ class BotManager {
         this.logCache = new Map();
         this.resourceUsage = new Map();
         this.botConfigs = new Map();
+
+        getInstanceId();
 
         setInterval(() => this.updateAllResourceUsage(), 5000);
         if (config.telemetry?.enabled) {
