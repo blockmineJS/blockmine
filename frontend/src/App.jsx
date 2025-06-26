@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import BotCard from './components/BotCard';
 import BotForm from './components/BotForm';
+import api from './lib/api';
 
 const socket = io('http://localhost:3001');
 
@@ -16,23 +17,23 @@ function App() {
 
   const fetchData = async () => {
     try {
-      const [botsRes, serversRes] = await Promise.all([
-        fetch('/api/bots'),
-        fetch('/api/bots/servers')
+      const [botsData, serversData] = await Promise.all([
+        api.get('/bots'),
+        api.get('/bots/servers')
       ]);
-      const botsData = await botsRes.json();
-      const serversData = await serversRes.json();
       
       setBots(botsData);
       setServers(serversData);
 
-      const initialStates = {};
-      botsData.forEach(bot => {
-        initialStates[bot.id] = { status: 'stopped', logs: [] };
+      setBotStates(prevStates => {
+        const newStates = {};
+        botsData.forEach(bot => {
+          newStates[bot.id] = prevStates[bot.id] || { status: 'stopped', logs: [] };
+        });
+        return newStates;
       });
-      setBotStates(initialStates);
     } catch (error) {
-      console.error("Ошибка при получении данных:", error);
+      // Ошибка уже обрабатывается в api.js
     }
   };
 
@@ -70,21 +71,18 @@ function App() {
   }, []);
   
   const handleStartBot = async (botId) => {
-    await fetch(`/api/bots/${botId}/start`, { method: 'POST' });
+    await api.post(`/bots/${botId}/start`);
   };
 
   const handleStopBot = async (botId) => {
-    await fetch(`/api/bots/${botId}/stop`, { method: 'POST' });
+    await api.post(`/bots/${botId}/stop`);
   };
   
   const handleDeleteBot = async (botId) => {
     if (window.confirm('Вы уверены, что хотите удалить этого бота?')) {
-      const response = await fetch(`/api/bots/${botId}`, { method: 'DELETE' });
-      if (response.ok) {
+      const result = await api.delete(`/bots/${botId}`);
+      if (result) {
         fetchData();
-      } else {
-        const { error } = await response.json();
-        alert(`Ошибка удаления: ${error}`);
       }
     }
   };
@@ -101,21 +99,16 @@ function App() {
 
   const handleSubmitBot = async (botData) => {
     const isEdit = !!editingBot;
-    const url = isEdit ? `/api/bots/${editingBot.id}` : '/api/bots';
-    const method = isEdit ? 'PUT' : 'POST';
+    let result;
+    if (isEdit) {
+      result = await api.put(`/bots/${editingBot.id}`, botData);
+    } else {
+      result = await api.post('/bots', botData);
+    }
 
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(botData),
-    });
-
-    if (response.ok) {
+    if (result) {
       fetchData();
       handleCloseModal();
-    } else {
-      const { error } = await response.json();
-      alert(`Ошибка: ${error}`);
     }
   };
 

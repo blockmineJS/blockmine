@@ -22,7 +22,7 @@ import TasksPage from './pages/TasksPage';
 import AdminPage from './pages/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
-function AppWrapper() {
+function AuthLayout() {
     const { 
         isAuthenticated, 
         needsSetup, 
@@ -57,11 +57,11 @@ function AppWrapper() {
     }
     
     if (needsSetup) {
-        return <SetupPage />;
+        return <Navigate to="/setup" replace />;
     }
     
     if (!isAuthenticated) {
-        return <LoginPage />;
+        return <Navigate to="/login" replace />;
     }
 
     return <Layout />;
@@ -69,8 +69,16 @@ function AppWrapper() {
 
 const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />
+  },
+  {
+path: '/setup',
+      element: <SetupPage />
+  },
+  {
     path: "/",
-    element: <AppWrapper />,
+    element: <AuthLayout />,
     children: [
       {
         index: true,

@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import { shallow } from 'zustand/shallow';
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +11,18 @@ import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
     const login = useAppStore((state) => state.login);
+    const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+    const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/', { replace: true });
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -41,7 +52,7 @@ export default function LoginPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Пароль</Label>
-                            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                         </div>
                         {error && <p className="text-sm text-destructive">{error}</p>}
                     </CardContent>
