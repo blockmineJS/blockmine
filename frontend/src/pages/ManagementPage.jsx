@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
+import { apiHelper } from '@/lib/api';
 
 import CommandsManager from '@/components/management/CommandsManager';
 import UsersManager from '@/components/management/UsersManager';
@@ -24,9 +24,7 @@ export default function ManagementPage() {
         if (!bot) return;
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/bots/${bot.id}/management-data`);
-            if (!response.ok) throw new Error('Failed to fetch management data');
-            const data = await response.json();
+            const data = await apiHelper(`/api/bots/${bot.id}/management-data`);
             setManagementData(data);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить данные управления.' });
