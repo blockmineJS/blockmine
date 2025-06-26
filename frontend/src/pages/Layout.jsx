@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import BotForm from "@/components/BotForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const SidebarNav = ({ onLinkClick }) => {
     const bots = useAppStore(state => state.bots);
@@ -48,7 +47,6 @@ const SidebarNav = ({ onLinkClick }) => {
 export default function Layout() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const isMobile = useMediaQuery("(max-width: 768px)");
 
     const user = useAppStore(state => state.user);
     const appVersion = useAppStore(state => state.appVersion);
@@ -154,34 +152,30 @@ export default function Layout() {
         </div>
     );
 
-    if (isMobile) {
-        return (
-            <div className="min-h-screen flex flex-col">
-                <header className="flex items-center justify-between p-2 border-b">
-                     <h2 className="text-lg font-semibold tracking-tight ml-2">BlockMine</h2>
-                     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                        <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                                <Menu className="h-6 w-6" />
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="left" className="p-0 w-full max-w-xs flex">
-                            {sidebarContent}
-                        </SheetContent>
-                    </Sheet>
-                </header>
-                <main className="flex-1 overflow-y-auto min-h-0">
-                    <Outlet />
-                </main>
-            </div>
-        );
-    }
 
     return (
-        <div className="grid grid-cols-[280px_1fr] h-screen">
-            <aside className="border-r">
+        <div className="grid md:grid-cols-[280px_1fr] h-screen">
+            {/* Mobile Header */}
+            <header className="md:hidden flex items-center justify-between p-2 border-b">
+                <h2 className="text-lg font-semibold tracking-tight ml-2">BlockMine</h2>
+                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-full max-w-xs flex">
+                        {sidebarContent}
+                    </SheetContent>
+                </Sheet>
+            </header>
+
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:block border-r">
                 {sidebarContent}
             </aside>
+
+            {/* Main Content */}
             <main className="overflow-y-auto">
                 <Outlet />
             </main>
