@@ -1,15 +1,16 @@
-
 const express = require('express');
+const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 const PluginManager = require('../../core/PluginManager');
 
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
 
+router.use(authenticate);
 
 const getCacheBustedUrl = (url) => `${url}?t=${new Date().getTime()}`;
 
 
-router.get('/catalog', async (req, res) => {
+router.get('/catalog', authorize('plugin:browse'), async (req, res) => {
     try {
         const response = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
         
@@ -26,7 +27,7 @@ router.get('/catalog', async (req, res) => {
     }
 });
 
-router.post('/check-updates/:botId', async (req, res) => {
+router.post('/check-updates/:botId', authorize('plugin:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         
@@ -42,7 +43,7 @@ router.post('/check-updates/:botId', async (req, res) => {
     }
 });
 
-router.post('/update/:pluginId', async (req, res) => {
+router.post('/update/:pluginId', authorize('plugin:update'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const updatedPlugin = await PluginManager.updatePlugin(pluginId);
@@ -52,7 +53,7 @@ router.post('/update/:pluginId', async (req, res) => {
     }
 });
 
-router.get('/catalog/:name', async (req, res) => {
+router.get('/catalog/:name', authorize('plugin:browse'), async (req, res) => {
     try {
         const pluginName = req.params.name;
         

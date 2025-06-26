@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
+const { authenticate, authorize } = require('../middleware/auth');
 const prisma = new PrismaClient();
 
-router.get('/', async (req, res) => {
+router.use(authenticate);
+
+router.get('/', authorize('server:list'), async (req, res) => {
     try {
         const servers = await prisma.server.findMany({ orderBy: { name: 'asc' } });
         res.json(servers);
@@ -13,7 +16,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authorize('server:create'), async (req, res) => {
     try {
         const { name, host, port, version } = req.body;
         if (!name || !host || !version) {
@@ -29,10 +32,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-
-
-
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('server:delete'), async (req, res) => {
     try {
         const serverId = parseInt(req.params.id, 10);
         
