@@ -16,6 +16,7 @@ export const apiHelper = async (url, options = {}, successMessage) => {
     try {
         const response = await fetch(url, { ...options, headers });
 
+
         if (response.status === 204 || response.headers.get("content-length") === "0") {
             if (successMessage) toast({ title: "Успех!", description: successMessage });
             return true;
@@ -25,7 +26,9 @@ export const apiHelper = async (url, options = {}, successMessage) => {
 
         if (!response.ok) {
             if (response.status === 401) {
-                useAppStore.getState().logout();
+                const { logout } = useAppStore.getState();
+                logout();
+                return null;
             }
             throw new Error(data.error || 'Произошла неизвестная ошибка на сервере');
         }
@@ -34,9 +37,22 @@ export const apiHelper = async (url, options = {}, successMessage) => {
         return data;
 
     } catch (error) {
-        if (error.message !== 'Невалидный токен' && error.message !== 'Нет токена, доступ запрещен') {
+        if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+            toast({ variant: "destructive", title: "Ошибка сети", description: "Не удается подключиться к серверу" });
+        } else if (error.message.includes('Невалидный токен')) {
+            const { logout } = useAppStore.getState();
+            logout();
+            return null;
+        } else {
             toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }
         throw error;
     }
+};
+
+export const api = {
+    get: (url, successMessage) => apiHelper(url, { method: 'GET' }, successMessage),
+    post: (url, body, successMessage) => apiHelper(url, { method: 'POST', body: JSON.stringify(body) }, successMessage),
+    put: (url, body, successMessage) => apiHelper(url, { method: 'PUT', body: JSON.stringify(body) }, successMessage),
+    delete: (url, successMessage) => apiHelper(url, { method: 'DELETE' }, successMessage),
 };
