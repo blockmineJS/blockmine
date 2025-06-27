@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog } from "@/components/ui/dialog";
+import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { FilePenLine } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
 import { apiHelper } from '@/lib/api';
-
+import { useNavigate } from 'react-router-dom';
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };
@@ -17,8 +19,13 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const [editingCommand, setEditingCommand] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const handleOpenModal = (command) => {
+        if (command.isVisual) {
+            navigate(`/bots/${botId}/commands/visual/${command.id}`);
+            return;
+        }
         setEditingCommand(command);
         setIsModalOpen(true);
     };
@@ -113,6 +120,14 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                     </TableCell>
                                     <TableCell>
                                         {command.cooldown} сек.
+                                    </TableCell>
+                                    <TableCell>
+                                        {command.isVisual && (
+                                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }}>
+                                                <FilePenLine className="h-4 w-4 mr-2" />
+                                                Редактор
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))

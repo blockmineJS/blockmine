@@ -2,11 +2,14 @@ const mineflayer = require('mineflayer');
 const { SocksClient } = require('socks');
 const EventEmitter = require('events');
 const { v4: uuidv4 } = require('uuid');
+const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
 const Command = require('./system/Command');
 const { parseArguments } = require('./system/parseArguments');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
+const NodeRegistry = require('./NodeRegistry');
 
 const UserService = require('./ipc/UserService.stub.js');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
@@ -235,7 +238,56 @@ process.on('message', async (message) => {
                 }
             };
 
+            const nodeRegistry = new NodeRegistry();
+            bot.graphExecutionEngine = new GraphExecutionEngine(nodeRegistry);
             bot.commands = await loadCommands();
+
+            // Load commands from database
+            const prisma = new PrismaClient();
+            const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
+            await prisma.$disconnect();
+
+            // Merge commands from DB with file-based commands and create visual command handlers
+            for (const dbCommand of dbCommands) {
+                // If the command is disabled in the DB, ensure it's not runnable in the bot process.
+                if (!dbCommand.isEnabled) {
+                    if (bot.commands.has(dbCommand.name)) {
+                        bot.commands.delete(dbCommand.name);
+                    }
+                    continue;
+                }
+
+                const existingCommand = bot.commands.get(dbCommand.name);
+
+                if (existingCommand) {
+                    // JS-based command exists, update its properties from the DB
+                    existingCommand.description = dbCommand.description;
+                    existingCommand.cooldown = dbCommand.cooldown;
+                    existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
+                    existingCommand.permissionId = dbCommand.permissionId;
+                    existingCommand.allowedChatTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
+                } else if (dbCommand.isVisual) {
+                    // It's a visual command that doesn't correspond to a JS file, create a new instance
+                    const visualCommand = new Command({
+                        name: dbCommand.name,
+                        description: dbCommand.description,
+                        aliases: JSON.parse(dbCommand.aliases || '[]'),
+                        cooldown: dbCommand.cooldown,
+                        allowedChatTypes: JSON.parse(dbCommand.allowedChatTypes || '[]'),
+                        args: JSON.parse(dbCommand.argumentsJson || '[]'),
+                        owner: 'visual_editor',
+                    });
+                    visualCommand.permissionId = dbCommand.permissionId;
+                    visualCommand.graphJson = dbCommand.graphJson;
+                    visualCommand.owner = 'visual_editor';
+                    visualCommand.handler = (botInstance, typeChat, user, args) => {
+                        const context = { bot: botInstance.api, user, args, typeChat };
+                        return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
+                    };
+                    bot.commands.set(visualCommand.name, visualCommand);
+                }
+            }
+
             if (process.send) {
                 for (const cmd of bot.commands.values()) {
                     process.send({
