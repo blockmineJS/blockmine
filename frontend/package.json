@@ -27,6 +27,8 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "ansi-to-html": "^0.7.2",
+    "@reactflow/node-toolbar": "^1.2.1",
+    "reactflow": "^11.11.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

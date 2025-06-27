@@ -6,6 +6,7 @@ const BotManager = require('../../core/BotManager');
 const PluginManager = require('../../core/PluginManager');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
+const NodeRegistry = require('../../core/NodeRegistry');
 const { authenticate, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
 
@@ -510,11 +511,24 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 
         const finalCommands = dbCommands.map(cmd => {
             const template = templatesMap.get(cmd.name);
+            let args = [];
+
+            if (cmd.isVisual) {
+                try {
+                    args = JSON.parse(cmd.argumentsJson || '[]');
+                } catch (e) {
+                    console.error(`Error parsing argumentsJson for visual command ${cmd.name} (ID: ${cmd.id}):`, e);
+                    args = [];
+                }
+            } else {
+                args = template ? template.args : [];
+            }
+
             return {
                 ...cmd,
-                args: template ? template.args : [],
+                args: args,
                 aliases: JSON.parse(cmd.aliases || '[]'),
-                allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]')
+                allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]'),
             };
         })
 
@@ -829,6 +843,108 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
     } catch (error) {
         console.error("[API Error] /settings/all GET:", error);
         res.status(500).json({ error: 'Не удалось загрузить все настройки' });
+    }
+});
+
+// Visual Command Editor endpoints
+const nodeRegistry = new NodeRegistry();
+
+// Get available node types for the visual editor
+router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, res) => {
+    try {
+        const nodesByCategory = nodeRegistry.getNodesByCategory();
+        res.json(nodesByCategory);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/nodes GET:', error);
+        res.status(500).json({ error: 'Failed to get available nodes' });
+    }
+});
+
+// Create a new visual command
+router.post('/:botId/commands/visual', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const {
+            name,
+            description,
+            aliases = [],
+            permissionId,
+            cooldown = 0,
+            allowedChatTypes = ['chat', 'private'],
+            argumentsJson = '[]',
+            graphJson = 'null'
+        } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Command name is required' });
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId,
+                name,
+                description,
+                aliases: JSON.stringify(aliases),
+                permissionId: permissionId || null,
+                cooldown,
+                allowedChatTypes: JSON.stringify(allowedChatTypes),
+                isVisual: true,
+                argumentsJson,
+                graphJson
+            }
+        });
+
+        BotManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands/visual POST:', error);
+        res.status(500).json({ error: 'Failed to create visual command' });
+    }
+});
+
+// Update a visual command
+router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+        const {
+            name,
+            description,
+            aliases,
+            permissionId,
+            cooldown,
+            allowedChatTypes,
+            argumentsJson,
+            graphJson
+        } = req.body;
+
+        const dataToUpdate = { isVisual: true };
+        
+        if (name) dataToUpdate.name = name;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (Array.isArray(aliases)) dataToUpdate.aliases = JSON.stringify(aliases);
+        if (permissionId !== undefined) dataToUpdate.permissionId = permissionId || null;
+        if (typeof cooldown === 'number') dataToUpdate.cooldown = cooldown;
+        if (Array.isArray(allowedChatTypes)) dataToUpdate.allowedChatTypes = JSON.stringify(allowedChatTypes);
+        if (argumentsJson !== undefined) dataToUpdate.argumentsJson = argumentsJson;
+        if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
+
+        const updatedCommand = await prisma.command.update({
+            where: { id: commandId, botId },
+            data: dataToUpdate
+        });
+
+        BotManager.reloadBotConfigInRealTime(botId);
+        res.json(updatedCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands/:commandId/visual PUT:', error);
+        res.status(500).json({ error: 'Failed to update visual command' });
     }
 });
 
