@@ -16,21 +16,25 @@ export default function ManagementPage() {
     const { bots } = useAppStore();
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
 
-    const [managementData, setManagementData] = useState({ users: [], groups: [], permissions: [], commands: [] }); 
+    const [managementData, setManagementData] = useState({ users: { items: [], total: 0 }, groups: [], permissions: [], commands: [] });
     const [isLoading, setIsLoading] = useState(true);
+    const [userPage, setUserPage] = useState(1);
+    const [userPageSize, setUserPageSize] = useState(20); 
     const { toast } = useToast();
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (page = userPage, pageSize = userPageSize) => {
         if (!bot) return;
         setIsLoading(true);
         try {
-            const data = await apiHelper(`/api/bots/${bot.id}/management-data`);
-            setManagementData(data);
+            const data = await apiHelper(`/api/bots/${bot.id}/management-data?page=${page}&pageSize=${pageSize}`);
+            setManagementData(prevData => ({ ...prevData, ...data }));
+            setUserPage(data.users.page);
+            setUserPageSize(data.users.pageSize);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить данные управления.' });
         }
         setIsLoading(false);
-    }, [bot, toast]);
+    }, [bot, toast, userPage, userPageSize]);
 
     useEffect(() => {
         if (bot) {
@@ -56,7 +60,14 @@ export default function ManagementPage() {
 
                 <TabsContent value="users" className="flex-grow min-h-0">
                     <UsersManager 
-                        users={managementData.users} 
+                        users={managementData.users.items} 
+                        pagination={{ 
+                            page: managementData.users.page, 
+                            pageSize: managementData.users.pageSize,
+                            total: managementData.users.total,
+                            totalPages: managementData.users.totalPages,
+                        }}
+                        onPageChange={(newPage) => fetchData(newPage, userPageSize)}
                         groups={managementData.groups}
                         botId={bot?.id}
                         isLoading={isLoading}

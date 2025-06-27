@@ -56,3 +56,12 @@ export const api = {
     put: (url, body, successMessage) => apiHelper(url, { method: 'PUT', body: JSON.stringify(body) }, successMessage),
     delete: (url, successMessage) => apiHelper(url, { method: 'DELETE' }, successMessage),
 };
+
+export const search = async (query) => {
+    try {
+        return await apiHelper(`/api/search?query=${encodeURIComponent(query)}`);
+    } catch (error) {
+        console.error("Search API call failed:", error);
+        return { bots: [], users: [], plugins: [] };
+    }
+};
