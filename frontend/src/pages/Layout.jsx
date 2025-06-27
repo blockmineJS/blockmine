@@ -8,6 +8,7 @@ import { PlusCircle, Server, LayoutDashboard, Upload, Github, Clock, LogOut, Shi
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
 import BotForm from "@/components/BotForm";
+import GlobalSearch from '@/components/GlobalSearch';
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
 
@@ -96,7 +97,7 @@ export default function Layout() {
                 <h2 className="text-lg font-semibold tracking-tight">BlockMine</h2>
                 <p className="text-sm text-muted-foreground">Пользователь: {user?.username}</p>
             </div>
-            
+
             <SidebarNav onLinkClick={() => setIsSheetOpen(false)} />
             
             <div className="mt-auto pt-2 border-t">
@@ -155,6 +156,7 @@ export default function Layout() {
 
     return (
         <div className="grid md:grid-cols-[280px_1fr] h-screen">
+            <GlobalSearch />
             {/* Mobile Header */}
             <header className="md:hidden flex items-center justify-between p-2 border-b">
                 <h2 className="text-lg font-semibold tracking-tight ml-2">BlockMine</h2>

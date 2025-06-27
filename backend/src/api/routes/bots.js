@@ -518,13 +518,36 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
             };
         })
 
-        const [groups, users, allPermissions] = await Promise.all([
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 100;
+
+        const userSkip = (page - 1) * pageSize;
+
+        const [groups, users, allPermissions, usersCount] = await Promise.all([
             prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
-            prisma.user.findMany({ where: { botId }, include: { groups: { include: { group: true } } }, orderBy: { username: 'asc' } }),
-            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
+            prisma.user.findMany({
+                where: { botId },
+                include: { groups: { include: { group: true } } },
+                orderBy: { username: 'asc' },
+                take: pageSize,
+                skip: userSkip,
+            }),
+            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } }),
+            prisma.user.count({ where: { botId } })
         ]);
 
-        res.json({ groups, permissions: allPermissions, users, commands: finalCommands });
+        res.json({
+            groups,
+            permissions: allPermissions,
+            users: {
+                items: users,
+                total: usersCount,
+                page,
+                pageSize,
+                totalPages: Math.ceil(usersCount / pageSize),
+            },
+            commands: finalCommands
+        });
         
     } catch (error) {
         console.error(`[API Error] /management-data for bot ${req.params.botId}:`, error);
@@ -558,7 +581,7 @@ router.put('/:botId/commands/:commandId', authorize('management:edit'), async (r
             data: dataToUpdate,
         });
 
-        BotManager.invalidateConfigCache(botId);
+        BotManager.reloadBotConfigInRealTime(botId);
 
         res.json(updatedCommand);
     } catch (error) {
@@ -582,7 +605,7 @@ router.post('/:botId/groups', authorize('management:edit'), async (req, res) => 
             }
         });
 
-        BotManager.invalidateConfigCache(botId);
+        BotManager.reloadBotConfigInRealTime(botId);
 
 
         res.status(201).json(newGroup);
@@ -618,7 +641,7 @@ router.put('/:botId/groups/:groupId', authorize('management:edit'), async (req, 
             BotManager.invalidateUserCache(botId, user.username);
         }
 
-        BotManager.invalidateConfigCache(botId);
+        BotManager.reloadBotConfigInRealTime(botId);
 
         res.status(200).send();
     } catch (error) {
@@ -636,7 +659,7 @@ router.delete('/:botId/groups/:groupId', authorize('management:edit'), async (re
             return res.status(403).json({ error: `Нельзя удалить группу с источником "${group.owner}".` });
         }
         await prisma.group.delete({ where: { id: groupId } });
-        BotManager.invalidateConfigCache(botId);
+        BotManager.reloadBotConfigInRealTime(botId);
 
 
         res.status(204).send();
@@ -652,7 +675,7 @@ router.post('/:botId/permissions', authorize('management:edit'), async (req, res
             data: { name, description, botId, owner: 'admin' }
         });
 
-        BotManager.invalidateConfigCache(botId);
+        BotManager.reloadBotConfigInRealTime(botId);
         
         res.status(201).json(newPermission);
     } catch (error) {

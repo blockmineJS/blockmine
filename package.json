@@ -1,6 +1,6 @@
 {
   "name": "blockmine",
-  "version": "1.4.6",
+  "version": "1.4.8",
   "description": "Мощная панель управления ботами для Майнкрафта.",
   "author": "merka",
   "license": "MIT",
@@ -43,6 +43,7 @@
     "node-cron": "^4.1.0",
     "pidusage": "^3.0.2",
     "prisma": "^5.14.0",
+    "react-virtualized-auto-sizer": "^1.0.26",
     "semver": "^7.6.2",
     "socket.io": "^4.7.5",
     "socks": "^2.8.5"

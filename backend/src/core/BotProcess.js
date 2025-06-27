@@ -22,6 +22,29 @@ function sendLog(content) {
     }
 }
 
+async function fetchNewConfig(botId) {
+    try {
+        const botData = await prisma.bot.findUnique({
+            where: { id: botId },
+            include: {
+                server: true,
+                installedPlugins: {
+                    where: { isEnabled: true }
+                },
+            }
+        });
+
+        if (!botData) return null;
+
+        const commands = await prisma.command.findMany({ where: { botId } });
+
+        return { ...botData, commands };
+    } catch (error) {
+        sendLog(`[fetchNewConfig] Error: ${error.message}`);
+        return null;
+    }
+}
+
 function handleIncomingCommand(type, username, message) {
     if (!message.startsWith(bot.config.prefix || '@')) return;
 
@@ -51,7 +74,7 @@ function handleIncomingCommand(type, username, message) {
                 if (argDef.type === 'number') {
                     const numValue = parseFloat(value);
                     if (isNaN(numValue)) {
-                        bot.api.sendMessage(type, `Ошибка: Аргумент "${argDef.description}" должен быть числом.`, username);
+                        bot.api.sendMessage(type, `Ошибка: Аргумент \"${argDef.description}\" должен быть числом.`, username);
                         return;
                     }
                     value = numValue;
@@ -181,7 +204,7 @@ process.on('message', async (message) => {
                             }
                         });
                     }
-                    sendLog(`[API] Команда "${commandInstance.name}" от плагина "${commandInstance.owner}" зарегистрирована в процессе.`);
+                    sendLog(`[API] Команда \"${commandInstance.name}\" от плагина \"${commandInstance.owner}\" зарегистрирована в процессе.`);
                 },
                 performUserAction: (username, action, data = {}) => {
                     return new Promise((resolve, reject) => {
@@ -282,6 +305,26 @@ process.on('message', async (message) => {
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
+        }
+    } else if (message.type === 'config:reload') {
+        sendLog('[System] Received config:reload command. Reloading configuration...');
+        try {
+            const newConfig = await fetchNewConfig(bot.config.id);
+            if (newConfig) {
+                bot.config = { ...bot.config, ...newConfig };
+
+                const newCommands = await loadCommands();
+                const newPlugins = bot.config.plugins;
+
+                bot.commands = newCommands;
+                await initializePlugins(bot, newPlugins, true);
+
+                sendLog('[System] Bot configuration and plugins reloaded successfully.');
+            } else {
+                sendLog('[System] Failed to fetch new configuration.');
+            }
+        } catch (error) {
+            sendLog(`[System] Error reloading configuration: ${error.message}`);
         }
     } else if (message.type === 'stop') {
         if (bot) bot.quit();

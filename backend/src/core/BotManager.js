@@ -96,6 +96,17 @@ class BotManager {
         }
     }
 
+    reloadBotConfigInRealTime(botId) {
+        this.invalidateConfigCache(botId);
+        const child = this.bots.get(botId);
+        if (child && !child.killed) {
+            child.send({ type: 'config:reload' });
+            console.log(`[BotManager] Sent config:reload to bot process ${botId}`);
+            
+            getIO().emit('bot:config_reloaded', { botId });
+        }
+    }
+
     triggerHeartbeat() {
         if (!config.telemetry?.enabled) return;
         if (this.heartbeatDebounceTimer) {
@@ -284,7 +295,7 @@ class BotManager {
     
     appendLog(botId, log) {
         const currentLogs = this.logCache.get(botId) || [];
-        const newLogs = [log, ...currentLogs.slice(0, 499)];
+        const newLogs = [...currentLogs.slice(-499), log];
         this.logCache.set(botId, newLogs);
         getIO().emit('bot:log', { botId, log });
     }
@@ -559,6 +570,18 @@ class BotManager {
             child.send({ type: 'invalidate_user_cache', username });
         }
         return { success: true };
+    }
+
+    reloadBotConfigInRealTime(botId) {
+        this.invalidateConfigCache(botId);
+        const child = this.bots.get(botId);
+        if (child && !child.killed) {
+            child.send({ type: 'config:reload' });
+            console.log(`[BotManager] Sent config:reload to bot process ${botId}`);
+            
+            const { getIO } = require('../real-time/socketHandler');
+            getIO().emit('bot:config_reloaded', { botId });
+        }
     }
 }
 

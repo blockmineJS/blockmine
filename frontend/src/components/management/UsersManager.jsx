@@ -9,7 +9,7 @@ import { Edit, ArrowUpDown } from 'lucide-react';
 import UserEditDialog from './UserEditDialog';
 import { apiHelper } from '@/lib/api';
 
-export default function UsersManager({ users, groups, botId, isLoading, onDataChange }) {
+export default function UsersManager({ users, pagination, onPageChange, groups, botId, isLoading, onDataChange }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -18,7 +18,7 @@ export default function UsersManager({ users, groups, botId, isLoading, onDataCh
     const [sortConfig, setSortConfig] = useState({ key: 'username', direction: 'ascending' });
 
     const sortedUsers = useMemo(() => {
-        let sortableUsers = [...users];
+        let sortableUsers = [...(users || [])];
         if (sortConfig.key) {
             sortableUsers.sort((a, b) => {
                 let aValue = a[sortConfig.key];
@@ -132,6 +132,34 @@ export default function UsersManager({ users, groups, botId, isLoading, onDataCh
                     </TableBody>
                 </Table>
             </CardContent>
+            {pagination && (
+                <div className="flex items-center justify-between px-6 py-3 border-t">
+                    <div className="text-sm text-muted-foreground">
+                        Показано {((pagination.page - 1) * pagination.pageSize) + 1} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} из {pagination.total} пользователей
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => onPageChange(pagination.page - 1)}
+                            disabled={pagination.page <= 1 || isLoading}
+                        >
+                            Назад
+                        </Button>
+                        <span className="text-sm">
+                            Страница {pagination.page} из {pagination.totalPages}
+                        </span>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => onPageChange(pagination.page + 1)}
+                            disabled={pagination.page >= pagination.totalPages || isLoading}
+                        >
+                            Вперед
+                        </Button>
+                    </div>
+                </div>
+            )}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <UserEditDialog 
                     user={editingUser}

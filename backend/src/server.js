@@ -12,6 +12,7 @@ const serverRoutes = require('./api/routes/servers');
 const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
 const authRoutes = require('./api/routes/auth');
+const searchRoutes = require('./api/routes/search');
 const BotManager = require('./core/BotManager');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
@@ -51,6 +52,7 @@ app.use('/api/bots', botRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/permissions', permissionsRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 
 app.use(express.static(frontendPath));
