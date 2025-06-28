@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -12,14 +12,18 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Button } from "@/components/ui/button";
 
 const VisualEditorPage = () => {
-  const { botId, commandId } = useParams();
+  const { botId, commandId, eventId } = useParams();
+  const location = useLocation();
   const { init, isLoading, command, saveGraph, isSaving } = useVisualEditorStore();
 
   useEffect(() => {
-    if (botId && commandId) {
-      init(botId, commandId);
+    const editorType = location.pathname.includes('/commands/') ? 'command' : 'event';
+    const id = editorType === 'command' ? commandId : eventId;
+    
+    if (botId && id) {
+      init(botId, id, editorType);
     }
-  }, [botId, commandId, init]);
+  }, [botId, commandId, eventId, location.pathname, init]);
 
   if (isLoading) {
     return <div>Загрузка редактора...</div>;

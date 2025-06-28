@@ -29,7 +29,7 @@ function CustomNode({ data, type, id: nodeId }) {
   );
 
   const inputs = useMemo(() => {
-    const baseInputs = nodeConfig?.inputs ? [...nodeConfig.inputs] : [];
+    const baseInputs = nodeConfig?.pins?.inputs ? [...nodeConfig.pins.inputs] : [];
     if (type === 'flow:branch' && data.advanced) {
       // В расширенном режиме удаляем "condition", если он есть
       const conditionIndex = baseInputs.findIndex(p => p.id === 'condition');
@@ -53,6 +53,22 @@ function CustomNode({ data, type, id: nodeId }) {
         return baseInputs.filter(p => p.id === 'condition' || p.type === 'Exec');
     }
     return baseInputs;
+  }, [nodeConfig, data, type]);
+
+  const outputs = useMemo(() => {
+    if (type === 'flow:sequence') {
+      const pinCount = data.pinCount || 2;
+      const dynamicOutputs = [];
+      for (let i = 0; i < pinCount; i++) {
+        dynamicOutputs.push({
+          id: `exec_${i}`,
+          name: `${i}`,
+          type: 'Exec',
+        });
+      }
+      return dynamicOutputs;
+    }
+    return nodeConfig?.pins?.outputs || [];
   }, [nodeConfig, data, type]);
 
   if (!nodeConfig) {
@@ -82,7 +98,7 @@ function CustomNode({ data, type, id: nodeId }) {
   return (
     <Card className="min-w-64 bg-slate-800 border-slate-600 text-white">
       <CardHeader className="bg-slate-700 p-2 rounded-t-lg">
-        <CardTitle className="text-sm text-center">{nodeConfig.label}</CardTitle>
+        <CardTitle className="text-sm text-center">{nodeConfig.name || nodeConfig.label}</CardTitle>
       </CardHeader>
       <CardContent className="p-2 flex flex-col">
         <div className="flex justify-between w-full">
@@ -95,12 +111,23 @@ function CustomNode({ data, type, id: nodeId }) {
               return (
                 <div key={pin.id} className="relative p-2 flex items-center w-full">
                   {renderPin(pin, true)}
-                  {!hasConnection && pin.type !== 'Boolean' && (
+                  {!hasConnection && pin.type !== 'Boolean' && pin.id !== 'persist' && (
                     <AutosizeInput
                       className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
                       value={data[pin.id] || ''}
                       onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
                     />
+                  )}
+                  {!hasConnection && pin.id === 'persist' && (
+                    <Select value={data[pin.id] || 'false'} onValueChange={(value) => updateNodeData(nodeId, { [pin.id]: value })}>
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">True</SelectItem>
+                        <SelectItem value="false">False</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               );
@@ -116,10 +143,25 @@ function CustomNode({ data, type, id: nodeId }) {
             )}
           </div>
           <div className="outputs flex flex-col items-end">
-            {nodeConfig.outputs.map(pin => renderPin(pin, false))}
+            {outputs.map(pin => renderPin(pin, false))}
           </div>
         </div>
       </CardContent>
+      {type === 'data:cast' && (
+        <div className="p-2 border-t border-slate-700">
+          <Label>Целевой тип:</Label>
+          <Select value={data.targetType || 'String'} onValueChange={(value) => updateNodeData(nodeId, { targetType: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="String">String (Текст)</SelectItem>
+              <SelectItem value="Number">Number (Число)</SelectItem>
+              <SelectItem value="Boolean">Boolean (Да/Нет)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {type === 'flow:branch' && (
         <div className="p-2 border-t border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -154,6 +196,24 @@ function CustomNode({ data, type, id: nodeId }) {
               )}
             </div>
           )}
+        </div>
+      )}
+      {type === 'flow:sequence' && (
+        <div className="p-2 border-t border-slate-700 flex items-center justify-center gap-2">
+            <Button size="sm" onClick={() => {
+                const currentCount = data.pinCount || 2;
+                updateNodeData(nodeId, { pinCount: currentCount + 1 });
+            }}>
+                Добавить
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => {
+                const currentCount = data.pinCount || 2;
+                if (currentCount > 1) {
+                    updateNodeData(nodeId, { pinCount: currentCount - 1 });
+                }
+            }}>
+                Удалить
+            </Button>
         </div>
       )}
       {nodeConfig.dynamicPins && (

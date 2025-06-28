@@ -40,7 +40,7 @@ const VisualEditorCanvas = () => {
       types[node.type] = CustomNode;
     });
     return types;
-  }, []);
+  }, [availableNodes]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -187,7 +187,12 @@ const VisualEditorCanvas = () => {
                   {Object.entries(filteredNodes).map(([category, nodes]) => (
                     <CommandGroup key={category} heading={category}>
                       {nodes.map(node => (
-                        <CommandItem key={node.type} value={node.type} onSelect={() => handleAddNodeFromMenu(node.type)} disabled={false}>
+                        <CommandItem 
+                          key={node.type} 
+                          value={node.label} 
+                          onSelect={() => handleAddNodeFromMenu(node.type)} 
+                          disabled={false}
+                        >
                           {node.label}
                         </CommandItem>
                       ))}

@@ -1,290 +1,323 @@
+// File: backend/src/core/GraphExecutionEngine.js
+
 /**
  * Движок для выполнения визуальных команд, представленных в виде графа.
  */
 class GraphExecutionEngine {
-  /**
-   * @param {import('./NodeRegistry')} nodeRegistry - Реестр всех доступных типов нод.
-   */
-  constructor(nodeRegistry) {
-    if (!nodeRegistry) {
-      throw new Error('GraphExecutionEngine requires a NodeRegistry instance.');
-    }
-    this.nodeRegistry = nodeRegistry;
-    this.activeGraph = null;
-    this.context = null;
-    this.memo = new Map(); // Для кэширования результатов нод данных
+  constructor(nodeRegistry, botManagerOrApi = null) {
+      if (!nodeRegistry || typeof nodeRegistry.getNodeConfig !== 'function') {
+          throw new Error('GraphExecutionEngine requires a valid NodeRegistry instance.');
+      }
+      this.nodeRegistry = nodeRegistry;
+      this.botManager = botManagerOrApi;
+      this.activeGraph = null;
+      this.context = null;
+      this.memo = new Map();
   }
 
-  /**
-   * Выполняет граф.
-   * @param {string} graphJson - JSON-строка графа.
-   * @param {object} context - Контекст выполнения (bot, user, args, typeChat).
-   */
-  async execute(graphJson, context) {
-    if (!graphJson || graphJson === 'null') return;
+  async execute(graph, context, eventType) {
+      if (!graph || graph === 'null') return context;
 
-    console.log('--- Запуск выполнения визуальной команды ---');
-    try {
-      this.activeGraph = JSON.parse(graphJson);
-      this.context = context;
-      this.memo.clear(); // Очищаем кэш для нового запуска
-
-      const startNode = this.activeGraph.nodes.find(n => n.type === 'event:command');
-      if (!startNode) {
-        throw new Error('Не найдена стартовая нода (event:command) в графе.');
+      let parsedGraph;
+      if (typeof graph === 'string') {
+          try {
+              parsedGraph = JSON.parse(graph);
+          } catch (e) {
+              console.error('[GraphExecutionEngine] Ошибка парсинга JSON графа:', e);
+              return context;
+          }
+      } else {
+          parsedGraph = graph;
       }
 
-      // Начинаем выполнение с выходного пина 'exec' стартовой ноды
-      await this.traverse(startNode, 'exec');
-      console.log('--- Выполнение визуальной команды завершено ---');
+      if (!parsedGraph.nodes || !parsedGraph.connections) {
+          console.error('[GraphExecutionEngine] Неверный формат графа. Отсутствуют nodes или connections.');
+          return context;
+      }
 
-    } catch (error) {
-      console.error('[GraphExecutionEngine] Критическая ошибка выполнения графа:', error);
-      this.context.bot.sendMessage(this.context.typeChat, `Ошибка в логике команды: ${error.message}`, this.context.user.username);
-    }
+      try {
+          this.activeGraph = parsedGraph;
+          this.context = context;
+          if (!this.context.variables) this.context.variables = {};
+          if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
+          this.memo.clear();
+
+          const eventName = eventType || 'command';
+          const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
+
+          if (startNode) {
+              await this.traverse(startNode, 'exec');
+          } else if (!eventType) {
+              throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
+          }
+
+      } catch (error) {
+          console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
+      }
+
+      return this.context;
   }
 
-  /**
-   * Рекурсивно обходит ветку выполнения (белые пины).
-   * @param {object} node - Текущая нода.
-   * @param {string} fromPinId - ID выходного пина, с которого начался переход.
-   */
   async traverse(node, fromPinId) {
-    const connection = this.activeGraph.connections.find(c => c.sourceNodeId === node.id && c.sourcePinId === fromPinId);
-    if (!connection) return; // Конец ветки выполнения
+      const connection = this.activeGraph.connections.find(c => c.sourceNodeId === node.id && c.sourcePinId === fromPinId);
+      if (!connection) return;
 
-    const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
-    if (!nextNode) return;
+      const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
+      if (!nextNode) return;
 
-    // Выполняем логику следующей ноды
-    const resultPin = await this.executeNode(nextNode);
-
-    // Если у ноды есть выходные пины выполнения, продолжаем обход
-    if (resultPin) {
-      await this.traverse(nextNode, resultPin);
-    }
+      await this.executeNode(nextNode);
   }
 
-  /**
-   * Выполняет одну ноду.
-   * @param {object} node - Нода для выполнения.
-   * @returns {Promise<string|null>} ID выходного пина выполнения для продолжения обхода.
-   */
   async executeNode(node) {
-    console.log(`[Graph] Выполнение ноды: ${node.type} (ID: ${node.id})`);
-    const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-    if (!nodeConfig) throw new Error(`Неизвестный тип ноды: ${node.type}`);
+      switch (node.type) {
+          case 'action:send_message': {
+              const message = await this.resolvePinValue(node, 'message', '');
+              const chatType = await this.resolvePinValue(node, 'chat_type', this.context.typeChat);
+              const recipient = await this.resolvePinValue(node, 'recipient', this.context.user?.username);
+              this.context.bot.sendMessage(chatType, message, recipient);
+              await this.traverse(node, 'exec');
+              break;
+          }
+          case 'action:server_command': {
+              const command = await this.resolvePinValue(node, 'command', '');
+              if (command) this.context.bot.executeCommand(command);
+              await this.traverse(node, 'exec');
+              break;
+          }
+          case 'action:send_log': {
+              const message = await this.resolvePinValue(node, 'message', '');
+              if (this.botManager?.appendLog && this.context?.botId) {
+                  this.botManager.appendLog(this.context.botId, `[Graph] ${message}`);
+              } else {
+                  console.log(`[Graph] ${message}`);
+              }
+              await this.traverse(node, 'exec');
+              break;
+          }
+          case 'action:bot_look_at': {
+            // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            const target = await this.resolvePinValue(node, 'target'); // Используем новый ID 'target'
+            const yOffset = await this.resolvePinValue(node, 'add_y', 0); // Используем новый ID 'add_y'
 
-    // ЗАГЛУШКА: Здесь будет логика для всех нод. Пока реализуем только send_message.
-    switch (node.type) {
-      case 'action:send_message': {
-        const message = await this.resolvePinValue(node, 'message', '');
-        const chatType = await this.resolvePinValue(node, 'chat_type', this.context.typeChat);
-        const recipient = await this.resolvePinValue(node, 'recipient', this.context.user.username);
-        
-        this.context.bot.sendMessage(chatType, message, recipient);
+            if (target && this.context.bot?.lookAt) {
+                // Проверяем, есть ли у цели свойство position (значит, это объект entity)
+                // или у нее есть x, y, z (значит, это объект Vec3 или похожий)
+                let finalPosition;
+                if (target.position) {
+                    finalPosition = { ...target.position }; // Копируем, чтобы не изменять исходный объект
+                } else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) {
+                    finalPosition = { ...target };
+                }
 
-        // Возвращаем ID стандартного выходного пина, чтобы traverse знал, куда идти дальше
-        return 'exec'; 
-      }
-      case 'action:server_command': {
-        const command = await this.resolvePinValue(node, 'command', '');
-        
-        if (command) {
-          console.log(`[Graph] Выполнение серверной команды: ${command}`);
-          // Выполняем команду от имени бота
-          this.context.bot.executeCommand(command);
-        }
-        
-        return 'exec';
-      }
-      case 'flow:branch': {
-        const operator = node.data.operator; // AND, OR, NOT
-        if (operator) {
-            const pinCount = node.data.pinCount || 2;
-            let result = operator === 'AND';
-
-            for (let i = 0; i < pinCount; i++) {
-                const pinId = String.fromCharCode(97 + i); // a, b, c...
-                const value = await this.resolvePinValue(node, pinId, false);
-
-                if (operator === 'AND') result = result && value;
-                if (operator === 'OR') result = result || value;
-                if (operator === 'NOT') {
-                    result = !value;
-                    break; 
+                if (finalPosition) {
+                    // Применяем смещение, если оно указано
+                    finalPosition.y += Number(yOffset || 0);
+                    this.context.bot.lookAt(finalPosition);
                 }
             }
-            return result ? 'exec_true' : 'exec_false';
-
-        } else {
-            // Простой режим
-            const condition = await this.resolvePinValue(node, 'condition', false);
-            return condition ? 'exec_true' : 'exec_false';
+            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            await this.traverse(node, 'exec');
+            break;
         }
-    }
-      case 'flow:sequence': {
-        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-        const execPins = nodeConfig.outputs.filter(p => p.type === 'Exec');
-        
-        // Последовательно запускаем каждую ветку
-        for (const pin of execPins) {
-          await this.traverse(node, pin.id);
-        }
+          case 'flow:branch': {
+              const condition = await this.resolvePinValue(node, 'condition', false);
+              await this.traverse(node, condition ? 'exec_true' : 'exec_false');
+              break;
+          }
+          case 'flow:sequence': {
+              const pinCount = node.data?.pinCount || 2;
+              for (let i = 0; i < pinCount; i++) {
+                  await this.traverse(node, `exec_${i}`);
+              }
+              break;
+          }
+          case 'variable:set': {
+              const varName = await this.resolvePinValue(node, 'name', '');
+              const varValue = await this.resolvePinValue(node, 'value');
+              const shouldPersist = await this.resolvePinValue(node, 'persist', false);
 
-        // У этой ноды нет единого выхода, поэтому возвращаем null
-        return null;
+              if (varName) {
+                  this.context.variables[varName] = varValue;
+                  this.context.persistenceIntent.set(varName, shouldPersist);
+              }
+              await this.traverse(node, 'exec');
+              break;
+          }
       }
-      // Другие ноды будут добавлены здесь
-      default:
-        console.warn(`Логика для ноды ${node.type} еще не реализована.`);
-        // Для нод потока (branch, sequence) здесь будет более сложная логика.
-        const execOutput = nodeConfig.outputs.find(p => p.type === 'Exec');
-        return execOutput ? execOutput.id : null;
-    }
   }
 
-  /**
-   * Вычисляет значение на входном пине данных.
-   * @param {object} node - Нода, для которой вычисляется значение.
-   * @param {string} pinId - ID входного пина.
-   * @param {*} defaultValue - Значение по умолчанию.
-   * @returns {Promise<*>} Вычисленное значение.
-   */
-  async resolvePinValue(node, pinId, defaultValue) {
-    // 1. Проверяем, есть ли входящее соединение к этому пину
-    const connection = this.activeGraph.connections.find(c => c.targetNodeId === node.id && c.targetPinId === pinId);
-    if (connection) {
-      const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
-      if (!sourceNode) return defaultValue;
-
-      // 2. Рекурсивно вычисляем значение из источника
-      return await this.evaluateOutputPin(sourceNode, connection.sourcePinId);
-    }
-
-    // 3. Если соединения нет, проверяем, есть ли статическое значение, заданное в самом узле
-    if (node.data && node.data[pinId] !== undefined) {
-      return node.data[pinId];
-    }
-
-    // 4. Возвращаем значение по умолчанию
-    return defaultValue;
+  async resolvePinValue(node, pinId, defaultValue = null) {
+      const connection = this.activeGraph.connections.find(c => c.targetNodeId === node.id && c.targetPinId === pinId);
+      if (connection) {
+          const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
+          return await this.evaluateOutputPin(sourceNode, connection.sourcePinId, defaultValue);
+      }
+      return node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
   }
 
-  /**
-   * Вычисляет значение на выходном пине данных.
-   * @param {object} node - Нода-источник.
-   * @param {string} pinId - ID выходного пина.
-   * @returns {Promise<*>} Значение.
-   */
-  async evaluateOutputPin(node, pinId) {
-    // Проверяем кэш
-    const cacheKey = `${node.id}:${pinId}`;
-    if (this.memo.has(cacheKey)) return this.memo.get(cacheKey);
+  async evaluateOutputPin(node, pinId, defaultValue = null) {
+      if (!node) return defaultValue;
+      const cacheKey = `${node.id}:${pinId}`;
+      if (this.memo.has(cacheKey)) {
+          return this.memo.get(cacheKey);
+      }
 
-    let result;
-    // ЗАГЛУШКА: Здесь будет логика для всех нод данных. Пока реализуем только event:command.
-    switch (node.type) {
-      case 'event:command':
-      case 'event:current_user':
-        if (pinId === 'user') result = this.context.user;
-        else if (pinId === 'args') result = this.context.args;
-        else if (pinId === 'chat_type') result = this.context.typeChat;
-        else result = null;
-        break;
-      case 'data:check_permission': {
-        const user = await this.resolvePinValue(node, 'user', null);
-        const permission = await this.resolvePinValue(node, 'permission', '');
-        if (user && permission) {
-          result = user.permission === permission;
-        } else {
-          result = false;
-        }
-        break;
-      }
-      case 'data:get_user_field': {
-        const user = await this.resolvePinValue(node, 'user', null);
-        if (user) {
-          switch (pinId) {
-            case 'username':
-              result = user.username;
-              break;
-            case 'groups':
-              result = user.groups;
-              break;
-            case 'is_blacklisted':
-              result = user.is_blacklisted;
-              break;
-            default:
-              result = null;
-          }
-        } else {
-          result = null;
-        }
-        break;
-      }
-      case 'data:get_argument': {
-        const args = await this.resolvePinValue(node, 'args', {});
-        const argName = await this.resolvePinValue(node, 'arg_name', '');
-        if (args && argName && args[argName] !== undefined) {
-          result = args[argName];
-        } else {
-          result = null;
-        }
-        break;
-      }
-      case 'data:concat_strings': {
-        const a = await this.resolvePinValue(node, 'a', '');
-        const b = await this.resolvePinValue(node, 'b', '');
-        result = a + b;
-        break;
-      }
-      case 'data:string_literal':
-        result = node.data.value || '';
-        break;
-      case 'logic:and': {
-        const pinCount = node.data.pinCount || 2;
-        let finalResult = true;
-        for (let i = 0; i < pinCount; i++) {
-          const pinId = i === 0 ? 'a' : i === 1 ? 'b' : `pin_${i}`;
-          const value = await this.resolvePinValue(node, pinId, true);
-          if (!value) {
-            finalResult = false;
-            break;
-          }
-        }
-        result = finalResult;
-        break;
-      }
-      case 'logic:or': {
-        const pinCount = node.data.pinCount || 2;
-        let finalResult = false;
-        for (let i = 0; i < pinCount; i++) {
-          const pinId = i === 0 ? 'a' : i === 1 ? 'b' : `pin_${i}`;
-          const value = await this.resolvePinValue(node, pinId, false);
-          if (value) {
-            finalResult = true;
-            break;
-          }
-        }
-        result = finalResult;
-        break;
-      }
-      case 'logic:not': {
-        const value = await this.resolvePinValue(node, 'value', false);
-        result = !value;
-        break;
-      }
-      // Другие ноды данных будут здесь
-      default:
-        result = null;
-        break;
-    }
+      let result;
 
-    this.memo.set(cacheKey, result); // Кэшируем результат
-    return result;
+      switch (node.type) {
+          case 'event:command': result = this.context[pinId]; break;
+          case 'event:chat': result = pinId === 'user' ? { username: this.context.username } : this.context[pinId]; break;
+          case 'event:playerJoined':
+          case 'event:playerLeft':
+              result = this.context[pinId];
+              break;
+          case 'event:entitySpawn':
+          case 'event:entityMoved':
+          case 'event:entityGone':
+              result = this.context[pinId];
+              break;
+          
+          case 'variable:get':
+              const varName = await this.resolvePinValue(node, 'name', '');
+              result = this.context.variables.hasOwnProperty(varName) ? this.context.variables[varName] : null;
+              break;
+          
+          case 'math:add': {
+              const rawA = await this.resolvePinValue(node, 'a', 0);
+              const rawB = await this.resolvePinValue(node, 'b', 0);
+              const numA = Number(rawA);
+              const numB = Number(rawB);
+              if (rawA !== '' && rawB !== '' && !isNaN(numA) && !isNaN(numB)) {
+                  result = numA + numB;
+              } else {
+                  result = String(rawA ?? '') + String(rawB ?? '');
+              }
+              break;
+          }
+
+          case 'data:get_entity_field': {
+              const entity = await this.resolvePinValue(node, 'entity');
+              result = entity ? entity[pinId] : defaultValue;
+              break;
+          }
+
+          case 'data:cast': {
+              const value = await this.resolvePinValue(node, 'value');
+              const targetType = node.data?.targetType || 'String';
+              switch (targetType) {
+                  case 'String': result = String(value ?? ''); break;
+                  case 'Number': result = Number(value); if (isNaN(result)) result = 0; break;
+                  case 'Boolean': result = ['true', '1', 'yes'].includes(String(value).toLowerCase()); break;
+                  default: result = value;
+              }
+              break;
+          }
+
+          case 'string:contains': {
+              const strA = String(await this.resolvePinValue(node, 'a', ''));
+              const strB = String(await this.resolvePinValue(node, 'b', ''));
+              const caseSensitive = await this.resolvePinValue(node, 'case_sensitive', true);
+              result = caseSensitive ? strA.includes(strB) : strA.toLowerCase().includes(strB.toLowerCase());
+              break;
+          }
+          case 'string:matches': {
+              const str = String(await this.resolvePinValue(node, 'input', ''));
+              const regexStr = String(await this.resolvePinValue(node, 'regex', ''));
+              try {
+                  result = new RegExp(regexStr).test(str);
+              } catch (e) { result = false; }
+              break;
+          }
+          case 'logic:and': {
+               const a = await this.resolvePinValue(node, 'a', false);
+               const b = await this.resolvePinValue(node, 'b', false);
+               result = a && b;
+               break;
+          }
+          case 'logic:or': {
+               const a = await this.resolvePinValue(node, 'a', false);
+               const b = await this.resolvePinValue(node, 'b', false);
+               result = a || b;
+               break;
+          }
+          case 'logic:not': {
+               const a = await this.resolvePinValue(node, 'a', false);
+               result = !a;
+               break;
+          }
+
+          case 'data:string_literal':
+              result = await this.resolvePinValue(node, 'value', '');
+              break;
+
+          case 'data:get_user_field': {
+               const user = await this.resolvePinValue(node, 'user');
+               result = user ? user[pinId] : defaultValue;
+               break;
+          }
+          case 'data:get_argument': {
+              const args = await this.resolvePinValue(node, 'args', {});
+              const argName = await this.resolvePinValue(node, 'arg_name', '');
+              result = args && argName && args[argName] !== undefined ? args[argName] : null;
+              break;
+          }
+          case 'data:concat_strings': {
+               const strA = await this.resolvePinValue(node, 'a', '');
+               const strB = await this.resolvePinValue(node, 'b', '');
+               result = String(strA ?? '') + String(strB ?? '');
+               break;
+          }
+          case 'data:get_server_players':
+              result = this.context.players || [];
+              break;
+          case 'data:get_bot_look':
+              result = this.context.botState ? { yaw: this.context.botState.yaw, pitch: this.context.botState.pitch } : null;
+              break;
+
+          case 'array:get_random_element': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              result = (!Array.isArray(arr) || arr.length === 0) ? null : arr[Math.floor(Math.random() * arr.length)];
+              break;
+          }
+          case 'array:add_element': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              const element = await this.resolvePinValue(node, 'element', null);
+              result = Array.isArray(arr) ? [...arr, element] : [element];
+              break;
+          }
+          case 'array:remove_by_index': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              const index = await this.resolvePinValue(node, 'index', -1);
+              if (!Array.isArray(arr) || index < 0 || index >= arr.length) {
+                  result = arr || [];
+              } else {
+                  const newArr = [...arr];
+                  newArr.splice(index, 1);
+                  result = newArr;
+              }
+              break;
+          }
+          case 'array:get_by_index': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              const index = await this.resolvePinValue(node, 'index', -1);
+              result = (!Array.isArray(arr) || index < 0 || index >= arr.length) ? null : arr[index];
+              break;
+          }
+          case 'array:find_index': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              const element = await this.resolvePinValue(node, 'element', null);
+              result = Array.isArray(arr) ? arr.indexOf(element) : -1;
+              break;
+          }
+          
+          default:
+              result = defaultValue;
+              break;
+      }
+
+      this.memo.set(cacheKey, result);
+      return result;
   }
 }
 
 module.exports = GraphExecutionEngine;
-

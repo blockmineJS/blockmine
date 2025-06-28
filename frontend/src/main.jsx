@@ -17,6 +17,7 @@ import PluginsTab from './pages/PluginsTab';
 import ConfigurationPage from './pages/ConfigurationPage';
 import ManagementPage from './pages/ManagementPage';
 import VisualEditorPage from './pages/Bot/VisualEditorPage';
+import EventGraphsPage from './pages/Bot/EventGraphsPage';
 import PluginDetailPage from './pages/PluginDetailPage';
 import ServersPage from './pages/ServersPage';
 import TasksPage from './pages/TasksPage';
@@ -104,6 +105,22 @@ path: '/setup',
             },
             { 
               path: "commands/visual/:commandId",
+              element: (
+                <ProtectedRoute requiredPermission="management:edit">
+                  <VisualEditorPage />
+                </ProtectedRoute>
+              )
+            },
+            { 
+              path: "events", 
+              element: (
+                <ProtectedRoute requiredPermission="management:edit">
+                  <EventGraphsPage />
+                </ProtectedRoute>
+              )
+            },
+            { 
+              path: "events/visual/:eventId",
               element: (
                 <ProtectedRoute requiredPermission="management:edit">
                   <VisualEditorPage />
