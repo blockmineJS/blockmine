@@ -9,19 +9,19 @@ export const useVisualEditorStore = create((set, get) => ({
   isLoading: true,
   isSaving: false,
   availableNodes: {},
+  permissions: [],
+  isMenuOpen: false,
+  menuPosition: { top: 0, left: 0, flowPosition: { x: 0, y: 0 } },
 
-  // Инициализация редактора
   init: async (botId, commandId) => {
     set({ isLoading: true });
     try {
-      const [commandData, availableNodesData] = await Promise.all([
+      const [commandData, availableNodesData, permissionsData] = await Promise.all([
         get().fetchCommand(botId, commandId),
-        get().fetchAvailableNodes(botId)
+        get().fetchAvailableNodes(botId),
+        get().fetchPermissions(botId)
       ]);
-
       const graph = commandData.graphJson ? JSON.parse(commandData.graphJson) : { nodes: [], connections: [] };
-      
-      // Преобразуем формат соединений из нашего формата в формат React Flow
       const reactFlowEdges = (graph.connections || []).map(conn => ({
         id: conn.id,
         source: conn.sourceNodeId,
@@ -29,96 +29,134 @@ export const useVisualEditorStore = create((set, get) => ({
         sourceHandle: conn.sourcePinId,
         targetHandle: conn.targetPinId,
       }));
-
       set({
         command: commandData,
         nodes: graph.nodes || [],
-        edges: reactFlowEdges, // Используем преобразованные данные
+        edges: reactFlowEdges,
         availableNodes: availableNodesData,
+        permissions: permissionsData,
         isLoading: false,
       });
-
     } catch (error) {
       console.error("Ошибка инициализации редактора:", error);
       set({ isLoading: false });
-      // Тут можно использовать toast для уведомления пользователя
     }
   },
 
-  // Загрузка данных команды
   fetchCommand: async (botId, commandId) => {
-    // Это немного неэффективно, так как management-data уже загружает все команды.
-    // В идеале, нужно брать данные из useAppStore, но для простоты сделаем прямой запрос.
     const allData = await apiHelper(`/api/bots/${botId}/management-data`);
     const command = allData.commands.find(c => c.id === parseInt(commandId));
     if (!command) throw new Error('Команда не найдена');
     return command;
   },
 
-  // Загрузка доступных нод
   fetchAvailableNodes: async (botId) => {
     return await apiHelper(`/api/bots/${botId}/visual-editor/nodes`);
   },
 
-  // Обработчики событий React Flow
-  onNodesChange: (changes) => {
-    const nextChanges = changes.filter(change => {
-      if (change.type === 'remove') {
-        const nodeToRemove = get().nodes.find(n => n.id === change.id);
-        // Запрещаем удаление стартовой ноды
-        if (nodeToRemove?.type === 'event:command') {
-          console.warn("Нельзя удалить стартовую ноду!"); // Можно показать toast
-          return false;
-        }
-      }
-      return true;
-    });
+  fetchPermissions: async (botId) => {
+    return await apiHelper(`/api/bots/${botId}/visual-editor/permissions`);
+  },
 
-    set({
-      nodes: applyNodeChanges(nextChanges, get().nodes),
-    });
+  onNodesChange: (changes) => {
+    set({ nodes: applyNodeChanges(changes, get().nodes) });
   },
 
   onEdgesChange: (changes) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
+    set({ edges: applyEdgeChanges(changes, get().edges) });
   },
 
   onConnect: (connection) => {
-    set({
-      edges: addEdge(connection, get().edges),
-    });
+    set({ edges: addEdge(connection, get().edges) });
   },
 
-  // Добавление новой ноды на холст
-  addNode: (type, position) => {
+  addNode: (type, position, shouldUpdateState = true) => {
     const newNode = {
-      id: `${type}-${Date.now()}`,
+      id: `${type}-${crypto.randomUUID()}`,
       type,
       position,
       data: {},
     };
-    set({ nodes: [...get().nodes, newNode] });
+    if (shouldUpdateState) {
+      set(state => ({ nodes: [...state.nodes, newNode] }));
+    }
+    return newNode; // Возвращаем ноду, чтобы ее можно было использовать
   },
 
-  // Обновление данных внутри ноды
-  updateNodeData: (nodeId, data) => {
-    set({
-      nodes: get().nodes.map(node => {
-        if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, ...data } };
-        }
-        return node;
-      }),
+  duplicateNode: (nodeId) => {
+      const originalNode = get().nodes.find(n => n.id === nodeId);
+      if (!originalNode || originalNode.type === 'event:command') return;
+
+      const newNode = {
+          ...originalNode,
+          id: `${originalNode.type}-${crypto.randomUUID()}`,
+          position: {
+              x: originalNode.position.x + 30,
+              y: originalNode.position.y + 30,
+          },
+          data: { ...originalNode.data },
+          selected: true,
+      };
+
+      set({ nodes: get().nodes.map(n => ({...n, selected: false })).concat(newNode) });
+  },
+
+  appendNode: (newNode) => {
+    set(state => ({ nodes: [...state.nodes, newNode] }));
+  },
+
+  updateCommand: (updates) => {
+    set(state => ({ command: { ...state.command, ...updates } }));
+  },
+
+  addArgument: () => {
+    set(state => {
+      const args = JSON.parse(state.command.argumentsJson || '[]');
+      const newArg = { id: crypto.randomUUID(), name: 'newArg', type: 'string', required: true };
+      return { command: { ...state.command, argumentsJson: JSON.stringify([...args, newArg]) } };
     });
   },
-  
-  // Сохранение графа
+
+  updateArgument: (argId, updates) => {
+    set(state => {
+      const args = JSON.parse(state.command.argumentsJson || '[]');
+      const newArgs = args.map(arg => (arg.id === argId ? { ...arg, ...updates } : arg));
+      return { command: { ...state.command, argumentsJson: JSON.stringify(newArgs) } };
+    });
+  },
+
+  removeArgument: (argId) => {
+    set(state => {
+      const args = JSON.parse(state.command.argumentsJson || '[]');
+      const newArgs = args.filter(arg => arg.id !== argId);
+      return { command: { ...state.command, argumentsJson: JSON.stringify(newArgs) } };
+    });
+  },
+
+  updateNodeData: (nodeId, newData) => {
+    set(state => {
+      const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
+      if (!nodeToUpdate) return state;
+
+      const newEntries = Object.entries(newData);
+      const isChanged = newEntries.some(([key, value]) => nodeToUpdate.data[key] !== value);
+
+      if (!isChanged) return state;
+
+      const updatedNodes = state.nodes.map(node =>
+        node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node
+      );
+      
+      return { nodes: updatedNodes };
+    });
+  },
+
+  openMenu: (top, left, flowPosition) => set({ isMenuOpen: true, menuPosition: { top, left, flowPosition } }),
+  closeMenu: () => set({ isMenuOpen: false }),
+
   saveGraph: async (botId) => {
     const { command, nodes, edges } = get();
     if (!command) return;
-
     set({ isSaving: true });
     try {
       const connections = edges.map(edge => ({
@@ -128,20 +166,15 @@ export const useVisualEditorStore = create((set, get) => ({
         sourcePinId: edge.sourceHandle,
         targetPinId: edge.targetHandle,
       }));
-
-      const graphJson = JSON.stringify({ 
-        nodes, 
-        connections
-      });
-
+      const graphJson = JSON.stringify({ nodes, connections });
       await apiHelper(`/api/bots/${botId}/commands/${command.id}/visual`, {
         method: 'PUT',
         body: JSON.stringify({ graphJson }),
       });
-      // Показать toast об успехе
+      // Тут хорошо бы показать toast
+      console.log("Граф успешно сохранен!");
     } catch (error) {
       console.error("Ошибка сохранения графа:", error);
-      // Показать toast об ошибке
     } finally {
       set({ isSaving: false });
     }

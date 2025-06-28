@@ -235,6 +235,10 @@ process.on('message', async (message) => {
                             }
                         }, 5000);
                     });
+                },
+                executeCommand: (command) => {
+                    sendLog(`[Graph] Выполнение серверной команды: ${command}`);
+                    bot.chat(command);
                 }
             };
 
