@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2 } from 'lucide-react';
+import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap } from 'lucide-react';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import ExportBotDialog from '@/components/ExportBotDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -95,9 +95,8 @@ export default function BotView() {
                      <NavLink to="console" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Terminal className="h-4 w-4"/>Консоль</NavLink>
                      <NavLink to="plugins" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Puzzle className="h-4 w-4"/>Плагины</NavLink>
                      <NavLink to="settings" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Settings className="h-4 w-4"/>Настройки</NavLink>
-                     {hasPermission('management:view') && (
-                        <NavLink to="management" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Users className="h-4 w-4"/>Управление</NavLink>
-                     )}
+                     <NavLink to="events" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Zap className="h-4 w-4"/>События</NavLink>
+                     <NavLink to="management" className={({isActive}) => `flex items-center gap-2 text-sm pb-2 border-b-2 shrink-0 ${isActive ? 'border-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}><Users className="h-4 w-4"/>Управление</NavLink>
                 </nav>
 
                 <main className="flex-grow min-h-0 flex flex-col">

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
@@ -10,6 +9,9 @@ const commandManager = require('../../core/system/CommandManager');
 const NodeRegistry = require('../../core/NodeRegistry');
 const { authenticate, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
+// const { setupBot, deleteBotData } = require('../../core/botSetup');
+// const { exportBot, importBot } = require('../../core/botArchiver');
+const eventGraphsRouter = require('./eventGraphs');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -18,11 +20,10 @@ const AdmZip = require('adm-zip');
 const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
 
-
 const router = express.Router();
 
-
 router.use(authenticate);
+router.use('/:botId/event-graphs', eventGraphsRouter);
 
 async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     const initialData = {
@@ -59,7 +60,6 @@ async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     }
     console.log(`[Setup] Для бота ID ${botId} созданы группы и права по умолчанию.`);
 }
-
 
 router.get('/', authorize('bot:list'), async (req, res) => {
     try {
@@ -165,7 +165,6 @@ router.delete('/:id', authorize('bot:delete'), async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить бота' }); }
 });
 
-
 router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
@@ -193,6 +192,7 @@ router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
+/*
 router.get('/:id/export', authorize('bot:export'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
@@ -249,137 +249,48 @@ router.get('/:id/export', authorize('bot:export'), async (req, res) => {
             for (const plugin of bot.installedPlugins) {
                 const pluginFolderName = path.basename(plugin.path);
                 try {
-                    await fs.access(plugin.path);
-                    archive.directory(plugin.path, `plugins/${pluginFolderName}`);
-                } catch (error) {
-                    console.warn(`[Export] Директория плагина ${plugin.name} (${plugin.path}) не найдена, пропускаем.`);
+                    const pluginPath = plugin.path;
+                    if ((await fs.stat(pluginPath)).isDirectory()) {
+                        archive.directory(pluginPath, `plugins/${pluginFolderName}`);
+                    }
+                } catch (err) {
+                    console.warn(`Could not add plugin ${plugin.name} to archive: ${err.message}`);
                 }
             }
         }
-
+        
         await archive.finalize();
 
     } catch (error) {
-        console.error("Bot export error:", error);
-        res.status(500).json({ error: 'Не удалось экспортировать бота.' });
+        console.error('Bot export error:', error);
+        res.status(500).send({ message: 'Error exporting bot' });
     }
 });
 
-router.post('/import', upload.single('file'), authorize('bot:import'), async (req, res) => {
+router.post('/import', authorize('bot:import'), upload.single('file'), async (req, res) => {
     if (!req.file) {
-        return res.status(400).send('Файл не загружен.');
+        return res.status(400).json({ error: 'Файл для импорта не найден' });
     }
-    if (path.extname(req.file.originalname).toLowerCase() !== '.zip') return res.status(400).json({ error: 'Неверный формат файла. Ожидался ZIP-архив.' });
-    
-    const zip = new AdmZip(req.file.buffer);
-    const metadataEntry = zip.getEntry('bot_export.json');
-    if (!metadataEntry) return res.status(400).json({ error: 'Файл bot_export.json не найден в архиве.' });
 
-    const importMetadata = JSON.parse(metadataEntry.getData().toString('utf-8'));
-    const { bot: botData, plugins: pluginsInfo, commands, permissions, groups, users } = importMetadata;
-
-    const existingBot = await prisma.bot.findUnique({ where: { username: botData.username } });
-    if (existingBot) return res.status(409).json({ error: `Бот с именем "${botData.username}" уже существует.` });
-
-    let newBotId;
-    let botStorageDir;
     try {
-        await prisma.$transaction(async (tx) => {
-            let server = await tx.server.findFirst({ where: { host: botData.server.host, port: botData.server.port } });
-            if (!server) server = await tx.server.create({ data: { name: botData.server.host, host: botData.server.host, port: botData.server.port, version: botData.server.version } });
-            const newBot = await tx.bot.create({ data: { username: botData.username, prefix: botData.prefix, note: botData.note, serverId: server.id, proxyHost: botData.proxy?.host, proxyPort: botData.proxy?.port } });
-            newBotId = newBot.id;
-            
-            if (permissions && groups && users) {
-                const permMap = new Map();
-                for (const perm of permissions) {
-                    const newPerm = await tx.permission.create({ data: { botId: newBotId, name: perm.name, description: perm.description, owner: perm.owner } });
-                    permMap.set(perm.name, newPerm.id);
-                }
-
-                const groupMap = new Map();
-                for (const group of groups) {
-                    const newGroup = await tx.group.create({
-                        data: {
-                            botId: newBotId,
-                            name: group.name,
-                            owner: group.owner,
-                            permissions: { create: group.permissions.map(p => ({ permissionId: permMap.get(p.permission.name) })).filter(p => p.permissionId) }
-                        }
-                    });
-                    groupMap.set(group.name, newGroup.id);
-                }
-
-                for (const user of users) {
-                    await tx.user.create({
-                        data: {
-                            botId: newBotId,
-                            username: user.username,
-                            isBlacklisted: user.isBlacklisted,
-                            groups: { create: user.groups.map(g => ({ groupId: groupMap.get(g.group.name) })).filter(g => g.groupId) }
-                        }
-                    });
-                }
-            } else {
-                await setupDefaultPermissionsForBot(newBotId, tx);
-            }
-
-            if (commands) {
-                for (const cmd of commands) {
-                    const permName = permissions?.find(p => p.id === cmd.permissionId)?.name;
-                    const permId = permName ? (await tx.permission.findUnique({where: {botId_name: {botId: newBotId, name: permName}}}))?.id : null;
-                    
-                    await tx.command.create({
-                        data: {
-                            botId: newBotId,
-                            name: cmd.name,
-                            isEnabled: cmd.isEnabled,
-                            cooldown: cmd.cooldown,
-                            aliases: cmd.aliases,
-                            description: cmd.description,
-                            owner: cmd.owner,
-                            permissionId: permId,
-                            allowedChatTypes: cmd.allowedChatTypes,
-                        }
-                    });
-                }
-            }
-
-            botStorageDir = path.resolve(__dirname, `../../../storage/plugins/bot_${newBotId}`);
-            await fs.mkdir(botStorageDir, { recursive: true });
-            const pluginsDirInZip = zip.getEntry('plugins/');
-
-            if (pluginsDirInZip && pluginsDirInZip.isDirectory) {
-                zip.extractEntryTo('plugins/', botStorageDir, true, true);
-                for (const pInfo of pluginsInfo) {
-                    const targetPath = path.join(botStorageDir, 'plugins', pInfo.folderName);
-                    const packageJson = JSON.parse(await fs.readFile(path.join(targetPath, 'package.json'), 'utf-8'));
-                    await tx.installedPlugin.create({
-                        data: { botId: newBotId, name: pInfo.name, version: packageJson.version, description: packageJson.description, path: targetPath, sourceType: 'IMPORTED', sourceUri: `imported_from_${req.file.originalname}`, manifest: JSON.stringify(packageJson.botpanel || {}), isEnabled: pInfo.isEnabled, settings: pInfo.settings }
-                    });
-                }
-            } else {
-                for (const pInfo of pluginsInfo) {
-                    if (pInfo.sourceUri) {
-                        const newPlugin = await PluginManager.installFromGithub(newBotId, pInfo.sourceUri, tx);
-                        await tx.installedPlugin.update({ where: { id: newPlugin.id }, data: { isEnabled: pInfo.isEnabled, settings: pInfo.settings } });
-                    }
-                }
-            }
-        });
-
-        const finalBot = await prisma.bot.findUnique({ where: { id: newBotId }});
-        res.status(201).json(finalBot);
-
+        const newBot = await importBot(req.file.buffer, prisma);
+        res.status(201).json(newBot);
     } catch (error) {
-        console.error("[API Error] /import POST:", error);
-        if (botStorageDir) {
-            await fs.rm(botStorageDir, { recursive: true, force: true }).catch(() => {});
-        }
-        res.status(500).json({ error: `Не удалось импортировать бота: ${error.message}` });
+        console.error('Bot import error:', error);
+        res.status(500).json({ error: `Ошибка импорта: ${error.message}` });
     }
 });
+*/
 
+router.get('/servers', authorize('bot:list'), async (req, res) => {
+    try {
+        const servers = await prisma.server.findMany();
+        res.json(servers);
+    } catch (error) {
+        console.error("[API /api/bots] Ошибка получения списка серверов:", error);
+        res.status(500).json({ error: 'Не удалось получить список серверов' });
+    }
+});
 
 router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
     try {
@@ -460,7 +371,6 @@ router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async
         res.json(updated);
     } catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
 });
-
 
 router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {
     try {
@@ -622,7 +532,6 @@ router.post('/:botId/groups', authorize('management:edit'), async (req, res) => 
 
         BotManager.reloadBotConfigInRealTime(botId);
 
-
         res.status(201).json(newGroup);
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ error: 'Группа с таким именем уже существует для этого бота.' });
@@ -675,7 +584,6 @@ router.delete('/:botId/groups/:groupId', authorize('management:edit'), async (re
         }
         await prisma.group.delete({ where: { id: groupId } });
         BotManager.reloadBotConfigInRealTime(botId);
-
 
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить группу.' }); }
@@ -735,7 +643,6 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
     }
 });
 
-
 router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на запуск всех ботов.');
@@ -769,7 +676,6 @@ router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
         res.status(500).json({ error: 'Произошла ошибка при массовой остановке ботов.' });
     }
 });
-
 
 router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
     try {
@@ -848,12 +754,13 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
 });
 
 // Visual Command Editor endpoints
-const nodeRegistry = new NodeRegistry();
+const nodeRegistry = require('../../core/NodeRegistry'); 
 
 // Get available node types for the visual editor
 router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, res) => {
     try {
-        const nodesByCategory = nodeRegistry.getNodesByCategory();
+        const { graphType } = req.query;
+        const nodesByCategory = nodeRegistry.getNodesByCategory(graphType);
         res.json(nodesByCategory);
     } catch (error) {
         console.error('[API Error] /visual-editor/nodes GET:', error);
@@ -963,7 +870,6 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
     }
 });
 
-
 router.post('/:botId/commands', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
@@ -1025,6 +931,117 @@ router.delete('/:botId/commands/:commandId', authorize('management:edit'), async
         console.error(`[API Error] /commands/:commandId DELETE:`, error);
         res.status(500).json({ error: 'Failed to delete command' });
     }
+});
+
+router.get('/:botId/event-graphs/:graphId', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const graphId = parseInt(req.params.graphId, 10);
+
+        const eventGraph = await prisma.eventGraph.findUnique({
+            where: { id: graphId, botId },
+            include: { triggers: true },
+        });
+
+        if (!eventGraph) {
+            return res.status(404).json({ error: 'Граф события не найден' });
+        }
+
+        res.json(eventGraph);
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId GET:`, error);
+        res.status(500).json({ error: 'Не удалось получить граф события' });
+    }
+});
+
+// Create a new event graph
+router.post('/:botId/event-graphs', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const { name } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Имя графа обязательно' });
+        }
+
+        const newEventGraph = await prisma.eventGraph.create({
+            data: {
+                botId,
+                name,
+                isEnabled: true,
+                graphJson: 'null',
+            },
+        });
+
+        res.status(201).json(newEventGraph);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Граф событий с таким именем уже существует' });
+        }
+        console.error(`[API Error] /event-graphs POST:`, error);
+        res.status(500).json({ error: 'Не удалось создать граф событий' });
+    }
+});
+
+// Delete an event graph
+router.delete('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const graphId = parseInt(req.params.graphId, 10);
+
+        await prisma.eventGraph.delete({
+            where: { id: graphId, botId: botId },
+        });
+
+        res.status(204).send();
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId DELETE:`, error);
+        res.status(500).json({ error: 'Не удалось удалить граф событий' });
+    }
+});
+
+router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const graphId = parseInt(req.params.graphId, 10);
+        const { name, isEnabled, graphJson, triggers } = req.body;
+
+        const dataToUpdate = {};
+        if (name) dataToUpdate.name = name;
+        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
+        if (graphJson) dataToUpdate.graphJson = graphJson;
+
+        await prisma.$transaction(async (tx) => {
+            if (Object.keys(dataToUpdate).length > 0) {
+                await tx.eventGraph.update({
+                    where: { id: graphId, botId },
+                    data: dataToUpdate,
+                });
+            }
+
+            if (Array.isArray(triggers)) {
+                await tx.eventTrigger.deleteMany({ where: { graphId } });
+                await tx.eventTrigger.createMany({
+                    data: triggers.map(eventType => ({ graphId, eventType }))
+                });
+            }
+        });
+
+        const updatedGraph = await prisma.eventGraph.findUnique({ 
+            where: { id: graphId },
+            include: { triggers: true }
+        });
+
+        res.json(updatedGraph);
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId PUT:`, error);
+        res.status(500).json({ error: 'Не удалось обновить граф событий' });
+    }
+});
+
+// Save a visual command/graph
+router.post('/:botId/visual-editor/save', authorize('management:edit'), async (req, res) => {
+    // ... existing code ...
 });
 
 module.exports = router;

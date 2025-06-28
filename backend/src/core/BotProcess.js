@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const { SocksClient } = require('socks');
 const EventEmitter = require('events');
 const { v4: uuidv4 } = require('uuid');
+const { Vec3 } = require('vec3');
 const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
@@ -15,7 +16,8 @@ const UserService = require('./ipc/UserService.stub.js');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
 
 let bot = null;
-const pendingRequests = new Map(); 
+const pendingRequests = new Map();
+const entityMoveThrottles = new Map();
 
 function sendLog(content) {
     if (process.send) {
@@ -24,6 +26,22 @@ function sendLog(content) {
         console.log(`[ChildProcess Log] ${content}`);
     }
 }
+
+function sendPlayerList() {
+    if (process.send && bot) {
+        const playerList = Object.keys(bot.players);
+        process.send({ type: 'playerListUpdate', data: { players: playerList } });
+    }
+}
+
+// --- НАЧАЛО ИЗМЕНЕНИЙ ---
+// Исправляем функцию для отправки событий в едином "плоском" формате
+function sendEvent(eventName, eventArgs) {
+    if (process.send) {
+        process.send({ type: 'event', eventType: eventName, args: eventArgs });
+    }
+}
+// --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 async function fetchNewConfig(botId) {
     try {
@@ -171,6 +189,8 @@ process.on('message', async (message) => {
 
             bot = mineflayer.createBot(botOptions);
 
+            let isReady = false;
+
             bot.events = new EventEmitter();
             bot.events.setMaxListeners(30);
             bot.config = config;
@@ -239,21 +259,31 @@ process.on('message', async (message) => {
                 executeCommand: (command) => {
                     sendLog(`[Graph] Выполнение серверной команды: ${command}`);
                     bot.chat(command);
+                },
+                lookAt: (position) => {
+                    if (bot && position) {
+                        bot.lookAt(position);
+                    }
                 }
             };
 
-            const nodeRegistry = new NodeRegistry();
-            bot.graphExecutionEngine = new GraphExecutionEngine(nodeRegistry);
+            const processApi = {
+                appendLog: (botId, message) => {
+                    if (process.send) {
+                        process.send({ type: 'log', content: message });
+                    }
+                }
+            };
+
+            bot.graphExecutionEngine = new GraphExecutionEngine(NodeRegistry, processApi);
+
             bot.commands = await loadCommands();
 
-            // Load commands from database
             const prisma = new PrismaClient();
             const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
             await prisma.$disconnect();
 
-            // Merge commands from DB with file-based commands and create visual command handlers
             for (const dbCommand of dbCommands) {
-                // If the command is disabled in the DB, ensure it's not runnable in the bot process.
                 if (!dbCommand.isEnabled) {
                     if (bot.commands.has(dbCommand.name)) {
                         bot.commands.delete(dbCommand.name);
@@ -264,14 +294,12 @@ process.on('message', async (message) => {
                 const existingCommand = bot.commands.get(dbCommand.name);
 
                 if (existingCommand) {
-                    // JS-based command exists, update its properties from the DB
                     existingCommand.description = dbCommand.description;
                     existingCommand.cooldown = dbCommand.cooldown;
                     existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
                     existingCommand.permissionId = dbCommand.permissionId;
                     existingCommand.allowedChatTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
                 } else if (dbCommand.isVisual) {
-                    // It's a visual command that doesn't correspond to a JS file, create a new instance
                     const visualCommand = new Command({
                         name: dbCommand.name,
                         description: dbCommand.description,
@@ -282,11 +310,12 @@ process.on('message', async (message) => {
                         owner: 'visual_editor',
                     });
                     visualCommand.permissionId = dbCommand.permissionId;
-                    visualCommand.permissionId = dbCommand.permissionId;
                     visualCommand.graphJson = dbCommand.graphJson;
                     visualCommand.owner = 'visual_editor';
                     visualCommand.handler = (botInstance, typeChat, user, args) => {
-                        const context = { bot: botInstance.api, user, args, typeChat };
+                        const playerList = bot ? Object.keys(bot.players) : [];
+                        const botState = bot ? { yaw: bot.entity.yaw, pitch: bot.entity.pitch } : {};
+                        const context = { bot: botInstance.api, user, args, typeChat, players: playerList, botState };
                         return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
                     bot.commands.set(visualCommand.name, visualCommand);
@@ -313,16 +342,8 @@ process.on('message', async (message) => {
             await initializePlugins(bot, config.plugins);
             sendLog('[System] Все системы инициализированы.');
 
-
             let messageHandledByCustomParser = false;
 
-            bot.events.on('chat:message', (data) => {
-                const { type, username, message } = data;
-                if (username && message) {
-                    messageHandledByCustomParser = true;
-                    handleIncomingCommand(type, username, message);
-                }
-            });
             bot.on('message', (jsonMsg) => {
                 const ansiMessage = jsonMsg.toAnsi();
                 if (ansiMessage.trim()) {
@@ -333,32 +354,87 @@ process.on('message', async (message) => {
                 const rawMessageText = jsonMsg.toString();
                 bot.events.emit('core:raw_message', rawMessageText, jsonMsg);
             });
+
+            bot.events.on('chat:message', (data) => {
+                messageHandledByCustomParser = true;
+                sendEvent('chat', {
+                    username: data.username,
+                    message: data.message,
+                    chatType: data.type,
+                    raw: data.raw,
+                });
+                handleIncomingCommand(data.type, data.username, data.message);
+            });
+
             bot.on('chat', (username, message) => {
-                if (messageHandledByCustomParser) {
-                    return;
-                }
+                if (messageHandledByCustomParser) return;
                 handleIncomingCommand('chat', username, message);
             });
+            
             bot.on('login', () => {
                 sendLog('[Event: login] Успешно залогинился!');
                 if (process.send) {
+                    process.send({ type: 'bot_ready' });
                     process.send({ type: 'status', status: 'running' });
                 }
             });
-            bot.on('spawn', () => {
-                sendLog('[Event: spawn] Бот заспавнился в мире. Полностью готов к работе!');
-            });
+
             bot.on('kicked', (reason) => {
                 let reasonText;
                 try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
                 sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
                 process.exit(0);
             });
+
             bot.on('error', (err) => sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`));
+            
             bot.on('end', (reason) => {
                 sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
                 process.exit(0);
             });
+
+            bot.on('playerJoined', (player) => {
+                if (!isReady) return;
+                sendEvent('playerJoined', { user: { username: player.username, uuid: player.uuid } });
+                sendPlayerList();
+            });
+
+            bot.on('playerLeft', (player) => {
+                if (!isReady) return;
+                sendEvent('playerLeft', { user: { username: player.username, uuid: player.uuid } });
+                sendPlayerList();
+            });
+
+            bot.on('entitySpawn', (entity) => {
+                if (entity.type === 'player' && entity.username) {
+                    sendLog(`[BotProcess] Entity Spawned: ${entity.username}`);
+                }
+                const serialized = serializeEntity(entity);
+                sendEvent('entitySpawn', { entity: serialized });
+            });
+
+            bot.on('entityMoved', (entity) => {
+                const now = Date.now();
+                const lastSent = entityMoveThrottles.get(entity.id) || 0;
+                if (now - lastSent > 200) {
+                    sendEvent('entityMoved', { entity: serializeEntity(entity) });
+                    entityMoveThrottles.set(entity.id, now);
+                }
+            });
+
+            bot.on('entityGone', (entity) => {
+                sendEvent('entityGone', { entity: serializeEntity(entity) });
+                entityMoveThrottles.delete(entity.id);
+            });
+
+            bot.on('spawn', () => {
+                sendLog('[Event: spawn] Бот заспавнился в мире.');
+                setTimeout(() => {
+                    isReady = true;
+                    sendLog('[BotProcess] Бот готов к приему событий playerJoined/playerLeft.');
+                }, 3000);
+            });
+
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
@@ -369,13 +445,10 @@ process.on('message', async (message) => {
             const newConfig = await fetchNewConfig(bot.config.id);
             if (newConfig) {
                 bot.config = { ...bot.config, ...newConfig };
-
                 const newCommands = await loadCommands();
                 const newPlugins = bot.config.plugins;
-
                 bot.commands = newCommands;
                 await initializePlugins(bot, newPlugins, true);
-
                 sendLog('[System] Bot configuration and plugins reloaded successfully.');
             } else {
                 sendLog('[System] Failed to fetch new configuration.');
@@ -428,9 +501,15 @@ process.on('message', async (message) => {
         if (commandInstance) {
             commandInstance.onBlacklisted(bot, typeChat, { username });
         }
-    } else if (message.type === 'invalidate_user_cache') {
-        if (message.username && bot && bot.config) {
-            UserService.clearCache(message.username, bot.config.id);
+    } else if (message.type === 'action') {
+        if (message.name === 'lookAt' && bot && message.payload.position) {
+            const { x, y, z } = message.payload.position;
+            // Проверяем, что все координаты - числа, перед созданием Vec3
+            if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
+                bot.lookAt(new Vec3(x, y, z));
+            } else {
+                sendLog(`[BotProcess] Ошибка lookAt: получены невалидные координаты: ${JSON.stringify(message.payload.position)}`);
+            }
         }
     }
 });
@@ -438,6 +517,23 @@ process.on('message', async (message) => {
 process.on('unhandledRejection', (reason, promise) => {
     const errorMsg = `[FATAL] Необработанная ошибка процесса: ${reason?.stack || reason}`;
     sendLog(errorMsg);
-    console.error(errorMsg, promise);
     process.exit(1);
 });
+
+function serializeEntity(entity) {
+    if (!entity) return null;
+    return {
+      id: entity.id,
+      type: entity.type,
+      username: entity.username,
+      displayName: entity.displayName,
+      position: entity.position,
+      yaw: entity.yaw,
+      pitch: entity.pitch,
+      onGround: entity.onGround,
+      isValid: entity.isValid,
+      heldItem: entity.heldItem,
+      equipment: entity.equipment,
+      metadata: entity.metadata
+    };
+}

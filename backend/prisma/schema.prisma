@@ -36,7 +36,8 @@ model Bot {
   users            User[]
   groups           Group[]
   permissions      Permission[]
-  commands         Command[] 
+  commands         Command[]
+  eventGraphs      EventGraph[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,6 +83,32 @@ model Command {
   graphJson        String? @default("null")
 
   @@unique([botId, name])
+}
+
+model EventGraph {
+  id          Int     @id @default(autoincrement())
+  botId       Int
+  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name        String
+  isEnabled   Boolean @default(true)
+  graphJson   String? @default("null")
+  variables   String? @default("[]")
+
+  triggers    EventTrigger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([botId, name])
+}
+
+model EventTrigger {
+  id        Int      @id @default(autoincrement())
+  graphId   Int
+  graph     EventGraph @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  eventType String   // e.g., "entitySpawn", "chat"
+
+  @@unique([graphId, eventType])
 }
 
 model User {

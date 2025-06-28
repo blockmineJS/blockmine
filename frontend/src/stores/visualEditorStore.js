@@ -8,6 +8,7 @@ export const useVisualEditorStore = create((set, get) => ({
   command: null,
   isLoading: true,
   isSaving: false,
+  editorType: 'command',
   availableNodes: {},
   permissions: [],
   chatTypes: [],
@@ -15,27 +16,39 @@ export const useVisualEditorStore = create((set, get) => ({
   menuPosition: { top: 0, left: 0, flowPosition: { x: 0, y: 0 } },
   connectingPin: null,
 
-  init: async (botId, commandId) => {
-    set({ isLoading: true });
+  init: async (botId, id, type) => { // type is now required
+    set({ isLoading: true, editorType: type }); // Устанавливаем тип
     try {
-      const [managementData, availableNodesData, permissionsData] = await Promise.all([
-        get().fetchManagementData(botId),
-        get().fetchAvailableNodes(botId),
+      const [availableNodesData, permissionsData] = await Promise.all([
+        get().fetchAvailableNodes(botId, type),
         get().fetchPermissions(botId)
       ]);
 
-      const commandData = managementData.commands.find(c => c.id === parseInt(commandId));
-      if (!commandData) throw new Error('Команда не найдена');
+      let itemData, graph;
+      let finalCommandState;
+
+      if (type === 'command') {
+        const managementData = await get().fetchManagementData(botId);
+        itemData = managementData.commands.find(c => c.id === parseInt(id));
+        if (!itemData) throw new Error('Команда не найдена');
+        set({ chatTypes: managementData.chatTypes });
+        finalCommandState = itemData;
+      } else { // event
+        itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
+        if (!itemData) throw new Error('Граф события не найден');
+        const variables = itemData.variables ? JSON.parse(itemData.variables) : [];
+        finalCommandState = { ...itemData, variables };
+      }
+
+      const parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : null;
+      graph = parsedGraph || { nodes: [], edges: [] };
 
       set({ 
-        command: commandData,
+        command: finalCommandState, // reusing 'command' state for simplicity
         availableNodes: availableNodesData,
         permissions: permissionsData,
-        chatTypes: managementData.chatTypes
       });
 
-      const parsedGraph = commandData.graphJson ? JSON.parse(commandData.graphJson) : null;
-      const graph = parsedGraph || { nodes: [], connections: [] };
       const reactFlowEdges = (graph.connections || []).map(conn => ({
         id: conn.id,
         source: conn.sourceNodeId,
@@ -45,10 +58,15 @@ export const useVisualEditorStore = create((set, get) => ({
       }));
 
       const initialNodes = (graph.nodes || []).map(node => {
-        if (node.type === 'event:command') {
-          return { ...node, deletable: false, draggable: false };
+        // For event graphs, ensure all nodes are deletable, overriding any stale saved state.
+        if (type === 'event') {
+          return { ...node, deletable: true };
         }
-        return node;
+        // For command graphs, only the 'event:command' trigger is non-deletable.
+        if (node.type === 'event:command') {
+          return { ...node, deletable: false };
+        }
+        return { ...node, deletable: true };
       });
 
       set({
@@ -70,8 +88,8 @@ export const useVisualEditorStore = create((set, get) => ({
     return command;
   },
 
-  fetchAvailableNodes: async (botId) => {
-    return await apiHelper(`/api/bots/${botId}/visual-editor/nodes`);
+  fetchAvailableNodes: async (botId, graphType) => {
+    return await apiHelper(`/api/bots/${botId}/visual-editor/nodes?graphType=${graphType}`);
   },
 
   fetchPermissions: async (botId) => {
@@ -121,10 +139,11 @@ export const useVisualEditorStore = create((set, get) => ({
       position,
       data: {},
     };
+
     if (shouldUpdateState) {
       set(state => ({ nodes: [...state.nodes, newNode] }));
     }
-    return newNode; // Возвращаем ноду, чтобы ее можно было использовать
+    return newNode;
   },
 
   duplicateNode: (nodeId) => {
@@ -174,6 +193,54 @@ export const useVisualEditorStore = create((set, get) => ({
       const args = JSON.parse(state.command.argumentsJson || '[]');
       const newArgs = args.filter(arg => arg.id !== argId);
       return { command: { ...state.command, argumentsJson: JSON.stringify(newArgs) } };
+    });
+  },
+
+  addVariable: () => {
+    set(state => {
+      const variables = state.command.variables || [];
+      const newVariable = { id: crypto.randomUUID(), name: 'newVar', type: 'string', value: '' };
+      return { command: { ...state.command, variables: [...variables, newVariable] } };
+    });
+  },
+
+  updateVariable: (varId, updates) => {
+    set(state => {
+      const variables = state.command.variables || [];
+      const newVariables = variables.map(v => {
+        if (v.id === varId) {
+            const updatedVar = { ...v, ...updates };
+            if (updates.type && updates.type !== v.type) {
+                switch(updates.type) {
+                    case 'string':
+                        updatedVar.value = '';
+                        break;
+                    case 'number':
+                        updatedVar.value = '0';
+                        break;
+                    case 'boolean':
+                        updatedVar.value = 'false';
+                        break;
+                    case 'array':
+                        updatedVar.value = '[]';
+                        break;
+                    default:
+                        updatedVar.value = '';
+                }
+            }
+            return updatedVar;
+        }
+        return v;
+      });
+      return { command: { ...state.command, variables: newVariables } };
+    });
+  },
+
+  removeVariable: (varId) => {
+    set(state => {
+      const variables = state.command.variables || [];
+      const newVariables = variables.filter(v => v.id !== varId);
+      return { command: { ...state.command, variables: newVariables } };
     });
   },
 
@@ -249,7 +316,7 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   saveGraph: async (botId) => {
-    const { command, nodes, edges } = get();
+    const { command, nodes, edges, editorType } = get();
     if (!command) return;
     set({ isSaving: true });
     try {
@@ -260,18 +327,32 @@ export const useVisualEditorStore = create((set, get) => ({
         sourcePinId: edge.sourceHandle,
         targetPinId: edge.targetHandle,
       }));
+
       const graphJson = JSON.stringify({ nodes, connections });
+      
+      let endpoint;
+      let payload;
 
-      const commandToSave = {
-        ...command,
-        graphJson: graphJson,
-      };
+      if (editorType === 'command') {
+        endpoint = `/api/bots/${botId}/commands/${command.id}/visual`;
+        payload = { graphJson }; 
+      } else { // event
+        endpoint = `/api/bots/${botId}/event-graphs/${command.id}`;
+        const triggerNodes = nodes.filter(n => n.type.startsWith('event:')).map(n => n.type.split(':')[1]);
+        payload = { 
+            name: command.name, 
+            isEnabled: command.isEnabled, 
+            graphJson, 
+            triggers: triggerNodes,
+            variables: command.variables || []
+        }; 
+      }
 
-      await apiHelper(`/api/bots/${botId}/commands/${command.id}/visual`, {
+      await apiHelper(endpoint, {
         method: 'PUT',
-        body: JSON.stringify(commandToSave),
+        body: JSON.stringify(payload),
       });
-      // Тут хорошо бы показать toast
+
       console.log("Граф успешно сохранен!");
     } catch (error) {
       console.error("Ошибка сохранения графа:", error);

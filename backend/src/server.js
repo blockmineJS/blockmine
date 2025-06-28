@@ -6,6 +6,13 @@ const os = require('os');
 
 const config = require('./config'); 
 const { initializeSocket } = require('./real-time/socketHandler');
+
+// --- НАЧАЛО БЛОКА ИЗМЕНЕНИЙ ---
+
+// 1. Импортируем BotManager как есть (он уже является экземпляром)
+const BotManager = require('./core/BotManager'); 
+
+// 2. Импортируем остальные модули, которые от него зависят
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
@@ -13,10 +20,11 @@ const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
 const authRoutes = require('./api/routes/auth');
 const searchRoutes = require('./api/routes/search');
-const BotManager = require('./core/BotManager');
+const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
 
+// --- КОНЕЦ БЛОКА ИЗМЕНЕНИЙ ---
 
 const app = express();
 const server = http.createServer(app);
@@ -52,7 +60,6 @@ app.use('/api/bots', botRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/permissions', permissionsRoutes);
-app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 
 app.use(express.static(frontendPath));
@@ -74,6 +81,8 @@ async function startServer() {
     return new Promise((resolve) => {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);
+
+            BotManager.initialize();
             
             if (HOST === '0.0.0.0') {
                 const networkInterfaces = os.networkInterfaces();
