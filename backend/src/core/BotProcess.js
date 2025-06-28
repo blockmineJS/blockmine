@@ -66,7 +66,7 @@ function handleIncomingCommand(type, username, message) {
         const parsedArgs = parseArguments(restOfMessage);
         let currentArgIndex = 0;
 
-        for (const argDef of commandInstance.args) {
+        for (const argDef of commandInstance.isVisual ? JSON.parse(dbCommand.argumentsJson || '[]') : commandInstance.args) {
             if (argDef.type === 'greedy_string') {
                 if (currentArgIndex < parsedArgs.length) {
                     processedArgs[argDef.name] = parsedArgs.slice(currentArgIndex).join(' ');
@@ -89,10 +89,10 @@ function handleIncomingCommand(type, username, message) {
             if (processedArgs[argDef.name] === undefined) {
                 if (argDef.required) {
                     const usage = commandInstance.args.map(arg => {
-                        return arg.required ? `<${arg.description}>` : `[${arg.description}]`;
+                        return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
                     }).join(' ');
 
-                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description}`, username);
+                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`, username);
                     bot.api.sendMessage(type, `Использование: ${bot.config.prefix}${commandInstance.name} ${usage}`, username);
                     return;
                 }
@@ -281,6 +281,7 @@ process.on('message', async (message) => {
                         args: JSON.parse(dbCommand.argumentsJson || '[]'),
                         owner: 'visual_editor',
                     });
+                    visualCommand.permissionId = dbCommand.permissionId;
                     visualCommand.permissionId = dbCommand.permissionId;
                     visualCommand.graphJson = dbCommand.graphJson;
                     visualCommand.owner = 'visual_editor';

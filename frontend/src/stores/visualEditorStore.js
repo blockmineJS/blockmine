@@ -10,18 +10,32 @@ export const useVisualEditorStore = create((set, get) => ({
   isSaving: false,
   availableNodes: {},
   permissions: [],
+  chatTypes: [],
   isMenuOpen: false,
   menuPosition: { top: 0, left: 0, flowPosition: { x: 0, y: 0 } },
+  connectingPin: null,
 
   init: async (botId, commandId) => {
     set({ isLoading: true });
     try {
-      const [commandData, availableNodesData, permissionsData] = await Promise.all([
-        get().fetchCommand(botId, commandId),
+      const [managementData, availableNodesData, permissionsData] = await Promise.all([
+        get().fetchManagementData(botId),
         get().fetchAvailableNodes(botId),
         get().fetchPermissions(botId)
       ]);
-      const graph = commandData.graphJson ? JSON.parse(commandData.graphJson) : { nodes: [], connections: [] };
+
+      const commandData = managementData.commands.find(c => c.id === parseInt(commandId));
+      if (!commandData) throw new Error('Команда не найдена');
+
+      set({ 
+        command: commandData,
+        availableNodes: availableNodesData,
+        permissions: permissionsData,
+        chatTypes: managementData.chatTypes
+      });
+
+      const parsedGraph = commandData.graphJson ? JSON.parse(commandData.graphJson) : null;
+      const graph = parsedGraph || { nodes: [], connections: [] };
       const reactFlowEdges = (graph.connections || []).map(conn => ({
         id: conn.id,
         source: conn.sourceNodeId,
@@ -38,11 +52,8 @@ export const useVisualEditorStore = create((set, get) => ({
       });
 
       set({
-        command: commandData,
         nodes: initialNodes,
         edges: reactFlowEdges,
-        availableNodes: availableNodesData,
-        permissions: permissionsData,
         isLoading: false,
       });
     } catch (error) {
@@ -55,6 +66,7 @@ export const useVisualEditorStore = create((set, get) => ({
     const allData = await apiHelper(`/api/bots/${botId}/management-data`);
     const command = allData.commands.find(c => c.id === parseInt(commandId));
     if (!command) throw new Error('Команда не найдена');
+    set({ chatTypes: allData.chatTypes }); // Сохраняем chatTypes
     return command;
   },
 
@@ -66,6 +78,10 @@ export const useVisualEditorStore = create((set, get) => ({
     return await apiHelper(`/api/bots/${botId}/visual-editor/permissions`);
   },
 
+  fetchManagementData: async (botId) => {
+    return await apiHelper(`/api/bots/${botId}/management-data`);
+  },
+
   onNodesChange: (changes) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) });
   },
@@ -75,7 +91,10 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   onConnect: (connection) => {
-    set({ edges: addEdge(connection, get().edges) });
+    set({ 
+      edges: addEdge(connection, get().edges), 
+      connectingPin: null 
+    });
   },
 
   onDelete: (nodesToRemove, edgesToRemove) => {
@@ -163,6 +182,18 @@ export const useVisualEditorStore = create((set, get) => ({
       const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
       if (!nodeToUpdate) return state;
 
+      const newPinCount = newData.pinCount;
+      if (newPinCount && newPinCount > (nodeToUpdate.data.pinCount || 2)) {
+        const newPinId = `pin_${newPinCount - 1}`;
+        const newPinName = String.fromCharCode(65 + newPinCount -1); // A, B, C...
+        if (!nodeToUpdate.inputs) {
+            nodeToUpdate.inputs = [];
+        }
+        if (!nodeToUpdate.inputs.find(p => p.id === newPinId)) {
+            nodeToUpdate.inputs.push({ id: newPinId, name: newPinName, type: 'Boolean', required: true });
+        }
+      }
+
       const newEntries = Object.entries(newData);
       const isChanged = newEntries.some(([key, value]) => nodeToUpdate.data[key] !== value);
 
@@ -177,7 +208,45 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   openMenu: (top, left, flowPosition) => set({ isMenuOpen: true, menuPosition: { top, left, flowPosition } }),
-  closeMenu: () => set({ isMenuOpen: false }),
+  closeMenu: () => set({ isMenuOpen: false, connectingPin: null }),
+
+  setConnectingPin: (pin) => set({ connectingPin: pin }),
+
+  connectAndAddNode: (nodeType, position) => {
+    const { connectingPin, availableNodes, nodes, addNode } = get();
+    if (!connectingPin) return;
+
+    const sourceNode = nodes.find(n => n.id === connectingPin.nodeId);
+    if (!sourceNode) return;
+
+    const newNode = addNode(nodeType, position, false); 
+
+    const allAvailableNodes = Object.values(availableNodes).flat();
+    const sourceNodeConfig = allAvailableNodes.find(n => n.type === sourceNode.type);
+    const destNodeConfig = allAvailableNodes.find(n => n.type === nodeType);
+    if (!sourceNodeConfig || !destNodeConfig) return;
+
+    const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.handleId);
+    if (!sourcePin) return;
+
+    const destPin = destNodeConfig.inputs.find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
+    if (!destPin) return;
+
+    const newEdge = {
+      id: `reactflow__edge-${connectingPin.nodeId}${connectingPin.handleId}-${newNode.id}${destPin.id}`,
+      source: connectingPin.nodeId,
+      sourceHandle: connectingPin.handleId,
+      target: newNode.id,
+      targetHandle: destPin.id,
+    };
+
+    set(state => ({
+      nodes: [...state.nodes, newNode],
+      edges: addEdge(newEdge, state.edges),
+      isMenuOpen: false,
+      connectingPin: null,
+    }));
+  },
 
   saveGraph: async (botId) => {
     const { command, nodes, edges } = get();

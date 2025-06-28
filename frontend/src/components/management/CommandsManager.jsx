@@ -4,10 +4,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { FilePenLine } from 'lucide-react';
+import { FilePenLine, Trash2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
+import { CreateCommandDialog } from './CreateCommandDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { apiHelper } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 const OWNER_TYPES = {
@@ -20,6 +22,9 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [commandToDelete, setCommandToDelete] = useState(null);
 
     const handleOpenModal = (command) => {
         if (command.isVisual) {
@@ -33,6 +38,34 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingCommand(null);
+    };
+
+    const handleCreateCommand = async (commandData) => {
+        try {
+            const newCommand = await apiHelper(`/api/bots/${botId}/commands`, {
+                method: 'POST',
+                body: JSON.stringify({ ...commandData, isVisual: true }),
+            });
+            toast({ title: 'Успех', description: `Команда "${newCommand.name}" успешно создана.` });
+            onDataChange();
+            setIsCreateDialogOpen(false);
+      navigate(`/bots/${botId}/commands/visual/${newCommand.id}`);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
+        }
+    };
+
+    const handleDeleteCommand = async () => {
+        if (!commandToDelete) return;
+        try {
+            await apiHelper(`/api/bots/${botId}/commands/${commandToDelete.id}`, { method: 'DELETE' });
+            toast({ title: 'Успех', description: `Команда "${commandToDelete.name}" удалена.` });
+            onDataChange();
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось удалить команду: ${error.message}` });
+        }
+        setIsDeleteDialogOpen(false);
+        setCommandToDelete(null);
     };
 
     const updateCommand = async (commandId, data) => {
@@ -69,8 +102,13 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Команды</CardTitle>
-                <CardDescription>Список всех команд, доступных боту. Кликните на строку для просмотра деталей и настроек.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Команды</CardTitle>
+                        <CardDescription>Список всех команд, доступных боту. Кликните на строку для просмотра деталей и настроек.</CardDescription>
+                    </div>
+                    <Button onClick={() => setIsCreateDialogOpen(true)}>Создать команду</Button>
+                </div>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
                 <Table>
@@ -83,6 +121,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                             <TableHead>Типы чатов</TableHead>
                             <TableHead>Право</TableHead>
                             <TableHead className="w-[100px]">Кулдаун</TableHead>
+                            <TableHead>Действия</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -122,11 +161,18 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                         {command.cooldown} сек.
                                     </TableCell>
                                     <TableCell>
-                                        {command.isVisual && (
-                                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }}>
-                                                <FilePenLine className="h-4 w-4 mr-2" />
-                                                Редактор
-                                            </Button>
+                                        {command.isVisual ? (
+                                            <div className="flex items-center gap-2">
+                                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }}>
+                                                    <FilePenLine className="h-4 w-4 mr-2" />
+                                                    Редактор
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-muted-foreground">-</span>
                                         )}
                                     </TableCell>
                                 </TableRow>
@@ -144,6 +190,22 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                     isSaving={isSaving}
                 />
             </Dialog>
+
+            <CreateCommandDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreate={handleCreateCommand} />
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Вы действительно хотите удалить команду "{commandToDelete?.name}"? Это действие нельзя будет отменить.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteCommand}>Удалить</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }

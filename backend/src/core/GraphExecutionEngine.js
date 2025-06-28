@@ -99,11 +99,30 @@ class GraphExecutionEngine {
         return 'exec';
       }
       case 'flow:branch': {
-        const condition = await this.resolvePinValue(node, 'condition', false);
-        
-        // Возвращаем соответствующий выходной пин в зависимости от условия
-        return condition ? 'exec_true' : 'exec_false';
-      }
+        const operator = node.data.operator; // AND, OR, NOT
+        if (operator) {
+            const pinCount = node.data.pinCount || 2;
+            let result = operator === 'AND';
+
+            for (let i = 0; i < pinCount; i++) {
+                const pinId = String.fromCharCode(97 + i); // a, b, c...
+                const value = await this.resolvePinValue(node, pinId, false);
+
+                if (operator === 'AND') result = result && value;
+                if (operator === 'OR') result = result || value;
+                if (operator === 'NOT') {
+                    result = !value;
+                    break; 
+                }
+            }
+            return result ? 'exec_true' : 'exec_false';
+
+        } else {
+            // Простой режим
+            const condition = await this.resolvePinValue(node, 'condition', false);
+            return condition ? 'exec_true' : 'exec_false';
+        }
+    }
       case 'flow:sequence': {
         const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
         const execPins = nodeConfig.outputs.filter(p => p.type === 'Exec');
@@ -133,21 +152,22 @@ class GraphExecutionEngine {
    * @returns {Promise<*>} Вычисленное значение.
    */
   async resolvePinValue(node, pinId, defaultValue) {
-    // 1. Проверяем, есть ли статическое значение, заданное в самом узле
-    if (node.data && node.data[pinId] !== undefined) {
-      return node.data[pinId];
-    }
-
-    // 2. Проверяем, есть ли входящее соединение к этому пину
+    // 1. Проверяем, есть ли входящее соединение к этому пину
     const connection = this.activeGraph.connections.find(c => c.targetNodeId === node.id && c.targetPinId === pinId);
     if (connection) {
       const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
       if (!sourceNode) return defaultValue;
 
-      // 3. Рекурсивно вычисляем значение из источника
+      // 2. Рекурсивно вычисляем значение из источника
       return await this.evaluateOutputPin(sourceNode, connection.sourcePinId);
     }
-    
+
+    // 3. Если соединения нет, проверяем, есть ли статическое значение, заданное в самом узле
+    if (node.data && node.data[pinId] !== undefined) {
+      return node.data[pinId];
+    }
+
+    // 4. Возвращаем значение по умолчанию
     return defaultValue;
   }
 
@@ -222,6 +242,39 @@ class GraphExecutionEngine {
       case 'data:string_literal':
         result = node.data.value || '';
         break;
+      case 'logic:and': {
+        const pinCount = node.data.pinCount || 2;
+        let finalResult = true;
+        for (let i = 0; i < pinCount; i++) {
+          const pinId = i === 0 ? 'a' : i === 1 ? 'b' : `pin_${i}`;
+          const value = await this.resolvePinValue(node, pinId, true);
+          if (!value) {
+            finalResult = false;
+            break;
+          }
+        }
+        result = finalResult;
+        break;
+      }
+      case 'logic:or': {
+        const pinCount = node.data.pinCount || 2;
+        let finalResult = false;
+        for (let i = 0; i < pinCount; i++) {
+          const pinId = i === 0 ? 'a' : i === 1 ? 'b' : `pin_${i}`;
+          const value = await this.resolvePinValue(node, pinId, false);
+          if (value) {
+            finalResult = true;
+            break;
+          }
+        }
+        result = finalResult;
+        break;
+      }
+      case 'logic:not': {
+        const value = await this.resolvePinValue(node, 'value', false);
+        result = !value;
+        break;
+      }
       // Другие ноды данных будут здесь
       default:
         result = null;

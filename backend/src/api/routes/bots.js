@@ -1,3 +1,4 @@
+
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
@@ -959,6 +960,70 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
         }
         console.error('[API Error] /commands/:commandId/visual PUT:', error);
         res.status(500).json({ error: 'Failed to update visual command' });
+    }
+});
+
+
+router.post('/:botId/commands', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const {
+            name,
+            description,
+            aliases = [],
+            permissionId,
+            cooldown = 0,
+            allowedChatTypes = ['chat', 'private'],
+            isVisual = false,
+            argumentsJson = '[]',
+            graphJson = 'null'
+        } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Command name is required' });
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId,
+                name,
+                description,
+                aliases: JSON.stringify(aliases),
+                permissionId: permissionId || null,
+                cooldown,
+                allowedChatTypes: JSON.stringify(allowedChatTypes),
+                isVisual,
+                argumentsJson,
+                graphJson,
+                owner: isVisual ? 'visual_editor' : 'manual',
+            }
+        });
+
+        BotManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands POST:', error);
+        res.status(500).json({ error: 'Failed to create command' });
+    }
+});
+
+router.delete('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+
+        await prisma.command.delete({
+            where: { id: commandId, botId: botId },
+        });
+
+        BotManager.reloadBotConfigInRealTime(botId);
+        res.status(204).send();
+    } catch (error) {
+        console.error(`[API Error] /commands/:commandId DELETE:`, error);
+        res.status(500).json({ error: 'Failed to delete command' });
     }
 });
 

@@ -3,6 +3,9 @@ import { Handle, Position } from 'reactflow';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AutosizeInput } from '@/components/ui/AutosizeInput';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 const pinColors = {
   Exec: '#ffffff',
   Boolean: '#dc2626', // red-600
@@ -25,6 +28,33 @@ function CustomNode({ data, type, id: nodeId }) {
     [availableNodes, type]
   );
 
+  const inputs = useMemo(() => {
+    const baseInputs = nodeConfig?.inputs ? [...nodeConfig.inputs] : [];
+    if (type === 'flow:branch' && data.advanced) {
+      // В расширенном режиме удаляем "condition", если он есть
+      const conditionIndex = baseInputs.findIndex(p => p.id === 'condition');
+      if (conditionIndex !== -1) {
+        baseInputs.splice(conditionIndex, 1);
+      }
+
+      // Добавляем динамические пины
+      for (let i = 0; i < (data.pinCount || 0); i++) {
+        baseInputs.push({
+          id: `pin_${i}`,
+          name: String.fromCharCode(65 + i),
+          type: 'Boolean',
+        });
+      }
+    } else if (type === 'flow:branch' && !data.advanced) {
+        // В простом режиме, убедимся что condition на месте, а динамических пинов нет
+        if (!baseInputs.find(p => p.id === 'condition')) {
+            baseInputs.push({ id: 'condition', name: 'Condition', type: 'Boolean', required: true });
+        }
+        return baseInputs.filter(p => p.id === 'condition' || p.type === 'Exec');
+    }
+    return baseInputs;
+  }, [nodeConfig, data, type]);
+
   if (!nodeConfig) {
     return <div>Неизвестный тип ноды: {type}</div>;
   }
@@ -41,7 +71,8 @@ function CustomNode({ data, type, id: nodeId }) {
           type={isInput ? 'target' : 'source'} 
           position={position} 
           id={pin.id} 
-          style={style}
+          style={{...style, width: '16px', height: '16px'}}
+          className="w-4 h-4"
         />
         <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
       </div>
@@ -56,7 +87,7 @@ function CustomNode({ data, type, id: nodeId }) {
       <CardContent className="p-2 flex flex-col">
         <div className="flex justify-between w-full">
           <div className="inputs flex flex-col items-start">
-            {nodeConfig.inputs.map(pin => {
+            {inputs.map(pin => {
               const hasConnection = edges.some(edge => edge.target === nodeId && edge.targetHandle === pin.id);
               if (pin.type === 'Exec') {
                 return renderPin(pin, true);
@@ -64,7 +95,7 @@ function CustomNode({ data, type, id: nodeId }) {
               return (
                 <div key={pin.id} className="relative p-2 flex items-center w-full">
                   {renderPin(pin, true)}
-                  {!hasConnection && (
+                  {!hasConnection && pin.type !== 'Boolean' && (
                     <AutosizeInput
                       className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
                       value={data[pin.id] || ''}
@@ -89,6 +120,49 @@ function CustomNode({ data, type, id: nodeId }) {
           </div>
         </div>
       </CardContent>
+      {type === 'flow:branch' && (
+        <div className="p-2 border-t border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Label>Режим:</Label>
+            <Select value={data.advanced ? 'advanced' : 'simple'} onValueChange={(value) => updateNodeData(nodeId, { advanced: value === 'advanced' })}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simple">Простой</SelectItem>
+                <SelectItem value="advanced">Расширенный</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {data.advanced && (
+            <div className="flex items-center gap-2">
+              <Label>Оператор:</Label>
+              <Select value={data.operator || 'AND'} onValueChange={(value) => updateNodeData(nodeId, { operator: value, pinCount: value === 'NOT' ? 1 : data.pinCount || 2 })}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AND">AND</SelectItem>
+                  <SelectItem value="OR">OR</SelectItem>
+                  <SelectItem value="NOT">NOT</SelectItem>
+                </SelectContent>
+              </Select>
+              {data.operator !== 'NOT' && (
+                <Button size="sm" variant="ghost" onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) + 1 })}>
+                  Добавить пин
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {nodeConfig.dynamicPins && (
+        <div className="p-2 border-t border-slate-700">
+          <Button size="sm" variant="ghost" onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) + 1 })}>
+            Добавить пин
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

@@ -10,6 +10,7 @@ import CommandsManager from '@/components/management/CommandsManager';
 import UsersManager from '@/components/management/UsersManager';
 import GroupsManager from '@/components/management/GroupsManager';
 import PermissionsManager from '@/components/management/PermissionsManager';
+import { CreateCommandDialog } from '@/components/management/CreateCommandDialog';
 
 export default function ManagementPage() {
     const { botId } = useParams();
@@ -20,7 +21,23 @@ export default function ManagementPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userPage, setUserPage] = useState(1);
     const [userPageSize, setUserPageSize] = useState(20); 
-    const { toast } = useToast();
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  const handleCreateCommand = async (commandData) => {
+    try {
+      const newCommand = await apiHelper(`/api/bots/${bot.id}/commands`, {
+        method: 'POST',
+        body: JSON.stringify({ ...commandData, isVisual: true }),
+      });
+      toast({ title: 'Успех', description: `Команда \"${newCommand.name}\" успешно создана.` });
+      fetchData();
+      setIsCreateDialogOpen(false);
+      navigate(`/bots/${bot.id}/commands/visual/${newCommand.id}`);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
+    }
+  };
 
     const fetchData = useCallback(async (page = userPage, pageSize = userPageSize) => {
         if (!bot) return;
@@ -101,6 +118,7 @@ export default function ManagementPage() {
                     />
                 </TabsContent>
             </Tabs>
+            <CreateCommandDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreate={handleCreateCommand} />
         </div>
     );
 }

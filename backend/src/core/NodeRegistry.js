@@ -231,7 +231,8 @@ class NodeRegistry {
         { id: 'arg_name', name: 'Имя аргумента', type: 'String', required: true }
       ],
       outputs: [
-        { id: 'value', name: 'Значение', type: 'Wildcard' }
+        { id: 'value', name: 'Значение', type: 'Wildcard' },
+        { id: 'exists', name: 'Существует', type: 'Boolean' },
       ]
     });
 
@@ -245,6 +246,8 @@ class NodeRegistry {
         { id: 'value', name: 'Значение', type: 'String' }
       ]
     });
+
+
 
     this.registerNodeType({
         type: 'event:current_user',
