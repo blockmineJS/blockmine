@@ -24,6 +24,7 @@ const VisualEditorCanvas = () => {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    onDelete,
     availableNodes,
     addNode,
     isMenuOpen,
@@ -99,6 +100,9 @@ const VisualEditorCanvas = () => {
         onPaneClick={handlePaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onNodesDelete={(nodes) => onDelete(nodes, [])}
+        onEdgesDelete={(edges) => onDelete([], edges)}
+        deleteKeyCode={['Delete', 'Backspace']}
         fitView
       >
         <Background />
