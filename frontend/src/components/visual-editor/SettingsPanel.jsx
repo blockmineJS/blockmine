@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2 } from 'lucide-react';
 
 const SettingsPanel = () => {
-  const { command, updateCommand, addArgument, updateArgument, removeArgument, permissions } = useVisualEditorStore();
+  const { command, updateCommand, addArgument, updateArgument, removeArgument, permissions, chatTypes } = useVisualEditorStore();
 
   if (!command) {
     return <div className="p-4">Загрузка настроек...</div>;
@@ -40,7 +40,7 @@ const SettingsPanel = () => {
       </div>
 
       <div>
-        <Label htmlFor="command-aliases">Псевдонимы (через запятую)</Label>
+        <Label htmlFor="command-aliases">Алиасы (через запятую)</Label>
         <Input
           id="command-aliases"
           value={command.aliases.join(', ')}
@@ -61,17 +61,16 @@ const SettingsPanel = () => {
             {permissions.map(perm => (
               <SelectItem key={perm.id} value={perm.id.toString()}>{perm.name}</SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
+        </SelectContent>
+      </Select>
+    </div>
 
-      <div>
-        <Label htmlFor="command-cooldown">Кулдаун (сек)</Label>
+      <div className="space-y-2">
+        <Label>Типы чатов (через запятую)</Label>
         <Input
-          id="command-cooldown"
-          type="number"
-          value={command.cooldown}
-          onChange={(e) => updateCommand({ cooldown: parseInt(e.target.value, 10) || 0 })}
+          id="command-chat-types"
+          value={(command.allowedChatTypes || []).join(', ')}
+          onChange={(e) => updateCommand({ allowedChatTypes: e.target.value.split(',').map(s => s.trim()) })}
         />
       </div>
 

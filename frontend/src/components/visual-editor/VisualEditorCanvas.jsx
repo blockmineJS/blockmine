@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useEffect } from 'react';
 import ReactFlow, { Background, Controls, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -18,20 +18,21 @@ const VisualEditorCanvas = () => {
   const menuRef = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
 
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    onDelete,
-    availableNodes,
-    addNode,
-    isMenuOpen,
-    menuPosition,
-    openMenu,
-    closeMenu
-  } = useVisualEditorStore();
+  const nodes = useVisualEditorStore(state => state.nodes);
+  const edges = useVisualEditorStore(state => state.edges);
+  const onNodesChange = useVisualEditorStore(state => state.onNodesChange);
+  const onEdgesChange = useVisualEditorStore(state => state.onEdgesChange);
+  const onConnect = useVisualEditorStore(state => state.onConnect);
+  const onDelete = useVisualEditorStore(state => state.onDelete);
+  const availableNodes = useVisualEditorStore(state => state.availableNodes);
+  const isMenuOpen = useVisualEditorStore(state => state.isMenuOpen);
+  const menuPosition = useVisualEditorStore(state => state.menuPosition);
+  const openMenu = useVisualEditorStore(state => state.openMenu);
+  const closeMenu = useVisualEditorStore(state => state.closeMenu);
+  const setConnectingPin = useVisualEditorStore(state => state.setConnectingPin);
+  const connectAndAddNode = useVisualEditorStore(state => state.connectAndAddNode);
+  const addNode = useVisualEditorStore(state => state.addNode);
+  const connectingPin = useVisualEditorStore(state => state.connectingPin);
 
   const nodeTypes = useMemo(() => {
     const types = {};
@@ -39,7 +40,7 @@ const VisualEditorCanvas = () => {
       types[node.type] = CustomNode;
     });
     return types;
-  }, [availableNodes]);
+  }, []);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -75,17 +76,82 @@ const VisualEditorCanvas = () => {
   );
 
   const handleAddNodeFromMenu = (nodeType) => {
+    if (connectingPin) {
+      connectAndAddNode(nodeType, menuPosition.flowPosition);
+    } else {
       if (menuPosition && menuPosition.flowPosition) {
-          addNode(nodeType, menuPosition.flowPosition);
+        addNode(nodeType, menuPosition.flowPosition);
       }
-      closeMenu();
+    }
+    closeMenu();
   };
 
-  const handlePaneClick = useCallback((event) => {
-    if (menuRef.current && !menuRef.current.contains(event.target)) {
-      closeMenu();
+  const onConnectEnd = useCallback(
+    (event) => {
+      const freshConnectingPin = useVisualEditorStore.getState().connectingPin;
+      if (!freshConnectingPin) return;
+
+      const targetIsPane = event.target.classList.contains('react-flow__pane');
+      if (targetIsPane) {
+        const position = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+        openMenu(event.clientY, event.clientX, position);
+      } else {
+        setConnectingPin(null);
+      }
+    },
+    [screenToFlowPosition, openMenu, setConnectingPin]
+  );
+
+  const onConnectStart = useCallback((_, { nodeId, handleId, handleType }) => {
+    const sourceNode = nodes.find(n => n.id === nodeId);
+    if (!sourceNode) return;
+    setConnectingPin({ nodeId, handleId, handleType, nodeType: sourceNode.type });
+  }, [nodes, setConnectingPin]);
+
+  const filteredNodes = useMemo(() => {
+    if (!connectingPin) {
+      return availableNodes;
     }
-  }, [closeMenu])
+    const allAvailableNodes = Object.values(availableNodes).flat();
+    const sourceNodeConfig = allAvailableNodes.find(n => n.type === connectingPin.nodeType);
+    if (!sourceNodeConfig) return availableNodes;
+
+    const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.handleId);
+    if (!sourcePin) return availableNodes;
+
+    const filtered = {};
+    Object.entries(availableNodes).forEach(([category, nodesInCategory]) => {
+      const compatibleNodes = nodesInCategory.filter(node =>
+        node.inputs.some(inputPin => inputPin.type === sourcePin.type || inputPin.type === 'Wildcard' || sourcePin.type === 'Wildcard')
+      );
+      if (compatibleNodes.length > 0) {
+        filtered[category] = compatibleNodes;
+      }
+    });
+    return filtered;
+  }, [JSON.stringify(availableNodes)]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        closeMenu();
+      }
+    };
+
+    if (isMenuOpen) {
+      // Use capture phase to catch event before ReactFlow stops propagation
+      document.addEventListener('mousedown', handleClickOutside, true);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    };
+  }, [isMenuOpen, closeMenu]);
 
   return (
     <div style={{ height: '100%', width: '100%' }} ref={reactFlowWrapper}>
@@ -97,9 +163,10 @@ const VisualEditorCanvas = () => {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         onPaneContextMenu={onPaneContextMenu}
-        onPaneClick={handlePaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onNodesDelete={(nodes) => onDelete(nodes, [])}
         onEdgesDelete={(edges) => onDelete([], edges)}
         deleteKeyCode={['Delete', 'Backspace']}
@@ -117,7 +184,7 @@ const VisualEditorCanvas = () => {
               <CommandInput placeholder="Type a command or search..." />
               <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
-                  {Object.entries(availableNodes).map(([category, nodes]) => (
+                  {Object.entries(filteredNodes).map(([category, nodes]) => (
                     <CommandGroup key={category} heading={category}>
                       {nodes.map(node => (
                         <CommandItem key={node.type} value={node.type} onSelect={() => handleAddNodeFromMenu(node.type)} disabled={false}>
