@@ -87,6 +87,35 @@ class GraphExecutionEngine {
         // Возвращаем ID стандартного выходного пина, чтобы traverse знал, куда идти дальше
         return 'exec'; 
       }
+      case 'action:server_command': {
+        const command = await this.resolvePinValue(node, 'command', '');
+        
+        if (command) {
+          console.log(`[Graph] Выполнение серверной команды: ${command}`);
+          // Выполняем команду от имени бота
+          this.context.bot.executeCommand(command);
+        }
+        
+        return 'exec';
+      }
+      case 'flow:branch': {
+        const condition = await this.resolvePinValue(node, 'condition', false);
+        
+        // Возвращаем соответствующий выходной пин в зависимости от условия
+        return condition ? 'exec_true' : 'exec_false';
+      }
+      case 'flow:sequence': {
+        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+        const execPins = nodeConfig.outputs.filter(p => p.type === 'Exec');
+        
+        // Последовательно запускаем каждую ветку
+        for (const pin of execPins) {
+          await this.traverse(node, pin.id);
+        }
+
+        // У этой ноды нет единого выхода, поэтому возвращаем null
+        return null;
+      }
       // Другие ноды будут добавлены здесь
       default:
         console.warn(`Логика для ноды ${node.type} еще не реализована.`);
@@ -143,6 +172,53 @@ class GraphExecutionEngine {
         else if (pinId === 'chat_type') result = this.context.typeChat;
         else result = null;
         break;
+      case 'data:check_permission': {
+        const user = await this.resolvePinValue(node, 'user', null);
+        const permission = await this.resolvePinValue(node, 'permission', '');
+        if (user && permission) {
+          result = user.permission === permission;
+        } else {
+          result = false;
+        }
+        break;
+      }
+      case 'data:get_user_field': {
+        const user = await this.resolvePinValue(node, 'user', null);
+        if (user) {
+          switch (pinId) {
+            case 'username':
+              result = user.username;
+              break;
+            case 'groups':
+              result = user.groups;
+              break;
+            case 'is_blacklisted':
+              result = user.is_blacklisted;
+              break;
+            default:
+              result = null;
+          }
+        } else {
+          result = null;
+        }
+        break;
+      }
+      case 'data:get_argument': {
+        const args = await this.resolvePinValue(node, 'args', {});
+        const argName = await this.resolvePinValue(node, 'arg_name', '');
+        if (args && argName && args[argName] !== undefined) {
+          result = args[argName];
+        } else {
+          result = null;
+        }
+        break;
+      }
+      case 'data:concat_strings': {
+        const a = await this.resolvePinValue(node, 'a', '');
+        const b = await this.resolvePinValue(node, 'b', '');
+        result = a + b;
+        break;
+      }
       case 'data:string_literal':
         result = node.data.value || '';
         break;

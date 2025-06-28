@@ -4,7 +4,7 @@ import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
-import VisualEditorCanvas from '@/components/visual-editor/VisualEditorCanvas';
+import VisualEditor from '@/components/visual-editor/VisualEditorPage';
 import NodePanel from '@/components/visual-editor/NodePanel';
 import SettingsPanel from '@/components/visual-editor/SettingsPanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
@@ -40,7 +40,7 @@ const VisualEditorPage = () => {
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
-            <VisualEditorCanvas />
+      <VisualEditor />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={20}>

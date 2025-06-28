@@ -1,16 +1,22 @@
-import React, { useMemo, useRef, useCallback, useState } from 'react';
-import ReactFlow, { Background, Controls } from 'reactflow';
+import React, { useMemo, useRef, useCallback } from 'react';
+import ReactFlow, { Background, Controls, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useReactFlow } from 'reactflow';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import CustomNode from './CustomNode';
 
 const VisualEditorCanvas = () => {
   const reactFlowWrapper = useRef(null);
+  const menuRef = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
-  const [menuPosition, setMenuPosition] = useState(null);
 
   const {
     nodes,
@@ -19,7 +25,11 @@ const VisualEditorCanvas = () => {
     onEdgesChange,
     onConnect,
     availableNodes,
-    addNode
+    addNode,
+    isMenuOpen,
+    menuPosition,
+    openMenu,
+    closeMenu
   } = useVisualEditorStore();
 
   const nodeTypes = useMemo(() => {
@@ -50,19 +60,34 @@ const VisualEditorCanvas = () => {
     },
     [screenToFlowPosition, addNode]
   );
-  
-  const handleContextMenu = (event) => {
+
+  const onPaneContextMenu = useCallback(
+    (event) => {
       event.preventDefault();
-      setMenuPosition({ top: event.clientY, left: event.clientX });
-  };
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      openMenu(event.clientY, event.clientX, position);
+    },
+    [screenToFlowPosition]
+  );
 
   const handleAddNodeFromMenu = (nodeType) => {
-      addNode(nodeType, screenToFlowPosition(menuPosition));
-      setMenuPosition(null);
+      if (menuPosition && menuPosition.flowPosition) {
+          addNode(nodeType, menuPosition.flowPosition);
+      }
+      closeMenu();
   };
 
+  const handlePaneClick = useCallback((event) => {
+    if (menuRef.current && !menuRef.current.contains(event.target)) {
+      closeMenu();
+    }
+  }, [closeMenu])
+
   return (
-    <div style={{ height: '100%', width: '100%' }} ref={reactFlowWrapper} onDragOver={onDragOver} onDrop={onDrop} onContextMenu={handleContextMenu}>
+    <div style={{ height: '100%', width: '100%' }} ref={reactFlowWrapper}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -70,25 +95,35 @@ const VisualEditorCanvas = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        onPaneContextMenu={onPaneContextMenu}
+        onPaneClick={handlePaneClick}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         fitView
       >
         <Background />
         <Controls />
       </ReactFlow>
-      {menuPosition && (
-          <div style={{ top: menuPosition.top, left: menuPosition.left, position: 'absolute', zIndex: 10 }}>
-            <ContextMenu open={true} onOpenChange={() => setMenuPosition(null)}>
-                <ContextMenuTrigger />
-                <ContextMenuContent>
-                    {Object.entries(availableNodes).map(([category, nodes]) => (
-                        <React.Fragment key={category}>
-                        {nodes.map(node => (
-                            <ContextMenuItem key={node.type} onClick={() => handleAddNodeFromMenu(node.type)}>{node.label}</ContextMenuItem>
-                        ))}
-                        </React.Fragment>
-                    ))}
-                </ContextMenuContent>
-            </ContextMenu>
+      {isMenuOpen && (
+          <div
+            ref={menuRef}
+            style={{ top: menuPosition.top, left: menuPosition.left, position: 'absolute', zIndex: 10 }}
+          >
+            <Command>
+              <CommandInput placeholder="Type a command or search..." />
+              <CommandList>
+                <CommandEmpty>No results found.</CommandEmpty>
+                  {Object.entries(availableNodes).map(([category, nodes]) => (
+                    <CommandGroup key={category} heading={category}>
+                      {nodes.map(node => (
+                        <CommandItem key={node.type} value={node.type} onSelect={() => handleAddNodeFromMenu(node.type)} disabled={false}>
+                          {node.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ))}
+              </CommandList>
+            </Command>
           </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -16,8 +16,14 @@ const pinColors = {
 
 function CustomNode({ data, type, id: nodeId }) {
   // Получаем полную конфигурацию этой ноды из нашего store
-  const { availableNodes, updateNodeData, edges } = useVisualEditorStore();
-  const nodeConfig = Object.values(availableNodes).flat().find(n => n.type === type);
+  const availableNodes = useVisualEditorStore(state => state.availableNodes);
+  const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
+  const edges = useVisualEditorStore(state => state.edges);
+
+  const nodeConfig = useMemo(() => 
+    Object.values(availableNodes).flat().find(n => n.type === type), 
+    [availableNodes, type]
+  );
 
   if (!nodeConfig) {
     return <div>Неизвестный тип ноды: {type}</div>;

@@ -860,6 +860,20 @@ router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, re
     }
 });
 
+router.get('/:botId/visual-editor/permissions', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const permissions = await prisma.permission.findMany({ 
+            where: { botId },
+            orderBy: { name: 'asc' }
+        });
+        res.json(permissions);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/permissions GET:', error);
+        res.status(500).json({ error: 'Failed to get permissions' });
+    }
+});
+
 // Create a new visual command
 router.post('/:botId/commands/visual', authorize('management:edit'), async (req, res) => {
     try {
