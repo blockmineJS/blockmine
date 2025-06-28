@@ -3,6 +3,7 @@ const { param, body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 const { authorize } = require('../middleware/auth');
 const logger = require('../../lib/logger');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
@@ -217,11 +218,60 @@ router.post('/import',
     const { name, graphJson, variables, triggers } = req.body;
 
     try {
+      const graph = JSON.parse(graphJson);
+      const idMap = new Map();
+
+      // 1. Создаём карту соответствия: старый ID -> новый ID
+      if (graph.nodes && Array.isArray(graph.nodes)) {
+        graph.nodes.forEach(node => {
+          if (node && node.id) {
+            const oldId = node.id;
+            const newId = `node_${crypto.randomUUID()}`;
+            idMap.set(oldId, newId);
+            node.id = newId;
+          }
+        });
+      }
+
+      // 2. Обновляем связи (обрабатываем и 'edges' и 'connections' для совместимости)
+      const connectionList = graph.edges || graph.connections;
+      const updatedConnections = [];
+      if (connectionList && Array.isArray(connectionList)) {
+        connectionList.forEach(conn => {
+          if (conn && (conn.source || conn.sourceNodeId) && (conn.target || conn.targetNodeId)) {
+            const oldSourceId = conn.source || conn.sourceNodeId;
+            const oldTargetId = conn.target || conn.targetNodeId;
+
+            const newSourceId = idMap.get(oldSourceId);
+            const newTargetId = idMap.get(oldTargetId);
+
+            // Сохраняем связь, только если оба узла были найдены и переименованы
+            if (newSourceId && newTargetId) {
+              conn.id = `edge_${crypto.randomUUID()}`;
+              conn.sourceNodeId = newSourceId;
+              conn.targetNodeId = newTargetId;
+              
+              // Удаляем старые/неправильные ключи
+              delete conn.source;
+              delete conn.target;
+              
+              updatedConnections.push(conn);
+            }
+          }
+        });
+
+        // Заменяем старый список связей на новый, отфильтрованный и обновлённый
+        graph.connections = updatedConnections;
+        delete graph.edges;
+      }
+
+      const newGraphJson = JSON.stringify(graph);
+
       const newGraph = await prisma.eventGraph.create({
         data: {
           botId: parseInt(botId),
           name: `${name} (копия)`,
-          graphJson: graphJson,
+          graphJson: newGraphJson,
           variables: variables || '[]',
           isEnabled: false, // Импортированный граф по умолчанию выключен
           triggers: {

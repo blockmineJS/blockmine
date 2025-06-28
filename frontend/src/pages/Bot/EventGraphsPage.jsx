@@ -85,15 +85,12 @@ function EventGraphList({ botId }) {
           setIsImportDialogOpen(false);
           fetchEventGraphs();
         }}
-        onCancel={() => setIsImportDialogOpen(false)}
       />
-      {sharingGraphId && (
-        <ShareEventGraphDialog
-          botId={botId}
-          graphId={sharingGraphId}
-          onCancel={() => setSharingGraphId(null)}
-        />
-      )}
+      <ShareEventGraphDialog
+        botId={botId}
+        graphId={sharingGraphId}
+        onCancel={() => setSharingGraphId(null)}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {eventGraphs.map(graph => (
           <Card key={graph.id}>

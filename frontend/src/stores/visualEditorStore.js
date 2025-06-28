@@ -249,28 +249,8 @@ export const useVisualEditorStore = create((set, get) => ({
       const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
       if (!nodeToUpdate) return state;
 
-      const newPinCount = newData.pinCount;
-      if (newPinCount && newPinCount > (nodeToUpdate.data.pinCount || 2)) {
-        const newPinId = `pin_${newPinCount - 1}`;
-        const newPinName = String.fromCharCode(65 + newPinCount -1); // A, B, C...
-        if (!nodeToUpdate.inputs) {
-            nodeToUpdate.inputs = [];
-        }
-        if (!nodeToUpdate.inputs.find(p => p.id === newPinId)) {
-            nodeToUpdate.inputs.push({ id: newPinId, name: newPinName, type: 'Boolean', required: true });
-        }
-      }
-
-      const newEntries = Object.entries(newData);
-      const isChanged = newEntries.some(([key, value]) => nodeToUpdate.data[key] !== value);
-
-      if (!isChanged) return state;
-
-      const updatedNodes = state.nodes.map(node =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node
-      );
-      
-      return { nodes: updatedNodes };
+      const updatedNode = { ...nodeToUpdate, data: { ...nodeToUpdate.data, ...newData } };
+      return { nodes: state.nodes.map(node => (node.id === nodeId ? updatedNode : node)) };
     });
   },
 
@@ -316,44 +296,44 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   saveGraph: async (botId) => {
-    const { command, nodes, edges, editorType } = get();
-    if (!command) return;
     set({ isSaving: true });
-    try {
-      const connections = edges.map(edge => ({
+    const { nodes, edges, command, editorType } = get();
+
+    const graphToSave = {
+      nodes,
+      connections: edges.map(edge => ({
         id: edge.id,
         sourceNodeId: edge.source,
         targetNodeId: edge.target,
         sourcePinId: edge.sourceHandle,
         targetPinId: edge.targetHandle,
-      }));
+      })),
+    };
+    
+    const url = editorType === 'command'
+      ? `/api/bots/${botId}/commands/${command.id}`
+      : `/api/bots/${botId}/event-graphs/${command.id}`;
 
-      const graphJson = JSON.stringify({ nodes, connections });
-      
-      let endpoint;
-      let payload;
+    const payload = {
+      name: command.name,
+      graphJson: JSON.stringify(graphToSave),
+      isEnabled: command.isEnabled
+    };
 
-      if (editorType === 'command') {
-        endpoint = `/api/bots/${botId}/commands/${command.id}/visual`;
-        payload = { graphJson }; 
-      } else { // event
-        endpoint = `/api/bots/${botId}/event-graphs/${command.id}`;
-        const triggerNodes = nodes.filter(n => n.type.startsWith('event:')).map(n => n.type.split(':')[1]);
-        payload = { 
-            name: command.name, 
-            isEnabled: command.isEnabled, 
-            graphJson, 
-            triggers: triggerNodes,
-            variables: command.variables || []
-        }; 
-      }
+    if (editorType === 'command') {
+      payload.description = command.description;
+      payload.cooldown = command.cooldown;
+      payload.aliases = command.aliases;
+      payload.permissionId = command.permissionId;
+      payload.allowedChatTypes = command.allowedChatTypes;
+      payload.argumentsJson = command.argumentsJson;
+    } else { // event
+      payload.variables = command.variables;
+      payload.triggers = command.triggers.map(t => t.eventType || t); // Handle both object and string array
+    }
 
-      await apiHelper(endpoint, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      });
-
-      console.log("Граф успешно сохранен!");
+    try {
+      await apiHelper(url, { method: 'PUT', body: payload });
     } catch (error) {
       console.error("Ошибка сохранения графа:", error);
     } finally {
