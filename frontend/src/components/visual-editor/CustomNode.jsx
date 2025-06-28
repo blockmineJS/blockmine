@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { AutosizeInput } from '@/components/ui/AutosizeInput';
 const pinColors = {
   Exec: '#ffffff',
   Boolean: '#dc2626', // red-600
@@ -49,34 +49,44 @@ function CustomNode({ data, type, id: nodeId }) {
   };
 
   return (
-    <Card className="w-64 bg-slate-800 border-slate-600 text-white">
+    <Card className="min-w-64 bg-slate-800 border-slate-600 text-white">
       <CardHeader className="bg-slate-700 p-2 rounded-t-lg">
         <CardTitle className="text-sm text-center">{nodeConfig.label}</CardTitle>
       </CardHeader>
-      <CardContent className="p-0 flex justify-between">
-        <div className="inputs w-1/2 flex flex-col items-start">
-          {nodeConfig.inputs.map(pin => {
-            const hasConnection = edges.some(edge => edge.target === nodeId && edge.targetHandle === pin.id);
-            if (pin.type === 'Exec') {
-              return renderPin(pin, true);
-            }
-            return (
-              <div key={pin.id} className="relative p-2 flex items-center w-full">
-                {renderPin(pin, true)}
-                {!hasConnection && (
-                  <Input 
-                    className="nodrag bg-slate-900 border-slate-500 h-8 ml-2"
-                    type="text"
-                    value={data[pin.id] || ''}
-                    onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
-                  />
-                )}
+      <CardContent className="p-2 flex flex-col">
+        <div className="flex justify-between w-full">
+          <div className="inputs flex flex-col items-start">
+            {nodeConfig.inputs.map(pin => {
+              const hasConnection = edges.some(edge => edge.target === nodeId && edge.targetHandle === pin.id);
+              if (pin.type === 'Exec') {
+                return renderPin(pin, true);
+              }
+              return (
+                <div key={pin.id} className="relative p-2 flex items-center w-full">
+                  {renderPin(pin, true)}
+                  {!hasConnection && (
+                    <AutosizeInput
+                      className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
+                      value={data[pin.id] || ''}
+                      onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            {type === 'data:string_literal' && (
+              <div className="p-2">
+                <AutosizeInput
+                  className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden w-full"
+                  value={data.value || ''}
+                  onChange={(e) => updateNodeData(nodeId, { value: e.target.value })}
+                />
               </div>
-            );
-          })}
-        </div>
-        <div className="outputs w-1/2 flex flex-col items-end">
-          {nodeConfig.outputs.map(pin => renderPin(pin, false))}
+            )}
+          </div>
+          <div className="outputs flex flex-col items-end">
+            {nodeConfig.outputs.map(pin => renderPin(pin, false))}
+          </div>
         </div>
       </CardContent>
     </Card>

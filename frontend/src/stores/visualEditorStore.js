@@ -29,9 +29,17 @@ export const useVisualEditorStore = create((set, get) => ({
         sourceHandle: conn.sourcePinId,
         targetHandle: conn.targetPinId,
       }));
+
+      const initialNodes = (graph.nodes || []).map(node => {
+        if (node.type === 'event:command') {
+          return { ...node, deletable: false, draggable: false };
+        }
+        return node;
+      });
+
       set({
         command: commandData,
-        nodes: graph.nodes || [],
+        nodes: initialNodes,
         edges: reactFlowEdges,
         availableNodes: availableNodesData,
         permissions: permissionsData,
@@ -68,6 +76,23 @@ export const useVisualEditorStore = create((set, get) => ({
 
   onConnect: (connection) => {
     set({ edges: addEdge(connection, get().edges) });
+  },
+
+  onDelete: (nodesToRemove, edgesToRemove) => {
+    const nodes = get().nodes;
+    const edges = get().edges;
+
+    const deletableNodes = nodesToRemove.filter(node => node.type !== 'event:command');
+    const deletableNodeIds = deletableNodes.map(node => node.id);
+
+    const nextNodes = nodes.filter(node => !deletableNodeIds.includes(node.id));
+    const nextEdges = edges.filter(edge => 
+        !deletableNodeIds.includes(edge.source) && 
+        !deletableNodeIds.includes(edge.target) &&
+        !edgesToRemove.some(e => e.id === edge.id)
+    );
+
+    set({ nodes: nextNodes, edges: nextEdges });
   },
 
   addNode: (type, position, shouldUpdateState = true) => {
@@ -167,9 +192,15 @@ export const useVisualEditorStore = create((set, get) => ({
         targetPinId: edge.targetHandle,
       }));
       const graphJson = JSON.stringify({ nodes, connections });
+
+      const commandToSave = {
+        ...command,
+        graphJson: graphJson,
+      };
+
       await apiHelper(`/api/bots/${botId}/commands/${command.id}/visual`, {
         method: 'PUT',
-        body: JSON.stringify({ graphJson }),
+        body: JSON.stringify(commandToSave),
       });
       // Тут хорошо бы показать toast
       console.log("Граф успешно сохранен!");
