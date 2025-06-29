@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload } from 'lucide-react';
 import { apiHelper } from '@/lib/api';
 
-export default function ImportEventGraphDialog({ botId, open, onOpenChange, onImportSuccess }) {
+export default function ImportCommandDialog({ botId, open, onOpenChange, onImportSuccess }) {
     const [jsonInput, setJsonInput] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const { toast } = useToast();
@@ -23,13 +23,14 @@ export default function ImportEventGraphDialog({ botId, open, onOpenChange, onIm
 
         setIsImporting(true);
         try {
-            await apiHelper(`/api/bots/${botId}/event-graphs/import`, {
+            await apiHelper(`/api/bots/${botId}/commands/import`, {
                 method: 'POST',
                 body: JSON.stringify(importData),
-            }, `Граф события успешно импортирован.`);
+            }, `Команда успешно импортирована.`);
             
             onImportSuccess();
         } catch (error) {
+            // apiHelper уже показывает тост в случае ошибки
         } finally {
             setIsImporting(false);
         }
@@ -39,15 +40,15 @@ export default function ImportEventGraphDialog({ botId, open, onOpenChange, onIm
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Импорт графа события</DialogTitle>
+                    <DialogTitle>Импорт команды</DialogTitle>
                     <DialogDescription>
-                        Вставьте ранее скопированный код для импорта графа. Будет создан новый граф события.
+                        Вставьте ранее скопированный код для импорта команды. Будет создана новая команда.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label htmlFor="graph-json-input">Код для импорта</Label>
+                    <Label htmlFor="command-json-input">Код для импорта</Label>
                     <Textarea
-                        id="graph-json-input"
+                        id="command-json-input"
                         value={jsonInput}
                         onChange={(e) => setJsonInput(e.target.value)}
                         placeholder='Вставьте сюда JSON...'

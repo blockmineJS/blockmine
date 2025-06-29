@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { FilePenLine, Trash2 } from 'lucide-react';
+import { FilePenLine, Trash2, Share2, Upload } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CommandDetailDialog from './CommandDetailDialog';
@@ -12,6 +12,9 @@ import { CreateCommandDialog } from './CreateCommandDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { apiHelper } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
+import ShareCommandDialog from '../ShareCommandDialog';
+import ImportCommandDialog from '../ImportCommandDialog';
+
 const OWNER_TYPES = {
   SYSTEM: 'system'
 };
@@ -25,6 +28,8 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [commandToDelete, setCommandToDelete] = useState(null);
+    const [commandToShare, setCommandToShare] = useState(null);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
     const handleOpenModal = (command) => {
         if (command.isVisual) {
@@ -107,7 +112,13 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                         <CardTitle>Команды</CardTitle>
                         <CardDescription>Список всех команд, доступных боту. Кликните на строку для просмотра деталей и настроек.</CardDescription>
                     </div>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>Создать команду</Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Импорт
+                        </Button>
+                        <Button onClick={() => setIsCreateDialogOpen(true)}>Создать команду</Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
@@ -167,7 +178,10 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                                     <FilePenLine className="h-4 w-4 mr-2" />
                                                     Редактор
                                                 </Button>
-                                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
+                                                <Button variant="ghost" size="icon" title="Экспорт" onClick={(e) => { e.stopPropagation(); setCommandToShare(command); }}>
+                                                    <Share2 className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" title="Удалить" onClick={(e) => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -190,6 +204,24 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                     isSaving={isSaving}
                 />
             </Dialog>
+
+            <ImportCommandDialog
+                botId={botId}
+                open={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                onImportSuccess={() => {
+                    setIsImportDialogOpen(false);
+                    onDataChange();
+                }}
+            />
+
+            {commandToShare && (
+                <ShareCommandDialog
+                    botId={botId}
+                    commandId={commandToShare.id}
+                    onCancel={() => setCommandToShare(null)}
+                />
+            )}
 
             <CreateCommandDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreate={handleCreateCommand} />
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

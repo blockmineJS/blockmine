@@ -8,7 +8,6 @@ const crypto = require('crypto');
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
 
-// Get all event graphs for a bot
 router.get('/', 
   authorize('management:view'),
   async (req, res) => {
@@ -28,7 +27,6 @@ router.get('/',
           nodeCount = parsedGraph.nodes?.length || 0;
           edgeCount = parsedGraph.connections?.length || 0;
         } catch (e) {
-          // Игнорируем ошибки парсинга, оставляем счётчики по нулям
         }
       }
       return { ...graph, nodeCount, edgeCount };
@@ -38,7 +36,6 @@ router.get('/',
   }
 );
 
-// Create a new event graph
 router.post('/', 
   authorize('management:edit'),
   [body('name').isString().notEmpty()],
@@ -75,7 +72,6 @@ router.post('/',
   }
 );
 
-// Get a single event graph by ID
 router.get('/:graphId', 
   authorize('management:view'),
   [param('graphId').isInt()],
@@ -97,7 +93,6 @@ router.get('/:graphId',
   }
 );
 
-// Update an event graph
 router.put('/:graphId', 
   authorize('management:edit'),
   [
@@ -122,21 +117,15 @@ router.put('/:graphId',
       if (name !== undefined) dataToUpdate.name = name;
       if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
       
-      // graphJson - это строка, поэтому isJSON() уже проверил валидность.
-      // Просто присваиваем, если она есть.
       if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
 
       if (variables !== undefined) {
-          // Убедимся, что variables это строка JSON
           dataToUpdate.variables = Array.isArray(variables) ? JSON.stringify(variables) : variables;
       }
       
-      // Если пришли триггеры, используем вложенную запись
       if (triggers !== undefined) {
         dataToUpdate.triggers = {
-          // Сначала удаляем все старые триггеры для этого графа
           deleteMany: {},
-          // Затем создаем новые
           create: triggers.map(eventType => ({
             eventType,
           })),
@@ -146,7 +135,7 @@ router.put('/:graphId',
       const updatedGraph = await prisma.eventGraph.update({
         where: { id: parseInt(graphId) },
         data: dataToUpdate,
-        include: { triggers: true }, // Включаем триггеры в ответ
+        include: { triggers: true },
       });
 
       res.json(updatedGraph);
@@ -157,7 +146,6 @@ router.put('/:graphId',
   }
 );
 
-// Delete an event graph
 router.delete('/:graphId',
   authorize('management:edit'),
   [param('graphId').isInt()],
@@ -179,7 +167,6 @@ router.delete('/:graphId',
   }
 );
 
-// Export an event graph
 router.get('/:graphId/export',
   authorize('management:view'),
   [param('graphId').isInt()],
@@ -215,7 +202,6 @@ router.get('/:graphId/export',
   }
 );
 
-// Import an event graph
 router.post('/import',
   authorize('management:edit'),
   [
@@ -237,7 +223,6 @@ router.post('/import',
       const graph = JSON.parse(graphJson);
       const idMap = new Map();
 
-      // 1. Создаём карту соответствия: старый ID -> новый ID
       if (graph.nodes && Array.isArray(graph.nodes)) {
         graph.nodes.forEach(node => {
           if (node && node.id) {
@@ -249,7 +234,6 @@ router.post('/import',
         });
       }
 
-      // 2. Обновляем связи (обрабатываем и 'edges' и 'connections' для совместимости)
       const connectionList = graph.edges || graph.connections;
       const updatedConnections = [];
       if (connectionList && Array.isArray(connectionList)) {
@@ -261,13 +245,11 @@ router.post('/import',
             const newSourceId = idMap.get(oldSourceId);
             const newTargetId = idMap.get(oldTargetId);
 
-            // Сохраняем связь, только если оба узла были найдены и переименованы
             if (newSourceId && newTargetId) {
               conn.id = `edge_${crypto.randomUUID()}`;
               conn.sourceNodeId = newSourceId;
               conn.targetNodeId = newTargetId;
               
-              // Удаляем старые/неправильные ключи
               delete conn.source;
               delete conn.target;
               
@@ -276,7 +258,6 @@ router.post('/import',
           }
         });
 
-        // Заменяем старый список связей на новый, отфильтрованный и обновлённый
         graph.connections = updatedConnections;
         delete graph.edges;
       }
@@ -289,7 +270,7 @@ router.post('/import',
           name: `${name} (копия)`,
           graphJson: newGraphJson,
           variables: variables || '[]',
-          isEnabled: false, // Импортированный граф по умолчанию выключен
+          isEnabled: false,
           triggers: {
             create: (triggers || []).map(eventType => ({ eventType })),
           },
@@ -307,7 +288,6 @@ router.post('/import',
   }
 );
 
-// Duplicate an event graph
 router.post('/:graphId/duplicate',
   authorize('management:edit'),
   [param('graphId').isInt()],

@@ -1,24 +1,24 @@
 /**
  * @typedef {object} NodePin
- * @property {string} id - Unique pin identifier (e.g., "exec", "data_result").
- * @property {string} name - Human-readable pin name.
- * @property {string} type - Pin data type ("Exec", "String", "Boolean", etc.).
- * @property {boolean} [required] - Whether this pin is required.
+ * @property {string} id - Уникальный идентификатор пина (например, "exec", "data_result").
+ * @property {string} name - Читаемое имя пина.
+ * @property {string} type - Тип данных пина ("Exec", "String", "Boolean" и т.д.).
+ * @property {boolean} [required] - Является ли этот пин обязательным.
  */
 
 /**
  * @typedef {object} NodeConfig
- * @property {string} type - Unique node type identifier (e.g., "action:send_message").
- * @property {string} label - Human-readable node name.
- * @property {string} category - Category for UI grouping.
- * @property {string} description - Node description.
- * @property {NodePin[]} inputs - Array of input pin descriptions.
- * @property {NodePin[]} outputs - Array of output pin descriptions.
- * @property {Function} [executor] - Function to execute this node (for backend).
+ * @property {string} type - Уникальный идентификатор типа узла (например, "action:send_message").
+ * @property {string} label - Читаемое имя узла.
+ * @property {string} category - Категория для группировки в интерфейсе.
+ * @property {string} description - Описание узла.
+ * @property {NodePin[]} inputs - Массив описаний входных пинов.
+ * @property {NodePin[]} outputs - Массив описаний выходных пинов.
+ * @property {Function} [executor] - Функция для выполнения этого узла (на бэкенде).
  */
 
 /**
- * Registry for managing all available node types.
+ * Реестр для управления всеми доступными типами узлов.
  */
 class NodeRegistry {
   constructor() {
@@ -27,8 +27,8 @@ class NodeRegistry {
   }
 
   /**
-   * Registers a new node type.
-   * @param {NodeConfig} nodeConfig - Node configuration.
+   * Регистрирует новый тип узла.
+   * @param {NodeConfig} nodeConfig - Конфигурация узла.
    */
   registerNodeType(nodeConfig) {
     if (!nodeConfig.type) {
@@ -44,8 +44,8 @@ class NodeRegistry {
   }
 
   /**
-   * Gets a node configuration by type.
-   * @param {string} nodeType - Node type identifier.
+   * Получает конфигурацию узла по его типу.
+   * @param {string} nodeType - Идентификатор типа узла.
    * @returns {NodeConfig|undefined}
    */
   getNodeConfig(nodeType) {
@@ -53,7 +53,7 @@ class NodeRegistry {
   }
 
   /**
-   * Gets all registered node types.
+   * Получает все зарегистрированные типы узлов.
    * @returns {NodeConfig[]}
    */
   getAllNodes() {
@@ -61,9 +61,9 @@ class NodeRegistry {
   }
 
   /**
-   * Gets nodes grouped by category.
-   * @param {string} [graphType] - The type of graph ('command' or 'event') to filter nodes for.
-   * @returns {Object.<string, NodeConfig[]>}
+   * Возвращает узлы, сгруппированные по категориям.
+   * @param {string} [graphType] - Тип графа ('command' или 'event') для фильтрации узлов.
+   * @returns {Object.<string, NodeConfig[]>} - Объект с узлами, сгруппированными по категориям.
    */
   getNodesByCategory(graphType) {
     const result = {};
@@ -79,8 +79,8 @@ class NodeRegistry {
   }
 
   /**
-   * Validates if a node type exists.
-   * @param {string} nodeType - Node type identifier.
+   * Проверяет, существует ли тип узла.
+   * @param {string} nodeType - Идентификатор типа узла.
    * @returns {boolean}
    */
   hasNodeType(nodeType) {
@@ -88,7 +88,7 @@ class NodeRegistry {
   }
 
   /**
-   * Registers the base node library.
+   * Регистрирует базовую библиотеку узлов.
    * @private
    */
   _registerBaseNodes() {
@@ -463,6 +463,22 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'data:length',
+      label: '📏 Размер (длина)',
+      category: 'Данные',
+      graphType: 'all',
+      description: 'Возвращает количество элементов в массиве или длину строки.',
+      pins: {
+        inputs: [
+          { id: 'data', name: 'Массив или Строка', type: 'Any', required: true }
+        ],
+        outputs: [
+          { id: 'length', name: 'Длина', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'string:contains',
       label: '🔍 Строка: Содержит',
       category: 'Строки',
@@ -642,6 +658,52 @@ class NodeRegistry {
         ],
         outputs: [
           { id: 'exec_out', name: 'Exec', type: 'Exec' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'math:random_number',
+      label: '🎲 Случайное число',
+      category: 'Математика',
+      graphType: 'all',
+      description: 'Генерирует случайное число в заданном диапазоне.',
+      pins: {
+        inputs: [
+          { id: 'min', name: 'Мин', type: 'Number' },
+          { id: 'max', name: 'Макс', type: 'Number' }
+        ],
+        outputs: [{ id: 'result', name: 'Результат', type: 'Number' }]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:get_random_element',
+      label: '🎲 Случайный элемент',
+      category: 'Данные',
+      graphType: 'all',
+      description: 'Возвращает случайный элемент из массива и его индекс.',
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true }
+        ],
+        outputs: [
+          { id: 'element', name: 'Элемент', type: 'Any' },
+          { id: 'index', name: 'Индекс', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:get_server_players',
+      label: '👥 Список игроков',
+      category: 'Данные',
+      graphType: 'all',
+      description: 'Возвращает массив с именами всех игроков на сервере.',
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'players', name: 'Игроки', type: 'Array' }
         ]
       }
     });

@@ -34,14 +34,11 @@ function sendPlayerList() {
     }
 }
 
-// --- НАЧАЛО ИЗМЕНЕНИЙ ---
-// Исправляем функцию для отправки событий в едином "плоском" формате
 function sendEvent(eventName, eventArgs) {
     if (process.send) {
         process.send({ type: 'event', eventType: eventName, args: eventArgs });
     }
 }
-// --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 async function fetchNewConfig(botId) {
     try {
@@ -504,7 +501,6 @@ process.on('message', async (message) => {
     } else if (message.type === 'action') {
         if (message.name === 'lookAt' && bot && message.payload.position) {
             const { x, y, z } = message.payload.position;
-            // Проверяем, что все координаты - числа, перед созданием Vec3
             if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
                 bot.lookAt(new Vec3(x, y, z));
             } else {
