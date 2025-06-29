@@ -94,7 +94,6 @@ class BotManager {
         }
     }
     
-    //... (все остальные методы до startBot остаются без изменений)
     async _ensureDefaultEventGraphs(botId) {
         return;
     }
@@ -167,7 +166,6 @@ class BotManager {
     }
 
     async _syncSystemPermissions(botId) {
-        // ... (этот метод без изменений)
         const systemPermissions = [
           { name: "admin.*", description: "Все права администратора" },
           { name: "admin.cooldown.bypass", description: "Обход кулдауна для админ-команд" },
@@ -214,7 +212,6 @@ class BotManager {
     }
 
     async updateAllResourceUsage() {
-        // ... (этот метод без изменений)
         if (this.bots.size === 0) {
             if (this.resourceUsage.size > 0) {
                 this.resourceUsage.clear();
@@ -254,7 +251,6 @@ class BotManager {
     }
 
     getFullState() {
-        // ... (этот метод без изменений)
         const statuses = {};
         this.bots.forEach((childProcess, botId) => {
              if (childProcess && !childProcess.killed) {
@@ -296,7 +292,6 @@ class BotManager {
         
         if (hasCriticalIssues) {
             this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен:');
-            // ... (логика ошибок зависимостей)
             this.emitStatusUpdate(botConfig.id, 'stopped', 'Ошибка зависимостей плагинов.');
             return { success: false, message: 'Критические ошибки в зависимостях плагинов.' };
         }
@@ -311,7 +306,6 @@ class BotManager {
 
         child.botConfig = botConfig;
 
-        // --- НАЧАЛО ИЗМЕНЕНИЙ: Единый обработчик сообщений ---
         child.on('message', async (message) => {
             const botId = botConfig.id;
             switch (message.type) {
@@ -333,7 +327,6 @@ class BotManager {
                     await this.handleCommandRegistration(botId, message.commandConfig);
                     break;
                 case 'request_user_action':
-                    // ... (логика без изменений)
                     const { requestId, payload } = message;
                     const { targetUsername, action, data } = payload;
                     try {
@@ -372,7 +365,6 @@ class BotManager {
                     break;
             }
         });
-        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         child.on('error', (err) => this.appendLog(botConfig.id, `[PROCESS FATAL] ${err.stack}`));
         child.stderr.on('data', (data) => this.appendLog(botConfig.id, `[STDERR] ${data.toString()}`));
@@ -398,7 +390,6 @@ class BotManager {
     }
 
     async handleCommandValidation(botConfig, message) {
-        // ... (этот метод без изменений)
         const { commandName, username, args, typeChat } = message;
         const botId = botConfig.id;
         try {
@@ -452,7 +443,6 @@ class BotManager {
     }
 
     async handleCommandRegistration(botId, commandConfig) {
-        // ... (этот метод без изменений)
         try {
             let permissionId = null;
             if (commandConfig.permissions) {
@@ -497,7 +487,6 @@ class BotManager {
     }
 
     stopBot(botId) {
-        // ... (этот метод без изменений)
         const child = this.bots.get(botId);
         if (child) {
             this.eventGraphManager.unloadGraphsForBot(botId);
@@ -509,7 +498,6 @@ class BotManager {
     }
     
     sendMessageToBot(botId, message, chatType = 'command', username = null) {
-        // ... (этот метод без изменений)
         const child = this.bots.get(botId);
         if (child) {
             child.send({ type: 'chat', payload: { message, chatType, username } });
@@ -519,7 +507,6 @@ class BotManager {
     }
 
     invalidateUserCache(botId, username) {
-        // ... (этот метод без изменений)
         RealUserService.clearCache(username, botId);
         const child = this.bots.get(botId);
         if (child) {

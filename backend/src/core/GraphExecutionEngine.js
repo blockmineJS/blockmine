@@ -1,5 +1,3 @@
-// File: backend/src/core/GraphExecutionEngine.js
-
 /**
  * Движок для выполнения визуальных команд, представленных в виде графа.
  */
@@ -69,11 +67,8 @@ class GraphExecutionEngine {
   }
 
   async executeNode(node) {
-      // Caching the execution of a node for the current traversal.
-      // This is a simple way to prevent infinite loops in graphs with cycles.
       const execCacheKey = `${node.id}_executed`;
       if (this.memo.has(execCacheKey)) {
-          // If we've already been here during this execution run, skip.
           return;
       }
       this.memo.set(execCacheKey, true);
@@ -109,9 +104,9 @@ class GraphExecutionEngine {
 
             if (target && this.context.bot?.lookAt) {
                 let finalPosition;
-                if (target.position) { // Entity
+                if (target.position) {
                     finalPosition = { ...target.position };
-                } else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) { // Vec3-like object
+                } else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) {
                     finalPosition = { ...target };
                 }
 
@@ -153,6 +148,12 @@ class GraphExecutionEngine {
               const value = await this.resolvePinValue(node, 'value');
               console.log('[Debug Log]', value);
               await this.traverse(node, 'exec_out');
+              break;
+          }
+          case 'math:random_number': {
+              const min = await this.resolvePinValue(node, 'min', 0);
+              const max = await this.resolvePinValue(node, 'max', 1);
+              result = Math.random() * (Number(max) - Number(min)) + Number(min);
               break;
           }
       }
@@ -213,6 +214,16 @@ class GraphExecutionEngine {
             break;
           }
           
+          case 'data:length': {
+              const data = await this.resolvePinValue(node, 'data');
+              if (Array.isArray(data) || typeof data === 'string') {
+                  result = data.length;
+              } else {
+                  result = 0;
+              }
+              break;
+          }
+          
           case 'math:operation': {
               const op = node.data?.operation || '+';
               const a = Number(await this.resolvePinValue(node, 'a', 0));
@@ -235,7 +246,7 @@ class GraphExecutionEngine {
                     inputs.push(await this.resolvePinValue(node, key, false));
                 }
             }
-            if (inputs.length === 0) { // Fallback for old nodes
+            if (inputs.length === 0) {
                 inputs.push(await this.resolvePinValue(node, 'a', false));
                 inputs.push(await this.resolvePinValue(node, 'b', false));
             }
@@ -251,13 +262,13 @@ class GraphExecutionEngine {
           }
 
           case 'string:concat': {
-            const numPins = node.data?.pinCount || 0;
-            const parts = [];
-            for (let i = 0; i < numPins; i++) {
+            const pinCount = node.data?.pinCount || 2;
+            let finalString = '';
+            for (let i = 0; i < pinCount; i++) {
                 const part = await this.resolvePinValue(node, `pin_${i}`, '');
-                parts.push(String(part ?? ''));
+                finalString += String(part ?? '');
             }
-            result = parts.join(node.data?.separator || '');
+            result = finalString;
             break;
           }
 
@@ -335,7 +346,18 @@ class GraphExecutionEngine {
 
           case 'array:get_random_element': {
               const arr = await this.resolvePinValue(node, 'array', []);
-              result = (!Array.isArray(arr) || arr.length === 0) ? null : arr[Math.floor(Math.random() * arr.length)];
+              if (!Array.isArray(arr) || arr.length === 0) {
+                  result = null;
+              } else {
+                  const randomIndex = Math.floor(Math.random() * arr.length);
+                  // Чтобы не вычислять дважды, сохраняем индекс в memo
+                  this.memo.set(`${node.id}:index`, randomIndex);
+                  if (pinId === 'element') {
+                      result = arr[randomIndex];
+                  } else if (pinId === 'index') {
+                      result = randomIndex;
+                  }
+              }
               break;
           }
           case 'array:add_element': {

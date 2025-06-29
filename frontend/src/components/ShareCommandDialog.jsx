@@ -7,20 +7,20 @@ import { Copy, Loader2 } from 'lucide-react';
 import { apiHelper } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 
-export default function ShareEventGraphDialog({ botId, graphId, onCancel }) {
-    const [graphData, setGraphData] = useState(null);
+export default function ShareCommandDialog({ botId, commandId, onCancel }) {
+    const [commandData, setCommandData] = useState(null);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
-        const fetchGraphData = async () => {
-            if (!botId || !graphId) return;
+        const fetchCommandData = async () => {
+            if (!botId || !commandId) return;
             setLoading(true);
             try {
-                const data = await apiHelper(`/api/bots/${botId}/event-graphs/${graphId}/export`);
-                setGraphData(JSON.stringify(data, null, 2));
+                const data = await apiHelper(`/api/bots/${botId}/commands/${commandId}/export`);
+                setCommandData(JSON.stringify(data, null, 2));
             } catch (error) {
-                console.error("Не удалось получить данные графа:", error);
+                console.error("Не удалось получить данные команды:", error);
                 toast({
                     variant: 'destructive',
                     title: 'Ошибка',
@@ -32,14 +32,14 @@ export default function ShareEventGraphDialog({ botId, graphId, onCancel }) {
             }
         };
 
-        if (graphId) {
-            fetchGraphData();
+        if (commandId) {
+            fetchCommandData();
         }
-    }, [botId, graphId, onCancel, toast]);
+    }, [botId, commandId, onCancel, toast]);
 
     const handleCopy = () => {
-        if (graphData) {
-            navigator.clipboard.writeText(graphData);
+        if (commandData) {
+            navigator.clipboard.writeText(commandData);
             toast({
                 title: 'Скопировано!',
                 description: 'Код для импорта скопирован в буфер обмена.',
@@ -48,32 +48,32 @@ export default function ShareEventGraphDialog({ botId, graphId, onCancel }) {
     };
 
     return (
-        <Dialog open={!!graphId} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+        <Dialog open={!!commandId} onOpenChange={(isOpen) => !isOpen && onCancel()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Поделиться графом события</DialogTitle>
+                    <DialogTitle>Поделиться командой</DialogTitle>
                     <DialogDescription>
-                        Скопируйте этот код, чтобы импортировать граф события на другом боте или поделиться им.
+                        Скопируйте этот код, чтобы импортировать команду на другом боте или поделиться ей.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label htmlFor="graph-json">Код для импорта</Label>
+                    <Label htmlFor="command-json">Код для импорта</Label>
                     {loading ? (
                         <div className="flex items-center justify-center h-24">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
                     ) : (
                         <Textarea
-                            id="graph-json"
+                            id="command-json"
                             readOnly
-                            value={graphData || ''}
+                            value={commandData || ''}
                             className="h-64 font-mono text-xs"
                         />
                     )}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onCancel}>Закрыть</Button>
-                    <Button onClick={handleCopy} disabled={loading || !graphData}>
+                    <Button onClick={handleCopy} disabled={loading || !commandData}>
                         <Copy className="mr-2 h-4 w-4" />
                         Скопировать код
                     </Button>

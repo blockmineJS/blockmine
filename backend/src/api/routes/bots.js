@@ -9,8 +9,7 @@ const commandManager = require('../../core/system/CommandManager');
 const NodeRegistry = require('../../core/NodeRegistry');
 const { authenticate, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
-// const { setupBot, deleteBotData } = require('../../core/botSetup');
-// const { exportBot, importBot } = require('../../core/botArchiver');
+const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
 
 const multer = require('multer');
@@ -192,95 +191,6 @@ router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
-/*
-router.get('/:id/export', authorize('bot:export'), async (req, res) => {
-    try {
-        const botId = parseInt(req.params.id, 10);
-        const {
-            includeCommands = 'true',
-            includePermissions = 'true',
-            includePluginFiles = 'true'
-        } = req.query;
-
-        const bot = await prisma.bot.findUnique({
-            where: { id: botId },
-            include: { server: true, installedPlugins: true },
-        });
-
-        if (!bot) {
-            return res.status(404).json({ error: 'Бот не найден' });
-        }
-
-        const archive = archiver('zip', { zlib: { level: 9 } });
-        res.setHeader('Content-Disposition', `attachment; filename="bot-${bot.username}-export.zip"`);
-        res.setHeader('Content-Type', 'application/zip');
-        archive.pipe(res);
-
-        const exportMetadata = {
-            version: '1.2-configurable',
-            bot: {
-                username: bot.username,
-                prefix: bot.prefix,
-                note: bot.note,
-                server: { host: bot.server.host, port: bot.server.port, version: bot.server.version },
-                proxy: { host: bot.proxyHost, port: bot.proxyPort },
-            },
-            plugins: bot.installedPlugins.map(p => ({
-                name: p.name,
-                folderName: path.basename(p.path),
-                isEnabled: p.isEnabled,
-                settings: p.settings,
-                sourceUri: p.sourceType === 'GITHUB' ? p.sourceUri : null,
-            })),
-        };
-
-        if (includeCommands === 'true') {
-            exportMetadata.commands = await prisma.command.findMany({ where: { botId } });
-        }
-        if (includePermissions === 'true') {
-            exportMetadata.permissions = await prisma.permission.findMany({ where: { botId } });
-            exportMetadata.groups = await prisma.group.findMany({ where: { botId }, include: { permissions: { select: { permission: { select: { name: true } } } } } });
-            exportMetadata.users = await prisma.user.findMany({ where: { botId }, include: { groups: { select: { group: { select: { name: true } } } } } });
-        }
-
-        archive.append(JSON.stringify(exportMetadata, null, 2), { name: 'bot_export.json' });
-
-        if (includePluginFiles === 'true') {
-            for (const plugin of bot.installedPlugins) {
-                const pluginFolderName = path.basename(plugin.path);
-                try {
-                    const pluginPath = plugin.path;
-                    if ((await fs.stat(pluginPath)).isDirectory()) {
-                        archive.directory(pluginPath, `plugins/${pluginFolderName}`);
-                    }
-                } catch (err) {
-                    console.warn(`Could not add plugin ${plugin.name} to archive: ${err.message}`);
-                }
-            }
-        }
-        
-        await archive.finalize();
-
-    } catch (error) {
-        console.error('Bot export error:', error);
-        res.status(500).send({ message: 'Error exporting bot' });
-    }
-});
-
-router.post('/import', authorize('bot:import'), upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'Файл для импорта не найден' });
-    }
-
-    try {
-        const newBot = await importBot(req.file.buffer, prisma);
-        res.status(201).json(newBot);
-    } catch (error) {
-        console.error('Bot import error:', error);
-        res.status(500).json({ error: `Ошибка импорта: ${error.message}` });
-    }
-});
-*/
 
 router.get('/servers', authorize('bot:list'), async (req, res) => {
     try {
@@ -746,10 +656,8 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
     }
 });
 
-// Visual Command Editor endpoints
 const nodeRegistry = require('../../core/NodeRegistry'); 
 
-// Get available node types for the visual editor
 router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, res) => {
     try {
         const { graphType } = req.query;
@@ -790,7 +698,6 @@ router.get('/:botId/visual-editor/permissions', authorize('management:view'), as
     }
 });
 
-// Create a new visual command
 router.post('/:botId/commands/visual', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
@@ -835,7 +742,6 @@ router.post('/:botId/commands/visual', authorize('management:edit'), async (req,
     }
 });
 
-// Update a visual command
 router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
@@ -875,6 +781,106 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
         }
         console.error('[API Error] /commands/:commandId/visual PUT:', error);
         res.status(500).json({ error: 'Failed to update visual command' });
+    }
+});
+
+router.get('/:botId/commands/:commandId/export', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+
+        const command = await prisma.command.findUnique({
+            where: { id: commandId, botId: botId },
+        });
+
+        if (!command) {
+            return res.status(404).json({ error: 'Command not found' });
+        }
+
+        const exportData = {
+            version: '1.0',
+            type: 'command',
+            ...command
+        };
+        
+        delete exportData.id;
+        delete exportData.botId;
+
+        res.json(exportData);
+    } catch (error) {
+        console.error('Failed to export command:', error);
+        res.status(500).json({ error: 'Failed to export command' });
+    }
+});
+
+router.post('/:botId/commands/import', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const importData = req.body;
+
+        if (importData.type !== 'command') {
+            return res.status(400).json({ error: 'Invalid file type. Expected "command".' });
+        }
+
+        let commandName = importData.name;
+        let counter = 1;
+
+        // Check for name conflicts and append a suffix if needed
+        while (await prisma.command.findFirst({ where: { botId, name: commandName } })) {
+            commandName = `${importData.name}_imported_${counter}`;
+            counter++;
+        }
+
+        let finalGraphJson = importData.graphJson;
+
+        if (finalGraphJson && finalGraphJson !== 'null') {
+            const graph = JSON.parse(finalGraphJson);
+            const nodeIdMap = new Map();
+
+            // Рандомизация ID узлов
+            if (graph.nodes) {
+                graph.nodes.forEach(node => {
+                    const oldId = node.id;
+                    const newId = `${node.type}-${randomUUID()}`;
+                    nodeIdMap.set(oldId, newId);
+                    node.id = newId;
+                });
+            }
+
+            // Обновление и рандомизация ID связей
+            if (graph.connections) {
+                graph.connections.forEach(conn => {
+                    conn.id = `edge-${randomUUID()}`;
+                    conn.sourceNodeId = nodeIdMap.get(conn.sourceNodeId) || conn.sourceNodeId;
+                    conn.targetNodeId = nodeIdMap.get(conn.targetNodeId) || conn.targetNodeId;
+                });
+            }
+
+            finalGraphJson = JSON.stringify(graph);
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId: botId,
+                name: commandName,
+                description: importData.description,
+                aliases: importData.aliases,
+                permissionId: null, // Permissions are not imported directly for security
+                cooldown: importData.cooldown,
+                allowedChatTypes: importData.allowedChatTypes,
+                isVisual: importData.isVisual,
+                isEnabled: importData.isEnabled,
+                argumentsJson: importData.argumentsJson,
+                graphJson: finalGraphJson,
+                owner: 'visual_editor',
+            }
+        });
+
+        BotManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        console.error("Failed to import command:", error);
+        res.status(500).json({ error: 'Failed to import command' });
     }
 });
 
@@ -962,7 +968,6 @@ router.get('/:botId/event-graphs/:graphId', authorize('management:view'), async 
     }
 });
 
-// Create a new event graph
 router.post('/:botId/event-graphs', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
@@ -991,7 +996,6 @@ router.post('/:botId/event-graphs', authorize('management:edit'), async (req, re
     }
 });
 
-// Delete an event graph
 router.delete('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
@@ -1047,9 +1051,7 @@ router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async 
     }
 });
 
-// Save a visual command/graph
 router.post('/:botId/visual-editor/save', authorize('management:edit'), async (req, res) => {
-    // ... existing code ...
 });
 
 module.exports = router;
