@@ -66,32 +66,16 @@ class NodeRegistry {
    * @returns {Object.<string, NodeConfig[]>}
    */
   getNodesByCategory(graphType) {
-    const categories = {};
+    const result = {};
     for (const node of this.nodes.values()) {
-      if (graphType === 'command') {
-        if (node.category === 'События' && node.type !== 'event:command') {
-          continue;
+      if (node.graphType === 'all' || node.graphType === graphType) {
+        if (!result[node.category]) {
+          result[node.category] = [];
         }
-      } else if (graphType === 'event') {
-        if (node.type === 'event:command' || node.type === 'event:current_user') {
-          continue;
-        }
-      }
-      
-      if (!categories[node.category]) {
-        categories[node.category] = [];
-      }
-      categories[node.category].push(node);
-    }
-
-    // Очистка пустых категорий
-    for (const categoryName in categories) {
-      if (categories[categoryName].length === 0) {
-        delete categories[categoryName];
+        result[node.category].push(node);
       }
     }
-
-    return categories;
+    return result;
   }
 
   /**
@@ -108,12 +92,17 @@ class NodeRegistry {
    * @private
    */
   _registerBaseNodes() {
+    const all = 'all';
+    const command = 'command';
+    const event = 'event';
+
     // События
     this.registerNodeType({
       type: 'event:command',
       label: '▶️ При выполнении команды',
       category: 'События',
       description: 'Стартовая точка для графа команды.',
+      graphType: command,
       pins: {
         inputs: [],
         outputs: [
@@ -126,11 +115,12 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
-      type: 'event:chat',
+        type: 'event:chat',
         name: 'Событие: Сообщение в чате',
         label: '💬 Сообщение в чате',
         description: 'Срабатывает, когда в чат приходит сообщение.',
         category: 'События',
+        graphType: event,
         isEvent: true,
         pins: {
             inputs: [],
@@ -149,6 +139,7 @@ class NodeRegistry {
       label: '👋 Игрок зашел',
       category: 'События',
       description: 'Срабатывает, когда игрок заходит на сервер.',
+      graphType: event,
       pins: {
         inputs: [],
         outputs: [
@@ -163,6 +154,7 @@ class NodeRegistry {
       label: '🚪 Игрок вышел',
       category: 'События',
       description: 'Срабатывает, когда игрок покидает сервер.',
+      graphType: event,
       pins: {
         inputs: [],
         outputs: [
@@ -177,6 +169,7 @@ class NodeRegistry {
       label: '📦 Сущность появилась',
       category: 'События',
       description: 'Вызывается, когда новая сущность появляется в поле зрения бота.',
+      graphType: event,
       pins: {
         inputs: [],
         outputs: [
@@ -191,6 +184,7 @@ class NodeRegistry {
       label: '🧍 Сущность подвинулась',
       category: 'События',
       description: 'Вызывается, когда любая сущность перемещается.',
+      graphType: event,
       pins: {
         inputs: [],
         outputs: [
@@ -205,6 +199,7 @@ class NodeRegistry {
       label: '❌ Сущность исчезла',
       category: 'События',
       description: 'Вызывается, когда сущность пропадает из зоны видимости бота.',
+      graphType: event,
       pins: {
         inputs: [],
         outputs: [
@@ -219,6 +214,7 @@ class NodeRegistry {
       label: '↔️ Ветвление (Branch)',
       category: 'Поток',
       description: 'if/else логика',
+      graphType: all,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -236,6 +232,7 @@ class NodeRegistry {
       label: '⛓️ Последовательность',
       category: 'Поток',
       description: 'Выполняет действия по очереди',
+      graphType: all,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true }
@@ -252,6 +249,7 @@ class NodeRegistry {
       label: '🗣️ Отправить сообщение',
       category: 'Действия',
       description: 'Отправляет сообщение в чат',
+      graphType: all,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -266,111 +264,68 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
-      type: 'action:send_log',
-      label: '📝 Отправить лог',
+        type: 'action:send_log',
+        label: '📝 Записать в лог (веб)',
+        category: 'Действия',
+        description: 'Отправляет сообщение в консоль на странице бота.',
+        graphType: all,
+        pins: {
+            inputs: [
+                { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+                { id: 'message', name: 'Сообщение', type: 'String', required: true },
+            ],
+            outputs: [
+                { id: 'exec', name: 'Выполнено', type: 'Exec' },
+            ]
+        }
+    });
+
+    this.registerNodeType({
+      type: 'action:bot_look_at',
+      label: '🤖 Бот: Посмотреть на',
       category: 'Действия',
-      description: 'Отправляет сообщение в лог-консоль бота на сайте',
+      description: 'Поворачивает голову бота в сторону координат или сущности.',
+      graphType: all,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-          { id: 'message', name: 'Сообщение', type: 'String', required: true }
+          { id: 'target', name: 'Цель (Позиция/Сущность)', type: 'Object', required: true },
+          { id: 'add_y', name: 'Прибавить к Y', type: 'Number', required: false }
         ],
         outputs: [
           { id: 'exec', name: 'Выполнено', type: 'Exec' }
         ]
       }
     });
-
+    
     this.registerNodeType({
-      type: 'action:server_command',
-      label: '⚙️ Выполнить команду сервера',
+      type: 'action:bot_set_variable',
+      label: '💾 Записать переменную',
       category: 'Действия',
-      description: 'Выполняет команду от имени бота',
+      description: 'Сохраняет значение в переменную графа.',
+      graphType: event,
       pins: {
-        inputs: [
-          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-          { id: 'command', name: 'Команда', type: 'String', required: true }
-        ],
-        outputs: [
-          { id: 'exec', name: 'Выполнено', type: 'Exec' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:get_user',
-      label: '👤 Получить пользователя',
-      category: 'Данные',
-      description: 'Находит пользователя по нику',
-      pins: {
-        inputs: [
-          { id: 'username', name: 'Никнейм', type: 'String', required: true }
-        ],
-        outputs: [
-          { id: 'user', name: 'Пользователь', type: 'User' },
-          { id: 'found', name: 'Найден', type: 'Boolean' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:check_permission',
-      label: '✔️ Проверить права',
-      category: 'Данные',
-      description: 'Проверяет, есть ли у юзера право',
-      pins: {
-        inputs: [
-          { id: 'user', name: 'Пользователь', type: 'User', required: true },
-          { id: 'permission', name: 'Право', type: 'String', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Результат', type: 'Boolean' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:concat_strings',
-      label: '🔤 Объединить строки',
-      category: 'Данные',
-      description: 'Конкатенация двух строк',
-      pins: {
-        inputs: [
-          { id: 'a', name: 'A', type: 'String', required: true },
-          { id: 'b', name: 'B', type: 'String', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Результат', type: 'String' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:get_user_field',
-      label: '📄 Получить поле из User',
-      category: 'Данные',
-      description: 'Деструктуризация объекта User',
-      pins: {
-        inputs: [
-          { id: 'user', name: 'Пользователь', type: 'User', required: true }
-        ],
-        outputs: [
-          { id: 'username', name: 'Никнейм', type: 'String' },
-          { id: 'groups', name: 'Группы', type: 'Array' },
-          { id: 'is_blacklisted', name: 'В ЧС?', type: 'Boolean' }
-        ]
+          inputs: [
+              { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+              { id: 'name', name: 'Имя', type: 'String', required: true },
+              { id: 'value', name: 'Значение', type: 'Wildcard', required: true },
+              { id: 'persist', name: 'Хранить в БД?', type: 'Boolean', required: false }
+          ],
+          outputs: [
+              { id: 'exec', name: 'Выполнено', type: 'Exec' }
+          ]
       }
     });
 
     this.registerNodeType({
       type: 'data:get_argument',
-      label: '📝 Получить аргумент',
+      label: '📥 Получить аргумент',
       category: 'Данные',
-      description: 'Получает значение аргумента команды',
+      description: 'Получает значение аргумента команды.',
+      graphType: command,
       pins: {
         inputs: [
-          { id: 'args', name: 'Аргументы', type: 'Object', required: true },
-          { id: 'arg_name', name: 'Имя аргумента', type: 'String', required: true }
+          { id: 'arg_name', name: 'Имя аргумента', type: 'String', required: true },
         ],
         outputs: [
           { id: 'value', name: 'Значение', type: 'Wildcard' },
@@ -380,261 +335,28 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
-      type: 'data:string_literal',
-      label: '📝 Текст (String)',
-      category: 'Данные',
-      description: 'Создает текстовую константу',
-      pins: {
-        inputs: [],
-        outputs: [
-          { id: 'value', name: 'Значение', type: 'String' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-        type: 'event:current_user',
-        label: '👤 Текущий Пользователь',
-        category: 'События',
-        description: 'Предоставляет пользователя, выполнившего команду',
-        pins: {
-          inputs: [],
-          outputs: [
-              { id: 'user', name: 'Пользователь', type: 'User' }
-          ]
-        }
-    });
-
-    this.registerNodeType({
-        type: 'string:contains',
-        label: 'Содержит строку',
+        type: 'data:get_variable',
+        label: '📤 Получить переменную',
         category: 'Данные',
-        description: 'Проверяет, содержит ли строка А строку Б',
+        description: 'Получает значение переменной графа.',
+        graphType: event,
         pins: {
-          inputs: [
-              { id: 'a', name: 'Входящая строка', type: 'String', required: true },
-              { id: 'b', name: 'Include', type: 'String', required: true },
-              { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
-          ],
-          outputs: [
-              { id: 'result', name: 'Результат', type: 'Boolean' }
-          ]
+            inputs: [],
+            outputs: [
+                { id: 'value', name: 'Значение', type: 'Wildcard' }
+            ]
         }
     });
-
-    this.registerNodeType({
-        type: 'string:matches',
-        label: 'Проверка по Regex',
-        category: 'Данные',
-        description: 'Проверяет строку по регулярному выражению',
-        pins: {
-          inputs: [
-              { id: 'input', name: 'Строка', type: 'String', required: true },
-              { id: 'regex', name: 'Regex', type: 'String', required: true }
-          ],
-          outputs: [
-              { id: 'result', name: 'Результат', type: 'Boolean' }
-          ]
-        }
-    });
-
-    this.registerNodeType({
-      type: 'variable:get',
-      label: 'Получить переменную',
-      category: 'Переменные',
-      description: 'Получает значение переменной графа',
-      pins: {
-        inputs: [
-          { id: 'name', name: 'Имя', type: 'String', required: true }
-        ],
-        outputs: [
-          { id: 'value', name: 'Значение', type: 'Wildcard' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'variable:set',
-      label: '🖊️ Установить переменную',
-      category: 'Переменные',
-      description: 'Устанавливает значение переменной графа',
-      pins: {
-        inputs: [
-          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-          { id: 'name', name: 'Имя', type: 'String', required: true },
-          { id: 'value', name: 'Значение', type: 'Wildcard', required: true },
-          { id: 'persist', name: 'Хранить в БД?', type: 'Boolean', required: false }
-        ],
-        outputs: [
-          { id: 'exec', name: 'Выполнено', type: 'Exec' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'math:add',
-      label: 'Сложение / Конкатенация',
-      category: 'Математика',
-      description: 'Складывает два числа или объединяет две строки',
-      pins: {
-        inputs: [
-          { id: 'a', name: 'A', type: 'Wildcard', required: true },
-          { id: 'b', name: 'B', type: 'Wildcard', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Результат', type: 'Wildcard' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:cast',
-      label: 'Преобразовать тип',
-      category: 'Данные',
-      description: 'Преобразует входное значение в выбранный тип данных',
-      pins: {
-        inputs: [
-          { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Результат', type: 'Wildcard' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:get_server_players',
-      label: '👥 Игроки на сервере',
-      category: 'Данные',
-      description: 'Возвращает массив никнеймов всех игроков на сервере.',
-      pins: {
-        inputs: [],
-        outputs: [
-          { id: 'players', name: 'Игроки', type: 'Array' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'array:get_random_element',
-      label: '🔀 Случайный элемент',
-      category: 'Массив',
-      description: 'Возвращает случайный элемент из массива. Возвращает null, если массив пуст.',
-      pins: {
-        inputs: [
-          { id: 'array', name: 'Массив', type: 'Array', required: true }
-        ],
-        outputs: [
-          { id: 'element', name: 'Элемент', type: 'Wildcard' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'array:add_element',
-      label: '➕ Добавить элемент',
-      category: 'Массив',
-      description: 'Добавляет элемент в конец массива и возвращает новый массив.',
-      pins: {
-        inputs: [
-          { id: 'array', name: 'Массив', type: 'Array', required: true },
-          { id: 'element', name: 'Элемент', type: 'Wildcard', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Новый массив', type: 'Array' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'array:remove_by_index',
-      label: '➖ Удалить по индексу',
-      category: 'Массив',
-      description: 'Удаляет элемент из массива по указанному индексу и возвращает новый массив.',
-      pins: {
-        inputs: [
-          { id: 'array', name: 'Массив', type: 'Array', required: true },
-          { id: 'index', name: 'Индекс', type: 'Number', required: true }
-        ],
-        outputs: [
-          { id: 'result', name: 'Новый массив', type: 'Array' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'array:get_by_index',
-      label: '📄 Получить по индексу',
-      category: 'Массив',
-      description: 'Получает элемент из массива по указанному индексу.',
-      pins: {
-        inputs: [
-          { id: 'array', name: 'Массив', type: 'Array', required: true },
-          { id: 'index', name: 'Индекс', type: 'Number', required: true }
-        ],
-        outputs: [
-          { id: 'element', name: 'Элемент', type: 'Wildcard' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'array:find_index',
-      label: '🔍 Найти индекс элемента',
-      category: 'Массив',
-      description: 'Находит индекс первого вхождения элемента в массиве. Возвращает -1, если элемент не найден.',
-      pins: {
-        inputs: [
-          { id: 'array', name: 'Массив', type: 'Array', required: true },
-          { id: 'element', name: 'Элемент для поиска', type: 'Wildcard', required: true }
-        ],
-        outputs: [
-          { id: 'index', name: 'Индекс', type: 'Number' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'action:bot_look_at',
-      label: '👁️ Посмотреть на точку/сущность',
-      category: 'Действия',
-      description: 'Поворачивает взгляд бота в сторону указанной позиции или сущности. Можно добавить смещение по высоте.',
-      pins: {
-        inputs: [
-          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-          // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-          { id: 'target', name: 'Цель (Позиция/Сущность)', type: 'Object', required: true },
-          { id: 'add_y', name: 'Прибавить к Y', type: 'Number', required: false } // Новый, понятный пин
-          // --- КОНЕЦ ИЗМЕНЕНИЙ ---
-        ],
-        outputs: [
-          { id: 'exec', name: 'Выполнено', type: 'Exec' }
-        ]
-      }
-    });
-
-    this.registerNodeType({
-      type: 'data:get_bot_look',
-      label: '👁️ Получить взгляд бота',
-      category: 'Данные',
-      description: 'Возвращает текущий горизонтальный (yaw) и вертикальный (pitch) угол взгляда бота в радианах.',
-      pins: {
-        inputs: [],
-        outputs: [
-          { id: 'yaw', name: 'Yaw', type: 'Number' },
-          { id: 'pitch', name: 'Pitch', type: 'Number' },
-        ]
-      }
-    });
-
+    
     this.registerNodeType({
       type: 'data:get_entity_field',
-      label: '📄 Получить поле из Entity',
+      label: '📦 Получить поле сущности',
       category: 'Данные',
-      description: 'Извлекает данные из объекта сущности.',
+      description: 'Получает определенное поле из объекта сущности (например, "position.x", "username").',
+      graphType: all,
       pins: {
         inputs: [
-          { id: 'entity', name: 'Сущность', type: 'Object', required: true }
+          { id: 'entity', name: 'Сущность', type: 'Object', required: true },
         ],
         outputs: [
           { id: 'username', name: 'Никнейм', type: 'String' },
@@ -644,8 +366,291 @@ class NodeRegistry {
         ]
       }
     });
+    
+    this.registerNodeType({
+      type: 'data:string_literal',
+      label: '📜 Строка',
+      category: 'Данные',
+      description: 'Простое текстовое значение.',
+      graphType: all,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'value', name: 'Значение', type: 'String' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:number_literal',
+      label: '🔢 Число',
+      category: 'Данные',
+      description: 'Простое числовое значение.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'value', name: 'Значение', type: 'Number', required: true }
+        ],
+        outputs: [
+          { id: 'value', name: 'Значение', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:boolean_literal',
+      label: '✔️ Булево',
+      category: 'Данные',
+      description: 'Значение Истина/Ложь.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'value', name: 'Значение', type: 'Boolean', required: true }
+        ],
+        outputs: [
+          { id: 'value', name: 'Значение', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:array_literal',
+      label: '📋 Массив',
+      category: 'Данные',
+      description: 'Создает массив из элементов.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'value', name: 'Массив', type: 'Array' }
+        ]
+      }
+    });
+    
+    this.registerNodeType({
+      type: 'data:make_object',
+      label: '🏗️ Собрать объект',
+      category: 'Данные',
+      description: 'Создает JSON-объект из пар ключ-значение.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'value', name: 'Объект', type: 'Object' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:cast',
+      label: '✨ Приведение типов',
+      category: 'Данные',
+      description: 'Преобразует значение из одного типа в другой.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec_in', name: 'Exec', type: 'Exec' },
+          { id: 'value', name: 'Значение', type: 'Wildcard', required: true },
+          { id: 'target_type', name: 'Целевой тип', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'exec_out', name: 'Exec', type: 'Exec' },
+          { id: 'value', name: 'Значение', type: 'Wildcard' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:contains',
+      label: '🔍 Строка: Содержит',
+      category: 'Строки',
+      description: 'Проверяет, содержит ли одна строка другую.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'haystack', name: 'Строка', type: 'String', required: true },
+          { id: 'needle', name: 'Подстрока', type: 'String', required: true },
+          { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:equals',
+      label: 'Строка: Равно',
+      category: 'Строки',
+      description: 'Проверяет, равны ли строки (с учетом/без учета регистра).',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'a', name: 'A', type: 'String', required: true },
+          { id: 'b', name: 'B', type: 'String', required: true },
+          { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:starts_with',
+      label: 'Строка: Начинается с',
+      category: 'Строки',
+      description: 'Проверяет, начинается ли строка с указанной подстроки.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'string', name: 'Строка', type: 'String', required: true },
+          { id: 'prefix', name: 'Префикс', type: 'String', required: true },
+          { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:ends_with',
+      label: 'Строка: Заканчивается на',
+      category: 'Строки',
+      description: 'Проверяет, заканчивается ли строка указанной подстрокой.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'string', name: 'Строка', type: 'String', required: true },
+          { id: 'suffix', name: 'Суффикс', type: 'String', required: true },
+          { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:length',
+      label: 'Строка: Длина',
+      category: 'Строки',
+      description: 'Возвращает количество символов в строке.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'string', name: 'Строка', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'length', name: 'Длина', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:split',
+      label: 'Строка: Разделить',
+      category: 'Строки',
+      description: 'Разделяет строку на массив подстрок по разделителю.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'string', name: 'Строка', type: 'String', required: true },
+          { id: 'separator', name: 'Разделитель', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'array', name: 'Массив', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'string:concat',
+      label: 'Строка: Объединить',
+      category: 'Строки',
+      description: 'Объединяет две или более строки в одну.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'result', name: 'Результат', type: 'String' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'math:operation',
+      label: '🔢 Математика',
+      category: 'Математика',
+      description: 'Выполняет математическую операцию над двумя числами.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'a', name: 'A', type: 'Number', required: true },
+          { id: 'b', name: 'B', type: 'Number', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Результат', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'logic:operation',
+      label: '💡 Логика',
+      category: 'Логика',
+      description: 'Выполняет логическую операцию. Для НЕ (NOT) используется только вход А.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [
+          { id: 'a', name: 'A', type: 'Boolean', required: true },
+          { id: 'b', name: 'B', type: 'Boolean', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'debug:log',
+      label: '🐞 Отладка (консоль)',
+      category: 'Отладка',
+      description: 'Выводит значение в консоль терминала, где запущен бот.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec_in', name: 'Exec', type: 'Exec' },
+          { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'exec_out', name: 'Exec', type: 'Exec' }
+        ]
+      }
+    });
 
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
+  }
+
+  getNodesByTypes(types) {
+    return types.map(type => this.nodes.get(type)).filter(Boolean);
   }
 }
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import { apiHelper } from '@/lib/api';
+import { toast } from 'sonner';
 
 export const useVisualEditorStore = create((set, get) => ({
   nodes: [],
@@ -15,9 +16,10 @@ export const useVisualEditorStore = create((set, get) => ({
   isMenuOpen: false,
   menuPosition: { top: 0, left: 0, flowPosition: { x: 0, y: 0 } },
   connectingPin: null,
+  variables: [],
 
-  init: async (botId, id, type) => { // type is now required
-    set({ isLoading: true, editorType: type }); // Устанавливаем тип
+  init: async (botId, id, type) => {
+    set({ isLoading: true, editorType: type, variables: [] });
     try {
       const [availableNodesData, permissionsData] = await Promise.all([
         get().fetchAvailableNodes(botId, type),
@@ -33,20 +35,22 @@ export const useVisualEditorStore = create((set, get) => ({
         if (!itemData) throw new Error('Команда не найдена');
         set({ chatTypes: managementData.chatTypes });
         finalCommandState = itemData;
-      } else { // event
+      } else {
         itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
         if (!itemData) throw new Error('Граф события не найден');
-        const variables = itemData.variables ? JSON.parse(itemData.variables) : [];
-        finalCommandState = { ...itemData, variables };
+        const variables = itemData.variables ? (typeof itemData.variables === 'string' ? JSON.parse(itemData.variables) : itemData.variables) : [];
+        const triggers = itemData.triggers ? (typeof itemData.triggers === 'string' ? JSON.parse(itemData.triggers) : itemData.triggers) : [];
+        finalCommandState = { ...itemData, variables, triggers };
       }
 
       const parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : null;
       graph = parsedGraph || { nodes: [], edges: [] };
 
-      set({ 
-        command: finalCommandState, // reusing 'command' state for simplicity
+      set({
+        command: finalCommandState,
         availableNodes: availableNodesData,
         permissions: permissionsData,
+        variables: finalCommandState.variables || [],
       });
 
       const reactFlowEdges = (graph.connections || []).map(conn => ({
@@ -58,11 +62,9 @@ export const useVisualEditorStore = create((set, get) => ({
       }));
 
       const initialNodes = (graph.nodes || []).map(node => {
-        // For event graphs, ensure all nodes are deletable, overriding any stale saved state.
         if (type === 'event') {
           return { ...node, deletable: true };
         }
-        // For command graphs, only the 'event:command' trigger is non-deletable.
         if (node.type === 'event:command') {
           return { ...node, deletable: false };
         }
@@ -76,6 +78,7 @@ export const useVisualEditorStore = create((set, get) => ({
       });
     } catch (error) {
       console.error("Ошибка инициализации редактора:", error);
+      toast.error(`Ошибка загрузки: ${error.message}`);
       set({ isLoading: false });
     }
   },
@@ -101,7 +104,17 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   onNodesChange: (changes) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes) });
+    set(state => {
+      const deletableChanges = changes.filter(change => {
+        if (change.type === 'remove') {
+          const nodeToRemove = state.nodes.find(n => n.id === change.id);
+          // Блокируем удаление, если узел помечен как deletable: false
+          return nodeToRemove?.deletable !== false;
+        }
+        return true;
+      });
+      return { nodes: applyNodeChanges(deletableChanges, state.nodes) };
+    });
   },
 
   onEdgesChange: (changes) => {
@@ -109,27 +122,10 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   onConnect: (connection) => {
-    set({ 
-      edges: addEdge(connection, get().edges), 
-      connectingPin: null 
+    set({
+      edges: addEdge(connection, get().edges),
+      connectingPin: null
     });
-  },
-
-  onDelete: (nodesToRemove, edgesToRemove) => {
-    const nodes = get().nodes;
-    const edges = get().edges;
-
-    const deletableNodes = nodesToRemove.filter(node => node.type !== 'event:command');
-    const deletableNodeIds = deletableNodes.map(node => node.id);
-
-    const nextNodes = nodes.filter(node => !deletableNodeIds.includes(node.id));
-    const nextEdges = edges.filter(edge => 
-        !deletableNodeIds.includes(edge.source) && 
-        !deletableNodeIds.includes(edge.target) &&
-        !edgesToRemove.some(e => e.id === edge.id)
-    );
-
-    set({ nodes: nextNodes, edges: nextEdges });
   },
 
   addNode: (type, position, shouldUpdateState = true) => {
@@ -147,21 +143,21 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   duplicateNode: (nodeId) => {
-      const originalNode = get().nodes.find(n => n.id === nodeId);
-      if (!originalNode || originalNode.type === 'event:command') return;
+    const originalNode = get().nodes.find(n => n.id === nodeId);
+    if (!originalNode || originalNode.type === 'event:command') return;
 
-      const newNode = {
-          ...originalNode,
-          id: `${originalNode.type}-${crypto.randomUUID()}`,
-          position: {
-              x: originalNode.position.x + 30,
-              y: originalNode.position.y + 30,
-          },
-          data: { ...originalNode.data },
-          selected: true,
-      };
+    const newNode = {
+      ...originalNode,
+      id: `${originalNode.type}-${crypto.randomUUID()}`,
+      position: {
+        x: originalNode.position.x + 30,
+        y: originalNode.position.y + 30,
+      },
+      data: { ...originalNode.data },
+      selected: true,
+    };
 
-      set({ nodes: get().nodes.map(n => ({...n, selected: false })).concat(newNode) });
+    set({ nodes: get().nodes.map(n => ({...n, selected: false })).concat(newNode) });
   },
 
   appendNode: (newNode) => {
@@ -200,7 +196,11 @@ export const useVisualEditorStore = create((set, get) => ({
     set(state => {
       const variables = state.command.variables || [];
       const newVariable = { id: crypto.randomUUID(), name: 'newVar', type: 'string', value: '' };
-      return { command: { ...state.command, variables: [...variables, newVariable] } };
+      const newVariables = [...variables, newVariable];
+      return {
+        command: { ...state.command, variables: newVariables },
+        variables: newVariables
+      };
     });
   },
 
@@ -209,30 +209,24 @@ export const useVisualEditorStore = create((set, get) => ({
       const variables = state.command.variables || [];
       const newVariables = variables.map(v => {
         if (v.id === varId) {
-            const updatedVar = { ...v, ...updates };
-            if (updates.type && updates.type !== v.type) {
-                switch(updates.type) {
-                    case 'string':
-                        updatedVar.value = '';
-                        break;
-                    case 'number':
-                        updatedVar.value = '0';
-                        break;
-                    case 'boolean':
-                        updatedVar.value = 'false';
-                        break;
-                    case 'array':
-                        updatedVar.value = '[]';
-                        break;
-                    default:
-                        updatedVar.value = '';
-                }
+          const updatedVar = { ...v, ...updates };
+          if (updates.type && updates.type !== v.type) {
+            switch (updates.type) {
+              case 'string': updatedVar.value = ''; break;
+              case 'number': updatedVar.value = '0'; break;
+              case 'boolean': updatedVar.value = 'false'; break;
+              case 'array': updatedVar.value = '[]'; break;
+              default: updatedVar.value = '';
             }
-            return updatedVar;
+          }
+          return updatedVar;
         }
         return v;
       });
-      return { command: { ...state.command, variables: newVariables } };
+      return {
+        command: { ...state.command, variables: newVariables },
+        variables: newVariables
+      };
     });
   },
 
@@ -240,7 +234,10 @@ export const useVisualEditorStore = create((set, get) => ({
     set(state => {
       const variables = state.command.variables || [];
       const newVariables = variables.filter(v => v.id !== varId);
-      return { command: { ...state.command, variables: newVariables } };
+      return {
+        command: { ...state.command, variables: newVariables },
+        variables: newVariables
+      };
     });
   },
 
@@ -255,90 +252,226 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   openMenu: (top, left, flowPosition) => set({ isMenuOpen: true, menuPosition: { top, left, flowPosition } }),
-  closeMenu: () => set({ isMenuOpen: false, connectingPin: null }),
+  closeMenu: () => set({ isMenuOpen: false }),
+
+  onConnectStart: (_, { handleType, nodeId, handleId }) => {
+    set({
+      connectingPin: {
+        type: handleType,
+        nodeId: nodeId,
+        pinId: handleId,
+      },
+    });
+  },
 
   setConnectingPin: (pin) => set({ connectingPin: pin }),
 
-  connectAndAddNode: (nodeType, position) => {
-    const { connectingPin, availableNodes, nodes, addNode } = get();
+  connectAndAddNode: async (nodeType, position) => {
+    const { connectingPin, addNode, onConnect, command } = get();
     if (!connectingPin) return;
 
-    const sourceNode = nodes.find(n => n.id === connectingPin.nodeId);
-    if (!sourceNode) return;
+    const botId = command.botId;
 
-    const newNode = addNode(nodeType, position, false); 
+    try {
+      const nodeConfigs = await apiHelper(`/api/bots/${botId}/visual-editor/node-config?types[]=${connectingPin.nodeType}&types[]=${nodeType}`);
+      const sourceNodeConfig = nodeConfigs.find(n => n.type === connectingPin.nodeType);
+      const targetNodeConfig = nodeConfigs.find(n => n.type === nodeType);
 
-    const allAvailableNodes = Object.values(availableNodes).flat();
-    const sourceNodeConfig = allAvailableNodes.find(n => n.type === sourceNode.type);
-    const destNodeConfig = allAvailableNodes.find(n => n.type === nodeType);
-    if (!sourceNodeConfig || !destNodeConfig) return;
+      if (!sourceNodeConfig || !targetNodeConfig) {
+        throw new Error('Не удалось получить конфигурацию узлов.');
+      }
 
-    const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.handleId);
-    if (!sourcePin) return;
+      const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.handleId);
+      const targetPin = targetNodeConfig.inputs.find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
 
-    const destPin = destNodeConfig.inputs.find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
-    if (!destPin) return;
+      const newNode = addNode(nodeType, position, false);
 
-    const newEdge = {
-      id: `reactflow__edge-${connectingPin.nodeId}${connectingPin.handleId}-${newNode.id}${destPin.id}`,
-      source: connectingPin.nodeId,
-      sourceHandle: connectingPin.handleId,
-      target: newNode.id,
-      targetHandle: destPin.id,
-    };
+      if (sourcePin && targetPin) {
+        const newConnection = {
+          source: connectingPin.nodeId,
+          sourceHandle: connectingPin.handleId,
+          target: newNode.id,
+          targetHandle: targetPin.id,
+        };
+        set(state => ({
+          nodes: [...state.nodes, newNode],
+          edges: addEdge(newConnection, state.edges),
+        }));
+      } else {
+        set(state => ({ nodes: [...state.nodes, newNode] }));
+      }
 
-    set(state => ({
-      nodes: [...state.nodes, newNode],
-      edges: addEdge(newEdge, state.edges),
-      isMenuOpen: false,
-      connectingPin: null,
-    }));
+    } catch (error) {
+      console.error("Ошибка при добавлении и подключении узла:", error);
+      toast.error('Ошибка добавления узла.');
+    } finally {
+      set({ connectingPin: null });
+    }
   },
 
   saveGraph: async (botId) => {
     set({ isSaving: true });
-    const { nodes, edges, command, editorType } = get();
-
-    const graphToSave = {
-      nodes,
-      connections: edges.map(edge => ({
-        id: edge.id,
-        sourceNodeId: edge.source,
-        targetNodeId: edge.target,
-        sourcePinId: edge.sourceHandle,
-        targetPinId: edge.targetHandle,
-      })),
-    };
-    
-    const url = editorType === 'command'
-      ? `/api/bots/${botId}/commands/${command.id}`
-      : `/api/bots/${botId}/event-graphs/${command.id}`;
-
-    const payload = {
-      name: command.name,
-      graphJson: JSON.stringify(graphToSave),
-      isEnabled: command.isEnabled
-    };
-
-    if (editorType === 'command') {
-      payload.description = command.description;
-      payload.cooldown = command.cooldown;
-      payload.aliases = command.aliases;
-      payload.permissionId = command.permissionId;
-      payload.allowedChatTypes = command.allowedChatTypes;
-      payload.argumentsJson = command.argumentsJson;
-    } else { // event
-      payload.variables = command.variables;
-      payload.triggers = command.triggers.map(t => t.eventType || t); // Handle both object and string array
-    }
-
     try {
-      await apiHelper(url, { method: 'PUT', body: payload });
+      const { editorType, command, nodes, edges } = get();
+      if (!command) {
+        throw new Error("Нет данных о команде или событии.");
+      }
+      const id = command.id;
+
+      const graphJson = {
+        nodes: nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: node.data || {},
+        })),
+        connections: edges.map(edge => ({
+          id: edge.id,
+          sourceNodeId: edge.source,
+          targetNodeId: edge.target,
+          sourcePinId: edge.sourceHandle,
+          targetPinId: edge.targetHandle,
+        })),
+      };
+      
+      const payload = {
+        name: command.name,
+        isEnabled: command.isEnabled,
+        graphJson: JSON.stringify(graphJson),
+      };
+
+      if (editorType === 'command') {
+        payload.argumentsJson = command.argumentsJson || '[]';
+        payload.accessType = command.accessType;
+        payload.requiredPermissions = JSON.stringify(command.requiredPermissions || []);
+        payload.allowedChats = JSON.stringify(command.allowedChats || []);
+        payload.description = command.description;
+        payload.cooldown = command.cooldown;
+        payload.aliases = command.aliases;
+        payload.permissionId = command.permissionId;
+        payload.allowedChatTypes = JSON.stringify(command.allowedChatTypes || []);
+      } else { 
+        payload.variables = command.variables || [];
+        payload.triggers = (command.triggers || []).map(t => t.eventType);
+      }
+      
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+      const url = editorType === 'command'
+        ? `/api/bots/${botId}/commands/${id}`
+        : `/api/bots/${botId}/event-graphs/${id}`;
+        
+      const method = 'PUT';
+
+      await apiHelper(url, { method, body: payload });
+      
+      toast.success("Граф успешно сохранен!");
+
     } catch (error) {
       console.error("Ошибка сохранения графа:", error);
+      toast.error(`Ошибка сохранения: ${error.message}`);
     } finally {
       set({ isSaving: false });
     }
   },
-}));
 
+  addDynamicPin: (nodeId) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const pinCount = node.data?.pinCount || 0;
+    const nextPinCount = pinCount + 1;
+    
+    let newPinData = { pinCount: nextPinCount };
+
+    if (node.type === 'data:make_object') {
+      newPinData[`key_${pinCount}`] = `key${pinCount}`;
+      newPinData[`value_${pinCount}`] = null;
+    }
+
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                ...newPinData,
+              },
+            }
+          : n
+      ),
+    }));
+  },
+
+  removeDynamicPin: (nodeId, pinId) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const pinIndex = parseInt(pinId.match(/_(\d+)$/)[1]);
+    
+    const nextNodes = get().nodes.map(n => {
+      if (n.id === nodeId) {
+        const nextData = { ...n.data };
+        const currentPinCount = nextData.pinCount || 0;
+
+        for (let i = pinIndex; i < currentPinCount - 1; i++) {
+          if (n.type === 'data:make_object') {
+            nextData[`key_${i}`] = nextData[`key_${i + 1}`];
+            nextData[`value_${i}`] = nextData[`value_${i + 1}`];
+          } else {
+            nextData[`pin_${i}`] = nextData[`pin_${i + 1}`];
+          }
+        }
+
+        if (currentPinCount > 0) {
+          if (n.type === 'data:make_object') {
+            delete nextData[`key_${currentPinCount - 1}`];
+            delete nextData[`value_${currentPinCount - 1}`];
+          } else {
+            delete nextData[`pin_${currentPinCount - 1}`];
+          }
+        }
+        
+        nextData.pinCount = Math.max(0, currentPinCount - 1);
+
+        return { ...n, data: nextData };
+      }
+      return n;
+    });
+    
+    const handlesToRemove = node.type === 'data:make_object' 
+      ? [`key_${pinIndex}`, `value_${pinIndex}`]
+      : [`pin_${pinIndex}`];
+
+    const edgesToRemove = get().edges.filter(edge => {
+      return edge.target === nodeId && handlesToRemove.includes(edge.targetHandle);
+    });
+
+    set({
+      nodes: nextNodes,
+      edges: get().edges.filter(e => !edgesToRemove.find(er => er.id === e.id)),
+    });
+  },
+
+  updateMakeObjectKey: (nodeId, pinIndex, newKey) => {
+    set((state) => ({
+      nodes: state.nodes.map((n) => {
+        if (n.id === nodeId && n.type === 'data:make_object') {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              [`key_${pinIndex}`]: newKey,
+            },
+          };
+        }
+        return n;
+      })
+    }));
+  },
+
+  setInitialState: (graphId, graphType, initialGraph) => {
+    get().init(graphId, graphType, initialGraph);
+  },
+}));

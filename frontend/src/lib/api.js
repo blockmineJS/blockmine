@@ -1,4 +1,3 @@
-
 import { useAppStore } from '@/stores/appStore';
 import { toast } from '@/hooks/use-toast';
 
@@ -13,8 +12,14 @@ export const apiHelper = async (url, options = {}, successMessage) => {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const finalOptions = { ...options, headers };
+
+    if (finalOptions.body && typeof finalOptions.body === 'object') {
+        finalOptions.body = JSON.stringify(finalOptions.body);
+    }
+
     try {
-        const response = await fetch(url, { ...options, headers });
+        const response = await fetch(url, finalOptions);
 
 
         if (response.status === 204 || response.headers.get("content-length") === "0") {
@@ -52,8 +57,8 @@ export const apiHelper = async (url, options = {}, successMessage) => {
 
 export const api = {
     get: (url, successMessage) => apiHelper(url, { method: 'GET' }, successMessage),
-    post: (url, body, successMessage) => apiHelper(url, { method: 'POST', body: JSON.stringify(body) }, successMessage),
-    put: (url, body, successMessage) => apiHelper(url, { method: 'PUT', body: JSON.stringify(body) }, successMessage),
+    post: (url, body, successMessage) => apiHelper(url, { method: 'POST', body }, successMessage),
+    put: (url, body, successMessage) => apiHelper(url, { method: 'PUT', body }, successMessage),
     delete: (url, successMessage) => apiHelper(url, { method: 'DELETE' }, successMessage),
 };
 
