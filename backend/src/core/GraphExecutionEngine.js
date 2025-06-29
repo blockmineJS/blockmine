@@ -1,3 +1,6 @@
+const User = require('./UserService');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 /**
  * Движок для выполнения визуальных команд, представленных в виде графа.
  */
@@ -74,8 +77,27 @@ class GraphExecutionEngine {
       this.memo.set(execCacheKey, true);
 
       switch (node.type) {
+          case 'user:set_blacklist': {
+              const userObject = await this.resolvePinValue(node, 'user', null);
+              const blacklistStatus = await this.resolvePinValue(node, 'blacklist_status', false);
+              let updatedUser = null;
+              
+              if (userObject && userObject.username) {
+                  const user = await User.getUser(userObject.username, this.context.botId);
+                  if (user) {
+                      updatedUser = await prisma.user.update({
+                          where: { id: user.id },
+                          data: { isBlacklisted: blacklistStatus }
+                      });
+                      User.clearCache(user.username, this.context.botId);
+                  }
+              }
+              this.memo.set(`${node.id}:updated_user`, updatedUser);
+              await this.traverse(node, 'exec');
+              break;
+          }
           case 'action:send_message': {
-              const message = await this.resolvePinValue(node, 'message', '');
+              const message = String(await this.resolvePinValue(node, 'message', ''));
               const chatType = await this.resolvePinValue(node, 'chat_type', this.context.typeChat);
               const recipient = await this.resolvePinValue(node, 'recipient', this.context.user?.username);
               this.context.bot.sendMessage(chatType, message, recipient);
@@ -146,7 +168,6 @@ class GraphExecutionEngine {
           }
           case 'debug:log': {
               const value = await this.resolvePinValue(node, 'value');
-              console.log('[Debug Log]', value);
               await this.traverse(node, 'exec_out');
               break;
           }
@@ -195,6 +216,69 @@ class GraphExecutionEngine {
       let result;
 
       switch (node.type) {
+          case 'user:check_blacklist': {
+              const userIdentifier = await this.resolvePinValue(node, 'user', null);
+              let isBlacklisted = false;
+              let usernameToFind = null;
+
+              if (typeof userIdentifier === 'string') {
+                  usernameToFind = userIdentifier;
+              } else if (userIdentifier && typeof userIdentifier === 'object' && userIdentifier.username) {
+                  usernameToFind = userIdentifier.username;
+              }
+    
+              if (usernameToFind) {
+                  const user = await User.getUser(usernameToFind, this.context.botId);
+                  if (user) {
+                      isBlacklisted = user.isBlacklisted;
+                  }
+              }
+              result = isBlacklisted;
+              break;
+          }
+          case 'user:get_groups': {
+              const userIdentifier = await this.resolvePinValue(node, 'user', null);
+              let groups = [];
+              let usernameToFind = null;
+
+              if (typeof userIdentifier === 'string') {
+                  usernameToFind = userIdentifier;
+              } else if (userIdentifier && typeof userIdentifier === 'object' && userIdentifier.username) {
+                  usernameToFind = userIdentifier.username;
+              }
+    
+              if (usernameToFind) {
+                  const user = await User.getUser(usernameToFind, this.context.botId);
+                  if (user && user.groups) {
+                      groups = user.groups.map(g => g.group.name);
+                  }
+              }
+              result = groups;
+              break;
+          }
+          case 'user:get_permissions': {
+              const userIdentifier = await this.resolvePinValue(node, 'user', null);
+              let permissions = [];
+              let usernameToFind = null;
+
+              if (typeof userIdentifier === 'string') {
+                  usernameToFind = userIdentifier;
+              } else if (userIdentifier && typeof userIdentifier === 'object' && userIdentifier.username) {
+                  usernameToFind = userIdentifier.username;
+              }
+    
+              if (usernameToFind) {
+                  const user = await User.getUser(usernameToFind, this.context.botId);
+                  if (user && user.permissionsSet) {
+                      permissions = Array.from(user.permissionsSet);
+                  }
+              }
+              result = permissions;
+              break;
+          }
+          case 'user:set_blacklist':
+              result = this.memo.get(`${node.id}:updated_user`);
+              break;
           case 'event:command':
               if (pinId === 'args') result = this.context.args || {};
               else if (pinId === 'user') result = this.context.user || {};

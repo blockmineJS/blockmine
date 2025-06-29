@@ -38,11 +38,11 @@ export default function ConfigurationPage() {
         fetchAllSettings();
     }, [fetchAllSettings]);
     
-    const handleBotFormChange = (newBotData) => {
+    const handleBotFormChange = useCallback((newBotData) => {
         setChanges(prev => ({ ...prev, bot: newBotData }));
-    };
+    }, []);
 
-    const handlePluginSettingsChange = (pluginId, newSettings) => {
+    const handlePluginSettingsChange = useCallback((pluginId, newSettings) => {
         setAllSettings(prev => ({
             ...prev,
             plugins: prev.plugins.map(p => p.id === pluginId ? { ...p, settings: newSettings } : p),
@@ -51,10 +51,11 @@ export default function ConfigurationPage() {
             ...prev,
             plugins: { ...(prev.plugins || {}), [pluginId]: newSettings }
         }));
-    };
+    }, []);
 
     const handleSaveAll = async () => {
         setIsSaving(true);
+        let updatedBotData = null;
         try {
             if (changes.bot) {
                 const dataToSend = { ...changes.bot };
@@ -64,7 +65,7 @@ export default function ConfigurationPage() {
                 if (!dataToSend.password) delete dataToSend.password;
                 if (!dataToSend.proxyPassword) delete dataToSend.proxyPassword;
                 
-                await apiHelper(`/api/bots/${botId}`, {
+                updatedBotData = await apiHelper(`/api/bots/${botId}`, {
                     method: 'PUT',
                     body: JSON.stringify(dataToSend),
                 });
@@ -83,8 +84,13 @@ export default function ConfigurationPage() {
 
             toast({ title: "Успех!", description: "Все изменения сохранены." });
             setChanges({});
+            
+            if (updatedBotData) {
+                setAllSettings(prev => ({...prev, bot: updatedBotData}));
+            } else {
+                 await fetchAllSettings();
+            }
             await refreshBotList();
-            await fetchAllSettings();
 
         } catch (error) {
             toast({ variant: "destructive", title: "Ошибка сохранения", description: error.message });

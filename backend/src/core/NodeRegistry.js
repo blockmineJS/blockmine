@@ -725,6 +725,89 @@ class NodeRegistry {
       }
     });
 
+    // Пользователи
+    this.registerNodeType({
+        type: 'user:check_blacklist',
+        label: '❓ В черном списке?',
+        category: 'Пользователи',
+        description: 'Проверяет, находится ли пользователь в черном списке.',
+        graphType: all,
+        pins: {
+            inputs: [
+                { id: 'user', name: 'Пользователь', type: 'User', required: true }
+            ],
+            outputs: [
+                { id: 'is_blacklisted', name: 'В ЧС', type: 'Boolean' }
+            ]
+        }
+    });
+
+    this.registerNodeType({
+        type: 'user:set_blacklist',
+        label: '🚫 Установить ЧС',
+        category: 'Пользователи',
+        description: 'Добавляет или убирает пользователя из черного списка.',
+        graphType: all,
+        pins: {
+            inputs: [
+                { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+                { id: 'user', name: 'Пользователь', type: 'User', required: true },
+                { id: 'blacklist_status', name: 'Статус ЧС', type: 'Boolean', required: true }
+            ],
+            outputs: [
+                { id: 'exec', name: 'Далее', type: 'Exec' },
+                { id: 'updated_user', name: 'Обновленный пользователь', type: 'User' }
+            ]
+        }
+    });
+    
+    // Переменные
+    this.registerNodeType({
+      type: 'variable:get',
+      label: '📤 Получить переменную',
+      category: 'Переменные',
+      description: 'Получает значение переменной графа.',
+      graphType: event,
+      pins: {
+          inputs: [],
+          outputs: [
+              { id: 'value', name: 'Значение', type: 'Wildcard' }
+          ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'user:get_groups',
+      label: '👥 Получить группы',
+      category: 'Пользователь',
+      description: 'Возвращает массив названий групп, в которых состоит пользователь.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'user', name: 'Пользователь', type: 'User', required: true }
+        ],
+        outputs: [
+          { id: 'groups', name: 'Группы', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'user:get_permissions',
+      label: '🔑 Получить права',
+      category: 'Пользователь',
+      description: 'Возвращает массив прав пользователя.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'user', name: 'Пользователь', type: 'User', required: true }
+        ],
+        outputs: [
+          { id: 'permissions', name: 'Права', type: 'Array' }
+        ]
+      }
+    });
+
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
   }
 

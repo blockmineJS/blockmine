@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const { decrypt } = require('./utils/crypto');
 const EventGraphManager = require('./EventGraphManager');
 const nodeRegistry = require('./NodeRegistry');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
 
 const RealUserService = require('./UserService');
 
@@ -51,7 +52,8 @@ class BotManager {
         this.resourceUsage = new Map();
         this.botConfigs = new Map();
         this.nodeRegistry = nodeRegistry;
-        this.playerLists = new Map();
+        this.pendingPlayerListRequests = new Map();
+        this.graphEngine = new GraphExecutionEngine(this.nodeRegistry, this);
         this.eventGraphManager = null;
 
         getInstanceId();
@@ -361,8 +363,17 @@ class BotManager {
                     }
                     break;
                 case 'playerListUpdate':
-                    this.playerLists.set(botId, message.data.players);
+                    // This is now deprecated and will be removed from the child process.
+                    // Kept for backward compatibility during transition, can be removed later.
                     break;
+                case 'get_player_list_response': {
+                    const { requestId, payload } = message;
+                    if (this.pendingPlayerListRequests.has(requestId)) {
+                        this.pendingPlayerListRequests.get(requestId).resolve(payload.players);
+                        this.pendingPlayerListRequests.delete(requestId);
+                    }
+                    break;
+                }
             }
         });
 
@@ -374,7 +385,6 @@ class BotManager {
             this.bots.delete(botId);
             this.resourceUsage.delete(botId);
             this.botConfigs.delete(botId);
-            this.playerLists.delete(botId);
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
         });
@@ -392,48 +402,97 @@ class BotManager {
     async handleCommandValidation(botConfig, message) {
         const { commandName, username, args, typeChat } = message;
         const botId = botConfig.id;
+
         try {
             let botConfigCache = this.botConfigs.get(botId);
             if (!botConfigCache) {
+                console.log(`[BotManager] No cache for ${botId}, loading...`);
                 botConfigCache = await this.loadConfigForBot(botId);
             }
+
             const user = await RealUserService.getUser(username, botId, botConfig);
+
             const child = this.bots.get(botId);
             if (!child) return;
+
             if (user.isBlacklisted) {
-                child.send({ type: 'handle_blacklist', commandName, username, typeChat });
+                // В будущем здесь может быть обработка через визуальный граф
+                this.sendMessageToBot(botId, 'Вы находитесь в черном списке и не можете использовать команды.', 'private', username);
                 return;
             }
+
             const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
             const dbCommand = botConfigCache.commands.get(mainCommandName);
+
             if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
-                return;
+                return; // Команда не найдена или отключена
             }
+
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') return;
-                child.send({ type: 'handle_wrong_chat', commandName: dbCommand.name, username, typeChat });
+                if (typeChat === 'global') return; // Игнорируем, чтобы не спамить
+                this.sendMessageToBot(botId, 'Эту команду нельзя использовать в этом чате.', 'private', username);
                 return;
             }
+
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
             if (permission && !user.hasPermission(permission.name)) {
-                child.send({ type: 'handle_permission_error', commandName: dbCommand.name, username, typeChat });
+                // В будущем здесь может быть обработка через визуальный граф
+                this.sendMessageToBot(botId, 'У вас нет прав на использование этой команды.', 'private', username);
                 return;
             }
+            
             const domain = (permission?.name || '').split('.')[0] || 'user';
             const bypassCooldownPermission = `${domain}.cooldown.bypass`;
+
             if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
                 const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
                 const now = Date.now();
                 const lastUsed = cooldowns.get(cooldownKey);
+
                 if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
                     const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    child.send({ type: 'handle_cooldown', commandName: dbCommand.name, username, typeChat, timeLeft });
+                    this.sendMessageToBot(botId, `Подождите еще ${timeLeft} сек. перед использованием команды.`, 'private', username);
                     return;
                 }
                 cooldowns.set(cooldownKey, now);
             }
-            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
+
+            if (dbCommand.isVisual) {
+                const graph = dbCommand.graphJson;
+                if (graph) {
+                    const players = await this.getPlayerList(botId);
+                    const botAPI = {
+                        sendMessage: (type, message, recipient) => {
+                            this.sendMessageToBot(botId, message, type, recipient);
+                        },
+                        executeCommand: (command) => {
+                            this.sendServerCommandToBot(botId, command);
+                        }
+                    };
+
+                    const graphContext = {
+                        bot: botAPI,
+                        botId: botId,
+                        user,
+                        args,
+                        typeChat,
+                        players,
+                    };
+                    
+                    try {
+                        const resultContext = await this.graphEngine.execute(graph, graphContext, 'command');
+                        // TODO: Handle persistence from resultContext
+                    } catch (e) {
+                        console.error(`[BotManager] Ошибка выполнения визуальной команды '${commandName}':`, e);
+                        this.sendMessageToBot(botId, 'Произошла внутренняя ошибка при выполнении команды.', 'private', username);
+                    }
+                }
+            } else {
+                // Fallback for non-visual commands if any exist
+                child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
+            }
+
         } catch (error) {
             console.error(`[BotManager] Command validation error for botId: ${botId}`, {
                 command: commandName, user: username, error: error.message, stack: error.stack
@@ -515,8 +574,26 @@ class BotManager {
         return { success: true };
     }
 
-    getPlayerList(botId) {
-        return this.playerLists.get(botId) || [];
+    async getPlayerList(botId) {
+        const child = this.bots.get(botId);
+        if (!child || child.killed) {
+            return [];
+        }
+
+        const requestId = uuidv4();
+        const promise = new Promise((resolve, reject) => {
+            this.pendingPlayerListRequests.set(requestId, { resolve, reject });
+            child.send({ type: 'get_player_list_request', requestId });
+
+            setTimeout(() => {
+                if (this.pendingPlayerListRequests.has(requestId)) {
+                    this.pendingPlayerListRequests.delete(requestId);
+                    reject(new Error(`[BotManager] Player list request for bot ${botId} timed out.`));
+                }
+            }, 2000);
+        });
+
+        return promise;
     }
 
     setEventGraphManager(manager) {
@@ -541,6 +618,13 @@ class BotManager {
             return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };
         }
         return { success: false, message: 'Бот не запущен.' };
+    }
+
+    sendServerCommandToBot(botId, command) {
+        const child = this.bots.get(botId);
+        if (child) {
+            child.send({ type: 'server_command', payload: { command } });
+        }
     }
 }
 

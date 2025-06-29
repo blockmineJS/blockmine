@@ -1,11 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
-const GraphExecutionEngine = require('./GraphExecutionEngine');
 
 const prisma = new PrismaClient();
 
 class EventGraphManager {
     constructor(botManager) {
         this.botManager = botManager;
+        this.graphEngine = botManager.graphEngine;
         this.activeGraphs = new Map();
         // Хранилище для состояний (переменных) каждого графа
         this.graphStates = new Map();
@@ -121,10 +121,9 @@ class EventGraphManager {
         initialContext.variables = { ...(this.graphStates.get(stateKey) || {}) };
 
         try {
-            const executionEngine = new GraphExecutionEngine(this.botManager.nodeRegistry, this.botManager);
             // --- НАЧАЛО ИЗМЕНЕНИЙ ---
             // Выполняем граф и ЗАХВАТЫВАЕМ обновленный контекст
-            const finalContext = await executionEngine.execute(graph, initialContext, eventType);
+            const finalContext = await this.graphEngine.execute(graph, initialContext, eventType);
 
             // Если выполнение прошло успешно, СОХРАНЯЕМ новое состояние переменных
             if (finalContext && finalContext.variables) {

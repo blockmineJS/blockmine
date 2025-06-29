@@ -107,7 +107,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
         const botId = parseInt(req.params.id, 10);
         
         const { 
-            username, password, prefix, serverId, note,
+            username, password, prefix, serverId, note, owners,
             proxyHost, proxyPort, proxyUsername, proxyPassword 
         } = req.body;
 
@@ -115,6 +115,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
             username,
             prefix,
             note,
+            owners,
             proxyHost,
             proxyPort: proxyPort ? parseInt(proxyPort, 10) : null,
             proxyUsername,
@@ -140,17 +141,21 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
              dataToUpdate = { ...rest, server: { connect: { id: sId } } };
         }
 
-        const updatedBot = await prisma.bot.update({ 
-            where: { id: botId }, 
-            data: dataToUpdate, 
-            include: { server: true } 
+        const updatedBot = await prisma.bot.update({
+            where: { id: parseInt(botId) },
+            data: dataToUpdate,
+            include: {
+                server: true
+            }
         });
-        
+
+        const botManager = req.app.get('botManager');
+        botManager.reloadBotConfigInRealTime(parseInt(botId));
+
         res.json(updatedBot);
     } catch (error) {
-        console.error("Update bot error:", error);
-        if (error.code === 'P2002') return res.status(409).json({ error: 'Бот с таким именем уже существует' });
-        res.status(500).json({ error: 'Не удалось обновить бота' });
+        console.error('Error updating bot:', error);
+        res.status(500).json({ message: `Не удалось обновить бота: ${error.message}` });
     }
 });
 
@@ -609,6 +614,7 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
                 username: bot.username,
                 prefix: bot.prefix,
                 note: bot.note,
+                owners: bot.owners,
                 serverId: bot.serverId,
                 proxyHost: bot.proxyHost,
                 proxyPort: bot.proxyPort,
