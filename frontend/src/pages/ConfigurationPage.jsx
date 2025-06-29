@@ -115,51 +115,49 @@ export default function ConfigurationPage() {
                 </Button>
             </header>
 
-            <Tabs defaultValue="general" className="flex-grow flex flex-col">
+            <Tabs defaultValue="general" className="flex-grow flex flex-col overflow-hidden">
                 <TabsList className="m-4 shrink-0 self-start">
                     <TabsTrigger value="general">Общие настройки</TabsTrigger>
                     <TabsTrigger value="plugins">Настройки плагинов</TabsTrigger>
                 </TabsList>
+                
+                <TabsContent value="general" className="flex-grow overflow-y-auto px-4 pb-4">
+                    <BotForm
+                        bot={allSettings.bot}
+                        servers={servers}
+                        onFormChange={handleBotFormChange}
+                        showFooter={false}
+                    />
+                </TabsContent>
 
-                <div className="flex-grow overflow-y-auto px-4 pb-4">
-                    <TabsContent value="general">
-                        <BotForm 
-                            bot={allSettings.bot} 
-                            servers={servers} 
-                            onFormChange={handleBotFormChange}
-                            showFooter={false}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="plugins">
-                        {allSettings.plugins.length > 0 ? (
-                            <Accordion type="multiple" className="w-full space-y-4">
-                                {allSettings.plugins.map(plugin => (
-                                    <AccordionItem key={plugin.id} value={`plugin-${plugin.id}`} className="border rounded-lg">
-                                        <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
-                                            <div className="text-left">
-                                                {plugin.name}
-                                                <p className="text-sm font-normal text-muted-foreground">
-                                                    {plugin.description || 'Нет описания.'}
-                                                </p>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="px-6 pb-6 border-t pt-6">
-                                            <PluginSettingsForm 
-                                                plugin={plugin}
-                                                onSettingsChange={handlePluginSettingsChange}
-                                            />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        ) : (
-                            <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed">
-                                У установленных плагинов нет настраиваемых параметров.
-                            </div>
-                        )}
-                    </TabsContent>
-                </div>
+                <TabsContent value="plugins" className="flex-grow overflow-y-auto px-4 pb-4">
+                    {allSettings.plugins.length > 0 ? (
+                        <Accordion type="multiple" className="w-full space-y-4">
+                            {allSettings.plugins.map(plugin => (
+                                <AccordionItem key={plugin.id} value={`plugin-${plugin.id}`} className="border rounded-lg">
+                                    <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
+                                        <div className="text-left">
+                                            {plugin.name}
+                                            <p className="text-sm font-normal text-muted-foreground">
+                                                {plugin.description || 'Нет описания.'}
+                                            </p>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-6 pb-6 border-t pt-6">
+                                        <PluginSettingsForm
+                                            plugin={plugin}
+                                            onSettingsChange={handlePluginSettingsChange}
+                                        />
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed">
+                            У установленных плагинов нет настраиваемых параметров.
+                        </div>
+                    )}
+                </TabsContent>
             </Tabs>
         </div>
     );

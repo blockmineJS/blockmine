@@ -6,6 +6,7 @@ import { AutosizeInput } from '@/components/ui/AutosizeInput';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 const pinColors = {
   Exec: '#ffffff',
   Boolean: '#dc2626', // red-600
@@ -160,6 +161,28 @@ function CustomNode({ data, type, id: nodeId }) {
                     </SelectContent>
                 </Select>
             </div>
+        )}
+        {type === 'math:random_number' && (
+          <div className="p-2 space-y-2">
+            <div>
+              <Label>Min</Label>
+              <Input
+                type="number"
+                className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm"
+                value={data.min || '0'}
+                onChange={(e) => updateNodeData(nodeId, { min: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Max</Label>
+              <Input
+                type="number"
+                className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm"
+                value={data.max || '1'}
+                onChange={(e) => updateNodeData(nodeId, { max: e.target.value })}
+              />
+            </div>
+          </div>
         )}
         <div className="flex justify-between w-full">
           <div className="inputs flex flex-col items-start">
@@ -364,6 +387,24 @@ function CustomNode({ data, type, id: nodeId }) {
                 )}
             </div>
           )}
+        </div>
+      )}
+      {type === 'logic:compare' && (
+        <div className="p-2 border-t border-slate-700">
+          <Label>Операция:</Label>
+          <Select value={data.operation || '=='} onValueChange={(value) => updateNodeData(nodeId, { operation: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="==">Равно (==)</SelectItem>
+              <SelectItem value="!=">Не равно (!=)</SelectItem>
+              <SelectItem value=">">Больше (&gt;)</SelectItem>
+              <SelectItem value="<">Меньше (&lt;)</SelectItem>
+              <SelectItem value=">=">Больше или равно (&gt;=)</SelectItem>
+              <SelectItem value="<=">Меньше или равно (&lt;=)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       )}
     </Card>

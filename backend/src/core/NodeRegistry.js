@@ -708,6 +708,23 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'logic:compare',
+      label: '⎗ Сравнение',
+      category: 'Логика',
+      description: 'Сравнивает два значения.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'a', name: 'A', type: 'Wildcard' },
+          { id: 'b', name: 'B', type: 'Wildcard' }
+        ],
+        outputs: [
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
   }
 

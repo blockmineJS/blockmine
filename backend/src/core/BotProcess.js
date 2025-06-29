@@ -404,7 +404,6 @@ process.on('message', async (message) => {
 
             bot.on('entitySpawn', (entity) => {
                 if (entity.type === 'player' && entity.username) {
-                    sendLog(`[BotProcess] Entity Spawned: ${entity.username}`);
                 }
                 const serialized = serializeEntity(entity);
                 sendEvent('entitySpawn', { entity: serialized });
