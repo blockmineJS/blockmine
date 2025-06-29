@@ -310,84 +310,87 @@ class BotManager {
 
         child.on('message', async (message) => {
             const botId = botConfig.id;
-            switch (message.type) {
-                case 'event':
-                    if (this.eventGraphManager) {
-                        this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
-                    }
-                    break;
-                case 'log':
-                    this.appendLog(botId, message.content);
-                    break;
-                case 'status':
-                    this.emitStatusUpdate(botId, message.status);
-                    break;
-                case 'validate_and_run_command':
-                    await this.handleCommandValidation(botConfig, message);
-                    break;
-                case 'register_command':
-                    await this.handleCommandRegistration(botId, message.commandConfig);
-                    break;
-                case 'register_group':
-                    await this.handleGroupRegistration(botId, message.groupConfig);
-                    break;
-                case 'request_user_action':
-                    const { requestId, payload } = message;
-                    const { targetUsername, action, data } = payload;
-                    
-                    try {
-                        const user = await UserService.getUser(targetUsername, botConfig.id);
-                        if (!user) throw new Error(`Пользователь ${targetUsername} не найден.`);
-                        
-                        let result;
-
-                        switch (action) {
-                            case 'addGroup':
-                                result = await user.addGroup(data.group);
-                                break;
-                            case 'removeGroup':
-                                result = await user.removeGroup(data.group);
-                                break;
-                            case 'addPermission':
-                                // To be implemented if needed
-                                break;
-                            case 'removePermission':
-                                // To be implemented if needed
-                                break;
-                            case 'getGroups':
-                                result = user.groups;
-                                break;
-                            case 'getPermissions':
-                                result = Array.from(user.permissionsSet);
-                                break;
-                            case 'isBlacklisted':
-                                result = user.isBlacklisted;
-                                break;
-                            case 'setBlacklisted':
-                                result = await user.setBlacklist(data.value);
-                                break;
-                            default:
-                                throw new Error(`Неизвестное действие: ${action}`);
+            try {
+                switch (message.type) {
+                    case 'event':
+                        if (this.eventGraphManager) {
+                            this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
                         }
+                        break;
+                    case 'log':
+                        this.appendLog(botId, message.content);
+                        break;
+                    case 'status':
+                        this.emitStatusUpdate(botId, message.status);
+                        break;
+                    case 'validate_and_run_command':
+                        await this.handleCommandValidation(botConfig, message);
+                        break;
+                    case 'register_command':
+                        await this.handleCommandRegistration(botId, message.commandConfig);
+                        break;
+                    case 'register_group':
+                        await this.handleGroupRegistration(botId, message.groupConfig);
+                        break;
+                    case 'request_user_action':
+                        const { requestId, payload } = message;
+                        const { targetUsername, action, data } = payload;
+                        
+                        try {
+                            const user = await UserService.getUser(targetUsername, botConfig.id);
+                            if (!user) throw new Error(`Пользователь ${targetUsername} не найден.`);
+                            
+                            let result;
 
-                        child.send({ type: 'user_action_response', requestId, payload: result });
-                    } catch (error) {
-                        console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
-                        child.send({ type: 'user_action_response', requestId, error: error.message });
+                            switch (action) {
+                                case 'addGroup':
+                                    result = await user.addGroup(data.group);
+                                    break;
+                                case 'removeGroup':
+                                    result = await user.removeGroup(data.group);
+                                    break;
+                                case 'addPermission':
+                                    break;
+                                case 'removePermission':
+                                    break;
+                                case 'getGroups':
+                                    result = user.groups;
+                                    break;
+                                case 'getPermissions':
+                                    result = Array.from(user.permissionsSet);
+                                    break;
+                                case 'isBlacklisted':
+                                    result = user.isBlacklisted;
+                                    break;
+                                case 'setBlacklisted':
+                                    result = await user.setBlacklist(data.value);
+                                    break;
+                                default:
+                                    throw new Error(`Неизвестное действие: ${action}`);
+                            }
+
+                            child.send({ type: 'user_action_response', requestId, payload: result });
+                        } catch (error) {
+                            console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
+                            child.send({ type: 'user_action_response', requestId, error: error.message });
+                        }
+                        break;
+                    case 'playerListUpdate':
+                        break;
+                    case 'get_player_list_response': {
+                        const { requestId, payload } = message;
+                        const request = this.pendingPlayerListRequests.get(requestId);
+                        if (request) {
+                            clearTimeout(request.timeout);
+                            request.resolve(payload.players);
+                            this.pendingPlayerListRequests.delete(requestId);
+                        }
+                        break;
                     }
-                    break;
-                case 'playerListUpdate':
-                    // This is now deprecated and will be removed from the child process.
-                    // Kept for backward compatibility during transition, can be removed later.
-                    break;
-                case 'get_player_list_response': {
-                    const { requestId, payload } = message;
-                    if (this.pendingPlayerListRequests.has(requestId)) {
-                        this.pendingPlayerListRequests.get(requestId).resolve(payload.players);
-                        this.pendingPlayerListRequests.delete(requestId);
-                    }
-                    break;
                 }
+            } catch (error) {
+                this.appendLog(botId, `[SYSTEM-ERROR] Критическая ошибка в обработчике сообщений от бота: ${error.stack}`);
+                console.error(`[BotManager] Критическая ошибка в обработчике сообщений от бота ${botId}:`, error);
             }
         });
 
@@ -430,7 +433,6 @@ class BotManager {
             if (!child) return;
 
             if (user.isBlacklisted) {
-                // В будущем здесь может быть обработка через визуальный граф
                 this.sendMessageToBot(botId, 'Вы находитесь в черном списке и не можете использовать команды.', 'private', username);
                 return;
             }
@@ -439,19 +441,18 @@ class BotManager {
             const dbCommand = botConfigCache.commands.get(mainCommandName);
 
             if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
-                return; // Команда не найдена или отключена
+                return;
             }
 
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') return; // Игнорируем, чтобы не спамить
+                if (typeChat === 'global') return;
                 this.sendMessageToBot(botId, 'Эту команду нельзя использовать в этом чате.', 'private', username);
                 return;
             }
 
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
             if (permission && !user.hasPermission(permission.name)) {
-                // В будущем здесь может быть обработка через визуальный граф
                 this.sendMessageToBot(botId, 'У вас нет прав на использование этой команды.', 'private', username);
                 return;
             }
@@ -498,14 +499,12 @@ class BotManager {
                     
                     try {
                         const resultContext = await this.graphEngine.execute(graph, graphContext, 'command');
-                        // TODO: Handle persistence from resultContext
                     } catch (e) {
                         console.error(`[BotManager] Ошибка выполнения визуальной команды '${commandName}':`, e);
                         this.sendMessageToBot(botId, 'Произошла внутренняя ошибка при выполнении команды.', 'private', username);
                     }
                 }
             } else {
-                // Fallback for non-visual commands if any exist
                 child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
             }
 
@@ -616,19 +615,26 @@ class BotManager {
         }
 
         const requestId = uuidv4();
-        const promise = new Promise((resolve, reject) => {
-            this.pendingPlayerListRequests.set(requestId, { resolve, reject });
-            child.send({ type: 'get_player_list_request', requestId });
-
-            setTimeout(() => {
-                if (this.pendingPlayerListRequests.has(requestId)) {
+        try {
+            return await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
                     this.pendingPlayerListRequests.delete(requestId);
-                    reject(new Error(`[BotManager] Player list request for bot ${botId} timed out.`));
-                }
-            }, 2000);
-        });
+                    resolve([]);
+                }, 15000);
 
-        return promise;
+                this.pendingPlayerListRequests.set(requestId, {
+                    resolve,
+                    reject: (error) => {
+                        resolve([]);
+                    },
+                    timeout
+                });
+
+                child.send({ type: 'system:get_player_list', requestId });
+            });
+        } catch (error) {
+            return [];
+        }
     }
 
     setEventGraphManager(manager) {

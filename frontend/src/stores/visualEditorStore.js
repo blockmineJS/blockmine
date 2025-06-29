@@ -37,35 +37,69 @@ export const useVisualEditorStore = create(
         let itemData, graph;
         let finalCommandState;
 
-        if (type === 'command') {
-          const managementData = await get().fetchManagementData(botId);
-          itemData = managementData.commands.find(c => c.id === parseInt(id));
-          if (!itemData) throw new Error('Команда не найдена');
-          set({ chatTypes: managementData.chatTypes });
-          const commandArgs = itemData.argumentsJson ? JSON.parse(itemData.argumentsJson) : [];
-          set({ commandArguments: commandArgs });
-          finalCommandState = { ...itemData, variables: [] };
+        if (id === 'new') {
+            if (type === 'command') {
+                const managementData = await get().fetchManagementData(botId);
+                itemData = {
+                    name: 'Новая команда',
+                    description: 'Описание новой команды',
+                    graphJson: JSON.stringify({ nodes: [], edges: [], variables: [] }),
+                    argumentsJson: '[]',
+                    isEnabled: true,
+                    cooldown: 0,
+                    allowedChatTypes: '["chat", "private"]'
+                };
+                 set({ chatTypes: managementData.chatTypes });
+            } else {
+                 itemData = {
+                    name: 'Новый граф',
+                    graphJson: JSON.stringify({ nodes: [], edges: [], variables: [] }),
+                    variables: '[]',
+                    triggers: '[]',
+                    isEnabled: true
+                };
+            }
         } else {
-          itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
-          if (!itemData) throw new Error('Граф события не найден');
-          const variables = itemData.variables ? (typeof itemData.variables === 'string' ? JSON.parse(itemData.variables) : itemData.variables) : [];
-          const triggers = itemData.triggers ? (typeof itemData.triggers === 'string' ? JSON.parse(itemData.triggers) : itemData.triggers) : [];
-          finalCommandState = { ...itemData, variables, triggers };
+            if (type === 'command') {
+              const managementData = await get().fetchManagementData(botId);
+              itemData = managementData.commands.find(c => c.id === parseInt(id));
+              set({ chatTypes: managementData.chatTypes });
+            } else {
+              itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
+            }
+        }
+        
+        if (!itemData) {
+            throw new Error(type === 'command' ? 'Команда не найдена.' : 'Граф события не найден.');
         }
 
-        const parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : { nodes: [], edges: [], variables: [] };
-
-        if (parsedGraph.variables) {
-          finalCommandState.variables = parsedGraph.variables;
+        let parsedGraph;
+        try {
+            parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : null;
+        } catch (e) {
+            console.error("Ошибка парсинга graphJson:", e);
+            parsedGraph = null;
         }
 
-        graph = parsedGraph || { nodes: [], edges: [] };
+        if (!parsedGraph) {
+            parsedGraph = { nodes: [], edges: [], variables: [] };
+        }
+        parsedGraph.variables = parsedGraph.variables || [];
+        
+        const commandArgs = (itemData.argumentsJson && JSON.parse(itemData.argumentsJson)) || [];
+        const triggers = (itemData.triggers && (typeof itemData.triggers === 'string' ? JSON.parse(itemData.triggers) : itemData.triggers)) || [];
+        
+        const finalVariables = parsedGraph.variables;
+
+        finalCommandState = { ...itemData, variables: finalVariables, triggers, arguments: commandArgs };
+        graph = parsedGraph;
 
         set({
-          command: finalCommandState,
-          availableNodes: availableNodesData,
-          permissions: permissionsData,
-          variables: finalCommandState.variables || [],
+            command: finalCommandState,
+            availableNodes: availableNodesData,
+            permissions: permissionsData,
+            variables: finalVariables,
+            commandArguments: commandArgs,
         });
 
         const reactFlowEdges = (graph.connections || []).map(conn => ({
@@ -76,7 +110,7 @@ export const useVisualEditorStore = create(
           targetHandle: conn.targetPinId,
         }));
 
-        const initialNodes = (graph.nodes || []).map(node => {
+        let initialNodes = (graph.nodes || []).map(node => {
           if (type === 'event') {
             return { ...node, deletable: true };
           }
@@ -85,6 +119,15 @@ export const useVisualEditorStore = create(
           }
           return { ...node, deletable: true };
         });
+
+        if (type === 'command' && initialNodes.every(n => n.type !== 'event:command')) {
+            initialNodes.unshift({
+                id: 'start',
+                type: 'event:command',
+                position: { x: 100, y: 100 },
+                deletable: false,
+            });
+        }
 
         set({
           nodes: initialNodes,

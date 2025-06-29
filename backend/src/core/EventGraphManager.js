@@ -98,6 +98,8 @@ class EventGraphManager {
     async executeGraph(botId, eventType, graph, eventArgs) {
         if (!graph || !graph.nodes || graph.nodes.length === 0) return;
 
+        const players = await this.botManager.getPlayerList(botId);
+
         const botApi = {
             sendMessage: (chatType, message, recipient) => {
                 this.botManager.sendMessageToBot(botId, message, chatType, recipient);
@@ -108,7 +110,7 @@ class EventGraphManager {
             lookAt: (position) => {
                 this.botManager.lookAt(botId, position);
             },
-            getPlayerList: () => this.botManager.getPlayerList(botId)
+            getPlayerList: () => players,
         };
         
         const stateKey = `${botId}-${graph.id}`;
@@ -116,21 +118,16 @@ class EventGraphManager {
         const initialContext = this.getInitialContextForEvent(eventType, eventArgs);
         initialContext.bot = botApi;
         initialContext.botId = botId;
-        initialContext.players = this.botManager.getPlayerList(botId);
+        initialContext.players = players;
         initialContext.botState = eventArgs.botState || {};
-        // Загружаем текущее состояние переменных в контекст. Создаем копию, чтобы избежать проблем.
         initialContext.variables = { ...(this.graphStates.get(stateKey) || {}) };
 
         try {
-            // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-            // Выполняем граф и ЗАХВАТЫВАЕМ обновленный контекст
             const finalContext = await this.graphEngine.execute(graph, initialContext, eventType);
 
-            // Если выполнение прошло успешно, СОХРАНЯЕМ новое состояние переменных
             if (finalContext && finalContext.variables) {
                 this.graphStates.set(stateKey, finalContext.variables);
             }
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
         } catch (error) {
             console.error(`[EventGraphManager] Error during execution or saving state for graph '${graph.name}'`, error);
         }

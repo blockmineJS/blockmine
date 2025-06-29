@@ -104,8 +104,6 @@ router.post('/', authorize('bot:create'), async (req, res) => {
 
 router.put('/:id', authorize('bot:update'), async (req, res) => {
     try {
-        const botId = parseInt(req.params.id, 10);
-        
         const { 
             username, password, prefix, serverId, note, owners,
             proxyHost, proxyPort, proxyUsername, proxyPassword 
@@ -128,10 +126,6 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
             dataToUpdate.proxyPassword = encrypt(proxyPassword);
         }
 
-        if (proxyPassword) {
-            dataToUpdate.proxyPassword = proxyPassword;
-        }
-
         if (serverId) {
             dataToUpdate.serverId = parseInt(serverId, 10);
         }
@@ -141,8 +135,13 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
              dataToUpdate = { ...rest, server: { connect: { id: sId } } };
         }
 
+        const botId = parseInt(req.params.id, 10);
+        if (isNaN(botId)) {
+            return res.status(400).json({ message: 'Неверный ID бота.' });
+        }
+
         const updatedBot = await prisma.bot.update({
-            where: { id: parseInt(botId) },
+            where: { id: botId },
             data: dataToUpdate,
             include: {
                 server: true
@@ -150,7 +149,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
         });
 
         const botManager = req.app.get('botManager');
-        botManager.reloadBotConfigInRealTime(parseInt(botId));
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.json(updatedBot);
     } catch (error) {
