@@ -92,12 +92,15 @@ const VisualEditorCanvas = () => {
       if (!freshConnectingPin) return;
 
       const targetIsPane = event.target.classList.contains('react-flow__pane');
+
       if (targetIsPane) {
-        const position = screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
-        });
-        openMenu(event.clientY, event.clientX, position);
+        setTimeout(() => {
+            const position = screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+            openMenu(event.clientY, event.clientX, position);
+        }, 50);
       } else {
         setConnectingPin(null);
       }

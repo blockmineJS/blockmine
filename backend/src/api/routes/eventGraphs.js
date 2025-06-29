@@ -15,9 +15,26 @@ router.get('/',
     const { botId } = req.params;
     const eventGraphs = await prisma.eventGraph.findMany({ 
       where: { botId: parseInt(botId) },
-      include: { triggers: true }
+      include: { triggers: true },
+      orderBy: { createdAt: 'desc' }
     });
-    res.json(eventGraphs);
+
+    const graphsWithCounts = eventGraphs.map(graph => {
+      let nodeCount = 0;
+      let edgeCount = 0;
+      if (graph.graphJson) {
+        try {
+          const parsedGraph = JSON.parse(graph.graphJson);
+          nodeCount = parsedGraph.nodes?.length || 0;
+          edgeCount = parsedGraph.connections?.length || 0;
+        } catch (e) {
+          // Игнорируем ошибки парсинга, оставляем счётчики по нулям
+        }
+      }
+      return { ...graph, nodeCount, edgeCount };
+    });
+
+    res.json(graphsWithCounts);
   }
 );
 
@@ -104,34 +121,33 @@ router.put('/:graphId',
       const dataToUpdate = {};
       if (name !== undefined) dataToUpdate.name = name;
       if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
+      
+      // graphJson - это строка, поэтому isJSON() уже проверил валидность.
+      // Просто присваиваем, если она есть.
       if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
-      if (variables !== undefined) dataToUpdate.variables = JSON.stringify(variables);
 
-      const updateGraphPromise = prisma.eventGraph.update({
-        where: { id: parseInt(graphId) },
-        data: dataToUpdate,
-      });
-
-      let transactionPromises = [updateGraphPromise];
-
-      if (triggers) {
-        const deleteTriggersPromise = prisma.eventTrigger.deleteMany({
-          where: { graphId: parseInt(graphId) },
-        });
-        transactionPromises.push(deleteTriggersPromise);
-
-        if (triggers.length > 0) {
-            const createTriggersPromise = prisma.eventTrigger.createMany({
-                data: triggers.map(eventType => ({
-                    graphId: parseInt(graphId),
-                    eventType,
-                })),
-            });
-            transactionPromises.push(createTriggersPromise);
-        }
+      if (variables !== undefined) {
+          // Убедимся, что variables это строка JSON
+          dataToUpdate.variables = Array.isArray(variables) ? JSON.stringify(variables) : variables;
       }
       
-      const [updatedGraph] = await prisma.$transaction(transactionPromises);
+      // Если пришли триггеры, используем вложенную запись
+      if (triggers !== undefined) {
+        dataToUpdate.triggers = {
+          // Сначала удаляем все старые триггеры для этого графа
+          deleteMany: {},
+          // Затем создаем новые
+          create: triggers.map(eventType => ({
+            eventType,
+          })),
+        };
+      }
+
+      const updatedGraph = await prisma.eventGraph.update({
+        where: { id: parseInt(graphId) },
+        data: dataToUpdate,
+        include: { triggers: true }, // Включаем триггеры в ответ
+      });
 
       res.json(updatedGraph);
     } catch (error) {
@@ -287,6 +303,87 @@ router.post('/import',
       }
       console.error("Failed to import event graph:", error);
       res.status(500).json({ error: 'Failed to import event graph' });
+    }
+  }
+);
+
+// Duplicate an event graph
+router.post('/:graphId/duplicate',
+  authorize('management:edit'),
+  [param('graphId').isInt()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    const { botId, graphId } = req.params;
+
+    try {
+      const originalGraph = await prisma.eventGraph.findUnique({
+        where: { id: parseInt(graphId) },
+        include: { triggers: true },
+      });
+
+      if (!originalGraph) {
+        return res.status(404).json({ error: 'Original event graph not found' });
+      }
+
+      const graph = JSON.parse(originalGraph.graphJson);
+      const idMap = new Map();
+      
+      if (graph.nodes && Array.isArray(graph.nodes)) {
+          graph.nodes.forEach(node => {
+              if (node && node.id) {
+                  const oldId = node.id;
+                  const newId = `node_${crypto.randomUUID()}`;
+                  idMap.set(oldId, newId);
+                  node.id = newId;
+              }
+          });
+      }
+
+      const connectionList = graph.connections || [];
+      const updatedConnections = [];
+      if (Array.isArray(connectionList)) {
+          connectionList.forEach(conn => {
+              if (conn && conn.sourceNodeId && conn.targetNodeId) {
+                  const newSourceId = idMap.get(conn.sourceNodeId);
+                  const newTargetId = idMap.get(conn.targetNodeId);
+
+                  if (newSourceId && newTargetId) {
+                      updatedConnections.push({
+                          ...conn,
+                          id: `edge_${crypto.randomUUID()}`,
+                          sourceNodeId: newSourceId,
+                          targetNodeId: newTargetId,
+                      });
+                  }
+              }
+          });
+      }
+      graph.connections = updatedConnections;
+
+      const newGraphJson = JSON.stringify(graph);
+      const newName = `${originalGraph.name} (копия)`;
+
+      const newGraph = await prisma.eventGraph.create({
+        data: {
+          botId: parseInt(botId),
+          name: newName,
+          graphJson: newGraphJson,
+          variables: originalGraph.variables,
+          isEnabled: false,
+          triggers: {
+            create: originalGraph.triggers.map(t => ({ eventType: t.eventType })),
+          },
+        },
+      });
+
+      res.status(201).json(newGraph);
+    } catch (error) {
+      logger.error('Failed to duplicate event graph:', error);
+      res.status(500).json({ error: 'Failed to duplicate event graph' });
     }
   }
 );

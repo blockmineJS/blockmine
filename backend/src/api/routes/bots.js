@@ -483,35 +483,28 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 router.put('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
     try {
         const commandId = parseInt(req.params.commandId, 10);
-        const botId = parseInt(req.params.botId, 10);
-        const { isEnabled, cooldown, aliases, permissionId, allowedChatTypes } = req.body;
+        const { name, description, cooldown, aliases, permissionId, allowedChatTypes, isEnabled, argumentsJson, graphJson } = req.body;
 
         const dataToUpdate = {};
-        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        if (typeof cooldown === 'number') dataToUpdate.cooldown = cooldown;
-        if (Array.isArray(aliases)) dataToUpdate.aliases = JSON.stringify(aliases);
-        if (permissionId !== undefined) {
-            dataToUpdate.permissionId = permissionId === null ? null : parseInt(permissionId, 10);
-        }
-        if (Array.isArray(allowedChatTypes)) {
-            dataToUpdate.allowedChatTypes = JSON.stringify(allowedChatTypes);
-        }
-
-        if (Object.keys(dataToUpdate).length === 0) {
-            return res.status(400).json({ error: "Нет данных для обновления" });
-        }
+        if (name !== undefined) dataToUpdate.name = name;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (cooldown !== undefined) dataToUpdate.cooldown = parseInt(cooldown, 10);
+        if (aliases !== undefined) dataToUpdate.aliases = Array.isArray(aliases) ? JSON.stringify(aliases) : aliases;
+        if (permissionId !== undefined) dataToUpdate.permissionId = permissionId ? parseInt(permissionId, 10) : null;
+        if (allowedChatTypes !== undefined) dataToUpdate.allowedChatTypes = Array.isArray(allowedChatTypes) ? JSON.stringify(allowedChatTypes) : allowedChatTypes;
+        if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
+        if (argumentsJson !== undefined) dataToUpdate.argumentsJson = Array.isArray(argumentsJson) ? JSON.stringify(argumentsJson) : argumentsJson;
+        if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
 
         const updatedCommand = await prisma.command.update({
-            where: { id: commandId, botId: botId },
+            where: { id: commandId },
             data: dataToUpdate,
         });
-
-        BotManager.reloadBotConfigInRealTime(botId);
 
         res.json(updatedCommand);
     } catch (error) {
         console.error(`[API Error] /commands/:commandId PUT:`, error);
-        res.status(500).json({ error: 'Не удалось обновить команду' });
+        res.status(500).json({ error: 'Failed to update command' });
     }
 });
 
@@ -765,6 +758,21 @@ router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, re
     } catch (error) {
         console.error('[API Error] /visual-editor/nodes GET:', error);
         res.status(500).json({ error: 'Failed to get available nodes' });
+    }
+});
+
+router.get('/:botId/visual-editor/node-config', authorize('management:view'), (req, res) => {
+    try {
+        const { types } = req.query;
+        if (!types) {
+            return res.status(400).json({ error: 'Node types must be provided' });
+        }
+        const typeArray = Array.isArray(types) ? types : [types];
+        const config = nodeRegistry.getNodesByTypes(typeArray);
+        res.json(config);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/node-config GET:', error);
+        res.status(500).json({ error: 'Failed to get node configuration' });
     }
 });
 

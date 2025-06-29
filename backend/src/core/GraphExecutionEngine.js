@@ -69,6 +69,15 @@ class GraphExecutionEngine {
   }
 
   async executeNode(node) {
+      // Caching the execution of a node for the current traversal.
+      // This is a simple way to prevent infinite loops in graphs with cycles.
+      const execCacheKey = `${node.id}_executed`;
+      if (this.memo.has(execCacheKey)) {
+          // If we've already been here during this execution run, skip.
+          return;
+      }
+      this.memo.set(execCacheKey, true);
+
       switch (node.type) {
           case 'action:send_message': {
               const message = await this.resolvePinValue(node, 'message', '');
@@ -89,36 +98,45 @@ class GraphExecutionEngine {
               if (this.botManager?.appendLog && this.context?.botId) {
                   this.botManager.appendLog(this.context.botId, `[Graph] ${message}`);
               } else {
-                  console.log(`[Graph] ${message}`);
+                  console.log(`[Graph Log] ${message}`);
               }
               await this.traverse(node, 'exec');
               break;
           }
           case 'action:bot_look_at': {
-            // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-            const target = await this.resolvePinValue(node, 'target'); // Используем новый ID 'target'
-            const yOffset = await this.resolvePinValue(node, 'add_y', 0); // Используем новый ID 'add_y'
+            const target = await this.resolvePinValue(node, 'target');
+            const yOffset = await this.resolvePinValue(node, 'add_y', 0);
 
             if (target && this.context.bot?.lookAt) {
-                // Проверяем, есть ли у цели свойство position (значит, это объект entity)
-                // или у нее есть x, y, z (значит, это объект Vec3 или похожий)
                 let finalPosition;
-                if (target.position) {
-                    finalPosition = { ...target.position }; // Копируем, чтобы не изменять исходный объект
-                } else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) {
+                if (target.position) { // Entity
+                    finalPosition = { ...target.position };
+                } else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) { // Vec3-like object
                     finalPosition = { ...target };
                 }
 
                 if (finalPosition) {
-                    // Применяем смещение, если оно указано
                     finalPosition.y += Number(yOffset || 0);
                     this.context.bot.lookAt(finalPosition);
                 }
             }
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             await this.traverse(node, 'exec');
             break;
-        }
+          }
+          case 'action:bot_set_variable': {
+              const varName = await this.resolvePinValue(node, 'name', '');
+              const varValue = await this.resolvePinValue(node, 'value');
+              const shouldPersist = await this.resolvePinValue(node, 'persist', false);
+
+              if (varName) {
+                  this.context.variables[varName] = varValue;
+                  if (this.context.persistenceIntent) {
+                    this.context.persistenceIntent.set(varName, shouldPersist);
+                  }
+              }
+              await this.traverse(node, 'exec');
+              break;
+          }
           case 'flow:branch': {
               const condition = await this.resolvePinValue(node, 'condition', false);
               await this.traverse(node, condition ? 'exec_true' : 'exec_false');
@@ -131,16 +149,10 @@ class GraphExecutionEngine {
               }
               break;
           }
-          case 'variable:set': {
-              const varName = await this.resolvePinValue(node, 'name', '');
-              const varValue = await this.resolvePinValue(node, 'value');
-              const shouldPersist = await this.resolvePinValue(node, 'persist', false);
-
-              if (varName) {
-                  this.context.variables[varName] = varValue;
-                  this.context.persistenceIntent.set(varName, shouldPersist);
-              }
-              await this.traverse(node, 'exec');
+          case 'debug:log': {
+              const value = await this.resolvePinValue(node, 'value');
+              console.log('[Debug Log]', value);
+              await this.traverse(node, 'exec_out');
               break;
           }
       }
@@ -165,8 +177,16 @@ class GraphExecutionEngine {
       let result;
 
       switch (node.type) {
-          case 'event:command': result = this.context[pinId]; break;
-          case 'event:chat': result = pinId === 'user' ? { username: this.context.username } : this.context[pinId]; break;
+          case 'event:command':
+              if (pinId === 'args') result = this.context.args || {};
+              else if (pinId === 'user') result = this.context.user || {};
+              else if (pinId === 'chat_type') result = this.context.typeChat || 'local';
+              else result = this.context[pinId];
+              break;
+          case 'event:chat':
+              if (pinId === 'user') result = { username: this.context.username };
+              else result = this.context[pinId];
+              break;
           case 'event:playerJoined':
           case 'event:playerLeft':
               result = this.context[pinId];
@@ -177,21 +197,90 @@ class GraphExecutionEngine {
               result = this.context[pinId];
               break;
           
-          case 'variable:get':
-              const varName = await this.resolvePinValue(node, 'name', '');
+          case 'data:get_variable':
+              const varName = node.data?.variableName || '';
               result = this.context.variables.hasOwnProperty(varName) ? this.context.variables[varName] : null;
               break;
           
-          case 'math:add': {
-              const rawA = await this.resolvePinValue(node, 'a', 0);
-              const rawB = await this.resolvePinValue(node, 'b', 0);
-              const numA = Number(rawA);
-              const numB = Number(rawB);
-              if (rawA !== '' && rawB !== '' && !isNaN(numA) && !isNaN(numB)) {
-                  result = numA + numB;
-              } else {
-                  result = String(rawA ?? '') + String(rawB ?? '');
+          case 'data:get_argument': {
+            const args = this.context.args || {};
+            const argName = await this.resolvePinValue(node, 'arg_name', '');
+            if (pinId === 'value') {
+                result = args && argName && args[argName] !== undefined ? args[argName] : null;
+            } else if (pinId === 'exists') {
+                result = args && argName && args[argName] !== undefined;
+            }
+            break;
+          }
+          
+          case 'math:operation': {
+              const op = node.data?.operation || '+';
+              const a = Number(await this.resolvePinValue(node, 'a', 0));
+              const b = Number(await this.resolvePinValue(node, 'b', 0));
+              switch (op) {
+                  case '+': result = a + b; break;
+                  case '-': result = a - b; break;
+                  case '*': result = a * b; break;
+                  case '/': result = b !== 0 ? a / b : 0; break;
+                  default: result = 0;
               }
+              break;
+          }
+
+          case 'logic:operation': {
+            const op = node.data?.operation || 'AND';
+            const inputs = [];
+            for (const key in node.data) {
+                if (key.startsWith('pin_')) {
+                    inputs.push(await this.resolvePinValue(node, key, false));
+                }
+            }
+            if (inputs.length === 0) { // Fallback for old nodes
+                inputs.push(await this.resolvePinValue(node, 'a', false));
+                inputs.push(await this.resolvePinValue(node, 'b', false));
+            }
+
+
+            switch (op) {
+                case 'AND': result = inputs.every(Boolean); break;
+                case 'OR': result = inputs.some(Boolean); break;
+                case 'NOT': result = !inputs[0]; break;
+                default: result = false;
+            }
+            break;
+          }
+
+          case 'string:concat': {
+            const numPins = node.data?.pinCount || 0;
+            const parts = [];
+            for (let i = 0; i < numPins; i++) {
+                const part = await this.resolvePinValue(node, `pin_${i}`, '');
+                parts.push(String(part ?? ''));
+            }
+            result = parts.join(node.data?.separator || '');
+            break;
+          }
+
+          case 'data:array_literal': {
+            const numPins = node.data?.pinCount || 0;
+            const items = [];
+            for (let i = 0; i < numPins; i++) {
+                items.push(await this.resolvePinValue(node, `pin_${i}`));
+            }
+            result = items;
+            break;
+          }
+
+          case 'data:make_object': {
+              const numPins = node.data?.pinCount || 0;
+              const obj = {};
+              for (let i = 0; i < numPins; i++) {
+                  const key = node.data[`key_${i}`];
+                  if (key) {
+                      obj[key] = await this.resolvePinValue(node, `value_${i}`);
+                  }
+              }
+              result = obj;
               break;
           }
 
@@ -228,24 +317,6 @@ class GraphExecutionEngine {
               } catch (e) { result = false; }
               break;
           }
-          case 'logic:and': {
-               const a = await this.resolvePinValue(node, 'a', false);
-               const b = await this.resolvePinValue(node, 'b', false);
-               result = a && b;
-               break;
-          }
-          case 'logic:or': {
-               const a = await this.resolvePinValue(node, 'a', false);
-               const b = await this.resolvePinValue(node, 'b', false);
-               result = a || b;
-               break;
-          }
-          case 'logic:not': {
-               const a = await this.resolvePinValue(node, 'a', false);
-               result = !a;
-               break;
-          }
-
           case 'data:string_literal':
               result = await this.resolvePinValue(node, 'value', '');
               break;
@@ -253,18 +324,6 @@ class GraphExecutionEngine {
           case 'data:get_user_field': {
                const user = await this.resolvePinValue(node, 'user');
                result = user ? user[pinId] : defaultValue;
-               break;
-          }
-          case 'data:get_argument': {
-              const args = await this.resolvePinValue(node, 'args', {});
-              const argName = await this.resolvePinValue(node, 'arg_name', '');
-              result = args && argName && args[argName] !== undefined ? args[argName] : null;
-              break;
-          }
-          case 'data:concat_strings': {
-               const strA = await this.resolvePinValue(node, 'a', '');
-               const strB = await this.resolvePinValue(node, 'b', '');
-               result = String(strA ?? '') + String(strB ?? '');
                break;
           }
           case 'data:get_server_players':

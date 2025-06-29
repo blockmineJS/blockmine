@@ -22,6 +22,7 @@ function CustomNode({ data, type, id: nodeId }) {
   const availableNodes = useVisualEditorStore(state => state.availableNodes);
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
   const edges = useVisualEditorStore(state => state.edges);
+  const variables = useVisualEditorStore(state => state.variables);
 
   const nodeConfig = useMemo(() => 
     Object.values(availableNodes).flat().find(n => n.type === type), 
@@ -29,8 +30,52 @@ function CustomNode({ data, type, id: nodeId }) {
   );
 
   const inputs = useMemo(() => {
-    const baseInputs = nodeConfig?.pins?.inputs ? [...nodeConfig.pins.inputs] : [];
-    if (type === 'flow:branch' && data.advanced) {
+    let baseInputs = nodeConfig?.pins?.inputs ? [...nodeConfig.pins.inputs] : [];
+    
+    if (type === 'data:array_literal') {
+      for (let i = 0; i < (data.pinCount || 0); i++) {
+        baseInputs.push({
+          id: `item_${i}`,
+          name: `[${i}]`,
+          type: 'Wildcard',
+        });
+      }
+    } else if (type === 'data:make_object') {
+      for (let i = 0; i < (data.pinCount || 0); i++) {
+        baseInputs.push({
+          id: `key_${i}`,
+          name: `Ключ ${i}`,
+          type: 'String',
+        });
+        baseInputs.push({
+          id: `value_${i}`,
+          name: `Значение ${i}`,
+          type: 'Wildcard',
+        });
+      }
+    } else if (type === 'string:concat') {
+        baseInputs = []; 
+        const pinCount = data.pinCount || 2;
+        for (let i = 0; i < pinCount; i++) {
+            baseInputs.push({
+                id: `pin_${i}`,
+                name: `Строка ${i}`,
+                type: 'String',
+            });
+        }
+    } else if (type === 'logic:operation' && data.operation !== 'NOT') {
+        baseInputs = []; // Очищаем базовые, чтобы создать динамически
+        const pinCount = data.pinCount || 2;
+        for (let i = 0; i < pinCount; i++) {
+            baseInputs.push({
+                id: `pin_${i}`,
+                name: String.fromCharCode(65 + i),
+                type: 'Boolean',
+            });
+        }
+    } else if (type === 'logic:operation' && data.operation === 'NOT') {
+        baseInputs = baseInputs.filter(p => p.id === 'a');
+    } else if (type === 'flow:branch' && data.advanced) {
       // В расширенном режиме удаляем "condition", если он есть
       const conditionIndex = baseInputs.findIndex(p => p.id === 'condition');
       if (conditionIndex !== -1) {
@@ -101,6 +146,21 @@ function CustomNode({ data, type, id: nodeId }) {
         <CardTitle className="text-sm text-center">{nodeConfig.name || nodeConfig.label}</CardTitle>
       </CardHeader>
       <CardContent className="p-2 flex flex-col">
+        {type === 'data:get_variable' && (
+            <div className="p-2">
+                <Label>Имя переменной:</Label>
+                <Select value={data.variableName || ''} onValueChange={(value) => updateNodeData(nodeId, { variableName: value })}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Выберите переменную..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {variables.map(v => (
+                            <SelectItem key={v.id} value={v.name}>{v.name} ({v.type})</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
         <div className="flex justify-between w-full">
           <div className="inputs flex flex-col items-start">
             {inputs.map(pin => {
@@ -146,6 +206,29 @@ function CustomNode({ data, type, id: nodeId }) {
             {outputs.map(pin => renderPin(pin, false))}
           </div>
         </div>
+        
+        {(type === 'flow:sequence' || type === 'string:concat' || type === 'logic:operation' || type === 'data:array_literal' || type === 'data:make_object' || (type === 'flow:branch' && data.advanced)) && (
+          <div className="p-2 border-t border-slate-700 flex items-center justify-center gap-2">
+            <Button
+              onClick={() => {
+                const currentPinCount = data.pinCount || (type === 'logic:operation' || type === 'string:concat' ? 2 : 0);
+                updateNodeData(nodeId, { pinCount: currentPinCount + 1 });
+              }}
+              className="h-8 rounded-md px-3 text-xs"
+            >
+              Добавить
+            </Button>
+            {(data.pinCount > (type === 'logic:operation' || type === 'string:concat' ? 2 : 0)) && (
+              <Button
+                onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 0) - 1 })}
+                variant="destructive"
+                className="h-8 rounded-md px-3 text-xs"
+              >
+                Удалить
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
       {type === 'data:cast' && (
         <div className="p-2 border-t border-slate-700">
@@ -216,11 +299,71 @@ function CustomNode({ data, type, id: nodeId }) {
             </Button>
         </div>
       )}
-      {nodeConfig.dynamicPins && (
-        <div className="p-2 border-t border-slate-700">
-          <Button size="sm" variant="ghost" onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) + 1 })}>
-            Добавить пин
+      {nodeConfig.dynamicPins && type !== 'logic:operation' && (
+        <div className="p-2 border-t border-slate-700 flex items-center justify-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 0) + 1 })}>
+            Добавить
           </Button>
+          {(data.pinCount || 0) > (type === 'string:concat' ? 2 : 0) && (
+              <Button size="sm" variant="destructive" onClick={() => updateNodeData(nodeId, { pinCount: Math.max((type === 'string:concat' ? 2 : 0), (data.pinCount || 0) - 1) })}>
+                  Удалить
+              </Button>
+          )}
+        </div>
+      )}
+      {type === 'math:operation' && (
+        <div className="p-2 border-t border-slate-700">
+          <Label>Операция:</Label>
+          <Select value={data.operation || '+'} onValueChange={(value) => updateNodeData(nodeId, { operation: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="+">Сложение (+)</SelectItem>
+              <SelectItem value="-">Вычитание (-)</SelectItem>
+              <SelectItem value="*">Умножение (*)</SelectItem>
+              <SelectItem value="/">Деление (/)</SelectItem>
+              <SelectItem value=">">Больше (&gt;)</SelectItem>
+              <SelectItem value="<">Меньше (&lt;)</SelectItem>
+              <SelectItem value="==">Равно (==)</SelectItem>
+              <SelectItem value=">=">Больше или равно (&gt;=)</SelectItem>
+              <SelectItem value="<=">Меньше или равно (&lt;=)</SelectItem>
+              <SelectItem value="!=">Не равно (!=)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {type === 'logic:operation' && (
+        <div className="p-2 border-t border-slate-700">
+          <Label>Операция:</Label>
+          <Select 
+            value={data.operation || 'AND'} 
+            onValueChange={(value) => {
+              const newPinCount = value === 'NOT' ? 1 : (data.pinCount || 2);
+              updateNodeData(nodeId, { operation: value, pinCount: newPinCount });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AND">И (AND)</SelectItem>
+              <SelectItem value="OR">ИЛИ (OR)</SelectItem>
+              <SelectItem value="NOT">НЕ (NOT)</SelectItem>
+            </SelectContent>
+          </Select>
+          {data.operation !== 'NOT' && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+                <Button size="sm" variant="ghost" onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) + 1 })}>
+                    Добавить
+                </Button>
+                {(data.pinCount || 0) > 2 && (
+                    <Button size="sm" variant="destructive" onClick={() => updateNodeData(nodeId, { pinCount: Math.max(2, (data.pinCount || 2) - 1) })}>
+                        Удалить
+                    </Button>
+                )}
+            </div>
+          )}
         </div>
       )}
     </Card>
