@@ -5,11 +5,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { Edit, ArrowUpDown } from 'lucide-react';
+import { Edit, ArrowUpDown, Search } from 'lucide-react';
 import UserEditDialog from './UserEditDialog';
 import { apiHelper } from '@/lib/api';
+import { Input } from '@/components/ui/input';
 
-export default function UsersManager({ users, pagination, onPageChange, groups, botId, isLoading, onDataChange }) {
+export default function UsersManager({ 
+    users, 
+    pagination, 
+    onPageChange, 
+    groups, 
+    botId, 
+    isLoading, 
+    onDataChange,
+    searchQuery,
+    onSearchQueryChange 
+}) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -78,8 +89,21 @@ export default function UsersManager({ users, pagination, onPageChange, groups, 
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Пользователи</CardTitle>
-                <CardDescription>Список всех пользователей, которые взаимодействовали с ботом.</CardDescription>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>Пользователи</CardTitle>
+                        <CardDescription>Список всех пользователей, которые взаимодействовали с ботом.</CardDescription>
+                    </div>
+                    <div className="relative w-full max-w-sm">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="Поиск по никнейму..." 
+                            className="pl-8"
+                            value={searchQuery}
+                            onChange={(e) => onSearchQueryChange(e.target.value)}
+                        />
+                    </div>
+                </div>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
                 <Table>
