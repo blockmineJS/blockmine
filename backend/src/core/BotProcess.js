@@ -138,6 +138,7 @@ process.on('message', async (message) => {
         }
     } else if (message.type === 'get_player_list_request') {
         const playerList = bot ? Object.keys(bot.players) : [];
+        console.log('[BotProcess] Sending player list:', playerList);
         if (process.send) {
             process.send({
                 type: 'get_player_list_response',

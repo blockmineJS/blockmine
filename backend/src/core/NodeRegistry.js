@@ -265,6 +265,20 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'flow:break',
+      label: '🛑 Выйти из цикла',
+      category: 'Поток',
+      description: 'Немедленно прерывает выполнение цикла (For Each Loop) и передает управление на его выход Completed.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true }
+        ],
+        outputs: []
+      }
+    });
+
+    this.registerNodeType({
       type: 'action:send_message',
       label: '🗣️ Отправить сообщение',
       category: 'Действия',

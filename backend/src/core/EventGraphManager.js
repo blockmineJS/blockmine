@@ -107,7 +107,8 @@ class EventGraphManager {
             },
             lookAt: (position) => {
                 this.botManager.lookAt(botId, position);
-            }
+            },
+            getPlayerList: () => this.botManager.getPlayerList(botId)
         };
         
         const stateKey = `${botId}-${graph.id}`;

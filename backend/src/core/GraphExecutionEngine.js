@@ -1,9 +1,14 @@
 const User = require('./UserService');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-/**
- * Движок для выполнения визуальных команд, представленных в виде графа.
- */
+
+class BreakLoopSignal extends Error {
+    constructor() {
+        super("Loop break signal");
+        this.name = "BreakLoopSignal";
+    }
+}
+
 class GraphExecutionEngine {
   constructor(nodeRegistry, botManagerOrApi = null) {
       if (!nodeRegistry || typeof nodeRegistry.getNodeConfig !== 'function') {
@@ -78,7 +83,9 @@ class GraphExecutionEngine {
           }
 
       } catch (error) {
-          console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
+          if (!(error instanceof BreakLoopSignal)) {
+            console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
+          }
       }
 
       return this.context;
@@ -188,14 +195,26 @@ class GraphExecutionEngine {
               await this.traverse(node, condition ? 'exec_true' : 'exec_false');
               break;
           }
+          case 'flow:break': {
+              throw new BreakLoopSignal();
+          }
           case 'flow:for_each': {
             const array = await this.resolvePinValue(node, 'array', []);
             if (Array.isArray(array)) {
-                for (let i = 0; i < array.length; i++) {
-                    const element = array[i];
-                    this.memo.set(`${node.id}:element`, element);
-                    this.memo.set(`${node.id}:index`, i);
-                    await this.traverse(node, 'loop_body');
+                try {
+                    for (let i = 0; i < array.length; i++) {
+                        const element = array[i];
+                        this.memo.set(`${node.id}:element`, element);
+                        this.memo.set(`${node.id}:index`, i);
+                        this.clearLoopBodyMemo(node);
+                        await this.traverse(node, 'loop_body');
+                    }
+                } catch (e) {
+                    if (e instanceof BreakLoopSignal) {
+                        // Loop was interrupted. Continue to 'completed'.
+                    } else {
+                        throw e;
+                    }
                 }
             }
             this.memo.delete(`${node.id}:element`);
@@ -216,23 +235,51 @@ class GraphExecutionEngine {
               await this.traverse(node, 'exec');
               break;
           }
-          case 'logic:compare':
-            const op = node.data.operation || '==';
-            const valA = this.getPinValue(node.id, 'a');
-            const valB = this.getPinValue(node.id, 'b');
-            let compareResult;
-            switch (op) {
-              case '==': compareResult = valA == valB; break;
-              case '!=': compareResult = valA != valB; break;
-              case '>': compareResult = valA > valB; break;
-              case '<': compareResult = valA < valB; break;
-              case '>=': compareResult = valA >= valB; break;
-              case '<=': compareResult = valA <= valB; break;
-              default: compareResult = false;
-            }
-            this.setPinValue(node.id, 'result', compareResult);
-            break;
+          case 'string:equals': {
+              await this.traverse(node, 'exec');
+              break;
+          }
       }
+  }
+
+  clearLoopBodyMemo(loopNode) {
+    const nodesToClear = new Set();
+    const queue = [];
+
+    const initialConnection = this.activeGraph.connections.find(
+      c => c.sourceNodeId === loopNode.id && c.sourcePinId === 'loop_body'
+    );
+    if (initialConnection) {
+        const firstNode = this.activeGraph.nodes.find(n => n.id === initialConnection.targetNodeId);
+        if (firstNode) {
+            queue.push(firstNode);
+        }
+    }
+    
+    const visited = new Set();
+    while (queue.length > 0) {
+      const currentNode = queue.shift();
+      if (visited.has(currentNode.id)) continue;
+      visited.add(currentNode.id);
+      
+      nodesToClear.add(currentNode.id);
+      
+      const connections = this.activeGraph.connections.filter(c => c.sourceNodeId === currentNode.id);
+      for (const conn of connections) {
+        const nextNode = this.activeGraph.nodes.find(n => n.id === conn.targetNodeId);
+        if (nextNode) {
+          queue.push(nextNode);
+        }
+      }
+    }
+
+    for (const nodeId of nodesToClear) {
+        for (const key of this.memo.keys()) {
+            if (key.startsWith(nodeId)) {
+                this.memo.delete(key);
+            }
+        }
+    }
   }
 
   async resolvePinValue(node, pinId, defaultValue = null) {
@@ -246,6 +293,7 @@ class GraphExecutionEngine {
 
   async evaluateOutputPin(node, pinId, defaultValue = null) {
       if (!node) return defaultValue;
+      
       const cacheKey = `${node.id}:${pinId}`;
       if (this.memo.has(cacheKey)) {
           return this.memo.get(cacheKey);
@@ -525,7 +573,6 @@ class GraphExecutionEngine {
                   result = null;
               } else {
                   const randomIndex = Math.floor(Math.random() * arr.length);
-                  // Чтобы не вычислять дважды, сохраняем индекс в memo
                   this.memo.set(`${node.id}:index`, randomIndex);
                   if (pinId === 'element') {
                       result = arr[randomIndex];
@@ -574,13 +621,64 @@ class GraphExecutionEngine {
             break;
           }
           
+          case 'string:equals': {
+              const strA = String(await this.resolvePinValue(node, 'a', ''));
+              const strB = String(await this.resolvePinValue(node, 'b', ''));
+              const caseSensitive = node.data?.case_sensitive ?? true;
+              if (pinId === 'result') {
+                  result = caseSensitive ? strA === strB : strA.toLowerCase() === strB.toLowerCase();
+              }
+              break;
+          }
+
+          case 'logic:compare': {
+              const op = node.data?.operation || '==';
+              const valA = await this.resolvePinValue(node, 'a');
+              const valB = await this.resolvePinValue(node, 'b');
+              if (pinId === 'result') {
+                  switch (op) {
+                      case '==': result = valA == valB; break;
+                      case '!=': result = valA != valB; break;
+                      case '>': result = valA > valB; break;
+                      case '<': result = valA < valB; break;
+                      case '>=': result = valA >= valB; break;
+                      case '<=': result = valA <= valB; break;
+                      default: result = false;
+                  }
+              }
+              break;
+          }
+          
           default:
               result = defaultValue;
               break;
       }
 
-      this.memo.set(cacheKey, result);
+      const isVolatile = this.isNodeVolatile(node);
+
+      if (!isVolatile) {
+          this.memo.set(cacheKey, result);
+      }
+
       return result;
+  }
+
+  isNodeVolatile(node) {
+    if (!node) return false;
+    
+    if (node.type === 'data:get_variable') {
+        return true;
+    }
+
+    const connections = this.activeGraph.connections.filter(c => c.targetNodeId === node.id);
+    for (const conn of connections) {
+        const sourceNode = this.activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
+        if (this.isNodeVolatile(sourceNode)) {
+            return true;
+        }
+    }
+
+    return false;
   }
 }
 
