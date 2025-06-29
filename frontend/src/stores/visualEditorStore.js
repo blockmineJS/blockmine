@@ -44,7 +44,7 @@ export const useVisualEditorStore = create(
           set({ chatTypes: managementData.chatTypes });
           const commandArgs = itemData.argumentsJson ? JSON.parse(itemData.argumentsJson) : [];
           set({ commandArguments: commandArgs });
-          finalCommandState = itemData;
+          finalCommandState = { ...itemData, variables: [] };
         } else {
           itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
           if (!itemData) throw new Error('Граф события не найден');
@@ -53,7 +53,12 @@ export const useVisualEditorStore = create(
           finalCommandState = { ...itemData, variables, triggers };
         }
 
-        const parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : null;
+        const parsedGraph = itemData.graphJson ? JSON.parse(itemData.graphJson) : { nodes: [], edges: [], variables: [] };
+
+        if (parsedGraph.variables) {
+          finalCommandState.variables = parsedGraph.variables;
+        }
+
         graph = parsedGraph || { nodes: [], edges: [] };
 
         set({
@@ -263,11 +268,11 @@ export const useVisualEditorStore = create(
       });
     },
 
-    updateNodeData: (nodeId, newData) => {
+    updateNodeData: (nodeId, data) => {
       set(state => {
         const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
         if (nodeToUpdate) {
-            nodeToUpdate.data = { ...nodeToUpdate.data, ...newData };
+            nodeToUpdate.data = { ...nodeToUpdate.data, ...data };
         }
       });
     },
@@ -332,64 +337,51 @@ export const useVisualEditorStore = create(
       }
     },
 
-    saveGraph: async (botId) => {
+    saveGraph: async () => {
       set({ isSaving: true });
       try {
-        const { editorType, command, nodes, edges } = get();
-        if (!command) {
-          throw new Error("Нет данных о команде или событии.");
-        }
-        const id = command.id;
+        const { command, nodes, edges, editorType, variables } = get();
+        const { id, botId, name, description, isEnabled, permissionId, allowedChatTypes, cooldown, aliases, argumentsJson } = command;
 
-        const graphJson = {
-          nodes: nodes.map(node => ({
-            id: node.id,
-            type: node.type,
-            position: node.position,
-            data: node.data || {},
+        const graphObject = {
+          nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+          connections: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
+            id,
+            sourceNodeId: source,
+            targetNodeId: target,
+            sourcePinId: sourceHandle,
+            targetPinId: targetHandle,
           })),
-          connections: edges.map(edge => ({
-            id: edge.id,
-            sourceNodeId: edge.source,
-            targetNodeId: edge.target,
-            sourcePinId: edge.sourceHandle,
-            targetPinId: edge.targetHandle,
-          })),
+          variables: variables || []
         };
-        
+
         const payload = {
-          name: command.name,
-          isEnabled: command.isEnabled,
-          graphJson: JSON.stringify(graphJson),
+          name,
+          description,
+          isEnabled,
+          graphJson: JSON.stringify(graphObject),
         };
 
-        if (editorType === 'command') {
-          payload.argumentsJson = command.argumentsJson || '[]';
-          payload.description = command.description;
-          payload.cooldown = command.cooldown;
-          payload.aliases = command.aliases;
-          payload.permissionId = command.permissionId;
-          payload.allowedChatTypes = JSON.stringify(command.allowedChatTypes || []);
-        } else { 
-          payload.variables = command.variables || [];
-          payload.triggers = (command.triggers || []).map(t => t.eventType);
+        if (editorType === 'event') {
+          payload.eventType = command.eventType;
+        } else {
+          payload.aliases = aliases;
+          payload.cooldown = cooldown;
+          payload.permissionId = permissionId;
+          payload.allowedChatTypes = allowedChatTypes;
+          payload.argumentsJson = argumentsJson;
         }
-        
-        Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
         const url = editorType === 'command'
-          ? `/api/bots/${botId}/commands/${command.id}`
+          ? `/api/bots/${botId}/commands/${id}`
           : `/api/bots/${botId}/event-graphs/${id}`;
-          
-        const method = 'PUT';
 
-        await apiHelper(url, { method, body: JSON.stringify(payload) });
-        
-        toast({ title: "Успех!", description: "Граф успешно сохранен!" });
+        await apiHelper(url, { method: 'PUT', body: payload });
 
+        toast({ title: 'Успешно', description: 'Граф сохранен.' });
       } catch (error) {
         console.error("Ошибка сохранения графа:", error);
-        toast({ variant: 'destructive', title: "Ошибка сохранения", description: error.message });
+        toast({ variant: 'destructive', title: 'Ошибка', description: `Ошибка сохранения графа: ${error.message}` });
       } finally {
         set({ isSaving: false });
       }

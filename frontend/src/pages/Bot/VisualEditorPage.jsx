@@ -7,6 +7,7 @@ import {
     Controls,
     Background,
 } from 'reactflow';
+import { shallow } from 'zustand/shallow';
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodePanel from '@/components/visual-editor/NodePanel';
@@ -24,27 +25,25 @@ function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
 
-    const {
-        init,
-        isLoading,
-        isSaving,
-        command,
-        availableNodes,
-        saveGraph,
-        nodes,
-        edges,
-        onNodesChange,
-        onEdgesChange,
-        onConnect,
-        addNode,
-        openMenu,
-        closeMenu,
-        isMenuOpen,
-        menuPosition,
-        setConnectingPin,
-        onConnectStart,
-        connectingPin
-    } = useVisualEditorStore();
+    const init = useVisualEditorStore(state => state.init);
+    const isLoading = useVisualEditorStore(state => state.isLoading);
+    const isSaving = useVisualEditorStore(state => state.isSaving);
+    const command = useVisualEditorStore(state => state.command);
+    const availableNodes = useVisualEditorStore(state => state.availableNodes);
+    const saveGraph = useVisualEditorStore(state => state.saveGraph);
+    const nodes = useVisualEditorStore(state => state.nodes);
+    const edges = useVisualEditorStore(state => state.edges);
+    const onNodesChange = useVisualEditorStore(state => state.onNodesChange);
+    const onEdgesChange = useVisualEditorStore(state => state.onEdgesChange);
+    const onConnect = useVisualEditorStore(state => state.onConnect);
+    const addNode = useVisualEditorStore(state => state.addNode);
+    const openMenu = useVisualEditorStore(state => state.openMenu);
+    const closeMenu = useVisualEditorStore(state => state.closeMenu);
+    const isMenuOpen = useVisualEditorStore(state => state.isMenuOpen);
+    const menuPosition = useVisualEditorStore(state => state.menuPosition);
+    const setConnectingPin = useVisualEditorStore(state => state.setConnectingPin);
+    const onConnectStart = useVisualEditorStore(state => state.onConnectStart);
+    const connectingPin = useVisualEditorStore(state => state.connectingPin);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);

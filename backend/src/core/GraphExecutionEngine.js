@@ -39,7 +39,32 @@ class GraphExecutionEngine {
       try {
           this.activeGraph = parsedGraph;
           this.context = context;
-          if (!this.context.variables) this.context.variables = {};
+          
+          if (!this.context.variables) {
+            this.context.variables = {};
+            if (Array.isArray(this.activeGraph.variables)) {
+              for (const variable of this.activeGraph.variables) {
+                  let value = variable.value;
+                  try {
+                      switch(variable.type) {
+                          case 'number':
+                              value = Number(value);
+                              break;
+                          case 'boolean':
+                              value = value === 'true';
+                              break;
+                          case 'array':
+                              value = JSON.parse(value);
+                              break;
+                      }
+                  } catch (e) {
+                      console.error(`Error parsing variable default value for ${variable.name}:`, e);
+                  }
+                  this.context.variables[variable.name] = value;
+              }
+            }
+          }
+
           if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
           this.memo.clear();
 
@@ -143,7 +168,11 @@ class GraphExecutionEngine {
           case 'action:bot_set_variable': {
               const varName = await this.resolvePinValue(node, 'name', '');
               const varValue = await this.resolvePinValue(node, 'value');
-              const shouldPersist = await this.resolvePinValue(node, 'persist', false);
+              let shouldPersist = await this.resolvePinValue(node, 'persist', false);
+              
+              if (this.context.eventType === 'command') {
+                  shouldPersist = false;
+              }
 
               if (varName) {
                   this.context.variables[varName] = varValue;
@@ -159,6 +188,21 @@ class GraphExecutionEngine {
               await this.traverse(node, condition ? 'exec_true' : 'exec_false');
               break;
           }
+          case 'flow:for_each': {
+            const array = await this.resolvePinValue(node, 'array', []);
+            if (Array.isArray(array)) {
+                for (let i = 0; i < array.length; i++) {
+                    const element = array[i];
+                    this.memo.set(`${node.id}:element`, element);
+                    this.memo.set(`${node.id}:index`, i);
+                    await this.traverse(node, 'loop_body');
+                }
+            }
+            this.memo.delete(`${node.id}:element`);
+            this.memo.delete(`${node.id}:index`);
+            await this.traverse(node, 'completed');
+            break;
+          }
           case 'flow:sequence': {
               const pinCount = node.data?.pinCount || 2;
               for (let i = 0; i < pinCount; i++) {
@@ -168,7 +212,8 @@ class GraphExecutionEngine {
           }
           case 'debug:log': {
               const value = await this.resolvePinValue(node, 'value');
-              await this.traverse(node, 'exec_out');
+              console.log('[Graph Debug]', value);
+              await this.traverse(node, 'exec');
               break;
           }
           case 'logic:compare':
@@ -268,6 +313,14 @@ class GraphExecutionEngine {
               }
               result = permissions;
               break;
+          }
+          case 'bot:get_position': {
+            if (this.context.bot?.entity?.position) {
+                result = this.context.bot.entity.position;
+            } else {
+                result = null;
+            }
+            break;
           }
           case 'user:set_blacklist':
               result = this.memo.get(`${node.id}:updated_user`);
@@ -511,6 +564,14 @@ class GraphExecutionEngine {
               const element = await this.resolvePinValue(node, 'element', null);
               result = Array.isArray(arr) ? arr.indexOf(element) : -1;
               break;
+          }
+          case 'flow:for_each': {
+            if (pinId === 'element') {
+                result = this.memo.get(`${node.id}:element`);
+            } else if (pinId === 'index') {
+                result = this.memo.get(`${node.id}:index`);
+            }
+            break;
           }
           
           default:

@@ -14,7 +14,7 @@ const EventGraphManager = require('./EventGraphManager');
 const nodeRegistry = require('./NodeRegistry');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 
-const RealUserService = require('./UserService');
+const UserService = require('./UserService');
 
 const prisma = new PrismaClient();
 const cooldowns = new Map();
@@ -328,35 +328,49 @@ class BotManager {
                 case 'register_command':
                     await this.handleCommandRegistration(botId, message.commandConfig);
                     break;
+                case 'register_group':
+                    await this.handleGroupRegistration(botId, message.groupConfig);
+                    break;
                 case 'request_user_action':
                     const { requestId, payload } = message;
                     const { targetUsername, action, data } = payload;
+                    
                     try {
-                        const targetUser = await RealUserService.getUser(targetUsername, botId);
-                        let replyPayload = {};
+                        const user = await UserService.getUser(targetUsername, botConfig.id);
+                        if (!user) throw new Error(`Пользователь ${targetUsername} не найден.`);
+                        
+                        let result;
+
                         switch (action) {
-                            case 'toggle_blacklist': {
-                                const isCurrentlyBlacklisted = targetUser.isBlacklisted;
-                                await targetUser.setBlacklist(!isCurrentlyBlacklisted);
-                                replyPayload.newStatus = !isCurrentlyBlacklisted; 
+                            case 'addGroup':
+                                result = await user.addGroup(data.group);
                                 break;
-                            }
-                            case 'toggle_group': {
-                                if (!data.groupName) throw new Error('Название группы не указано.');
-                                const hasGroup = targetUser.hasGroup(data.groupName);
-                                if (hasGroup) {
-                                    await targetUser.removeGroup(data.groupName);
-                                    replyPayload.actionTaken = 'removed'; 
-                                } else {
-                                    await targetUser.addGroup(data.groupName);
-                                    replyPayload.actionTaken = 'added'; 
-                                }
+                            case 'removeGroup':
+                                result = await user.removeGroup(data.group);
                                 break;
-                            }
+                            case 'addPermission':
+                                // To be implemented if needed
+                                break;
+                            case 'removePermission':
+                                // To be implemented if needed
+                                break;
+                            case 'getGroups':
+                                result = user.groups;
+                                break;
+                            case 'getPermissions':
+                                result = Array.from(user.permissionsSet);
+                                break;
+                            case 'isBlacklisted':
+                                result = user.isBlacklisted;
+                                break;
+                            case 'setBlacklisted':
+                                result = await user.setBlacklist(data.value);
+                                break;
                             default:
                                 throw new Error(`Неизвестное действие: ${action}`);
                         }
-                        child.send({ type: 'user_action_response', requestId, payload: replyPayload });
+
+                        child.send({ type: 'user_action_response', requestId, payload: result });
                     } catch (error) {
                         console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
                         child.send({ type: 'user_action_response', requestId, error: error.message });
@@ -410,7 +424,7 @@ class BotManager {
                 botConfigCache = await this.loadConfigForBot(botId);
             }
 
-            const user = await RealUserService.getUser(username, botId, botConfig);
+            const user = await UserService.getUser(username, botId, botConfig);
 
             const child = this.bots.get(botId);
             if (!child) return;
@@ -545,6 +559,25 @@ class BotManager {
         }
     }
 
+    async handleGroupRegistration(botId, groupConfig) {
+        try {
+            await prisma.group.upsert({
+                where: { botId_name: { botId, name: groupConfig.name } },
+                update: {
+                    owner: groupConfig.owner,
+                },
+                create: {
+                    botId,
+                    name: groupConfig.name,
+                    owner: groupConfig.owner,
+                },
+            });
+            this.invalidateConfigCache(botId);
+        } catch (error) {
+            console.error(`[BotManager] Ошибка при регистрации группы '${groupConfig.name}':`, error);
+        }
+    }
+
     stopBot(botId) {
         const child = this.bots.get(botId);
         if (child) {
@@ -566,7 +599,7 @@ class BotManager {
     }
 
     invalidateUserCache(botId, username) {
-        RealUserService.clearCache(username, botId);
+        UserService.clearCache(username, botId);
         const child = this.bots.get(botId);
         if (child) {
             child.send({ type: 'invalidate_user_cache', username });

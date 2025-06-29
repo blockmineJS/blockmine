@@ -245,6 +245,26 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'flow:for_each',
+      label: '🔁 Перебор массива (цикл)',
+      category: 'Поток',
+      description: 'Выполняет "Тело цикла" для каждого элемента в "Массиве".',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+          { id: 'array', name: 'Массив', type: 'Array', required: true }
+        ],
+        outputs: [
+          { id: 'loop_body', name: 'Тело цикла', type: 'Exec' },
+          { id: 'element', name: 'Элемент', type: 'Any' },
+          { id: 'index', name: 'Индекс', type: 'Number' },
+          { id: 'completed', name: 'Завершено', type: 'Exec' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'action:send_message',
       label: '🗣️ Отправить сообщение',
       category: 'Действия',
@@ -303,7 +323,7 @@ class NodeRegistry {
       label: '💾 Записать переменную',
       category: 'Действия',
       description: 'Сохраняет значение в переменную графа.',
-      graphType: event,
+      graphType: all,
       pins: {
           inputs: [
               { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -343,7 +363,7 @@ class NodeRegistry {
         label: '📤 Получить переменную',
         category: 'Данные',
         description: 'Получает значение переменной графа.',
-        graphType: event,
+        graphType: all,
         pins: {
             inputs: [],
             outputs: [
@@ -654,11 +674,11 @@ class NodeRegistry {
       graphType: all,
       pins: {
         inputs: [
-          { id: 'exec_in', name: 'Exec', type: 'Exec' },
+          { id: 'exec', name: 'Exec', type: 'Exec' },
           { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
         ],
         outputs: [
-          { id: 'exec_out', name: 'Exec', type: 'Exec' }
+          { id: 'exec', name: 'Exec', type: 'Exec' }
         ]
       }
     });
@@ -722,6 +742,20 @@ class NodeRegistry {
         ],
         outputs: [
           { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'bot:get_position',
+      label: '🤖 Позиция бота',
+      category: 'Бот',
+      description: 'Возвращает текущую позицию бота в мире.',
+      graphType: all,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'position', name: 'Позиция', type: 'Object' }
         ]
       }
     });

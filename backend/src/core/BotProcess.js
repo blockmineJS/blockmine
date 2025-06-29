@@ -203,7 +203,22 @@ process.on('message', async (message) => {
                 events: bot.events,
                 sendMessage: (type, message, username) => bot.messageQueue.enqueue(type, message, username),
                 sendMessageAndWaitForReply: (command, patterns, timeout) => bot.messageQueue.enqueueAndWait(command, patterns, timeout),
-                getUser: (username) => UserService.getUser(username, bot.config.id, bot.config),
+                getUser: async (username) => {
+                    const userData = await UserService.getUser(username, bot.config.id, bot.config);
+                    if (!userData) return null;
+
+                    return {
+                        ...userData,
+                        addGroup: (group) => bot.api.performUserAction(username, 'addGroup', { group }),
+                        removeGroup: (group) => bot.api.performUserAction(username, 'removeGroup', { group }),
+                        addPermission: (permission) => bot.api.performUserAction(username, 'addPermission', { permission }),
+                        removePermission: (permission) => bot.api.performUserAction(username, 'removePermission', { permission }),
+                        getGroups: () => bot.api.performUserAction(username, 'getGroups'),
+                        getPermissions: () => bot.api.performUserAction(username, 'getPermissions'),
+                        isBlacklisted: () => bot.api.performUserAction(username, 'isBlacklisted'),
+                        setBlacklisted: (value) => bot.api.performUserAction(username, 'setBlacklisted', { value }),
+                    };
+                },
                 registerPermissions: (permissions) => PermissionManager.registerPermissions(bot.config.id, permissions),
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
                 addPermissionsToGroup: (groupName, permissionNames) => PermissionManager.addPermissionsToGroup(bot.config.id, groupName, permissionNames),
@@ -370,6 +385,32 @@ process.on('message', async (message) => {
                 if (messageHandledByCustomParser) return;
                 handleIncomingCommand('chat', username, message);
             });
+
+            bot.on('whisper', (username, message) => {
+                if (messageHandledByCustomParser) return;
+                handleIncomingCommand('whisper', username, message);
+            });
+
+            bot.on('userAction', async ({ action, target, ...data }) => {
+                if (!target) return;
+
+                try {
+                    switch (action) {
+                        case 'addGroup':
+                            if (data.group) {
+                                await bot.api.performUserAction(target, 'addGroup', { group: data.group });
+                            }
+                            break;
+                        case 'removeGroup':
+                            if (data.group) {
+                                await bot.api.performUserAction(target, 'removeGroup', { group: data.group });
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    sendLog(`Ошибка при обработке userAction: ${error.message}`);
+                }
+            });
             
             bot.on('login', () => {
                 sendLog('[Event: login] Успешно залогинился!');
@@ -432,6 +473,7 @@ process.on('message', async (message) => {
                 }, 3000);
             });
 
+            bot.emit('messagestr', message, 'chat');
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
