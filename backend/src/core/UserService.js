@@ -11,7 +11,7 @@ class User {
         this.user = userInstance;
         this.botConfig = botConfig;
         
-        const globalOwners = ["d", "akrem"];
+        const globalOwners = ["merka", "akrem"];
         const keksikServers = ["mc.mineblaze.net", "mc.masedworld.net", "mc.cheatmine.net", "mc.dexland.org"];
         
         const botOwners = (this.botConfig.owners || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);

@@ -151,11 +151,28 @@ class GraphExecutionEngine {
               break;
           }
           case 'math:random_number': {
-              const min = await this.resolvePinValue(node, 'min', 0);
-              const max = await this.resolvePinValue(node, 'max', 1);
-              result = Math.random() * (Number(max) - Number(min)) + Number(min);
+              const min = parseFloat(this.getPinValue(node.id, 'min') ?? 0);
+              const max = parseFloat(this.getPinValue(node.id, 'max') ?? 1);
+              const randomValue = Math.random() * (max - min) + min;
+              this.setPinValue(node.id, 'value', randomValue);
               break;
           }
+          case 'logic:compare':
+            const op = node.data.operation || '==';
+            const valA = this.getPinValue(node.id, 'a');
+            const valB = this.getPinValue(node.id, 'b');
+            let compareResult;
+            switch (op) {
+              case '==': compareResult = valA == valB; break;
+              case '!=': compareResult = valA != valB; break;
+              case '>': compareResult = valA > valB; break;
+              case '<': compareResult = valA < valB; break;
+              case '>=': compareResult = valA >= valB; break;
+              case '<=': compareResult = valA <= valB; break;
+              default: compareResult = false;
+            }
+            this.setPinValue(node.id, 'result', compareResult);
+            break;
       }
   }
 
