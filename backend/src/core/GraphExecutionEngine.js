@@ -171,13 +171,6 @@ class GraphExecutionEngine {
               await this.traverse(node, 'exec_out');
               break;
           }
-          case 'math:random_number': {
-              const min = parseFloat(this.getPinValue(node.id, 'min') ?? 0);
-              const max = parseFloat(this.getPinValue(node.id, 'max') ?? 1);
-              const randomValue = Math.random() * (max - min) + min;
-              this.setPinValue(node.id, 'value', randomValue);
-              break;
-          }
           case 'logic:compare':
             const op = node.data.operation || '==';
             const valA = this.getPinValue(node.id, 'a');
@@ -306,9 +299,9 @@ class GraphExecutionEngine {
           
           case 'data:get_argument': {
             const args = this.context.args || {};
-            const argName = await this.resolvePinValue(node, 'arg_name', '');
+            const argName = node.data?.argumentName || '';
             if (pinId === 'value') {
-                result = args && argName && args[argName] !== undefined ? args[argName] : null;
+                result = args && argName && args[argName] !== undefined ? args[argName] : defaultValue;
             } else if (pinId === 'exists') {
                 result = args && argName && args[argName] !== undefined;
             }
@@ -337,6 +330,34 @@ class GraphExecutionEngine {
                   default: result = 0;
               }
               break;
+          }
+
+          case 'math:random_number': {
+             const minRaw = await this.resolvePinValue(node, 'min', node.data.min ?? '0');
+             const maxRaw = await this.resolvePinValue(node, 'max', node.data.max ?? '1');
+
+             const minStr = String(minRaw);
+             const maxStr = String(maxRaw);
+
+             const min = parseFloat(minStr.replace(',', '.'));
+             const max = parseFloat(maxStr.replace(',', '.'));
+
+             if (isNaN(min) || isNaN(max)) {
+                 result = NaN;
+                 break;
+             }
+            
+             const produceFloat = minStr.includes('.') || minStr.includes(',') || !Number.isInteger(min) ||
+                                  maxStr.includes('.') || maxStr.includes(',') || !Number.isInteger(max);
+
+             if (produceFloat) {
+                 result = Math.random() * (max - min) + min;
+             } else {
+                 const minInt = Math.ceil(min);
+                 const maxInt = Math.floor(max);
+                 result = Math.floor(Math.random() * (maxInt - minInt + 1)) + minInt;
+             }
+             break;
           }
 
           case 'logic:operation': {

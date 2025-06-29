@@ -24,6 +24,7 @@ function CustomNode({ data, type, id: nodeId }) {
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
   const edges = useVisualEditorStore(state => state.edges);
   const variables = useVisualEditorStore(state => state.variables);
+  const commandArguments = useVisualEditorStore(state => state.commandArguments);
 
   const nodeConfig = useMemo(() => 
     Object.values(availableNodes).flat().find(n => n.type === type), 
@@ -147,6 +148,36 @@ function CustomNode({ data, type, id: nodeId }) {
         <CardTitle className="text-sm text-center">{nodeConfig.name || nodeConfig.label}</CardTitle>
       </CardHeader>
       <CardContent className="p-2 flex flex-col">
+        {type === 'data:cast' && (
+            <div className="p-2 border-t border-slate-700">
+                <Label>Целевой тип:</Label>
+                <Select value={data.targetType || 'String'} onValueChange={(value) => updateNodeData(nodeId, { targetType: value })}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Выберите тип..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="String">String (Текст)</SelectItem>
+                        <SelectItem value="Number">Number (Число)</SelectItem>
+                        <SelectItem value="Boolean">Boolean (Да/Нет)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+        {type === 'data:get_argument' && (
+            <div className="p-2">
+                <Label>Имя аргумента:</Label>
+                <Select value={data.argumentName || ''} onValueChange={(value) => updateNodeData(nodeId, { argumentName: value })}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Выберите аргумент..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(commandArguments || []).map(arg => (
+                            <SelectItem key={arg.id} value={arg.name}>{arg.name} ({arg.type})</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
         {type === 'data:get_variable' && (
             <div className="p-2">
                 <Label>Имя переменной:</Label>
@@ -162,7 +193,7 @@ function CustomNode({ data, type, id: nodeId }) {
                 </Select>
             </div>
         )}
-        {type === 'math:random_number' && (
+        {false && type === 'math:random_number' && (
           <div className="p-2 space-y-2">
             <div>
               <Label>Min</Label>
@@ -253,21 +284,6 @@ function CustomNode({ data, type, id: nodeId }) {
           </div>
         )}
       </CardContent>
-      {type === 'data:cast' && (
-        <div className="p-2 border-t border-slate-700">
-          <Label>Целевой тип:</Label>
-          <Select value={data.targetType || 'String'} onValueChange={(value) => updateNodeData(nodeId, { targetType: value })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="String">String (Текст)</SelectItem>
-              <SelectItem value="Number">Number (Число)</SelectItem>
-              <SelectItem value="Boolean">Boolean (Да/Нет)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
       {type === 'flow:branch' && (
         <div className="p-2 border-t border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-2">

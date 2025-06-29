@@ -321,15 +321,19 @@ class NodeRegistry {
       type: 'data:get_argument',
       label: '📥 Получить аргумент',
       category: 'Данные',
-      description: 'Получает значение аргумента команды.',
+      description: 'Получает значение аргумента команды по его имени.',
       graphType: command,
+      data: {
+        argumentName: {
+          type: 'argument',
+          label: 'Аргумент'
+        }
+      },
       pins: {
-        inputs: [
-          { id: 'arg_name', name: 'Имя аргумента', type: 'String', required: true },
-        ],
+        inputs: [],
         outputs: [
-          { id: 'value', name: 'Значение', type: 'Wildcard' },
-          { id: 'exists', name: 'Существует', type: 'Boolean' },
+          { id: 'value', name: 'Значение', type: 'Any' },
+          { id: 'exists', name: 'Существует', type: 'Boolean' }
         ]
       }
     });
@@ -447,16 +451,13 @@ class NodeRegistry {
       type: 'data:cast',
       label: '✨ Приведение типов',
       category: 'Данные',
-      description: 'Преобразует значение из одного типа в другой.',
+      description: 'Приводит входящее значение к указанному целевому типу.',
       graphType: all,
       pins: {
         inputs: [
-          { id: 'exec_in', name: 'Exec', type: 'Exec' },
-          { id: 'value', name: 'Значение', type: 'Wildcard', required: true },
-          { id: 'target_type', name: 'Целевой тип', type: 'String', required: true }
+          { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
         ],
         outputs: [
-          { id: 'exec_out', name: 'Exec', type: 'Exec' },
           { id: 'value', name: 'Значение', type: 'Wildcard' }
         ]
       }

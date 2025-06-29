@@ -24,9 +24,10 @@ export const useVisualEditorStore = create(
     menuPosition: { top: 0, left: 0, flowPosition: { x: 0, y: 0 } },
     connectingPin: null,
     variables: [],
+    commandArguments: [],
 
     init: async (botId, id, type) => {
-      set({ isLoading: true, editorType: type, variables: [] });
+      set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
       try {
         const [availableNodesData, permissionsData] = await Promise.all([
           get().fetchAvailableNodes(botId, type),
@@ -41,6 +42,8 @@ export const useVisualEditorStore = create(
           itemData = managementData.commands.find(c => c.id === parseInt(id));
           if (!itemData) throw new Error('Команда не найдена');
           set({ chatTypes: managementData.chatTypes });
+          const commandArgs = itemData.argumentsJson ? JSON.parse(itemData.argumentsJson) : [];
+          set({ commandArguments: commandArgs });
           finalCommandState = itemData;
         } else {
           itemData = await apiHelper(`/api/bots/${botId}/event-graphs/${id}`);
@@ -193,7 +196,9 @@ export const useVisualEditorStore = create(
       set(state => {
         const args = JSON.parse(state.command.argumentsJson || '[]');
         const newArg = { id: randomUUID(), name: 'newArg', type: 'string', required: true };
-        state.command.argumentsJson = JSON.stringify([...args, newArg]);
+        const newArgs = [...args, newArg];
+        state.command.argumentsJson = JSON.stringify(newArgs);
+        state.commandArguments = newArgs;
       });
     },
 
@@ -202,6 +207,7 @@ export const useVisualEditorStore = create(
         const args = JSON.parse(state.command.argumentsJson || '[]');
         const newArgs = args.map(arg => (arg.id === argId ? { ...arg, ...updates } : arg));
         state.command.argumentsJson = JSON.stringify(newArgs);
+        state.commandArguments = newArgs;
       });
     },
 
@@ -210,6 +216,7 @@ export const useVisualEditorStore = create(
         const args = JSON.parse(state.command.argumentsJson || '[]');
         const newArgs = args.filter(arg => arg.id !== argId);
         state.command.argumentsJson = JSON.stringify(newArgs);
+        state.commandArguments = newArgs;
       });
     },
 
