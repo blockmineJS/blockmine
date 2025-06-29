@@ -857,6 +857,25 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'data:get_user_field',
+      label: '👤 Данные пользователя',
+      category: 'Данные',
+      description: 'Получает различные данные из объекта пользователя.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'user', name: 'Пользователь', type: 'User', required: true }
+        ],
+        outputs: [
+          { id: 'username', name: 'Никнейм', type: 'String' },
+          { id: 'groups', name: 'Группы', type: 'Array' },
+          { id: 'permissions', name: 'Права', type: 'Array' },
+          { id: 'isBlacklisted', name: 'В черном списке', type: 'Boolean' },
+        ]
+      }
+    });
+
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
   }
 

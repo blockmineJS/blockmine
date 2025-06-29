@@ -485,7 +485,6 @@ class BotManager {
                         executeCommand: (command) => {
                             this.sendServerCommandToBot(botId, command);
                         },
-                        getPlayerList: () => this.getPlayerList(botId)
                     };
 
                     const graphContext = {

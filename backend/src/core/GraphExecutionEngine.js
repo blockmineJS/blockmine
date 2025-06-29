@@ -217,8 +217,8 @@ class GraphExecutionEngine {
                     }
                 }
             }
-            this.memo.delete(`${node.id}:element`);
-            this.memo.delete(`${node.id}:index`);
+            // this.memo.delete(`${node.id}:element`);
+            // this.memo.delete(`${node.id}:index`);
             await this.traverse(node, 'completed');
             break;
           }
@@ -235,6 +235,8 @@ class GraphExecutionEngine {
               await this.traverse(node, 'exec');
               break;
           }
+          case 'string:contains':
+          case 'string:matches':
           case 'string:equals': {
               await this.traverse(node, 'exec');
               break;
@@ -537,10 +539,10 @@ class GraphExecutionEngine {
           }
 
           case 'string:contains': {
-              const strA = String(await this.resolvePinValue(node, 'a', ''));
-              const strB = String(await this.resolvePinValue(node, 'b', ''));
+              const haystack = String(await this.resolvePinValue(node, 'haystack', ''));
+              const needle = String(await this.resolvePinValue(node, 'needle', ''));
               const caseSensitive = await this.resolvePinValue(node, 'case_sensitive', true);
-              result = caseSensitive ? strA.includes(strB) : strA.toLowerCase().includes(strB.toLowerCase());
+              result = caseSensitive ? haystack.includes(needle) : haystack.toLowerCase().includes(needle.toLowerCase());
               break;
           }
           case 'string:matches': {
@@ -556,13 +558,35 @@ class GraphExecutionEngine {
               break;
 
           case 'data:get_user_field': {
-               const user = await this.resolvePinValue(node, 'user');
-               result = user ? user[pinId] : defaultValue;
+               const userIdentifier = await this.resolvePinValue(node, 'user');
+               let userObject = null;
+           
+               if (userIdentifier && typeof userIdentifier === 'object' && userIdentifier.username) {
+                   userObject = userIdentifier;
+               } else if (typeof userIdentifier === 'string' && userIdentifier.length > 0) {
+                   userObject = await User.getUser(userIdentifier, this.context.botId);
+               }
+           
+               if (userObject) {
+                   if (pinId === 'username') {
+                       result = userObject.username;
+                   } else if (pinId === 'groups') {
+                       result = userObject.groups ? userObject.groups.map(g => g.group?.name).filter(Boolean) : [];
+                   } else if (pinId === 'permissions') {
+                       result = userObject.permissionsSet ? Array.from(userObject.permissionsSet) : [];
+                   } else if (pinId === 'isBlacklisted') {
+                       result = !!userObject.isBlacklisted;
+                   } else {
+                       result = defaultValue;
+                   }
+               } else {
+                    result = defaultValue;
+               }
                break;
           }
-          case 'data:get_server_players':
-              result = this.context.players || [];
-              break;
+           case 'data:get_server_players':
+               result = this.context.players || [];
+               break;
           case 'data:get_bot_look':
               result = this.context.botState ? { yaw: this.context.botState.yaw, pitch: this.context.botState.pitch } : null;
               break;

@@ -100,8 +100,7 @@ router.put('/:graphId',
     body('name').optional().isString().notEmpty(),
     body('isEnabled').optional().isBoolean(),
     body('graphJson').optional().isJSON(),
-    body('variables').optional().isArray(),
-    body('triggers').optional().isArray()
+    body('variables').optional().isArray()
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -110,26 +109,28 @@ router.put('/:graphId',
     }
 
     const { graphId } = req.params;
-    const { name, isEnabled, graphJson, variables, triggers } = req.body;
+    const { name, isEnabled, graphJson, variables } = req.body;
 
     try {
       const dataToUpdate = {};
       if (name !== undefined) dataToUpdate.name = name;
       if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
       
-      if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
+      if (graphJson !== undefined) {
+          dataToUpdate.graphJson = graphJson;
+
+          const parsedGraph = JSON.parse(graphJson);
+          const eventNodes = parsedGraph.nodes.filter(node => node.type.startsWith('event:'));
+          const eventTypes = eventNodes.map(node => node.type.split(':')[1]);
+          
+          dataToUpdate.triggers = {
+              deleteMany: {},
+              create: eventTypes.map(eventType => ({ eventType })),
+          };
+      }
 
       if (variables !== undefined) {
           dataToUpdate.variables = Array.isArray(variables) ? JSON.stringify(variables) : variables;
-      }
-      
-      if (triggers !== undefined) {
-        dataToUpdate.triggers = {
-          deleteMany: {},
-          create: triggers.map(eventType => ({
-            eventType,
-          })),
-        };
       }
 
       const updatedGraph = await prisma.eventGraph.update({
@@ -208,7 +209,6 @@ router.post('/import',
     body('name').isString().notEmpty(),
     body('graphJson').isJSON(),
     body('variables').optional().isJSON(),
-    body('triggers').optional().isArray(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -217,7 +217,7 @@ router.post('/import',
     }
 
     const { botId } = req.params;
-    const { name, graphJson, variables, triggers } = req.body;
+    const { name, graphJson, variables } = req.body;
 
     try {
       const graph = JSON.parse(graphJson);
@@ -264,6 +264,9 @@ router.post('/import',
 
       const newGraphJson = JSON.stringify(graph);
 
+      const eventNodes = graph.nodes.filter(node => node.type.startsWith('event:'));
+      const eventTypes = eventNodes.map(node => node.type.split(':')[1]);
+
       const newGraph = await prisma.eventGraph.create({
         data: {
           botId: parseInt(botId),
@@ -272,7 +275,7 @@ router.post('/import',
           variables: variables || '[]',
           isEnabled: false,
           triggers: {
-            create: (triggers || []).map(eventType => ({ eventType })),
+            create: eventTypes.map(eventType => ({ eventType })),
           },
         },
         include: { triggers: true }
