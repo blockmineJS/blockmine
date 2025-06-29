@@ -1024,41 +1024,34 @@ router.delete('/:botId/event-graphs/:graphId', authorize('management:edit'), asy
 });
 
 router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
+    const { botId, graphId } = req.params;
+    const { name, isEnabled, graphJson, eventType } = req.body;
+
+    if (!name || !eventType || !graphJson) {
+        return res.status(400).json({ error: 'Поля name, eventType и graphJson обязательны.' });
+    }
+
+    if (typeof isEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Поле isEnabled должно быть true или false.' });
+    }
+
     try {
-        const botId = parseInt(req.params.botId, 10);
-        const graphId = parseInt(req.params.graphId, 10);
-        const { name, isEnabled, graphJson, triggers } = req.body;
-
-        const dataToUpdate = {};
-        if (name) dataToUpdate.name = name;
-        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        if (graphJson) dataToUpdate.graphJson = graphJson;
-
-        await prisma.$transaction(async (tx) => {
-            if (Object.keys(dataToUpdate).length > 0) {
-                await tx.eventGraph.update({
-                    where: { id: graphId, botId },
-                    data: dataToUpdate,
-                });
-            }
-
-            if (Array.isArray(triggers)) {
-                await tx.eventTrigger.deleteMany({ where: { graphId } });
-                await tx.eventTrigger.createMany({
-                    data: triggers.map(eventType => ({ graphId, eventType }))
-                });
+        const updatedGraph = await prisma.eventGraph.update({
+            where: { id: parseInt(graphId), botId: parseInt(botId) },
+            data: {
+                name,
+                isEnabled,
+                graphJson,
+                eventType,
             }
         });
-
-        const updatedGraph = await prisma.eventGraph.findUnique({ 
-            where: { id: graphId },
-            include: { triggers: true }
-        });
-
+        
+        botManager.eventGraphManager.updateGraph(parseInt(botId), updatedGraph);
+        
         res.json(updatedGraph);
     } catch (error) {
         console.error(`[API Error] /event-graphs/:graphId PUT:`, error);
-        res.status(500).json({ error: 'Не удалось обновить граф событий' });
+        res.status(500).json({ error: 'Ошибка при обновлении графа событий.' });
     }
 });
 

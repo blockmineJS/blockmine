@@ -10,6 +10,13 @@ import {
 
 export default function CommandMenu({ items, onClose, position, onSelect }) {
   const menuRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   return (
     <>
@@ -27,7 +34,7 @@ export default function CommandMenu({ items, onClose, position, onSelect }) {
         style={{ top: position.top, left: position.left }}
       >
         <Command className="rounded-lg border shadow-md w-64">
-          <CommandInput placeholder="Search..." />
+          <CommandInput ref={inputRef} placeholder="Search..." />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             {items.map((group) => (

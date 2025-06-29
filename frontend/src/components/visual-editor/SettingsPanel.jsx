@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
+import { shallow } from 'zustand/shallow';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,9 +11,15 @@ import { Trash2 } from 'lucide-react';
 import VariablesPanel from './VariablesPanel';
 
 const SettingsPanel = () => {
-  const { command, updateCommand, addArgument, updateArgument, removeArgument, permissions } = useVisualEditorStore();
+  const command = useVisualEditorStore(state => state.command);
+  const updateCommand = useVisualEditorStore(state => state.updateCommand);
+  const addArgument = useVisualEditorStore(state => state.addArgument);
+  const updateArgument = useVisualEditorStore(state => state.updateArgument);
+  const removeArgument = useVisualEditorStore(state => state.removeArgument);
+  const permissions = useVisualEditorStore(state => state.permissions);
+  const editorType = useVisualEditorStore(state => state.editorType);
 
-  const isEventGraph = command ? 'variables' in command : false;
+  const isEventGraph = editorType === 'event';
 
   const safeJsonParse = (jsonString, defaultVal = []) => {
     try {
@@ -165,7 +172,7 @@ const SettingsPanel = () => {
         </>
       )}
 
-      {isEventGraph && <VariablesPanel />}
+      <VariablesPanel />
     </div>
   );
 };

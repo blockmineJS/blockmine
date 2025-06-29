@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -25,6 +25,7 @@ function CustomNode({ data, type, id: nodeId }) {
   const edges = useVisualEditorStore(state => state.edges);
   const variables = useVisualEditorStore(state => state.variables);
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
+  const editorType = useVisualEditorStore(state => state.editorType);
 
   const nodeConfig = useMemo(() => 
     Object.values(availableNodes).flat().find(n => n.type === type), 
@@ -186,7 +187,7 @@ function CustomNode({ data, type, id: nodeId }) {
                         <SelectValue placeholder="Выберите переменную..." />
                     </SelectTrigger>
                     <SelectContent>
-                        {variables.map(v => (
+                        {variables.filter(v => v.name).map(v => (
                             <SelectItem key={v.id} value={v.name}>{v.name} ({v.type})</SelectItem>
                         ))}
                     </SelectContent>
@@ -232,7 +233,7 @@ function CustomNode({ data, type, id: nodeId }) {
                       onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
                     />
                   )}
-                  {!hasConnection && pin.id === 'persist' && (
+                  {!hasConnection && pin.id === 'persist' && editorType === 'event' && (
                     <Select value={data[pin.id] || 'false'} onValueChange={(value) => updateNodeData(nodeId, { [pin.id]: value })}>
                       <SelectTrigger className="w-[100px]">
                         <SelectValue />
