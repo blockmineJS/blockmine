@@ -357,7 +357,7 @@ class BotManager {
                         child.send({ type: 'user_action_response', requestId, payload: replyPayload });
                     } catch (error) {
                         console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
-                        child.send({ type: 'user_action_response', requestId, error: message });
+                        child.send({ type: 'user_action_response', requestId, error: error.message });
                     }
                     break;
                 case 'playerListUpdate':
@@ -531,7 +531,17 @@ class BotManager {
             console.error(`[BotManager] Не удалось найти запущенный процесс для бота ${botId}, чтобы выполнить lookAt.`);
         }
     }
+
+    async reloadPlugins(botId) {
+        const child = this.bots.get(botId);
+        if (child && !child.killed) {
+            child.send({ type: 'plugins:reload' });
+            console.log(`[BotManager] Sent plugins:reload to bot process ${botId}`);
+            getIO().emit('bot:plugins_reloaded', { botId });
+            return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };
+        }
+        return { success: false, message: 'Бот не запущен.' };
+    }
 }
 
-const botManagerInstance = new BotManager();
-module.exports = botManagerInstance;
+module.exports = BotManager;

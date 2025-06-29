@@ -250,7 +250,7 @@ process.on('message', async (message) => {
                                 reject(new Error('Request to main process timed out.'));
                                 pendingRequests.delete(requestId);
                             }
-                        }, 5000);
+                        }, 10000);
                     });
                 },
                 executeCommand: (command) => {
@@ -506,6 +506,18 @@ process.on('message', async (message) => {
                 sendLog(`[BotProcess] Ошибка lookAt: получены невалидные координаты: ${JSON.stringify(message.payload.position)}`);
             }
         }
+    } else if (message.type === 'plugins:reload') {
+        sendLog('[System] Получена команда на перезагрузку плагинов...');
+        const newConfig = await fetchNewConfig(bot.config.id);
+        if (newConfig) {
+            bot.config.plugins = newConfig.installedPlugins;
+            bot.commands.clear();
+            await loadCommands(bot, newConfig.commands);
+            await initializePlugins(bot, newConfig.installedPlugins);
+            sendLog('[System] Плагины успешно перезагружены.');
+        } else {
+            sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
+        }
     }
 });
 
@@ -531,4 +543,8 @@ function serializeEntity(entity) {
       equipment: entity.equipment,
       metadata: entity.metadata
     };
+}
+
+async function main() {
+    // ... existing code ...
 }

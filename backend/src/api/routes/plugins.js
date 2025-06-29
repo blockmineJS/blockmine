@@ -1,8 +1,10 @@
 const express = require('express');
 const { authenticate, authorize } = require('../middleware/auth');
+const { PrismaClient } = require('@prisma/client');
 const router = express.Router();
-const PluginManager = require('../../core/PluginManager');
+const { pluginManager } = require('../../core/services');
 
+const prisma = new PrismaClient();
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
 
 router.use(authenticate);
@@ -35,7 +37,7 @@ router.post('/check-updates/:botId', authorize('plugin:update'), async (req, res
         if (!catalogResponse.ok) throw new Error('Не удалось загрузить каталог для проверки обновлений.');
         const catalog = await catalogResponse.json();
 
-        const updates = await PluginManager.checkForUpdates(botId, catalog);
+        const updates = await pluginManager.checkForUpdates(botId, catalog);
         res.json(updates);
     } catch (error) {
         console.error("[API Error] /check-updates:", error);
@@ -46,7 +48,7 @@ router.post('/check-updates/:botId', authorize('plugin:update'), async (req, res
 router.post('/update/:pluginId', authorize('plugin:update'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
-        const updatedPlugin = await PluginManager.updatePlugin(pluginId);
+        const updatedPlugin = await pluginManager.updatePlugin(pluginId);
         res.json(updatedPlugin);
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -2,8 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 const fs = require('fs/promises');
-const BotManager = require('../../core/BotManager');
-const PluginManager = require('../../core/PluginManager');
+const { botManager, pluginManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
 const NodeRegistry = require('../../core/NodeRegistry');
@@ -72,7 +71,7 @@ router.get('/', authorize('bot:list'), async (req, res) => {
 
 router.get('/state', authorize('bot:list'), (req, res) => {
     try {
-        const state = BotManager.getFullState();
+        const state = botManager.getFullState();
         res.json(state);
     } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
 });
@@ -158,7 +157,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
 router.delete('/:id', authorize('bot:delete'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
-        if (BotManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
+        if (botManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
         await prisma.bot.delete({ where: { id: botId } });
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить бота' }); }
@@ -169,14 +168,14 @@ router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
         const botId = parseInt(req.params.id, 10);
         const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
         if (!botConfig) return res.status(404).json({ error: 'Бот не найден' });
-        const result = await BotManager.startBot(botConfig);
+        const result = await botManager.startBot(botConfig);
         res.json(result);
     } catch (error) { res.status(500).json({ error: 'Ошибка при запуске бота: ' + error.message }); }
 });
 
 router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
     const botId = parseInt(req.params.id, 10);
-    const result = BotManager.stopBot(botId);
+    const result = botManager.stopBot(botId);
     res.json(result);
 });
 
@@ -185,7 +184,7 @@ router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
         const botId = parseInt(req.params.id, 10);
         const { message } = req.body;
         if (!message) return res.status(400).json({ error: 'Сообщение не может быть пустым' });
-        const result = BotManager.sendMessageToBot(botId, message);
+        const result = botManager.sendMessageToBot(botId, message);
         if (result.success) res.json({ success: true });
         else res.status(404).json(result);
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
@@ -211,29 +210,35 @@ router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
 });
 
 router.post('/:botId/plugins/install/github', authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { repoUrl } = req.body;
     try {
-        const botId = parseInt(req.params.botId);
-        const { repoUrl } = req.body;
-        const newPlugin = await PluginManager.installFromGithub(botId, repoUrl);
+        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), repoUrl);
         res.status(201).json(newPlugin);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
-router.post('/:botId/plugins/register/local', authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/local', authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { path } = req.body;
     try {
-        const botId = parseInt(req.params.botId);
-        const { path } = req.body;
-        const newPlugin = await PluginManager.installFromLocalPath(botId, path);
+        const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
         res.status(201).json(newPlugin);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (req, res) => {
+    const { pluginId } = req.params;
     try {
-        const pluginId = parseInt(req.params.pluginId);
-        await PluginManager.deletePlugin(pluginId);
+        await pluginManager.deletePlugin(parseInt(pluginId));
         res.status(204).send();
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view'), async (req, res) => {
@@ -433,7 +438,7 @@ router.post('/:botId/groups', authorize('management:edit'), async (req, res) => 
             }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(201).json(newGroup);
     } catch (error) {
@@ -465,10 +470,10 @@ router.put('/:botId/groups/:groupId', authorize('management:edit'), async (req, 
         });
 
         for (const user of usersInGroup) {
-            BotManager.invalidateUserCache(botId, user.username);
+            botManager.invalidateUserCache(botId, user.username);
         }
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(200).send();
     } catch (error) {
@@ -486,7 +491,7 @@ router.delete('/:botId/groups/:groupId', authorize('management:edit'), async (re
             return res.status(403).json({ error: `Нельзя удалить группу с источником "${group.owner}".` });
         }
         await prisma.group.delete({ where: { id: groupId } });
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить группу.' }); }
@@ -501,7 +506,7 @@ router.post('/:botId/permissions', authorize('management:edit'), async (req, res
             data: { name, description, botId, owner: 'admin' }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         
         res.status(201).json(newPermission);
     } catch (error) {
@@ -534,7 +539,7 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
             include: { groups: true }
         });
 
-        BotManager.invalidateUserCache(botId, updatedUser.username);
+        botManager.invalidateUserCache(botId, updatedUser.username);
 
         UserService.clearCache(updatedUser.username, botId);
 
@@ -552,8 +557,8 @@ router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
         const allBots = await prisma.bot.findMany({ include: { server: true } });
         let startedCount = 0;
         for (const botConfig of allBots) {
-            if (!BotManager.bots.has(botConfig.id)) {
-                await BotManager.startBot(botConfig);
+            if (!botManager.bots.has(botConfig.id)) {
+                await botManager.startBot(botConfig);
                 startedCount++;
             }
         }
@@ -567,10 +572,10 @@ router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
 router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
     try {
         console.log('[API] Получен запрос на остановку всех ботов.');
-        const botIds = Array.from(BotManager.bots.keys());
+        const botIds = Array.from(botManager.bots.keys());
         let stoppedCount = 0;
         for (const botId of botIds) {
-            BotManager.stopBot(botId);
+            botManager.stopBot(botId);
             stoppedCount++;
         }
         res.json({ success: true, message: `Остановлено ${stoppedCount} ботов.` });
@@ -731,7 +736,7 @@ router.post('/:botId/commands/visual', authorize('management:edit'), async (req,
             }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         res.status(201).json(newCommand);
     } catch (error) {
         if (error.code === 'P2002') {
@@ -773,7 +778,7 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
             data: dataToUpdate
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         res.json(updatedCommand);
     } catch (error) {
         if (error.code === 'P2002') {
@@ -876,7 +881,7 @@ router.post('/:botId/commands/import', authorize('management:edit'), async (req,
             }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         res.status(201).json(newCommand);
     } catch (error) {
         console.error("Failed to import command:", error);
@@ -919,7 +924,7 @@ router.post('/:botId/commands', authorize('management:edit'), async (req, res) =
             }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         res.status(201).json(newCommand);
     } catch (error) {
         if (error.code === 'P2002') {
@@ -939,7 +944,7 @@ router.delete('/:botId/commands/:commandId', authorize('management:edit'), async
             where: { id: commandId, botId: botId },
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         res.status(204).send();
     } catch (error) {
         console.error(`[API Error] /commands/:commandId DELETE:`, error);

@@ -6,11 +6,9 @@ const os = require('os');
 
 const config = require('./config'); 
 const { initializeSocket } = require('./real-time/socketHandler');
+const { botManager } = require('./core/services');
 
 // --- НАЧАЛО БЛОКА ИЗМЕНЕНИЙ ---
-
-// 1. Импортируем BotManager как есть (он уже является экземпляром)
-const BotManager = require('./core/BotManager'); 
 
 // 2. Импортируем остальные модули, которые от него зависят
 const botRoutes = require('./api/routes/bots');
@@ -82,7 +80,7 @@ async function startServer() {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);
 
-            BotManager.initialize();
+            botManager.initialize();
             
             if (HOST === '0.0.0.0') {
                 const networkInterfaces = os.networkInterfaces();
@@ -110,11 +108,11 @@ async function startServer() {
 const gracefulShutdown = (signal) => {
     console.log(`[Shutdown] Получен сигнал ${signal}. Начинаем завершение...`);
     
-    const botIds = Array.from(BotManager.bots.keys());
+    const botIds = Array.from(botManager.bots.keys());
     if (botIds.length > 0) {
         console.log(`[Shutdown] Остановка ${botIds.length} активных ботов...`);
         for (const botId of botIds) {
-            BotManager.stopBot(botId);
+            botManager.stopBot(botId);
         }
     }
 

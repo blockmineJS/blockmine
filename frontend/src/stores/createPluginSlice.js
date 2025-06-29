@@ -117,7 +117,7 @@ export const createPluginSlice = (set, get) => ({
     installPluginFromPath: async (botId, path) => {
          try {
             const data = await apiHelper(
-                `/api/bots/${botId}/plugins/register/local`,
+                `/api/bots/${botId}/plugins/install/local`,
                 { method: 'POST', body: JSON.stringify({ path }) }
             );
              toast({ title: "Успех!", description: `Плагин "${data.name}" успешно установлен.` });
