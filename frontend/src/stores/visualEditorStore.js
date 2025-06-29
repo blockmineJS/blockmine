@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import { apiHelper } from '@/lib/api';
-import { toast } from 'sonner';
+import { toast } from "@/hooks/use-toast";
 
 export const useVisualEditorStore = create((set, get) => ({
   nodes: [],
@@ -78,7 +78,7 @@ export const useVisualEditorStore = create((set, get) => ({
       });
     } catch (error) {
       console.error("Ошибка инициализации редактора:", error);
-      toast.error(`Ошибка загрузки: ${error.message}`);
+      toast({ variant: 'destructive', title: 'Ошибка загрузки', description: error.message });
       set({ isLoading: false });
     }
   },
@@ -311,7 +311,7 @@ export const useVisualEditorStore = create((set, get) => ({
 
     } catch (error) {
       console.error("Ошибка при добавлении и подключении узла:", error);
-      toast.error('Ошибка добавления узла.');
+      toast({ variant: 'destructive', title: 'Ошибка', description: 'Ошибка добавления узла.' });
     } finally {
       set({ connectingPin: null });
     }
@@ -373,11 +373,11 @@ export const useVisualEditorStore = create((set, get) => ({
 
       await apiHelper(url, { method, body: payload });
       
-      toast.success("Граф успешно сохранен!");
+      toast({ title: "Успех!", description: "Граф успешно сохранен!" });
 
     } catch (error) {
       console.error("Ошибка сохранения графа:", error);
-      toast.error(`Ошибка сохранения: ${error.message}`);
+      toast({ variant: 'destructive', title: "Ошибка сохранения", description: error.message });
     } finally {
       set({ isSaving: false });
     }
