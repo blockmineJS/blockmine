@@ -53,6 +53,7 @@ class BotManager {
         this.botConfigs = new Map();
         this.nodeRegistry = nodeRegistry;
         this.pendingPlayerListRequests = new Map();
+        this.playerListCache = new Map();
         this.graphEngine = new GraphExecutionEngine(this.nodeRegistry, this);
         this.eventGraphManager = null;
 
@@ -609,32 +610,57 @@ class BotManager {
     }
 
     async getPlayerList(botId) {
+        const PLAYER_LIST_CACHE_TTL = 2000;
+
         const child = this.bots.get(botId);
         if (!child || child.killed) {
             return [];
         }
 
-        const requestId = uuidv4();
-        try {
-            return await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    this.pendingPlayerListRequests.delete(requestId);
-                    resolve([]);
-                }, 15000);
-
-                this.pendingPlayerListRequests.set(requestId, {
-                    resolve,
-                    reject: (error) => {
-                        resolve([]);
-                    },
-                    timeout
-                });
-
-                child.send({ type: 'system:get_player_list', requestId });
-            });
-        } catch (error) {
-            return [];
+        const cachedEntry = this.playerListCache.get(botId);
+        if (cachedEntry && (Date.now() - cachedEntry.timestamp < PLAYER_LIST_CACHE_TTL)) {
+            return cachedEntry.promise;
         }
+
+        const newPromise = new Promise((resolve) => {
+            const requestId = uuidv4();
+            const timeout = setTimeout(() => {
+                this.pendingPlayerListRequests.delete(requestId);
+                if (this.playerListCache.get(botId)?.promise === newPromise) {
+                    this.playerListCache.delete(botId);
+                }
+                resolve([]);
+            }, 5000);
+
+            this.pendingPlayerListRequests.set(requestId, {
+                resolve: (playerList) => {
+                    clearTimeout(timeout);
+                    this.pendingPlayerListRequests.delete(requestId);
+                    this.playerListCache.set(botId, {
+                        promise: Promise.resolve(playerList),
+                        timestamp: Date.now()
+                    });
+                    resolve(playerList);
+                },
+                reject: (error) => {
+                    clearTimeout(timeout);
+                    this.pendingPlayerListRequests.delete(requestId);
+                    if (this.playerListCache.get(botId)?.promise === newPromise) {
+                        this.playerListCache.delete(botId);
+                    }
+                    resolve([]);
+                },
+            });
+
+            child.send({ type: 'system:get_player_list', requestId });
+        });
+
+        this.playerListCache.set(botId, {
+            promise: newPromise,
+            timestamp: Date.now()
+        });
+
+        return newPromise;
     }
 
     setEventGraphManager(manager) {

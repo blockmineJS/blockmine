@@ -139,7 +139,7 @@ process.on('message', async (message) => {
             }
             pendingRequests.delete(message.requestId);
         }
-    } else if (message.type === 'get_player_list_request') {
+    } else if (message.type === 'system:get_player_list') {
         const playerList = bot ? Object.keys(bot.players) : [];
         if (process.send) {
             process.send({
@@ -473,8 +473,6 @@ process.on('message', async (message) => {
                     sendLog('[BotProcess] Бот готов к приему событий playerJoined/playerLeft.');
                 }, 3000);
             });
-
-            bot.emit('messagestr', message, 'chat');
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
