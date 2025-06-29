@@ -6,11 +6,9 @@ const os = require('os');
 
 const config = require('./config'); 
 const { initializeSocket } = require('./real-time/socketHandler');
-const { botManager } = require('./core/services');
+const { botManager, pluginManager } = require('./core/services');
 
-// --- НАЧАЛО БЛОКА ИЗМЕНЕНИЙ ---
 
-// 2. Импортируем остальные модули, которые от него зависят
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
@@ -22,12 +20,15 @@ const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
 
-// --- КОНЕЦ БЛОКА ИЗМЕНЕНИЙ ---
+
 
 const app = express();
 const server = http.createServer(app);
 
 initializeSocket(server); 
+
+app.set('botManager', botManager);
+app.set('pluginManager', pluginManager);
 
 const PORT = config.server.port;
 const HOST = config.server.host;

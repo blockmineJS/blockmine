@@ -27,12 +27,6 @@ function sendLog(content) {
     }
 }
 
-function sendPlayerList() {
-    if (process.send && bot) {
-        const playerList = Object.keys(bot.players);
-        process.send({ type: 'playerListUpdate', data: { players: playerList } });
-    }
-}
 
 function sendEvent(eventName, eventArgs) {
     if (process.send) {
@@ -141,6 +135,15 @@ process.on('message', async (message) => {
                 resolve(message.payload);
             }
             pendingRequests.delete(message.requestId);
+        }
+    } else if (message.type === 'get_player_list_request') {
+        const playerList = bot ? Object.keys(bot.players) : [];
+        if (process.send) {
+            process.send({
+                type: 'get_player_list_response',
+                requestId: message.requestId,
+                payload: { players: playerList }
+            });
         }
     } else if (message.type === 'start') {
         const config = message.config;
@@ -393,13 +396,11 @@ process.on('message', async (message) => {
             bot.on('playerJoined', (player) => {
                 if (!isReady) return;
                 sendEvent('playerJoined', { user: { username: player.username, uuid: player.uuid } });
-                sendPlayerList();
             });
 
             bot.on('playerLeft', (player) => {
                 if (!isReady) return;
                 sendEvent('playerLeft', { user: { username: player.username, uuid: player.uuid } });
-                sendPlayerList();
             });
 
             bot.on('entitySpawn', (entity) => {
@@ -518,6 +519,10 @@ process.on('message', async (message) => {
         } else {
             sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
         }
+    } else if (message.type === 'server_command') {
+        if (bot && message.payload && message.payload.command) {
+            bot.chat(message.payload.command);
+        }
     }
 });
 
@@ -545,6 +550,3 @@ function serializeEntity(entity) {
     };
 }
 
-async function main() {
-    // ... existing code ...
-}
