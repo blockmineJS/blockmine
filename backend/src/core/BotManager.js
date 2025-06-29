@@ -476,13 +476,16 @@ class BotManager {
                 const graph = dbCommand.graphJson;
                 if (graph) {
                     const players = await this.getPlayerList(botId);
+                    console.log('[BotManager] Received player list for graph:', players);
+
                     const botAPI = {
                         sendMessage: (type, message, recipient) => {
                             this.sendMessageToBot(botId, message, type, recipient);
                         },
                         executeCommand: (command) => {
                             this.sendServerCommandToBot(botId, command);
-                        }
+                        },
+                        getPlayerList: () => this.getPlayerList(botId)
                     };
 
                     const graphContext = {
