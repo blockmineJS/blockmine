@@ -129,11 +129,19 @@ export const useVisualEditorStore = create((set, get) => ({
   },
 
   addNode: (type, position, shouldUpdateState = true) => {
+    const defaultData = {};
+    if (type === 'string:concat' || type === 'logic:operation' || type === 'flow:sequence') {
+        defaultData.pinCount = 2;
+    }
+    if (type === 'data:array_literal' || type === 'data:make_object') {
+        defaultData.pinCount = 0;
+    }
+
     const newNode = {
       id: `${type}-${crypto.randomUUID()}`,
       type,
       position,
-      data: {},
+      data: defaultData,
     };
 
     if (shouldUpdateState) {
