@@ -35,6 +35,7 @@ function sendEvent(eventName, eventArgs) {
 }
 
 async function fetchNewConfig(botId) {
+    const prisma = new PrismaClient();
     try {
         const botData = await prisma.bot.findUnique({
             where: { id: botId },
@@ -54,6 +55,8 @@ async function fetchNewConfig(botId) {
     } catch (error) {
         sendLog(`[fetchNewConfig] Error: ${error.message}`);
         return null;
+    } finally {
+        await prisma.$disconnect();
     }
 }
 
@@ -138,7 +141,6 @@ process.on('message', async (message) => {
         }
     } else if (message.type === 'get_player_list_request') {
         const playerList = bot ? Object.keys(bot.players) : [];
-        console.log('[BotProcess] Sending player list:', playerList);
         if (process.send) {
             process.send({
                 type: 'get_player_list_response',
@@ -446,18 +448,16 @@ process.on('message', async (message) => {
             });
 
             bot.on('entitySpawn', (entity) => {
-                if (entity.type === 'player' && entity.username) {
-                }
                 const serialized = serializeEntity(entity);
                 sendEvent('entitySpawn', { entity: serialized });
             });
 
             bot.on('entityMoved', (entity) => {
                 const now = Date.now();
-                const lastSent = entityMoveThrottles.get(entity.id) || 0;
-                if (now - lastSent > 200) {
-                    sendEvent('entityMoved', { entity: serializeEntity(entity) });
+                const lastSent = entityMoveThrottles.get(entity.id);
+                if (!lastSent || now - lastSent > 500) {
                     entityMoveThrottles.set(entity.id, now);
+                    sendEvent('entityMoved', { entity: serializeEntity(entity) });
                 }
             });
 
