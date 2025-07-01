@@ -1,63 +1,66 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import './index.css';
 
 import { useAppStore } from '@/stores/appStore';
 import { Toaster } from "@/components/ui/toaster";
 import { Loader2 } from 'lucide-react';
 
-import Layout from './pages/Layout';
-import LoginPage from './pages/LoginPage';
-import SetupPage from './pages/SetupPage';
-import DashboardPage from './pages/DashboardPage';
-import BotView from './pages/BotView';
-import ConsoleTab from './pages/ConsoleTab';
-import PluginsTab from './pages/PluginsTab';
-import ConfigurationPage from './pages/ConfigurationPage';
-import ManagementPage from './pages/ManagementPage';
-import VisualEditorPage from './pages/Bot/VisualEditorPage';
-import EventGraphsPage from './pages/Bot/EventGraphsPage';
-import PluginDetailPage from './pages/PluginDetailPage';
-import ServersPage from './pages/ServersPage';
-import TasksPage from './pages/TasksPage';
-import AdminPage from './pages/AdminPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import Layout from "./pages/Layout";
+import LoginPage from "./pages/LoginPage";
+import SetupPage from "./pages/SetupPage";
+import DashboardPage from "./pages/DashboardPage";
+import BotView from "./pages/BotView";
+import ConsoleTab from "./pages/ConsoleTab";
+import PluginsTab from "./pages/PluginsTab";
+import ConfigurationPage from "./pages/ConfigurationPage";
+import ManagementPage from "./pages/ManagementPage";
+import VisualEditorPage from "./pages/Bot/VisualEditorPage";
+import EventGraphsPage from "./pages/Bot/EventGraphsPage";
+import PluginDetailPage from "./pages/PluginDetailPage";
+import ServersPage from "./pages/ServersPage";
+import TasksPage from "./pages/TasksPage";
+import AdminPage from "./pages/AdminPage";
+import ProtectedRoute from '@/components/ProtectedRoute';
 
-function AuthLayout() {
-    const { 
-        isAuthenticated, 
-        needsSetup, 
-        authInitialized, 
-        initializeAuth,
-        connectSocket,
-        fetchInitialData,
-        fetchTasks 
-    } = useAppStore();
 
-    useEffect(() => {
-        if (!authInitialized) {
-            initializeAuth();
-        }
-    }, [authInitialized, initializeAuth]);
+function Root() {
+  const authInitialized = useAppStore(state => state.authInitialized);
+  const initializeAuth = useAppStore(state => state.initializeAuth);
+
+  useEffect(() => {
+    if (!authInitialized) {
+      initializeAuth();
+    }
+  }, [authInitialized]);
+
+  if (!authInitialized) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <Outlet />;
+}
+
+function ProtectedLayout() {
+    const isAuthenticated = useAppStore(state => state.isAuthenticated);
+    const needsSetup = useAppStore(state => state.needsSetup);
+    const connectSocket = useAppStore(state => state.connectSocket);
+    const fetchInitialData = useAppStore(state => state.fetchInitialData);
+    const fetchTasks = useAppStore(state => state.fetchTasks);
 
     useEffect(() => {
         if (isAuthenticated) {
-            console.log("[Auth] Пользователь аутентифицирован. Загружаем данные и подключаем сокет...");
             connectSocket();
             fetchInitialData();
             fetchTasks();
         }
-    }, [isAuthenticated, connectSocket, fetchInitialData, fetchTasks]);
-    
-    if (!authInitialized) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
+    }, [isAuthenticated]);
+
     if (needsSetup) {
         return <Navigate to="/setup" replace />;
     }
@@ -71,90 +74,47 @@ function AuthLayout() {
 
 const router = createBrowserRouter([
   {
-    path: '/login',
-    element: <LoginPage />
-  },
-  {
-path: '/setup',
-      element: <SetupPage />
-  },
-  {
-    path: "/",
-    element: <AuthLayout />,
+    path: '/',
+    element: <Root />,
     children: [
       {
-        index: true,
-        element: <DashboardPage />,
+        path: 'login',
+        element: <LoginPage />
       },
       {
-        path: "bots/:botId",
-        element: <BotView />,
+        path: 'setup',
+        element: <SetupPage />
+      },
+      {
+        path: '/',
+        element: <ProtectedLayout />,
         children: [
-            { index: true, element: <Navigate to="console" replace /> },
-            { path: "console", element: <ConsoleTab /> },
-            { path: "plugins", element: <PluginsTab /> },
-            { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
-            { path: "settings", element: <ConfigurationPage /> },
-            { 
-              path: "management", 
-              element: (
-                <ProtectedRoute requiredPermission="management:view">
-                  <ManagementPage />
-                </ProtectedRoute>
-              )
+            {
+              index: true,
+              element: <DashboardPage />,
             },
-            { 
-              path: "commands/visual/:commandId",
-              element: (
-                <ProtectedRoute requiredPermission="management:edit">
-                  <VisualEditorPage />
-                </ProtectedRoute>
-              )
+            {
+              path: "bots/:botId",
+              element: <BotView />,
+              children: [
+                  { index: true, element: <Navigate to="console" replace /> },
+                  { path: "console", element: <ConsoleTab /> },
+                  { path: "plugins", element: <PluginsTab /> },
+                  { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
+                  { path: "settings", element: <ConfigurationPage /> },
+                  { path: "management", element: <ProtectedRoute requiredPermission="management:view"><ManagementPage /></ProtectedRoute> },
+                  { path: "commands/visual/:commandId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
+                  { path: "events", element: <ProtectedRoute requiredPermission="management:edit"><EventGraphsPage /></ProtectedRoute> },
+                  { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> }
+              ]
             },
-            { 
-              path: "events", 
-              element: (
-                <ProtectedRoute requiredPermission="management:edit">
-                  <EventGraphsPage />
-                </ProtectedRoute>
-              )
-            },
-            { 
-              path: "events/visual/:eventId",
-              element: (
-                <ProtectedRoute requiredPermission="management:edit">
-                  <VisualEditorPage />
-                </ProtectedRoute>
-              )
-            }
+            { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },
+            { path: "tasks", element: <ProtectedRoute requiredPermission="task:list"><TasksPage /></ProtectedRoute> },
+            { path: "admin", element: <ProtectedRoute requiredPermission="panel:user:list"><AdminPage /></ProtectedRoute> },
         ]
-      },
-      {
-        path: "servers",
-        element: (
-          <ProtectedRoute requiredPermission="server:list">
-            <ServersPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "tasks",
-        element: (
-          <ProtectedRoute requiredPermission="task:list">
-            <TasksPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "admin",
-        element: (
-          <ProtectedRoute requiredPermission="panel:user:list">
-            <AdminPage />
-          </ProtectedRoute>
-        ),
-      },
-    ],
-  },
+      }
+    ]
+  }
 ]);
 
 createRoot(document.getElementById('root')).render(
@@ -163,5 +123,5 @@ createRoot(document.getElementById('root')).render(
         <RouterProvider router={router} />
         <Toaster />
     </div>
-  </StrictMode>,
+  </StrictMode>
 );

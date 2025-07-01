@@ -1,4 +1,3 @@
-import { shallow } from 'zustand/shallow';
 
 
 import React, { useState, useEffect } from 'react';
@@ -12,10 +11,9 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function SetupPage() {
-    const { setupAdmin, isAuthenticated } = useAppStore(
-        (state) => ({ setupAdmin: state.setupAdmin, isAuthenticated: state.isAuthenticated }),
-        shallow
-    );
+    const setupAdmin = useAppStore((state) => state.setupAdmin);
+    const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
