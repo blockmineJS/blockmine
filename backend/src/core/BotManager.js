@@ -294,7 +294,24 @@ class BotManager {
         const { sortedPlugins, hasCriticalIssues, pluginInfo } = DependencyService.resolveDependencies(allPluginsForBot, allPluginsForBot);
         
         if (hasCriticalIssues) {
-            this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен:');
+            this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен.');
+
+            const criticalIssueTypes = new Set(['missing_dependency', 'version_mismatch', 'circular_dependency']);
+
+            for (const pluginId in pluginInfo) {
+                const info = pluginInfo[pluginId];
+                if (info.issues.length === 0) continue;
+
+                const criticalIssues = info.issues.filter(issue => criticalIssueTypes.has(issue.type));
+
+                if (criticalIssues.length > 0) {
+                    this.appendLog(botConfig.id, `* Плагин "${info.name}":`);
+                    for (const issue of criticalIssues) {
+                        this.appendLog(botConfig.id, `  - ${issue.message}`);
+                    }
+                }
+            }
+            
             this.emitStatusUpdate(botConfig.id, 'stopped', 'Ошибка зависимостей плагинов.');
             return { success: false, message: 'Критические ошибки в зависимостях плагинов.' };
         }

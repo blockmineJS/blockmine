@@ -26,24 +26,24 @@ export default function ManagementPage() {
     const [userPageSize, setUserPageSize] = useState(20); 
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
-    const { toast } = useToast();
-    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('commands');
 
-    const handleCreateCommand = async (commandData) => {
-        try {
-            const newCommand = await apiHelper(`/api/bots/${bot.id}/commands`, {
-                method: 'POST',
-                body: JSON.stringify({ ...commandData, isVisual: true }),
-            });
-            toast({ title: 'Успех', description: `Команда \"${newCommand.name}\" успешно создана.` });
-            fetchData();
-            setIsCreateDialogOpen(false);
-            navigate(`/bots/${bot.id}/commands/visual/${newCommand.id}`);
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
-        }
-    };
+  const handleCreateCommand = async (commandData) => {
+    try {
+      const newCommand = await apiHelper(`/api/bots/${bot.id}/commands`, {
+        method: 'POST',
+        body: JSON.stringify({ ...commandData, isVisual: true }),
+      });
+      toast({ title: 'Успех', description: `Команда \"${newCommand.name}\" успешно создана.` });
+      fetchData();
+      setIsCreateDialogOpen(false);
+      navigate(`/bots/${bot.id}/commands/visual/${newCommand.id}`);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
+    }
+  };
 
     const fetchData = useCallback(async (page = 1, pageSize = userPageSize, search = searchQuery) => {
         if (!bot) return;
@@ -73,48 +73,48 @@ export default function ManagementPage() {
     
     const tabContent = {
         users: (
-            <UsersManager 
-                users={managementData.users.items} 
-                pagination={{ 
-                    page: managementData.users.page, 
-                    pageSize: managementData.users.pageSize,
-                    total: managementData.users.total,
-                    totalPages: managementData.users.totalPages,
-                }}
+                    <UsersManager 
+                        users={managementData.users.items} 
+                        pagination={{ 
+                            page: managementData.users.page, 
+                            pageSize: managementData.users.pageSize,
+                            total: managementData.users.total,
+                            totalPages: managementData.users.totalPages,
+                        }}
                 onPageChange={(newPage) => fetchData(newPage, userPageSize, debouncedSearchQuery)}
-                groups={managementData.groups}
-                botId={bot?.id}
-                isLoading={isLoading}
+                        groups={managementData.groups}
+                        botId={bot?.id}
+                        isLoading={isLoading}
                 onDataChange={() => fetchData(userPage, userPageSize, debouncedSearchQuery)}
                 searchQuery={searchQuery}
                 onSearchQueryChange={setSearchQuery}
-            />
+                    />
         ),
         groups: (
-            <GroupsManager 
-                groups={managementData.groups} 
-                allPermissions={managementData.permissions}
-                botId={bot?.id}
-                isLoading={isLoading}
-                onDataChange={fetchData} 
-            />
+                    <GroupsManager 
+                        groups={managementData.groups} 
+                        allPermissions={managementData.permissions}
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData} 
+                    />
         ),
         permissions: (
-            <PermissionsManager 
-                permissions={managementData.permissions} 
-                botId={bot?.id}
-                isLoading={isLoading}
-                onDataChange={fetchData}
-            />
+                    <PermissionsManager 
+                        permissions={managementData.permissions} 
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData}
+                    />
         ),
         commands: (
-            <CommandsManager
-                commands={managementData.commands}
-                allPermissions={managementData.permissions}
-                botId={bot?.id}
-                isLoading={isLoading}
-                onDataChange={fetchData}
-            />
+                    <CommandsManager
+                        commands={managementData.commands}
+                        allPermissions={managementData.permissions}
+                        botId={bot?.id}
+                        isLoading={isLoading}
+                        onDataChange={fetchData}
+                    />
         )
     };
 
@@ -132,7 +132,7 @@ export default function ManagementPage() {
                         <TabsTrigger value="permissions">Права</TabsTrigger>
                         <TabsTrigger value="commands">Команды</TabsTrigger>
                     </TabsList>
-                </Tabs>
+            </Tabs>
             </CardHeader>
             
             <main className="flex-grow min-h-0">

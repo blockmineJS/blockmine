@@ -226,26 +226,87 @@ process.on('message', async (message) => {
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
                 addPermissionsToGroup: (groupName, permissionNames) => PermissionManager.addPermissionsToGroup(bot.config.id, groupName, permissionNames),
                 installedPlugins: installedPluginNames,
-                registerCommand: (commandInstance) => {
-                    if (!(commandInstance instanceof Command)) {
-                        throw new Error('registerCommand ожидает экземпляр класса Command.');
-                    }
-                    bot.commands.set(commandInstance.name, commandInstance);
-                    if (process.send) {
-                        process.send({
-                            type: 'register_command',
-                            commandConfig: {
-                                name: commandInstance.name,
-                                description: commandInstance.description,
-                                aliases: commandInstance.aliases,
-                                owner: commandInstance.owner,
-                                permissions: commandInstance.permissions,
-                                cooldown: commandInstance.cooldown,
-                                allowedChatTypes: commandInstance.allowedChatTypes,
+                registerCommand: async (command) => { // похуй. пляшем
+                    const prisma = new PrismaClient();
+                    try {
+                        let permissionId = null;
+                        if (command.permissions) {
+                            const permission = await prisma.permission.findUnique({
+                                where: {
+                                    botId_name: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                    },
+                                },
+                            });
+
+                            if (permission) {
+                                permissionId = permission.id;
+                            } else {
+                                sendLog(`[API] Внимание: право "${command.permissions}" не найдено для команды "${command.name}". Команда будет создана без привязанного права.`);
                             }
+                        }
+
+                        const commandData = {
+                            botId: bot.config.id,
+                            name: command.name,
+                            description: command.description || '',
+                            owner: command.owner || 'unknown',
+                            permissionId: permissionId,
+                            cooldown: command.cooldown || 0,
+                            isEnabled: command.isActive !== undefined ? command.isActive : true,
+                            aliases: JSON.stringify(command.aliases || []),
+                            allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
+                            argumentsJson: JSON.stringify(command.args || []),
+                        };
+
+                        await prisma.command.upsert({
+                            where: {
+                                botId_name: {
+                                    botId: commandData.botId,
+                                    name: commandData.name,
+                                }
+                            },
+                            update: {
+                                description: commandData.description,
+                                aliases: commandData.aliases,
+                                allowedChatTypes: commandData.allowedChatTypes,
+                                cooldown: commandData.cooldown,
+                                isEnabled: commandData.isEnabled,
+                                argumentsJson: commandData.argumentsJson,
+                                permissionId: commandData.permissionId,
+                            },
+                            create: commandData,
                         });
+
+                         if (process.send) {
+                             process.send({
+                                 type: 'register_command',
+                                 commandConfig: {
+                                     name: command.name,
+                                     description: command.description,
+                                     aliases: command.aliases,
+                                     owner: command.owner,
+                                     permissions: command.permissions,
+                                     cooldown: command.cooldown,
+                                     allowedChatTypes: command.allowedChatTypes,
+                                 }
+                             });
+                         }
+                         sendLog(`[API] Команда "${command.name}" от плагина "${command.owner}" зарегистрирована в процессе.`);
+
+                         if (!bot.commands) bot.commands = new Map();
+                         bot.commands.set(command.name, command);
+                         if (Array.isArray(command.aliases)) {
+                             for (const alias of command.aliases) {
+                                 bot.commands.set(alias, command);
+                             }
+                         }
+                    } catch (error) {
+                        sendLog(`[API] Ошибка при регистрации команды: ${error.message}`);
+                    } finally {
+                        await prisma.$disconnect();
                     }
-                    sendLog(`[API] Команда \"${commandInstance.name}\" от плагина \"${commandInstance.owner}\" зарегистрирована в процессе.`);
                 },
                 performUserAction: (username, action, data = {}) => {
                     return new Promise((resolve, reject) => {

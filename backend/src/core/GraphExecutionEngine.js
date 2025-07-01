@@ -211,14 +211,11 @@ class GraphExecutionEngine {
                     }
                 } catch (e) {
                     if (e instanceof BreakLoopSignal) {
-                        // Loop was interrupted. Continue to 'completed'.
                     } else {
                         throw e;
                     }
                 }
             }
-            // this.memo.delete(`${node.id}:element`);
-            // this.memo.delete(`${node.id}:index`);
             await this.traverse(node, 'completed');
             break;
           }
@@ -584,9 +581,9 @@ class GraphExecutionEngine {
                }
                break;
           }
-           case 'data:get_server_players':
-               result = this.context.players || [];
-               break;
+          case 'data:get_server_players':
+              result = this.context.players || [];
+              break;
           case 'data:get_bot_look':
               result = this.context.botState ? { yaw: this.context.botState.yaw, pitch: this.context.botState.pitch } : null;
               break;

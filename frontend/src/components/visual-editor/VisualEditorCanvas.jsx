@@ -145,7 +145,6 @@ const VisualEditorCanvas = () => {
     };
 
     if (isMenuOpen) {
-      // Use capture phase to catch event before ReactFlow stops propagation
       document.addEventListener('mousedown', handleClickOutside, true);
     } else {
       document.removeEventListener('mousedown', handleClickOutside, true);
