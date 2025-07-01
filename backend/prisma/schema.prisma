@@ -194,7 +194,7 @@ model PanelUser {
 // Роли пользователей (Admin, Moderator, Viewer)
 model PanelRole {
   id          Int      @id @default(autoincrement())
-  name        String   @unique // Например, "Admin", "Moderator", "Viewer"
+  name        String   @unique 
   
   // Храним права как джсон строку.  SQLite не поддерживает массивы.
   // Пример: '["bot:create", "bot:delete", "user:manage"]'
