@@ -40,3 +40,7 @@ plug.md
 
 stats-server/
 blockmine-proxy/
+/image/
+/test_visual_command.json
+/tailwind.config.js
+/vite.config.js
