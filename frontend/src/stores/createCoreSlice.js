@@ -11,9 +11,16 @@ export const createCoreSlice = (set, get) => ({
     appVersion: '',
 
     connectSocket: () => {
-        if (get().socket) {
-            get().socket.disconnect();
+        const currentSocket = get().socket;
+        if (currentSocket && (currentSocket.connected || currentSocket.connecting)) {
+            console.log("[Socket] Подключение уже в процессе или установлено. Новое не создается.");
+            return;
         }
+
+        if (currentSocket) {
+            currentSocket.disconnect();
+        }
+
         const token = get().token;
         if (!token) {
             console.log("[Socket] Подключение отложено: нет токена.");
@@ -26,7 +33,6 @@ export const createCoreSlice = (set, get) => ({
 
         const newSocket = io(socketUrl, {
             auth: { token },
-            autoConnect: false,
             reconnection: true,
             transports: ['websocket'], 
         });
@@ -34,7 +40,7 @@ export const createCoreSlice = (set, get) => ({
         newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
         newSocket.on('disconnect', (reason) => console.log('Socket.IO отключен:', reason));
         newSocket.on('connect_error', (err) => {
-            console.error(`[Socket] Ошибка подключения: ${err.message}`);
+            console.warn(`[Socket] Ошибка подключения (попытка переподключения): ${err.message}`);
         });
 
         newSocket.on('bot:status', ({ botId, status, message }) => {
@@ -46,6 +52,7 @@ export const createCoreSlice = (set, get) => ({
             const usageMap = usageData.reduce((acc, usage) => ({ ...acc, [usage.botId]: usage }), {});
             set({ resourceUsage: usageMap });
         });
+        
         set({ socket: newSocket });
     },
 
@@ -74,17 +81,15 @@ export const createCoreSlice = (set, get) => ({
     appendLog: (botId, log) => {
         set(state => {
             const currentLogs = state.botLogs[botId] || [];
-            const newLog = typeof log === 'object' && log !== null ? log : { id: Date.now() + Math.random(), content: log };
+            const newLog = (typeof log === 'object' && log !== null && log.id) 
+                ? log 
+                : { id: Date.now() + Math.random(), content: (typeof log === 'object' && log !== null ? JSON.stringify(log) : log) };
+            
             const newLogs = [...currentLogs, newLog];
 
             const uniqueLogs = Array.from(new Map(newLogs.map(item => [item.id, item])).values());
 
-            return {
-                botLogs: {
-                    ...state.botLogs,
-                    [botId]: uniqueLogs.slice(-500)
-                }
-            };
+            state.botLogs[botId] = uniqueLogs.slice(-500);
         });
     },
 });
