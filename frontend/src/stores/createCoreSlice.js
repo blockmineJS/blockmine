@@ -74,7 +74,17 @@ export const createCoreSlice = (set, get) => ({
     appendLog: (botId, log) => {
         set(state => {
             const currentLogs = state.botLogs[botId] || [];
-            state.botLogs[botId] = [...currentLogs, log].slice(-200); 
+            const newLog = typeof log === 'object' && log !== null ? log : { id: Date.now() + Math.random(), content: log };
+            const newLogs = [...currentLogs, newLog];
+
+            const uniqueLogs = Array.from(new Map(newLogs.map(item => [item.id, item])).values());
+
+            return {
+                botLogs: {
+                    ...state.botLogs,
+                    [botId]: uniqueLogs.slice(-500)
+                }
+            };
         });
     },
 });

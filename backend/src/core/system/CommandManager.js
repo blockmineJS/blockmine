@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const Command = require('./Command');
+const GraphExecutionEngine = require('../GraphExecutionEngine');
+const NodeRegistry = require('../NodeRegistry');
 
 class CommandManager {
     constructor(commandsPath) {

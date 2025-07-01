@@ -6,6 +6,9 @@ const os = require('os');
 
 const config = require('./config'); 
 const { initializeSocket } = require('./real-time/socketHandler');
+const { botManager, pluginManager } = require('./core/services');
+
+
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
@@ -13,15 +16,19 @@ const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
 const authRoutes = require('./api/routes/auth');
 const searchRoutes = require('./api/routes/search');
-const BotManager = require('./core/BotManager');
+const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
+
 
 
 const app = express();
 const server = http.createServer(app);
 
 initializeSocket(server); 
+
+app.set('botManager', botManager);
+app.set('pluginManager', pluginManager);
 
 const PORT = config.server.port;
 const HOST = config.server.host;
@@ -52,7 +59,6 @@ app.use('/api/bots', botRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/permissions', permissionsRoutes);
-app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 
 app.use(express.static(frontendPath));
@@ -74,6 +80,8 @@ async function startServer() {
     return new Promise((resolve) => {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);
+
+            botManager.initialize();
             
             if (HOST === '0.0.0.0') {
                 const networkInterfaces = os.networkInterfaces();
@@ -101,11 +109,11 @@ async function startServer() {
 const gracefulShutdown = (signal) => {
     console.log(`[Shutdown] Получен сигнал ${signal}. Начинаем завершение...`);
     
-    const botIds = Array.from(BotManager.bots.keys());
+    const botIds = Array.from(botManager.bots.keys());
     if (botIds.length > 0) {
         console.log(`[Shutdown] Остановка ${botIds.length} активных ботов...`);
         for (const botId of botIds) {
-            BotManager.stopBot(botId);
+            botManager.stopBot(botId);
         }
     }
 

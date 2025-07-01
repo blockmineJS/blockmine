@@ -1,7 +1,4 @@
-import { VariableSizeList as List } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
-
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,74 +21,31 @@ export default function ConsoleTab() {
     const botStatuses = useAppStore(state => state.botStatuses);
 
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
-    const logs = useMemo(() => {
-        const botLog = botLogs[botId] || [];
-        if (botLog.length > 0 && typeof botLog[0] === 'object' && botLog[0] !== null && 'id' in botLog[0]) {
-            return [...botLog].sort((a, b) => a.id - b.id);
-        }
-        return botLog;
-    }, [botLogs, botId]);
+    const logs = useMemo(() => botLogs[botId] || [], [botLogs, botId]);
     const status = bot ? botStatuses[bot.id] || 'stopped' : 'stopped';
 
     const [command, setCommand] = useState('');
     const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
-
-    const listRef = useRef(null);
-    const rowHeights = useRef({});
-
-    const getRowHeight = index => rowHeights.current[index] || 25; // Default height
-
-    // Using useCallback to avoid re-creating the function on every render
-    const setRowHeight = useCallback((index, size) => {
-        if (rowHeights.current[index] !== size) {
-            rowHeights.current[index] = size;
-            // Purge cache to recalculate heights
-            if (listRef.current) {
-                listRef.current.resetAfterIndex(index);
-            }
-        }
-    }, []);
+    const logContainerRef = useRef(null);
 
     useEffect(() => {
-        if (!isUserScrolledUp && listRef.current) {
-            listRef.current.scrollToItem(logs.length - 1, 'end');
+        if (!isUserScrolledUp && logContainerRef.current) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
-    }, [logs.length, isUserScrolledUp]); // Trigger on new logs
+    }, [logs, isUserScrolledUp]);
 
-    const handleScroll = ({ scrollOffset }) => {
-        if (listRef.current && listRef.current._outerRef) {
-            const outerElement = listRef.current._outerRef;
-            const { scrollHeight, clientHeight } = outerElement;
-            const isAtBottom = scrollOffset >= scrollHeight - clientHeight - 1;
+    const handleScroll = () => {
+        if (logContainerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = logContainerRef.current;
+            const isAtBottom = scrollHeight - clientHeight <= scrollTop + 1;
             setIsUserScrolledUp(!isAtBottom);
         }
     };
 
     const scrollToBottom = () => {
-        if (listRef.current) {
-            listRef.current.scrollToItem(logs.length - 1, 'end');
+        if (logContainerRef.current) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
-    };
-
-    const LogRow = ({ index, style }) => {
-        const rowRef = useRef(null);
-        const log = logs[index];
-
-        useEffect(() => {
-            if (rowRef.current) {
-                setRowHeight(index, rowRef.current.scrollHeight);
-            }
-        }, [log, index, setRowHeight]);
-
-        const logContent = typeof log === 'object' && log !== null && log.content ? log.content : (typeof log === 'string' ? log : '');
-
-        return (
-            <div style={style}>
-                <div ref={rowRef} className="leading-relaxed whitespace-pre-wrap break-all">
-                    <div dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(logContent) }} />
-                </div>
-            </div>
-        );
     };
 
     const handleSendCommand = async (e) => {
@@ -104,11 +58,7 @@ export default function ConsoleTab() {
                 body: JSON.stringify({ message: command }),
             });
             setCommand('');
-            if (isUserScrolledUp) {
-               // If user is scrolled up, don't force scroll down
-            } else {
-               scrollToBottom();
-            }
+            scrollToBottom();
         } catch (error) {
             console.error("Failed to send command:", error);
         }
@@ -116,21 +66,19 @@ export default function ConsoleTab() {
 
     return (
         <div className="flex flex-col h-full w-full bg-background rounded-lg border border-border relative">
-            <div className="flex-1 p-4 overflow-y-auto font-mono text-sm bg-black">
-                <AutoSizer>
-                    {({ height, width }) => (
-                        <List
-                            ref={listRef}
-                            height={height}
-                            itemCount={logs.length}
-                            itemSize={getRowHeight}
-                            width={width}
-                            onScroll={handleScroll}
-                        >
-                            {LogRow}
-                        </List>
-                    )}
-                </AutoSizer>
+            <div 
+                ref={logContainerRef} 
+                onScroll={handleScroll}
+                className="flex-1 p-4 overflow-y-auto font-mono text-sm bg-black"
+            >
+                {logs.map((log, index) => {
+                    const logContent = typeof log === 'object' && log !== null && log.content ? log.content : (typeof log === 'string' ? log : '');
+                    return (
+                        <div key={index} className="leading-relaxed whitespace-pre-wrap break-all">
+                            <div dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(logContent) }} />
+                        </div>
+                    );
+                })}
             </div>
             
             {isUserScrolledUp && (

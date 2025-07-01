@@ -2,17 +2,22 @@ const mineflayer = require('mineflayer');
 const { SocksClient } = require('socks');
 const EventEmitter = require('events');
 const { v4: uuidv4 } = require('uuid');
+const { Vec3 } = require('vec3');
+const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
 const Command = require('./system/Command');
 const { parseArguments } = require('./system/parseArguments');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
+const NodeRegistry = require('./NodeRegistry');
 
 const UserService = require('./ipc/UserService.stub.js');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
 
 let bot = null;
-const pendingRequests = new Map(); 
+const pendingRequests = new Map();
+const entityMoveThrottles = new Map();
 
 function sendLog(content) {
     if (process.send) {
@@ -22,7 +27,15 @@ function sendLog(content) {
     }
 }
 
+
+function sendEvent(eventName, eventArgs) {
+    if (process.send) {
+        process.send({ type: 'event', eventType: eventName, args: eventArgs });
+    }
+}
+
 async function fetchNewConfig(botId) {
+    const prisma = new PrismaClient();
     try {
         const botData = await prisma.bot.findUnique({
             where: { id: botId },
@@ -42,6 +55,8 @@ async function fetchNewConfig(botId) {
     } catch (error) {
         sendLog(`[fetchNewConfig] Error: ${error.message}`);
         return null;
+    } finally {
+        await prisma.$disconnect();
     }
 }
 
@@ -63,7 +78,7 @@ function handleIncomingCommand(type, username, message) {
         const parsedArgs = parseArguments(restOfMessage);
         let currentArgIndex = 0;
 
-        for (const argDef of commandInstance.args) {
+        for (const argDef of commandInstance.isVisual ? JSON.parse(dbCommand.argumentsJson || '[]') : commandInstance.args) {
             if (argDef.type === 'greedy_string') {
                 if (currentArgIndex < parsedArgs.length) {
                     processedArgs[argDef.name] = parsedArgs.slice(currentArgIndex).join(' ');
@@ -86,10 +101,10 @@ function handleIncomingCommand(type, username, message) {
             if (processedArgs[argDef.name] === undefined) {
                 if (argDef.required) {
                     const usage = commandInstance.args.map(arg => {
-                        return arg.required ? `<${arg.description}>` : `[${arg.description}]`;
+                        return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
                     }).join(' ');
 
-                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description}`, username);
+                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`, username);
                     bot.api.sendMessage(type, `Использование: ${bot.config.prefix}${commandInstance.name} ${usage}`, username);
                     return;
                 }
@@ -123,6 +138,15 @@ process.on('message', async (message) => {
                 resolve(message.payload);
             }
             pendingRequests.delete(message.requestId);
+        }
+    } else if (message.type === 'system:get_player_list') {
+        const playerList = bot ? Object.keys(bot.players) : [];
+        if (process.send) {
+            process.send({
+                type: 'get_player_list_response',
+                requestId: message.requestId,
+                payload: { players: playerList }
+            });
         }
     } else if (message.type === 'start') {
         const config = message.config;
@@ -168,6 +192,8 @@ process.on('message', async (message) => {
 
             bot = mineflayer.createBot(botOptions);
 
+            let isReady = false;
+
             bot.events = new EventEmitter();
             bot.events.setMaxListeners(30);
             bot.config = config;
@@ -180,31 +206,107 @@ process.on('message', async (message) => {
                 events: bot.events,
                 sendMessage: (type, message, username) => bot.messageQueue.enqueue(type, message, username),
                 sendMessageAndWaitForReply: (command, patterns, timeout) => bot.messageQueue.enqueueAndWait(command, patterns, timeout),
-                getUser: (username) => UserService.getUser(username, bot.config.id, bot.config),
+                getUser: async (username) => {
+                    const userData = await UserService.getUser(username, bot.config.id, bot.config);
+                    if (!userData) return null;
+
+                    return {
+                        ...userData,
+                        addGroup: (group) => bot.api.performUserAction(username, 'addGroup', { group }),
+                        removeGroup: (group) => bot.api.performUserAction(username, 'removeGroup', { group }),
+                        addPermission: (permission) => bot.api.performUserAction(username, 'addPermission', { permission }),
+                        removePermission: (permission) => bot.api.performUserAction(username, 'removePermission', { permission }),
+                        getGroups: () => bot.api.performUserAction(username, 'getGroups'),
+                        getPermissions: () => bot.api.performUserAction(username, 'getPermissions'),
+                        isBlacklisted: () => bot.api.performUserAction(username, 'isBlacklisted'),
+                        setBlacklisted: (value) => bot.api.performUserAction(username, 'setBlacklisted', { value }),
+                    };
+                },
                 registerPermissions: (permissions) => PermissionManager.registerPermissions(bot.config.id, permissions),
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
                 addPermissionsToGroup: (groupName, permissionNames) => PermissionManager.addPermissionsToGroup(bot.config.id, groupName, permissionNames),
                 installedPlugins: installedPluginNames,
-                registerCommand: (commandInstance) => {
-                    if (!(commandInstance instanceof Command)) {
-                        throw new Error('registerCommand ожидает экземпляр класса Command.');
-                    }
-                    bot.commands.set(commandInstance.name, commandInstance);
-                    if (process.send) {
-                        process.send({
-                            type: 'register_command',
-                            commandConfig: {
-                                name: commandInstance.name,
-                                description: commandInstance.description,
-                                aliases: commandInstance.aliases,
-                                owner: commandInstance.owner,
-                                permissions: commandInstance.permissions,
-                                cooldown: commandInstance.cooldown,
-                                allowedChatTypes: commandInstance.allowedChatTypes,
+                registerCommand: async (command) => { // похуй. пляшем
+                    const prisma = new PrismaClient();
+                    try {
+                        let permissionId = null;
+                        if (command.permissions) {
+                            const permission = await prisma.permission.findUnique({
+                                where: {
+                                    botId_name: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                    },
+                                },
+                            });
+
+                            if (permission) {
+                                permissionId = permission.id;
+                            } else {
+                                sendLog(`[API] Внимание: право "${command.permissions}" не найдено для команды "${command.name}". Команда будет создана без привязанного права.`);
                             }
+                        }
+
+                        const commandData = {
+                            botId: bot.config.id,
+                            name: command.name,
+                            description: command.description || '',
+                            owner: command.owner || 'unknown',
+                            permissionId: permissionId,
+                            cooldown: command.cooldown || 0,
+                            isEnabled: command.isActive !== undefined ? command.isActive : true,
+                            aliases: JSON.stringify(command.aliases || []),
+                            allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
+                            argumentsJson: JSON.stringify(command.args || []),
+                        };
+
+                        await prisma.command.upsert({
+                            where: {
+                                botId_name: {
+                                    botId: commandData.botId,
+                                    name: commandData.name,
+                                }
+                            },
+                            update: {
+                                description: commandData.description,
+                                aliases: commandData.aliases,
+                                allowedChatTypes: commandData.allowedChatTypes,
+                                cooldown: commandData.cooldown,
+                                isEnabled: commandData.isEnabled,
+                                argumentsJson: commandData.argumentsJson,
+                                permissionId: commandData.permissionId,
+                            },
+                            create: commandData,
                         });
+
+                         if (process.send) {
+                             process.send({
+                                 type: 'register_command',
+                                 commandConfig: {
+                                     name: command.name,
+                                     description: command.description,
+                                     aliases: command.aliases,
+                                     owner: command.owner,
+                                     permissions: command.permissions,
+                                     cooldown: command.cooldown,
+                                     allowedChatTypes: command.allowedChatTypes,
+                                 }
+                             });
+                         }
+                         sendLog(`[API] Команда "${command.name}" от плагина "${command.owner}" зарегистрирована в процессе.`);
+
+                         if (!bot.commands) bot.commands = new Map();
+                         bot.commands.set(command.name, command);
+                         if (Array.isArray(command.aliases)) {
+                             for (const alias of command.aliases) {
+                                 bot.commands.set(alias, command);
+                             }
+                         }
+                    } catch (error) {
+                        sendLog(`[API] Ошибка при регистрации команды: ${error.message}`);
+                    } finally {
+                        await prisma.$disconnect();
                     }
-                    sendLog(`[API] Команда \"${commandInstance.name}\" от плагина \"${commandInstance.owner}\" зарегистрирована в процессе.`);
                 },
                 performUserAction: (username, action, data = {}) => {
                     return new Promise((resolve, reject) => {
@@ -230,12 +332,75 @@ process.on('message', async (message) => {
                                 reject(new Error('Request to main process timed out.'));
                                 pendingRequests.delete(requestId);
                             }
-                        }, 5000);
+                        }, 10000);
                     });
+                },
+                executeCommand: (command) => {
+                    sendLog(`[Graph] Выполнение серверной команды: ${command}`);
+                    bot.chat(command);
+                },
+                lookAt: (position) => {
+                    if (bot && position) {
+                        bot.lookAt(position);
+                    }
                 }
             };
 
+            const processApi = {
+                appendLog: (botId, message) => {
+                    if (process.send) {
+                        process.send({ type: 'log', content: message });
+                    }
+                }
+            };
+
+            bot.graphExecutionEngine = new GraphExecutionEngine(NodeRegistry, processApi);
+
             bot.commands = await loadCommands();
+
+            const prisma = new PrismaClient();
+            const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
+            await prisma.$disconnect();
+
+            for (const dbCommand of dbCommands) {
+                if (!dbCommand.isEnabled) {
+                    if (bot.commands.has(dbCommand.name)) {
+                        bot.commands.delete(dbCommand.name);
+                    }
+                    continue;
+                }
+
+                const existingCommand = bot.commands.get(dbCommand.name);
+
+                if (existingCommand) {
+                    existingCommand.description = dbCommand.description;
+                    existingCommand.cooldown = dbCommand.cooldown;
+                    existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
+                    existingCommand.permissionId = dbCommand.permissionId;
+                    existingCommand.allowedChatTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
+                } else if (dbCommand.isVisual) {
+                    const visualCommand = new Command({
+                        name: dbCommand.name,
+                        description: dbCommand.description,
+                        aliases: JSON.parse(dbCommand.aliases || '[]'),
+                        cooldown: dbCommand.cooldown,
+                        allowedChatTypes: JSON.parse(dbCommand.allowedChatTypes || '[]'),
+                        args: JSON.parse(dbCommand.argumentsJson || '[]'),
+                        owner: 'visual_editor',
+                    });
+                    visualCommand.permissionId = dbCommand.permissionId;
+                    visualCommand.graphJson = dbCommand.graphJson;
+                    visualCommand.owner = 'visual_editor';
+                    visualCommand.handler = (botInstance, typeChat, user, args) => {
+                        const playerList = bot ? Object.keys(bot.players) : [];
+                        const botState = bot ? { yaw: bot.entity.yaw, pitch: bot.entity.pitch } : {};
+                        const context = { bot: botInstance.api, user, args, typeChat, players: playerList, botState };
+                        return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
+                    };
+                    bot.commands.set(visualCommand.name, visualCommand);
+                }
+            }
+
             if (process.send) {
                 for (const cmd of bot.commands.values()) {
                     process.send({
@@ -256,16 +421,8 @@ process.on('message', async (message) => {
             await initializePlugins(bot, config.plugins);
             sendLog('[System] Все системы инициализированы.');
 
-
             let messageHandledByCustomParser = false;
 
-            bot.events.on('chat:message', (data) => {
-                const { type, username, message } = data;
-                if (username && message) {
-                    messageHandledByCustomParser = true;
-                    handleIncomingCommand(type, username, message);
-                }
-            });
             bot.on('message', (jsonMsg) => {
                 const ansiMessage = jsonMsg.toAnsi();
                 if (ansiMessage.trim()) {
@@ -276,31 +433,106 @@ process.on('message', async (message) => {
                 const rawMessageText = jsonMsg.toString();
                 bot.events.emit('core:raw_message', rawMessageText, jsonMsg);
             });
+
+            bot.events.on('chat:message', (data) => {
+                messageHandledByCustomParser = true;
+                sendEvent('chat', {
+                    username: data.username,
+                    message: data.message,
+                    chatType: data.type,
+                    raw: data.raw,
+                });
+                handleIncomingCommand(data.type, data.username, data.message);
+            });
+
             bot.on('chat', (username, message) => {
-                if (messageHandledByCustomParser) {
-                    return;
-                }
+                if (messageHandledByCustomParser) return;
                 handleIncomingCommand('chat', username, message);
             });
+
+            bot.on('whisper', (username, message) => {
+                if (messageHandledByCustomParser) return;
+                handleIncomingCommand('whisper', username, message);
+            });
+
+            bot.on('userAction', async ({ action, target, ...data }) => {
+                if (!target) return;
+
+                try {
+                    switch (action) {
+                        case 'addGroup':
+                            if (data.group) {
+                                await bot.api.performUserAction(target, 'addGroup', { group: data.group });
+                            }
+                            break;
+                        case 'removeGroup':
+                            if (data.group) {
+                                await bot.api.performUserAction(target, 'removeGroup', { group: data.group });
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    sendLog(`Ошибка при обработке userAction: ${error.message}`);
+                }
+            });
+            
             bot.on('login', () => {
                 sendLog('[Event: login] Успешно залогинился!');
                 if (process.send) {
+                    process.send({ type: 'bot_ready' });
                     process.send({ type: 'status', status: 'running' });
                 }
             });
-            bot.on('spawn', () => {
-                sendLog('[Event: spawn] Бот заспавнился в мире. Полностью готов к работе!');
-            });
+
             bot.on('kicked', (reason) => {
                 let reasonText;
                 try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
                 sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
                 process.exit(0);
             });
+
             bot.on('error', (err) => sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`));
+            
             bot.on('end', (reason) => {
                 sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
                 process.exit(0);
+            });
+
+            bot.on('playerJoined', (player) => {
+                if (!isReady) return;
+                sendEvent('playerJoined', { user: { username: player.username, uuid: player.uuid } });
+            });
+
+            bot.on('playerLeft', (player) => {
+                if (!isReady) return;
+                sendEvent('playerLeft', { user: { username: player.username, uuid: player.uuid } });
+            });
+
+            bot.on('entitySpawn', (entity) => {
+                const serialized = serializeEntity(entity);
+                sendEvent('entitySpawn', { entity: serialized });
+            });
+
+            bot.on('entityMoved', (entity) => {
+                const now = Date.now();
+                const lastSent = entityMoveThrottles.get(entity.id);
+                if (!lastSent || now - lastSent > 500) {
+                    entityMoveThrottles.set(entity.id, now);
+                    sendEvent('entityMoved', { entity: serializeEntity(entity) });
+                }
+            });
+
+            bot.on('entityGone', (entity) => {
+                sendEvent('entityGone', { entity: serializeEntity(entity) });
+                entityMoveThrottles.delete(entity.id);
+            });
+
+            bot.on('spawn', () => {
+                sendLog('[Event: spawn] Бот заспавнился в мире.');
+                setTimeout(() => {
+                    isReady = true;
+                    sendLog('[BotProcess] Бот готов к приему событий playerJoined/playerLeft.');
+                }, 3000);
             });
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
@@ -312,13 +544,10 @@ process.on('message', async (message) => {
             const newConfig = await fetchNewConfig(bot.config.id);
             if (newConfig) {
                 bot.config = { ...bot.config, ...newConfig };
-
                 const newCommands = await loadCommands();
                 const newPlugins = bot.config.plugins;
-
                 bot.commands = newCommands;
                 await initializePlugins(bot, newPlugins, true);
-
                 sendLog('[System] Bot configuration and plugins reloaded successfully.');
             } else {
                 sendLog('[System] Failed to fetch new configuration.');
@@ -371,9 +600,30 @@ process.on('message', async (message) => {
         if (commandInstance) {
             commandInstance.onBlacklisted(bot, typeChat, { username });
         }
-    } else if (message.type === 'invalidate_user_cache') {
-        if (message.username && bot && bot.config) {
-            UserService.clearCache(message.username, bot.config.id);
+    } else if (message.type === 'action') {
+        if (message.name === 'lookAt' && bot && message.payload.position) {
+            const { x, y, z } = message.payload.position;
+            if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
+                bot.lookAt(new Vec3(x, y, z));
+            } else {
+                sendLog(`[BotProcess] Ошибка lookAt: получены невалидные координаты: ${JSON.stringify(message.payload.position)}`);
+            }
+        }
+    } else if (message.type === 'plugins:reload') {
+        sendLog('[System] Получена команда на перезагрузку плагинов...');
+        const newConfig = await fetchNewConfig(bot.config.id);
+        if (newConfig) {
+            bot.config.plugins = newConfig.installedPlugins;
+            bot.commands.clear();
+            await loadCommands(bot, newConfig.commands);
+            await initializePlugins(bot, newConfig.installedPlugins);
+            sendLog('[System] Плагины успешно перезагружены.');
+        } else {
+            sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
+        }
+    } else if (message.type === 'server_command') {
+        if (bot && message.payload && message.payload.command) {
+            bot.chat(message.payload.command);
         }
     }
 });
@@ -381,6 +631,24 @@ process.on('message', async (message) => {
 process.on('unhandledRejection', (reason, promise) => {
     const errorMsg = `[FATAL] Необработанная ошибка процесса: ${reason?.stack || reason}`;
     sendLog(errorMsg);
-    console.error(errorMsg, promise);
     process.exit(1);
 });
+
+function serializeEntity(entity) {
+    if (!entity) return null;
+    return {
+      id: entity.id,
+      type: entity.type,
+      username: entity.username,
+      displayName: entity.displayName,
+      position: entity.position,
+      yaw: entity.yaw,
+      pitch: entity.pitch,
+      onGround: entity.onGround,
+      isValid: entity.isValid,
+      heldItem: entity.heldItem,
+      equipment: entity.equipment,
+      metadata: entity.metadata
+    };
+}
+

@@ -36,7 +36,8 @@ model Bot {
   users            User[]
   groups           Group[]
   permissions      Permission[]
-  commands         Command[] 
+  commands         Command[]
+  eventGraphs      EventGraph[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -64,20 +65,50 @@ model InstalledPlugin {
 }
 
 model Command {
-  id        Int     @id @default(autoincrement())
-  botId     Int
-  bot       Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
-  name      String
-  isEnabled Boolean @default(true)
-  cooldown  Int     @default(0)
-  aliases   String  @default("[]") // Храним как джсон строку
-  description String?
-  owner     String?
-  permissionId Int? 
-  permission   Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
-  allowedChatTypes String  @default("[\"chat\", \"private\"]") 
+  id               Int     @id @default(autoincrement())
+  botId            Int
+  bot              Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name             String
+  isEnabled        Boolean @default(true)
+  cooldown         Int     @default(0)
+  aliases          String  @default("[]")
+  description      String?
+  owner            String?
+  permissionId     Int?
+  permission       Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
+  allowedChatTypes String  @default("[\"chat\", \"private\"]")
+
+  isVisual         Boolean @default(false)
+  argumentsJson    String? @default("[]")
+  graphJson        String? @default("null")
 
   @@unique([botId, name])
+}
+
+model EventGraph {
+  id          Int     @id @default(autoincrement())
+  botId       Int
+  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name        String
+  isEnabled   Boolean @default(true)
+  graphJson   String? @default("null")
+  variables   String? @default("[]")
+
+  triggers    EventTrigger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([botId, name])
+}
+
+model EventTrigger {
+  id        Int      @id @default(autoincrement())
+  graphId   Int
+  graph     EventGraph @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  eventType String   // e.g., "entitySpawn", "chat"
+
+  @@unique([graphId, eventType])
 }
 
 model User {

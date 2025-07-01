@@ -8,7 +8,7 @@ export default function DynamicInputList({ value = [], onChange, placeholder = "
     const handleItemChange = (index, newValue) => {
         const updatedItems = [...value];
         updatedItems[index] = newValue;
-        onChange(updatedItems.filter(item => item.trim() !== ''));
+        onChange(updatedItems);
     };
 
     const handleAddItem = () => {
