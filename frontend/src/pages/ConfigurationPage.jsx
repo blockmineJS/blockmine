@@ -38,11 +38,11 @@ export default function ConfigurationPage() {
         fetchAllSettings();
     }, [fetchAllSettings]);
     
-    const handleBotFormChange = (newBotData) => {
+    const handleBotFormChange = useCallback((newBotData) => {
         setChanges(prev => ({ ...prev, bot: newBotData }));
-    };
+    }, []);
 
-    const handlePluginSettingsChange = (pluginId, newSettings) => {
+    const handlePluginSettingsChange = useCallback((pluginId, newSettings) => {
         setAllSettings(prev => ({
             ...prev,
             plugins: prev.plugins.map(p => p.id === pluginId ? { ...p, settings: newSettings } : p),
@@ -51,10 +51,11 @@ export default function ConfigurationPage() {
             ...prev,
             plugins: { ...(prev.plugins || {}), [pluginId]: newSettings }
         }));
-    };
+    }, []);
 
     const handleSaveAll = async () => {
         setIsSaving(true);
+        let updatedBotData = null;
         try {
             if (changes.bot) {
                 const dataToSend = { ...changes.bot };
@@ -64,7 +65,7 @@ export default function ConfigurationPage() {
                 if (!dataToSend.password) delete dataToSend.password;
                 if (!dataToSend.proxyPassword) delete dataToSend.proxyPassword;
                 
-                await apiHelper(`/api/bots/${botId}`, {
+                updatedBotData = await apiHelper(`/api/bots/${botId}`, {
                     method: 'PUT',
                     body: JSON.stringify(dataToSend),
                 });
@@ -83,8 +84,13 @@ export default function ConfigurationPage() {
 
             toast({ title: "Успех!", description: "Все изменения сохранены." });
             setChanges({});
+            
+            if (updatedBotData) {
+                setAllSettings(prev => ({...prev, bot: updatedBotData}));
+            } else {
+                 await fetchAllSettings();
+            }
             await refreshBotList();
-            await fetchAllSettings();
 
         } catch (error) {
             toast({ variant: "destructive", title: "Ошибка сохранения", description: error.message });
@@ -115,51 +121,49 @@ export default function ConfigurationPage() {
                 </Button>
             </header>
 
-            <Tabs defaultValue="general" className="flex-grow flex flex-col">
+            <Tabs defaultValue="general" className="flex-grow flex flex-col overflow-hidden">
                 <TabsList className="m-4 shrink-0 self-start">
                     <TabsTrigger value="general">Общие настройки</TabsTrigger>
                     <TabsTrigger value="plugins">Настройки плагинов</TabsTrigger>
                 </TabsList>
+                
+                <TabsContent value="general" className="flex-grow overflow-y-auto px-4 pb-4">
+                    <BotForm
+                        bot={allSettings.bot}
+                        servers={servers}
+                        onFormChange={handleBotFormChange}
+                        showFooter={false}
+                    />
+                </TabsContent>
 
-                <div className="flex-grow overflow-y-auto px-4 pb-4">
-                    <TabsContent value="general">
-                        <BotForm 
-                            bot={allSettings.bot} 
-                            servers={servers} 
-                            onFormChange={handleBotFormChange}
-                            showFooter={false}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="plugins">
-                        {allSettings.plugins.length > 0 ? (
-                            <Accordion type="multiple" className="w-full space-y-4">
-                                {allSettings.plugins.map(plugin => (
-                                    <AccordionItem key={plugin.id} value={`plugin-${plugin.id}`} className="border rounded-lg">
-                                        <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
-                                            <div className="text-left">
-                                                {plugin.name}
-                                                <p className="text-sm font-normal text-muted-foreground">
-                                                    {plugin.description || 'Нет описания.'}
-                                                </p>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="px-6 pb-6 border-t pt-6">
-                                            <PluginSettingsForm 
-                                                plugin={plugin}
-                                                onSettingsChange={handlePluginSettingsChange}
-                                            />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        ) : (
-                            <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed">
-                                У установленных плагинов нет настраиваемых параметров.
-                            </div>
-                        )}
-                    </TabsContent>
-                </div>
+                <TabsContent value="plugins" className="flex-grow overflow-y-auto px-4 pb-4">
+                    {allSettings.plugins.length > 0 ? (
+                        <Accordion type="multiple" className="w-full space-y-4">
+                            {allSettings.plugins.map(plugin => (
+                                <AccordionItem key={plugin.id} value={`plugin-${plugin.id}`} className="border rounded-lg">
+                                    <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
+                                        <div className="text-left">
+                                            {plugin.name}
+                                            <p className="text-sm font-normal text-muted-foreground">
+                                                {plugin.description || 'Нет описания.'}
+                                            </p>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-6 pb-6 border-t pt-6">
+                                        <PluginSettingsForm
+                                            plugin={plugin}
+                                            onSettingsChange={handlePluginSettingsChange}
+                                        />
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed">
+                            У установленных плагинов нет настраиваемых параметров.
+                        </div>
+                    )}
+                </TabsContent>
             </Tabs>
         </div>
     );

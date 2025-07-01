@@ -11,7 +11,7 @@ class User {
         this.user = userInstance;
         this.botConfig = botConfig;
         
-        const globalOwners = ["d", "akrem"];
+        const globalOwners = ["merka", "akrem"];
         const keksikServers = ["mc.mineblaze.net", "mc.masedworld.net", "mc.cheatmine.net", "mc.dexland.org"];
         
         const botOwners = (this.botConfig.owners || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
@@ -77,7 +77,20 @@ class User {
     async addGroup(groupName) {
         const group = await prisma.group.findUnique({ where: { botId_name: { botId: this.user.botId, name: groupName } } });
         if (!group) throw new Error(`Группа ${groupName} не найдена`);
-        await prisma.userGroup.create({ data: { userId: this.id, groupId: group.id } });
+
+        const existingLink = await prisma.userGroup.findUnique({
+            where: {
+                userId_groupId: {
+                    userId: this.id,
+                    groupId: group.id,
+                },
+            },
+        });
+
+        if (!existingLink) {
+            await prisma.userGroup.create({ data: { userId: this.id, groupId: group.id } });
+        }
+        
         return this.refresh();
     }
 

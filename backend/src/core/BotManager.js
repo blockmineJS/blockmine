@@ -10,16 +10,16 @@ const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const { decrypt } = require('./utils/crypto');
+const EventGraphManager = require('./EventGraphManager');
+const nodeRegistry = require('./NodeRegistry');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
 
-
-const RealPermissionManager = require('./PermissionManager');
-const RealUserService = require('./UserService');
+const UserService = require('./UserService');
 
 const prisma = new PrismaClient();
 const cooldowns = new Map();
 const warningCache = new Map();
 const WARNING_COOLDOWN = 10 * 1000;
-
 
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 let instanceId = null;
@@ -45,19 +45,28 @@ function getInstanceId() {
     return instanceId;
 }
 
-
 class BotManager {
     constructor() {
         this.bots = new Map();
         this.logCache = new Map();
         this.resourceUsage = new Map();
         this.botConfigs = new Map();
+        this.nodeRegistry = nodeRegistry;
+        this.pendingPlayerListRequests = new Map();
+        this.playerListCache = new Map();
+        this.graphEngine = new GraphExecutionEngine(this.nodeRegistry, this);
+        this.eventGraphManager = null;
 
         getInstanceId();
-
         setInterval(() => this.updateAllResourceUsage(), 5000);
         if (config.telemetry?.enabled) {
             setInterval(() => this.sendHeartbeat(), 5 * 60 * 1000);
+        }
+    }
+
+    initialize() {
+        if (!this.eventGraphManager) {
+            this.eventGraphManager = new EventGraphManager(this);
         }
     }
 
@@ -79,7 +88,6 @@ class BotManager {
                     config.commandAliases.set(alias, cmd.name);
                 }
             }
-
             this.botConfigs.set(botId, config);
             console.log(`[BotManager] Configuration for bot ID ${botId} cached successfully.`);
             return config;
@@ -87,6 +95,10 @@ class BotManager {
             console.error(`[BotManager] Failed to cache configuration for bot ${botId}:`, error);
             throw new Error(`Failed to load/cache bot configuration for botId ${botId}: ${error.message}`);
         }
+    }
+    
+    async _ensureDefaultEventGraphs(botId) {
+        return;
     }
 
     invalidateConfigCache(botId) {
@@ -102,7 +114,6 @@ class BotManager {
         if (child && !child.killed) {
             child.send({ type: 'config:reload' });
             console.log(`[BotManager] Sent config:reload to bot process ${botId}`);
-            
             getIO().emit('bot:config_reloaded', { botId });
         }
     }
@@ -117,45 +128,22 @@ class BotManager {
         }, 3000);
     }
 
-
-    _sendThrottledWarning(botId, username, warningType, message, typeChat = 'private') {
-        const cacheKey = `${botId}:${username}:${warningType}`;
-        const now = Date.now();
-        const lastWarning = warningCache.get(cacheKey);
-
-        if (!lastWarning || (now - lastWarning > WARNING_COOLDOWN)) {
-            this.sendMessageToBot(botId, message, typeChat, username);
-            warningCache.set(cacheKey, now);
-        }
-    }
-
-
     async sendHeartbeat() {
-        if (!config.telemetry?.enabled) return;
-        if (!instanceId) return;
-
+        if (!config.telemetry?.enabled || !instanceId) return;
         try {
-            const runningBots = [];
-            for (const botProcess of this.bots.values()) {
-                if (botProcess.botConfig) {
-                    runningBots.push({
-                        username: botProcess.botConfig.username,
-                        serverHost: botProcess.botConfig.server.host,
-                        serverPort: botProcess.botConfig.server.port
-                    });
-                }
-            }
+            const runningBots = Array.from(this.bots.values())
+                .filter(p => p.botConfig)
+                .map(p => ({
+                    username: p.botConfig.username,
+                    serverHost: p.botConfig.server.host,
+                    serverPort: p.botConfig.server.port
+                }));
             
-            if (runningBots.length === 0) {
-                return;
-            }
-
+            if (runningBots.length === 0) return;
 
             const challengeRes = await fetch(`${STATS_SERVER_URL}/api/challenge?uuid=${instanceId}`);
-            if (!challengeRes.ok) {
-                console.error(`[Telemetry] Сервер статистики вернул ошибку при получении challenge: ${challengeRes.statusText}`);
-                return;
-            }
+            if (!challengeRes.ok) throw new Error(`Challenge server error: ${challengeRes.statusText}`);
+            
             const { challenge, difficulty, prefix } = await challengeRes.json();
             let nonce = 0;
             let hash = '';
@@ -180,7 +168,6 @@ class BotManager {
         }
     }
 
-
     async _syncSystemPermissions(botId) {
         const systemPermissions = [
           { name: "admin.*", description: "Все права администратора" },
@@ -195,7 +182,6 @@ class BotManager {
           "Admin": ["admin.*", "admin.cooldown.bypass", "user.cooldown.bypass", "user.*"]
         };
         console.log(`[Permission Sync] Синхронизация системных прав для бота ID ${botId}...`);
-
         for (const perm of systemPermissions) {
             await prisma.permission.upsert({
                 where: { botId_name: { botId, name: perm.name } },
@@ -203,7 +189,6 @@ class BotManager {
                 create: { ...perm, botId, owner: 'system' }
             });
         }
-
         for (const groupName of systemGroups) {
             await prisma.group.upsert({
                 where: { botId_name: { botId, name: groupName } },
@@ -211,7 +196,6 @@ class BotManager {
                 create: { name: groupName, botId, owner: 'system' }
             });
         }
-
         for (const [groupName, permNames] of Object.entries(systemGroupPermissions)) {
             const group = await prisma.group.findUnique({ where: { botId_name: { botId, name: groupName } } });
             if (group) {
@@ -238,13 +222,11 @@ class BotManager {
             }
             return;
         }
-
         const pids = Array.from(this.bots.values()).map(child => child.pid).filter(Boolean);
         if (pids.length === 0) return;
         try {
             const stats = await pidusage(pids);
             const usageData = [];
-
             for (const pid in stats) {
                 if (!stats[pid]) continue;
                 const botId = this.getBotIdByPid(parseInt(pid, 10));
@@ -259,8 +241,7 @@ class BotManager {
                 }
             }
             getIO().emit('bots:usage', usageData);
-        } catch (error) {
-        }
+        } catch (error) {}
     }
 
     getBotIdByPid(pid) {
@@ -287,9 +268,7 @@ class BotManager {
     }
 
     emitStatusUpdate(botId, status, message = null) {
-        if (message) {
-            this.appendLog(botId, `[SYSTEM] ${message}`);
-        }
+        if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
         getIO().emit('bot:status', { botId, status, message });
     }
     
@@ -301,13 +280,9 @@ class BotManager {
     }
 
     async startBot(botConfig) {
-        if (this.bots.has(botConfig.id)) {
-            const existingProcess = this.bots.get(botConfig.id);
-            if (existingProcess && !existingProcess.killed) {
-                 console.error(`[BotManager] Попытка повторного запуска уже работающего бота ID: ${botConfig.id}. Запуск отменен.`);
-                 this.appendLog(botConfig.id, `[SYSTEM-ERROR] Попытка повторного запуска. Запуск отменен.`);
-                 return { success: false, message: 'Бот уже запущен или запускается.' };
-            }
+        if (this.bots.has(botConfig.id) && !this.bots.get(botConfig.id).killed) {
+            this.appendLog(botConfig.id, `[SYSTEM-ERROR] Попытка повторного запуска. Запуск отменен.`);
+            return { success: false, message: 'Бот уже запущен или запускается.' };
         }
 
         await this._syncSystemPermissions(botConfig.id);
@@ -315,98 +290,131 @@ class BotManager {
         this.logCache.set(botConfig.id, []);
         this.emitStatusUpdate(botConfig.id, 'starting', '');
 
-        const allPluginsForBot = await prisma.installedPlugin.findMany({
-            where: { botId: botConfig.id },
-        });
-        const enabledPlugins = allPluginsForBot.filter(p => p.isEnabled);
-
-        const { sortedPlugins, pluginInfo, hasCriticalIssues } = DependencyService.resolveDependencies(enabledPlugins, allPluginsForBot);
+        const allPluginsForBot = await prisma.installedPlugin.findMany({ where: { botId: botConfig.id, isEnabled: true } });
+        const { sortedPlugins, hasCriticalIssues, pluginInfo } = DependencyService.resolveDependencies(allPluginsForBot, allPluginsForBot);
+        
         if (hasCriticalIssues) {
-            this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями:');
-            for (const plugin of Object.values(pluginInfo)) {
-                if (plugin.issues.length > 0) {
-                    this.appendLog(botConfig.id, `  - Плагин "${plugin.name}":`);
-                    for (const issue of plugin.issues) {
-                        const logMessage = `    - [${issue.type.toUpperCase()}] ${issue.message}`;
-                        this.appendLog(botConfig.id, logMessage);
+            this.appendLog(botConfig.id, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен.');
+
+            const criticalIssueTypes = new Set(['missing_dependency', 'version_mismatch', 'circular_dependency']);
+
+            for (const pluginId in pluginInfo) {
+                const info = pluginInfo[pluginId];
+                if (info.issues.length === 0) continue;
+
+                const criticalIssues = info.issues.filter(issue => criticalIssueTypes.has(issue.type));
+
+                if (criticalIssues.length > 0) {
+                    this.appendLog(botConfig.id, `* Плагин "${info.name}":`);
+                    for (const issue of criticalIssues) {
+                        this.appendLog(botConfig.id, `  - ${issue.message}`);
                     }
                 }
             }
-            this.appendLog(botConfig.id, '[DependencyManager] [FATAL] Запуск отменен.');
+            
             this.emitStatusUpdate(botConfig.id, 'stopped', 'Ошибка зависимостей плагинов.');
             return { success: false, message: 'Критические ошибки в зависимостях плагинов.' };
         }
         
         const decryptedConfig = { ...botConfig };
-        if (decryptedConfig.password) {
-            decryptedConfig.password = decrypt(decryptedConfig.password);
-        }
-        if (decryptedConfig.proxyPassword) {
-            decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
-        }
+        if (decryptedConfig.password) decryptedConfig.password = decrypt(decryptedConfig.password);
+        if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
 
         const fullBotConfig = { ...decryptedConfig, plugins: sortedPlugins };
         const botProcessPath = path.resolve(__dirname, 'BotProcess.js');
         const child = fork(botProcessPath, [], { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
 
         child.botConfig = botConfig;
-        child.on('error', (err) => {
-            this.appendLog(botConfig.id, `[PROCESS FATAL] КРИТИЧЕСКАЯ ОШИБКА ПРОЦЕССА: ${err.stack}`);
-        });
-        child.stderr.on('data', (data) => {
-            this.appendLog(botConfig.id, `[STDERR] ${data.toString()}`);
-        });
+
         child.on('message', async (message) => {
-            if (message.type === 'log') {
-                this.appendLog(botConfig.id, message.content);
-            } else if (message.type === 'status') {
-                this.emitStatusUpdate(botConfig.id, message.status); 
-            } else if (message.type === 'validate_and_run_command') {
-                await this.handleCommandValidation(botConfig, message);
-            } else if (message.type === 'register_command') {
-                await this.handleCommandRegistration(botConfig.id, message.commandConfig);
-            } else if (message.type === 'request_user_action') {
-                const { requestId, payload } = message;
-                const { targetUsername, action, data } = payload;
-                const botId = botConfig.id;
-            
-                try {
-                    const targetUser = await RealUserService.getUser(targetUsername, botId);
-                    let replyPayload = {};
-            
-                    switch (action) {
-                        case 'toggle_blacklist': {
-                            const isCurrentlyBlacklisted = targetUser.isBlacklisted;
-                            await targetUser.setBlacklist(!isCurrentlyBlacklisted);
-                            replyPayload.newStatus = !isCurrentlyBlacklisted; 
-                            break;
+            const botId = botConfig.id;
+            try {
+                switch (message.type) {
+                    case 'event':
+                        if (this.eventGraphManager) {
+                            this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
                         }
-            
-                        case 'toggle_group': {
-                            if (!data.groupName) throw new Error('Название группы не указано.');
-                            const hasGroup = targetUser.hasGroup(data.groupName);
-                            if (hasGroup) {
-                                await targetUser.removeGroup(data.groupName);
-                                replyPayload.actionTaken = 'removed'; 
-                            } else {
-                                await targetUser.addGroup(data.groupName);
-                                replyPayload.actionTaken = 'added'; 
+                        break;
+                    case 'log':
+                        this.appendLog(botId, message.content);
+                        break;
+                    case 'status':
+                        this.emitStatusUpdate(botId, message.status);
+                        break;
+                    case 'validate_and_run_command':
+                        await this.handleCommandValidation(botConfig, message);
+                        break;
+                    case 'register_command':
+                        await this.handleCommandRegistration(botId, message.commandConfig);
+                        break;
+                    case 'register_group':
+                        await this.handleGroupRegistration(botId, message.groupConfig);
+                        break;
+                    case 'request_user_action':
+                        const { requestId, payload } = message;
+                        const { targetUsername, action, data } = payload;
+                        
+                        try {
+                            const user = await UserService.getUser(targetUsername, botConfig.id);
+                            if (!user) throw new Error(`Пользователь ${targetUsername} не найден.`);
+                            
+                            let result;
+
+                            switch (action) {
+                                case 'addGroup':
+                                    result = await user.addGroup(data.group);
+                                    break;
+                                case 'removeGroup':
+                                    result = await user.removeGroup(data.group);
+                                    break;
+                                case 'addPermission':
+                                    break;
+                                case 'removePermission':
+                                    break;
+                                case 'getGroups':
+                                    result = user.groups;
+                                    break;
+                                case 'getPermissions':
+                                    result = Array.from(user.permissionsSet);
+                                    break;
+                                case 'isBlacklisted':
+                                    result = user.isBlacklisted;
+                                    break;
+                                case 'setBlacklisted':
+                                    result = await user.setBlacklist(data.value);
+                                    break;
+                                default:
+                                    throw new Error(`Неизвестное действие: ${action}`);
                             }
-                            break;
+
+                            child.send({ type: 'user_action_response', requestId, payload: result });
+                        } catch (error) {
+                            console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
+                            child.send({ type: 'user_action_response', requestId, error: error.message });
                         }
-            
-                        default:
-                            throw new Error(`Неизвестное действие: ${action}`);
+                        break;
+                    case 'playerListUpdate':
+                        break;
+                    case 'get_player_list_response': {
+                        const { requestId, payload } = message;
+                        const request = this.pendingPlayerListRequests.get(requestId);
+                        if (request) {
+                            clearTimeout(request.timeout);
+                            request.resolve(payload.players);
+                            this.pendingPlayerListRequests.delete(requestId);
+                        }
+                        break;
                     }
-            
-                    child.send({ type: 'user_action_response', requestId, payload: replyPayload });
-            
-                } catch (error) {
-                    console.error(`[BotManager] Ошибка выполнения действия '${action}' для пользователя '${targetUsername}':`, error);
-                    child.send({ type: 'user_action_response', requestId, error: error.message });
                 }
+            } catch (error) {
+                this.appendLog(botId, `[SYSTEM-ERROR] Критическая ошибка в обработчике сообщений от бота: ${error.stack}`);
+                console.error(`[BotManager] Критическая ошибка в обработчике сообщений от бота ${botId}:`, error);
             }
         });
+
+        child.on('error', (err) => this.appendLog(botConfig.id, `[PROCESS FATAL] ${err.stack}`));
+        child.stderr.on('data', (data) => this.appendLog(botConfig.id, `[STDERR] ${data.toString()}`));
+        
         child.on('exit', (code, signal) => {
             const botId = botConfig.id;
             this.bots.delete(botId);
@@ -415,13 +423,15 @@ class BotManager {
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
         });
+
         this.bots.set(botConfig.id, child);
         child.send({ type: 'start', config: fullBotConfig });
 
-        this.triggerHeartbeat();
+        await this.eventGraphManager.loadGraphsForBot(botConfig.id);
         
-        this.appendLog(botConfig.id, '[SYSTEM] Проверка зависимостей пройдена. Запускаем процесс бота...');
-        return { success: true, message: 'Бот запускается' };
+        this.triggerHeartbeat();
+        getIO().emit('bot:status', { botId: botConfig.id, status: 'starting' });
+        return child;
     }
 
     async handleCommandValidation(botConfig, message) {
@@ -431,71 +441,98 @@ class BotManager {
         try {
             let botConfigCache = this.botConfigs.get(botId);
             if (!botConfigCache) {
+                console.log(`[BotManager] No cache for ${botId}, loading...`);
                 botConfigCache = await this.loadConfigForBot(botId);
             }
-            
-            const user = await RealUserService.getUser(username, botId, botConfig);
+
+            const user = await UserService.getUser(username, botId, botConfig);
+
             const child = this.bots.get(botId);
-            
-            if (!child) {
-                console.warn(`[BotManager] No running bot process found for botId: ${botId} during command validation. Aborting.`);
+            if (!child) return;
+
+            if (user.isBlacklisted) {
+                this.sendMessageToBot(botId, 'Вы находитесь в черном списке и не можете использовать команды.', 'private', username);
                 return;
             }
 
-            if (user.isBlacklisted) {
-                child.send({ type: 'handle_blacklist', commandName, username, typeChat });
-                return;
-            }
-            
             const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
             const dbCommand = botConfigCache.commands.get(mainCommandName);
-            
+
             if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
                 return;
             }
-    
+
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') {
-                    return;
-                }
-                child.send({ type: 'handle_wrong_chat', commandName: dbCommand.name, username, typeChat });
+                if (typeChat === 'global') return;
+                this.sendMessageToBot(botId, 'Эту команду нельзя использовать в этом чате.', 'private', username);
+                return;
+            }
+
+            const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
+            if (permission && !user.hasPermission(permission.name)) {
+                this.sendMessageToBot(botId, 'У вас нет прав на использование этой команды.', 'private', username);
                 return;
             }
             
-            const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
-            if (permission && !user.hasPermission(permission.name)) {
-                child.send({ type: 'handle_permission_error', commandName: dbCommand.name, username, typeChat });
-                return;
-            }
-    
             const domain = (permission?.name || '').split('.')[0] || 'user';
             const bypassCooldownPermission = `${domain}.cooldown.bypass`;
+
             if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
                 const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
                 const now = Date.now();
                 const lastUsed = cooldowns.get(cooldownKey);
-    
+
                 if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
                     const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    child.send({ type: 'handle_cooldown', commandName: dbCommand.name, username, typeChat, timeLeft });
+                    this.sendMessageToBot(botId, `Подождите еще ${timeLeft} сек. перед использованием команды.`, 'private', username);
                     return;
                 }
                 cooldowns.set(cooldownKey, now);
             }
 
-            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
+            if (dbCommand.isVisual) {
+                const graph = dbCommand.graphJson;
+                if (graph) {
+                    const players = await this.getPlayerList(botId);
+                    console.log('[BotManager] Received player list for graph:', players);
+
+                    const botAPI = {
+                        sendMessage: (type, message, recipient) => {
+                            this.sendMessageToBot(botId, message, type, recipient);
+                        },
+                        executeCommand: (command) => {
+                            this.sendServerCommandToBot(botId, command);
+                        },
+                    };
+
+                    const graphContext = {
+                        bot: botAPI,
+                        botId: botId,
+                        user,
+                        args,
+                        typeChat,
+                        players,
+                    };
+                    
+                    try {
+                        const resultContext = await this.graphEngine.execute(graph, graphContext, 'command');
+                    } catch (e) {
+                        console.error(`[BotManager] Ошибка выполнения визуальной команды '${commandName}':`, e);
+                        this.sendMessageToBot(botId, 'Произошла внутренняя ошибка при выполнении команды.', 'private', username);
+                    }
+                }
+            } else {
+                child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
+            }
+
         } catch (error) {
             console.error(`[BotManager] Command validation error for botId: ${botId}`, {
-                command: commandName,
-                user: username,
-                error: error.message,
-                stack: error.stack
+                command: commandName, user: username, error: error.message, stack: error.stack
             });
             this.sendMessageToBot(botId, `Произошла внутренняя ошибка при выполнении команды.`, 'private', username);
         }
     }
-
 
     async handleCommandRegistration(botId, commandConfig) {
         try {
@@ -516,8 +553,6 @@ class BotManager {
                 }
                 permissionId = permission.id;
             }
-    
-
             const createData = {
                 botId,
                 name: commandConfig.name,
@@ -538,15 +573,34 @@ class BotManager {
                 create: createData,
             });
             this.invalidateConfigCache(botId);
-
         } catch (error) {
             console.error(`[BotManager] Ошибка при регистрации команды '${commandConfig.name}':`, error);
+        }
+    }
+
+    async handleGroupRegistration(botId, groupConfig) {
+        try {
+            await prisma.group.upsert({
+                where: { botId_name: { botId, name: groupConfig.name } },
+                update: {
+                    owner: groupConfig.owner,
+                },
+                create: {
+                    botId,
+                    name: groupConfig.name,
+                    owner: groupConfig.owner,
+                },
+            });
+            this.invalidateConfigCache(botId);
+        } catch (error) {
+            console.error(`[BotManager] Ошибка при регистрации группы '${groupConfig.name}':`, error);
         }
     }
 
     stopBot(botId) {
         const child = this.bots.get(botId);
         if (child) {
+            this.eventGraphManager.unloadGraphsForBot(botId);
             child.send({ type: 'stop' });
             this.botConfigs.delete(botId);
             return { success: true };
@@ -564,7 +618,7 @@ class BotManager {
     }
 
     invalidateUserCache(botId, username) {
-        RealUserService.clearCache(username, botId);
+        UserService.clearCache(username, botId);
         const child = this.bots.get(botId);
         if (child) {
             child.send({ type: 'invalidate_user_cache', username });
@@ -572,17 +626,90 @@ class BotManager {
         return { success: true };
     }
 
-    reloadBotConfigInRealTime(botId) {
-        this.invalidateConfigCache(botId);
+    async getPlayerList(botId) {
+        const PLAYER_LIST_CACHE_TTL = 2000;
+
+        const child = this.bots.get(botId);
+        if (!child || child.killed) {
+            return [];
+        }
+
+        const cachedEntry = this.playerListCache.get(botId);
+        if (cachedEntry && (Date.now() - cachedEntry.timestamp < PLAYER_LIST_CACHE_TTL)) {
+            return cachedEntry.promise;
+        }
+
+        const newPromise = new Promise((resolve) => {
+            const requestId = uuidv4();
+            const timeout = setTimeout(() => {
+                this.pendingPlayerListRequests.delete(requestId);
+                if (this.playerListCache.get(botId)?.promise === newPromise) {
+                    this.playerListCache.delete(botId);
+                }
+                resolve([]);
+            }, 5000);
+
+            this.pendingPlayerListRequests.set(requestId, {
+                resolve: (playerList) => {
+                    clearTimeout(timeout);
+                    this.pendingPlayerListRequests.delete(requestId);
+                    this.playerListCache.set(botId, {
+                        promise: Promise.resolve(playerList),
+                        timestamp: Date.now()
+                    });
+                    resolve(playerList);
+                },
+                reject: (error) => {
+                    clearTimeout(timeout);
+                    this.pendingPlayerListRequests.delete(requestId);
+                    if (this.playerListCache.get(botId)?.promise === newPromise) {
+                        this.playerListCache.delete(botId);
+                    }
+                    resolve([]);
+                },
+            });
+
+            child.send({ type: 'system:get_player_list', requestId });
+        });
+
+        this.playerListCache.set(botId, {
+            promise: newPromise,
+            timestamp: Date.now()
+        });
+
+        return newPromise;
+    }
+
+    setEventGraphManager(manager) {
+        this.eventGraphManager = manager;
+    }
+
+    lookAt(botId, position) {
+        const botProcess = this.bots.get(botId);
+        if (botProcess && !botProcess.killed) {
+            botProcess.send({ type: 'action', name: 'lookAt', payload: { position } });
+        } else {
+            console.error(`[BotManager] Не удалось найти запущенный процесс для бота ${botId}, чтобы выполнить lookAt.`);
+        }
+    }
+
+    async reloadPlugins(botId) {
         const child = this.bots.get(botId);
         if (child && !child.killed) {
-            child.send({ type: 'config:reload' });
-            console.log(`[BotManager] Sent config:reload to bot process ${botId}`);
-            
-            const { getIO } = require('../real-time/socketHandler');
-            getIO().emit('bot:config_reloaded', { botId });
+            child.send({ type: 'plugins:reload' });
+            console.log(`[BotManager] Sent plugins:reload to bot process ${botId}`);
+            getIO().emit('bot:plugins_reloaded', { botId });
+            return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };
+        }
+        return { success: false, message: 'Бот не запущен.' };
+    }
+
+    sendServerCommandToBot(botId, command) {
+        const child = this.bots.get(botId);
+        if (child) {
+            child.send({ type: 'server_command', payload: { command } });
         }
     }
 }
 
-module.exports = new BotManager();
+module.exports = BotManager;

@@ -21,9 +21,11 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
         proxyUsername: '',
         proxyPassword: ''
     });
+    const isInitialized = React.useRef(false);
 
     useEffect(() => {
         if (bot) {
+            isInitialized.current = false;
             setFormData({
                 username: bot.username || '',
                 password: '', 
@@ -39,29 +41,27 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
         }
     }, [bot]);
 
+    useEffect(() => {
+        if (onFormChange) {
+            if (isInitialized.current) {
+                onFormChange(formData);
+            } else {
+                isInitialized.current = true;
+            }
+        }
+    }, [formData, onFormChange]);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
-        const newFormData = { ...formData, [name]: value };
-        setFormData(newFormData);
-        if (onFormChange) {
-            onFormChange(newFormData);
-        }
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSelectChange = (value) => {
-        const newFormData = { ...formData, serverId: value };
-        setFormData(newFormData);
-        if (onFormChange) {
-            onFormChange(newFormData);
-        }
+        setFormData(prev => ({ ...prev, serverId: value }));
     };
 
     const handleOwnersChange = (newOwners) => {
-        const newFormData = { ...formData, owners: newOwners };
-        setFormData(newFormData);
-        if (onFormChange) {
-            onFormChange(newFormData);
-        }
+        setFormData(prev => ({ ...prev, owners: newOwners }));
     };
 
     const handleSubmit = (e) => {

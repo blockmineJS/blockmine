@@ -37,7 +37,8 @@ function reportPluginDownload(pluginName) {
 
 
 class PluginManager {
-    constructor() {
+    constructor(botManager) {
+        this.botManager = botManager;
         this.ensureBaseDirExists();
     }
 
@@ -53,6 +54,11 @@ class PluginManager {
         } catch(e) {
             console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
         }
+        
+        if (this.botManager) {
+            await this.botManager.reloadPlugins(botId);
+        }
+        
         return newPlugin;
     }
 
@@ -104,6 +110,10 @@ class PluginManager {
             
             const packageJson = JSON.parse(await fse.readFile(path.join(localPath, 'package.json'), 'utf-8'));
             reportPluginDownload(packageJson.name);
+
+            if (this.botManager) {
+                await this.botManager.reloadPlugins(botId);
+            }
             
             return newPlugin;
 
@@ -258,4 +268,4 @@ class PluginManager {
     }
 }
 
-module.exports = new PluginManager();
+module.exports = PluginManager;

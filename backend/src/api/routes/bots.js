@@ -2,12 +2,14 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 const fs = require('fs/promises');
-const BotManager = require('../../core/BotManager');
-const PluginManager = require('../../core/PluginManager');
+const { botManager, pluginManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
+const NodeRegistry = require('../../core/NodeRegistry');
 const { authenticate, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
+const { randomUUID } = require('crypto');
+const eventGraphsRouter = require('./eventGraphs');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -16,11 +18,10 @@ const AdmZip = require('adm-zip');
 const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
 
-
 const router = express.Router();
 
-
 router.use(authenticate);
+router.use('/:botId/event-graphs', eventGraphsRouter);
 
 async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     const initialData = {
@@ -58,7 +59,6 @@ async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     console.log(`[Setup] Для бота ID ${botId} созданы группы и права по умолчанию.`);
 }
 
-
 router.get('/', authorize('bot:list'), async (req, res) => {
     try {
         const bots = await prisma.bot.findMany({ include: { server: true }, orderBy: { createdAt: 'asc' } });
@@ -71,7 +71,7 @@ router.get('/', authorize('bot:list'), async (req, res) => {
 
 router.get('/state', authorize('bot:list'), (req, res) => {
     try {
-        const state = BotManager.getFullState();
+        const state = botManager.getFullState();
         res.json(state);
     } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
 });
@@ -104,10 +104,8 @@ router.post('/', authorize('bot:create'), async (req, res) => {
 
 router.put('/:id', authorize('bot:update'), async (req, res) => {
     try {
-        const botId = parseInt(req.params.id, 10);
-        
         const { 
-            username, password, prefix, serverId, note,
+            username, password, prefix, serverId, note, owners,
             proxyHost, proxyPort, proxyUsername, proxyPassword 
         } = req.body;
 
@@ -115,6 +113,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
             username,
             prefix,
             note,
+            owners,
             proxyHost,
             proxyPort: proxyPort ? parseInt(proxyPort, 10) : null,
             proxyUsername,
@@ -127,10 +126,6 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
             dataToUpdate.proxyPassword = encrypt(proxyPassword);
         }
 
-        if (proxyPassword) {
-            dataToUpdate.proxyPassword = proxyPassword;
-        }
-
         if (serverId) {
             dataToUpdate.serverId = parseInt(serverId, 10);
         }
@@ -140,43 +135,51 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
              dataToUpdate = { ...rest, server: { connect: { id: sId } } };
         }
 
-        const updatedBot = await prisma.bot.update({ 
-            where: { id: botId }, 
-            data: dataToUpdate, 
-            include: { server: true } 
+        const botId = parseInt(req.params.id, 10);
+        if (isNaN(botId)) {
+            return res.status(400).json({ message: 'Неверный ID бота.' });
+        }
+
+        const updatedBot = await prisma.bot.update({
+            where: { id: botId },
+            data: dataToUpdate,
+            include: {
+                server: true
+            }
         });
-        
+
+        const botManager = req.app.get('botManager');
+        botManager.reloadBotConfigInRealTime(botId);
+
         res.json(updatedBot);
     } catch (error) {
-        console.error("Update bot error:", error);
-        if (error.code === 'P2002') return res.status(409).json({ error: 'Бот с таким именем уже существует' });
-        res.status(500).json({ error: 'Не удалось обновить бота' });
+        console.error('Error updating bot:', error);
+        res.status(500).json({ message: `Не удалось обновить бота: ${error.message}` });
     }
 });
 
 router.delete('/:id', authorize('bot:delete'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
-        if (BotManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
+        if (botManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
         await prisma.bot.delete({ where: { id: botId } });
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить бота' }); }
 });
-
 
 router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
         if (!botConfig) return res.status(404).json({ error: 'Бот не найден' });
-        const result = await BotManager.startBot(botConfig);
+        const result = await botManager.startBot(botConfig);
         res.json(result);
     } catch (error) { res.status(500).json({ error: 'Ошибка при запуске бота: ' + error.message }); }
 });
 
 router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
     const botId = parseInt(req.params.id, 10);
-    const result = BotManager.stopBot(botId);
+    const result = botManager.stopBot(botId);
     res.json(result);
 });
 
@@ -185,199 +188,22 @@ router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
         const botId = parseInt(req.params.id, 10);
         const { message } = req.body;
         if (!message) return res.status(400).json({ error: 'Сообщение не может быть пустым' });
-        const result = BotManager.sendMessageToBot(botId, message);
+        const result = botManager.sendMessageToBot(botId, message);
         if (result.success) res.json({ success: true });
         else res.status(404).json(result);
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
-router.get('/:id/export', authorize('bot:export'), async (req, res) => {
+
+router.get('/servers', authorize('bot:list'), async (req, res) => {
     try {
-        const botId = parseInt(req.params.id, 10);
-        const {
-            includeCommands = 'true',
-            includePermissions = 'true',
-            includePluginFiles = 'true'
-        } = req.query;
-
-        const bot = await prisma.bot.findUnique({
-            where: { id: botId },
-            include: { server: true, installedPlugins: true },
-        });
-
-        if (!bot) {
-            return res.status(404).json({ error: 'Бот не найден' });
-        }
-
-        const archive = archiver('zip', { zlib: { level: 9 } });
-        res.setHeader('Content-Disposition', `attachment; filename="bot-${bot.username}-export.zip"`);
-        res.setHeader('Content-Type', 'application/zip');
-        archive.pipe(res);
-
-        const exportMetadata = {
-            version: '1.2-configurable',
-            bot: {
-                username: bot.username,
-                prefix: bot.prefix,
-                note: bot.note,
-                server: { host: bot.server.host, port: bot.server.port, version: bot.server.version },
-                proxy: { host: bot.proxyHost, port: bot.proxyPort },
-            },
-            plugins: bot.installedPlugins.map(p => ({
-                name: p.name,
-                folderName: path.basename(p.path),
-                isEnabled: p.isEnabled,
-                settings: p.settings,
-                sourceUri: p.sourceType === 'GITHUB' ? p.sourceUri : null,
-            })),
-        };
-
-        if (includeCommands === 'true') {
-            exportMetadata.commands = await prisma.command.findMany({ where: { botId } });
-        }
-        if (includePermissions === 'true') {
-            exportMetadata.permissions = await prisma.permission.findMany({ where: { botId } });
-            exportMetadata.groups = await prisma.group.findMany({ where: { botId }, include: { permissions: { select: { permission: { select: { name: true } } } } } });
-            exportMetadata.users = await prisma.user.findMany({ where: { botId }, include: { groups: { select: { group: { select: { name: true } } } } } });
-        }
-
-        archive.append(JSON.stringify(exportMetadata, null, 2), { name: 'bot_export.json' });
-
-        if (includePluginFiles === 'true') {
-            for (const plugin of bot.installedPlugins) {
-                const pluginFolderName = path.basename(plugin.path);
-                try {
-                    await fs.access(plugin.path);
-                    archive.directory(plugin.path, `plugins/${pluginFolderName}`);
-                } catch (error) {
-                    console.warn(`[Export] Директория плагина ${plugin.name} (${plugin.path}) не найдена, пропускаем.`);
-                }
-            }
-        }
-
-        await archive.finalize();
-
+        const servers = await prisma.server.findMany();
+        res.json(servers);
     } catch (error) {
-        console.error("Bot export error:", error);
-        res.status(500).json({ error: 'Не удалось экспортировать бота.' });
+        console.error("[API /api/bots] Ошибка получения списка серверов:", error);
+        res.status(500).json({ error: 'Не удалось получить список серверов' });
     }
 });
-
-router.post('/import', upload.single('file'), authorize('bot:import'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).send('Файл не загружен.');
-    }
-    if (path.extname(req.file.originalname).toLowerCase() !== '.zip') return res.status(400).json({ error: 'Неверный формат файла. Ожидался ZIP-архив.' });
-    
-    const zip = new AdmZip(req.file.buffer);
-    const metadataEntry = zip.getEntry('bot_export.json');
-    if (!metadataEntry) return res.status(400).json({ error: 'Файл bot_export.json не найден в архиве.' });
-
-    const importMetadata = JSON.parse(metadataEntry.getData().toString('utf-8'));
-    const { bot: botData, plugins: pluginsInfo, commands, permissions, groups, users } = importMetadata;
-
-    const existingBot = await prisma.bot.findUnique({ where: { username: botData.username } });
-    if (existingBot) return res.status(409).json({ error: `Бот с именем "${botData.username}" уже существует.` });
-
-    let newBotId;
-    let botStorageDir;
-    try {
-        await prisma.$transaction(async (tx) => {
-            let server = await tx.server.findFirst({ where: { host: botData.server.host, port: botData.server.port } });
-            if (!server) server = await tx.server.create({ data: { name: botData.server.host, host: botData.server.host, port: botData.server.port, version: botData.server.version } });
-            const newBot = await tx.bot.create({ data: { username: botData.username, prefix: botData.prefix, note: botData.note, serverId: server.id, proxyHost: botData.proxy?.host, proxyPort: botData.proxy?.port } });
-            newBotId = newBot.id;
-            
-            if (permissions && groups && users) {
-                const permMap = new Map();
-                for (const perm of permissions) {
-                    const newPerm = await tx.permission.create({ data: { botId: newBotId, name: perm.name, description: perm.description, owner: perm.owner } });
-                    permMap.set(perm.name, newPerm.id);
-                }
-
-                const groupMap = new Map();
-                for (const group of groups) {
-                    const newGroup = await tx.group.create({
-                        data: {
-                            botId: newBotId,
-                            name: group.name,
-                            owner: group.owner,
-                            permissions: { create: group.permissions.map(p => ({ permissionId: permMap.get(p.permission.name) })).filter(p => p.permissionId) }
-                        }
-                    });
-                    groupMap.set(group.name, newGroup.id);
-                }
-
-                for (const user of users) {
-                    await tx.user.create({
-                        data: {
-                            botId: newBotId,
-                            username: user.username,
-                            isBlacklisted: user.isBlacklisted,
-                            groups: { create: user.groups.map(g => ({ groupId: groupMap.get(g.group.name) })).filter(g => g.groupId) }
-                        }
-                    });
-                }
-            } else {
-                await setupDefaultPermissionsForBot(newBotId, tx);
-            }
-
-            if (commands) {
-                for (const cmd of commands) {
-                    const permName = permissions?.find(p => p.id === cmd.permissionId)?.name;
-                    const permId = permName ? (await tx.permission.findUnique({where: {botId_name: {botId: newBotId, name: permName}}}))?.id : null;
-                    
-                    await tx.command.create({
-                        data: {
-                            botId: newBotId,
-                            name: cmd.name,
-                            isEnabled: cmd.isEnabled,
-                            cooldown: cmd.cooldown,
-                            aliases: cmd.aliases,
-                            description: cmd.description,
-                            owner: cmd.owner,
-                            permissionId: permId,
-                            allowedChatTypes: cmd.allowedChatTypes,
-                        }
-                    });
-                }
-            }
-
-            botStorageDir = path.resolve(__dirname, `../../../storage/plugins/bot_${newBotId}`);
-            await fs.mkdir(botStorageDir, { recursive: true });
-            const pluginsDirInZip = zip.getEntry('plugins/');
-
-            if (pluginsDirInZip && pluginsDirInZip.isDirectory) {
-                zip.extractEntryTo('plugins/', botStorageDir, true, true);
-                for (const pInfo of pluginsInfo) {
-                    const targetPath = path.join(botStorageDir, 'plugins', pInfo.folderName);
-                    const packageJson = JSON.parse(await fs.readFile(path.join(targetPath, 'package.json'), 'utf-8'));
-                    await tx.installedPlugin.create({
-                        data: { botId: newBotId, name: pInfo.name, version: packageJson.version, description: packageJson.description, path: targetPath, sourceType: 'IMPORTED', sourceUri: `imported_from_${req.file.originalname}`, manifest: JSON.stringify(packageJson.botpanel || {}), isEnabled: pInfo.isEnabled, settings: pInfo.settings }
-                    });
-                }
-            } else {
-                for (const pInfo of pluginsInfo) {
-                    if (pInfo.sourceUri) {
-                        const newPlugin = await PluginManager.installFromGithub(newBotId, pInfo.sourceUri, tx);
-                        await tx.installedPlugin.update({ where: { id: newPlugin.id }, data: { isEnabled: pInfo.isEnabled, settings: pInfo.settings } });
-                    }
-                }
-            }
-        });
-
-        const finalBot = await prisma.bot.findUnique({ where: { id: newBotId }});
-        res.status(201).json(finalBot);
-
-    } catch (error) {
-        console.error("[API Error] /import POST:", error);
-        if (botStorageDir) {
-            await fs.rm(botStorageDir, { recursive: true, force: true }).catch(() => {});
-        }
-        res.status(500).json({ error: `Не удалось импортировать бота: ${error.message}` });
-    }
-});
-
 
 router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
     try {
@@ -388,29 +214,35 @@ router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
 });
 
 router.post('/:botId/plugins/install/github', authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { repoUrl } = req.body;
     try {
-        const botId = parseInt(req.params.botId);
-        const { repoUrl } = req.body;
-        const newPlugin = await PluginManager.installFromGithub(botId, repoUrl);
+        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), repoUrl);
         res.status(201).json(newPlugin);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
-router.post('/:botId/plugins/register/local', authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/local', authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { path } = req.body;
     try {
-        const botId = parseInt(req.params.botId);
-        const { path } = req.body;
-        const newPlugin = await PluginManager.installFromLocalPath(botId, path);
+        const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
         res.status(201).json(newPlugin);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (req, res) => {
+    const { pluginId } = req.params;
     try {
-        const pluginId = parseInt(req.params.pluginId);
-        await PluginManager.deletePlugin(pluginId);
+        await pluginManager.deletePlugin(parseInt(pluginId));
         res.status(204).send();
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view'), async (req, res) => {
@@ -459,21 +291,50 @@ router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async
     } catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
 });
 
-
 router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {
     try {
-        const botId = parseInt(req.params.botId);
-        
-        const commandTemplates = commandManager.getCommandTemplates();
-        const templatesMap = new Map(commandTemplates.map(t => [t.name, t]));
+        const botId = parseInt(req.params.botId, 10);
+        if (isNaN(botId)) return res.status(400).json({ error: 'Неверный ID бота' });
 
-        let dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 100;
+        const searchQuery = req.query.search || '';
 
-        const dbCommandNames = new Set(dbCommands.map(cmd => cmd.name));
+        const userSkip = (page - 1) * pageSize;
+
+        const whereClause = {
+            botId,
+        };
+
+        if (searchQuery) {
+            whereClause.username = {
+                contains: searchQuery,
+            };
+        }
+
+        const [dbCommands, groups, allPermissions] = await Promise.all([
+            prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] }),
+            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
+            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
+        ]);
+
+        const [users, usersCount] = await Promise.all([
+            prisma.user.findMany({
+                where: whereClause,
+                include: { groups: { include: { group: true } } },
+                orderBy: { username: 'asc' },
+                take: pageSize,
+                skip: userSkip,
+            }),
+            prisma.user.count({ where: whereClause })
+        ]);
+
+        const templatesMap = new Map(commandManager.getCommandTemplates().map(t => [t.name, t]));
+        let dbCommandsFromDb = await prisma.command.findMany({ where: { botId } });
+
         const commandsToCreate = [];
-
-        for (const template of commandTemplates) {
-            if (!dbCommandNames.has(template.name)) {
+        for (const template of templatesMap.values()) {
+            if (!dbCommandsFromDb.some(cmd => cmd.name === template.name)) {
                 let permissionId = null;
                 if (template.permissions) {
                     const permission = await prisma.permission.upsert({
@@ -505,36 +366,39 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 
         if (commandsToCreate.length > 0) {
             await prisma.command.createMany({ data: commandsToCreate });
-            dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+            dbCommandsFromDb = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
         }
 
-        const finalCommands = dbCommands.map(cmd => {
+        const finalCommands = dbCommandsFromDb.map(cmd => {
             const template = templatesMap.get(cmd.name);
+            let args = [];
+
+            if (cmd.isVisual) {
+                try {
+                    args = JSON.parse(cmd.argumentsJson || '[]');
+                } catch (e) {
+                    console.error(`Error parsing argumentsJson for visual command ${cmd.name} (ID: ${cmd.id}):`, e);
+                    args = [];
+                }
+            } else {
+                if (template && template.args && template.args.length > 0) {
+                    args = template.args;
+                } else {
+                    try {
+                        args = JSON.parse(cmd.argumentsJson || '[]');
+                    } catch (e) {
+                        args = [];
+                    }
+                }
+            }
+
             return {
                 ...cmd,
-                args: template ? template.args : [],
+                args: args,
                 aliases: JSON.parse(cmd.aliases || '[]'),
-                allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]')
+                allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]'),
             };
         })
-
-        const page = parseInt(req.query.page) || 1;
-        const pageSize = parseInt(req.query.pageSize) || 100;
-
-        const userSkip = (page - 1) * pageSize;
-
-        const [groups, users, allPermissions, usersCount] = await Promise.all([
-            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
-            prisma.user.findMany({
-                where: { botId },
-                include: { groups: { include: { group: true } } },
-                orderBy: { username: 'asc' },
-                take: pageSize,
-                skip: userSkip,
-            }),
-            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } }),
-            prisma.user.count({ where: { botId } })
-        ]);
 
         res.json({
             groups,
@@ -558,35 +422,28 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 router.put('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
     try {
         const commandId = parseInt(req.params.commandId, 10);
-        const botId = parseInt(req.params.botId, 10);
-        const { isEnabled, cooldown, aliases, permissionId, allowedChatTypes } = req.body;
+        const { name, description, cooldown, aliases, permissionId, allowedChatTypes, isEnabled, argumentsJson, graphJson } = req.body;
 
         const dataToUpdate = {};
-        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        if (typeof cooldown === 'number') dataToUpdate.cooldown = cooldown;
-        if (Array.isArray(aliases)) dataToUpdate.aliases = JSON.stringify(aliases);
-        if (permissionId !== undefined) {
-            dataToUpdate.permissionId = permissionId === null ? null : parseInt(permissionId, 10);
-        }
-        if (Array.isArray(allowedChatTypes)) {
-            dataToUpdate.allowedChatTypes = JSON.stringify(allowedChatTypes);
-        }
-
-        if (Object.keys(dataToUpdate).length === 0) {
-            return res.status(400).json({ error: "Нет данных для обновления" });
-        }
+        if (name !== undefined) dataToUpdate.name = name;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (cooldown !== undefined) dataToUpdate.cooldown = parseInt(cooldown, 10);
+        if (aliases !== undefined) dataToUpdate.aliases = Array.isArray(aliases) ? JSON.stringify(aliases) : aliases;
+        if (permissionId !== undefined) dataToUpdate.permissionId = permissionId ? parseInt(permissionId, 10) : null;
+        if (allowedChatTypes !== undefined) dataToUpdate.allowedChatTypes = Array.isArray(allowedChatTypes) ? JSON.stringify(allowedChatTypes) : allowedChatTypes;
+        if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
+        if (argumentsJson !== undefined) dataToUpdate.argumentsJson = Array.isArray(argumentsJson) ? JSON.stringify(argumentsJson) : argumentsJson;
+        if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
 
         const updatedCommand = await prisma.command.update({
-            where: { id: commandId, botId: botId },
+            where: { id: commandId },
             data: dataToUpdate,
         });
-
-        BotManager.reloadBotConfigInRealTime(botId);
 
         res.json(updatedCommand);
     } catch (error) {
         console.error(`[API Error] /commands/:commandId PUT:`, error);
-        res.status(500).json({ error: 'Не удалось обновить команду' });
+        res.status(500).json({ error: 'Failed to update command' });
     }
 });
 
@@ -605,8 +462,7 @@ router.post('/:botId/groups', authorize('management:edit'), async (req, res) => 
             }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
-
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(201).json(newGroup);
     } catch (error) {
@@ -638,10 +494,10 @@ router.put('/:botId/groups/:groupId', authorize('management:edit'), async (req, 
         });
 
         for (const user of usersInGroup) {
-            BotManager.invalidateUserCache(botId, user.username);
+            botManager.invalidateUserCache(botId, user.username);
         }
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(200).send();
     } catch (error) {
@@ -659,8 +515,7 @@ router.delete('/:botId/groups/:groupId', authorize('management:edit'), async (re
             return res.status(403).json({ error: `Нельзя удалить группу с источником "${group.owner}".` });
         }
         await prisma.group.delete({ where: { id: groupId } });
-        BotManager.reloadBotConfigInRealTime(botId);
-
+        botManager.reloadBotConfigInRealTime(botId);
 
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить группу.' }); }
@@ -675,7 +530,7 @@ router.post('/:botId/permissions', authorize('management:edit'), async (req, res
             data: { name, description, botId, owner: 'admin' }
         });
 
-        BotManager.reloadBotConfigInRealTime(botId);
+        botManager.reloadBotConfigInRealTime(botId);
         
         res.status(201).json(newPermission);
     } catch (error) {
@@ -708,7 +563,7 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
             include: { groups: true }
         });
 
-        BotManager.invalidateUserCache(botId, updatedUser.username);
+        botManager.invalidateUserCache(botId, updatedUser.username);
 
         UserService.clearCache(updatedUser.username, botId);
 
@@ -720,15 +575,14 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
     }
 });
 
-
 router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на запуск всех ботов.');
         const allBots = await prisma.bot.findMany({ include: { server: true } });
         let startedCount = 0;
         for (const botConfig of allBots) {
-            if (!BotManager.bots.has(botConfig.id)) {
-                await BotManager.startBot(botConfig);
+            if (!botManager.bots.has(botConfig.id)) {
+                await botManager.startBot(botConfig);
                 startedCount++;
             }
         }
@@ -742,10 +596,10 @@ router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
 router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
     try {
         console.log('[API] Получен запрос на остановку всех ботов.');
-        const botIds = Array.from(BotManager.bots.keys());
+        const botIds = Array.from(botManager.bots.keys());
         let stoppedCount = 0;
         for (const botId of botIds) {
-            BotManager.stopBot(botId);
+            botManager.stopBot(botId);
             stoppedCount++;
         }
         res.json({ success: true, message: `Остановлено ${stoppedCount} ботов.` });
@@ -754,7 +608,6 @@ router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
         res.status(500).json({ error: 'Произошла ошибка при массовой остановке ботов.' });
     }
 });
-
 
 router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
     try {
@@ -780,6 +633,7 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
                 username: bot.username,
                 prefix: bot.prefix,
                 note: bot.note,
+                owners: bot.owners,
                 serverId: bot.serverId,
                 proxyHost: bot.proxyHost,
                 proxyPort: bot.proxyPort,
@@ -830,6 +684,396 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
         console.error("[API Error] /settings/all GET:", error);
         res.status(500).json({ error: 'Не удалось загрузить все настройки' });
     }
+});
+
+const nodeRegistry = require('../../core/NodeRegistry'); 
+
+router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, res) => {
+    try {
+        const { graphType } = req.query;
+        const nodesByCategory = nodeRegistry.getNodesByCategory(graphType);
+        res.json(nodesByCategory);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/nodes GET:', error);
+        res.status(500).json({ error: 'Failed to get available nodes' });
+    }
+});
+
+router.get('/:botId/visual-editor/node-config', authorize('management:view'), (req, res) => {
+    try {
+        const { types } = req.query;
+        if (!types) {
+            return res.status(400).json({ error: 'Node types must be provided' });
+        }
+        const typeArray = Array.isArray(types) ? types : [types];
+        const config = nodeRegistry.getNodesByTypes(typeArray);
+        res.json(config);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/node-config GET:', error);
+        res.status(500).json({ error: 'Failed to get node configuration' });
+    }
+});
+
+router.get('/:botId/visual-editor/permissions', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const permissions = await prisma.permission.findMany({ 
+            where: { botId },
+            orderBy: { name: 'asc' }
+        });
+        res.json(permissions);
+    } catch (error) {
+        console.error('[API Error] /visual-editor/permissions GET:', error);
+        res.status(500).json({ error: 'Failed to get permissions' });
+    }
+});
+
+router.post('/:botId/commands/visual', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const {
+            name,
+            description,
+            aliases = [],
+            permissionId,
+            cooldown = 0,
+            allowedChatTypes = ['chat', 'private'],
+            argumentsJson = '[]',
+            graphJson = 'null'
+        } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Command name is required' });
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId,
+                name,
+                description,
+                aliases: JSON.stringify(aliases),
+                permissionId: permissionId || null,
+                cooldown,
+                allowedChatTypes: JSON.stringify(allowedChatTypes),
+                isVisual: true,
+                argumentsJson,
+                graphJson
+            }
+        });
+
+        botManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands/visual POST:', error);
+        res.status(500).json({ error: 'Failed to create visual command' });
+    }
+});
+
+router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+        const {
+            name,
+            description,
+            aliases,
+            permissionId,
+            cooldown,
+            allowedChatTypes,
+            argumentsJson,
+            graphJson
+        } = req.body;
+
+        const dataToUpdate = { isVisual: true };
+        
+        if (name) dataToUpdate.name = name;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (Array.isArray(aliases)) dataToUpdate.aliases = JSON.stringify(aliases);
+        if (permissionId !== undefined) dataToUpdate.permissionId = permissionId || null;
+        if (typeof cooldown === 'number') dataToUpdate.cooldown = cooldown;
+        if (Array.isArray(allowedChatTypes)) dataToUpdate.allowedChatTypes = JSON.stringify(allowedChatTypes);
+        if (argumentsJson !== undefined) dataToUpdate.argumentsJson = argumentsJson;
+        if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
+
+        const updatedCommand = await prisma.command.update({
+            where: { id: commandId, botId },
+            data: dataToUpdate
+        });
+
+        botManager.reloadBotConfigInRealTime(botId);
+        res.json(updatedCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands/:commandId/visual PUT:', error);
+        res.status(500).json({ error: 'Failed to update visual command' });
+    }
+});
+
+router.get('/:botId/commands/:commandId/export', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+
+        const command = await prisma.command.findUnique({
+            where: { id: commandId, botId: botId },
+        });
+
+        if (!command) {
+            return res.status(404).json({ error: 'Command not found' });
+        }
+
+        const exportData = {
+            version: '1.0',
+            type: 'command',
+            ...command
+        };
+        
+        delete exportData.id;
+        delete exportData.botId;
+
+        res.json(exportData);
+    } catch (error) {
+        console.error('Failed to export command:', error);
+        res.status(500).json({ error: 'Failed to export command' });
+    }
+});
+
+router.post('/:botId/commands/import', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const importData = req.body;
+
+        if (importData.type !== 'command') {
+            return res.status(400).json({ error: 'Invalid file type. Expected "command".' });
+        }
+
+        let commandName = importData.name;
+        let counter = 1;
+
+        while (await prisma.command.findFirst({ where: { botId, name: commandName } })) {
+            commandName = `${importData.name}_imported_${counter}`;
+            counter++;
+        }
+
+        let finalGraphJson = importData.graphJson;
+
+        if (finalGraphJson && finalGraphJson !== 'null') {
+            const graph = JSON.parse(finalGraphJson);
+            const nodeIdMap = new Map();
+
+            // Рандомизация ID узлов
+            if (graph.nodes) {
+                graph.nodes.forEach(node => {
+                    const oldId = node.id;
+                    const newId = `${node.type}-${randomUUID()}`;
+                    nodeIdMap.set(oldId, newId);
+                    node.id = newId;
+                });
+            }
+
+            // Обновление и рандомизация ID связей
+            if (graph.connections) {
+                graph.connections.forEach(conn => {
+                    conn.id = `edge-${randomUUID()}`;
+                    conn.sourceNodeId = nodeIdMap.get(conn.sourceNodeId) || conn.sourceNodeId;
+                    conn.targetNodeId = nodeIdMap.get(conn.targetNodeId) || conn.targetNodeId;
+                });
+            }
+
+            finalGraphJson = JSON.stringify(graph);
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId: botId,
+                name: commandName,
+                description: importData.description,
+                aliases: importData.aliases,
+                permissionId: null,
+                cooldown: importData.cooldown,
+                allowedChatTypes: importData.allowedChatTypes,
+                isVisual: importData.isVisual,
+                isEnabled: importData.isEnabled,
+                argumentsJson: importData.argumentsJson,
+                graphJson: finalGraphJson,
+                owner: 'visual_editor',
+            }
+        });
+
+        botManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        console.error("Failed to import command:", error);
+        res.status(500).json({ error: 'Failed to import command' });
+    }
+});
+
+router.post('/:botId/commands', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const {
+            name,
+            description,
+            aliases = [],
+            permissionId,
+            cooldown = 0,
+            allowedChatTypes = ['chat', 'private'],
+            isVisual = false,
+            argumentsJson = '[]',
+            graphJson = 'null'
+        } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Command name is required' });
+        }
+
+        const newCommand = await prisma.command.create({
+            data: {
+                botId,
+                name,
+                description,
+                aliases: JSON.stringify(aliases),
+                permissionId: permissionId || null,
+                cooldown,
+                allowedChatTypes: JSON.stringify(allowedChatTypes),
+                isVisual,
+                argumentsJson,
+                graphJson,
+                owner: isVisual ? 'visual_editor' : 'manual',
+            }
+        });
+
+        botManager.reloadBotConfigInRealTime(botId);
+        res.status(201).json(newCommand);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Command with this name already exists' });
+        }
+        console.error('[API Error] /commands POST:', error);
+        res.status(500).json({ error: 'Failed to create command' });
+    }
+});
+
+router.delete('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const commandId = parseInt(req.params.commandId, 10);
+
+        await prisma.command.delete({
+            where: { id: commandId, botId: botId },
+        });
+
+        botManager.reloadBotConfigInRealTime(botId);
+        res.status(204).send();
+    } catch (error) {
+        console.error(`[API Error] /commands/:commandId DELETE:`, error);
+        res.status(500).json({ error: 'Failed to delete command' });
+    }
+});
+
+router.get('/:botId/event-graphs/:graphId', authorize('management:view'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const graphId = parseInt(req.params.graphId, 10);
+
+        const eventGraph = await prisma.eventGraph.findUnique({
+            where: { id: graphId, botId },
+            include: { triggers: true },
+        });
+
+        if (!eventGraph) {
+            return res.status(404).json({ error: 'Граф события не найден' });
+        }
+
+        res.json(eventGraph);
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId GET:`, error);
+        res.status(500).json({ error: 'Не удалось получить граф события' });
+    }
+});
+
+router.post('/:botId/event-graphs', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const { name } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Имя графа обязательно' });
+        }
+
+        const newEventGraph = await prisma.eventGraph.create({
+            data: {
+                botId,
+                name,
+                isEnabled: true,
+                graphJson: 'null',
+            },
+        });
+
+        res.status(201).json(newEventGraph);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Граф событий с таким именем уже существует' });
+        }
+        console.error(`[API Error] /event-graphs POST:`, error);
+        res.status(500).json({ error: 'Не удалось создать граф событий' });
+    }
+});
+
+router.delete('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const graphId = parseInt(req.params.graphId, 10);
+
+        await prisma.eventGraph.delete({
+            where: { id: graphId, botId: botId },
+        });
+
+        res.status(204).send();
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId DELETE:`, error);
+        res.status(500).json({ error: 'Не удалось удалить граф событий' });
+    }
+});
+
+router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
+    const { botId, graphId } = req.params;
+    const { name, isEnabled, graphJson, eventType } = req.body;
+
+    if (!name || !eventType || !graphJson) {
+        return res.status(400).json({ error: 'Поля name, eventType и graphJson обязательны.' });
+    }
+
+    if (typeof isEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Поле isEnabled должно быть true или false.' });
+    }
+
+    try {
+        const updatedGraph = await prisma.eventGraph.update({
+            where: { id: parseInt(graphId), botId: parseInt(botId) },
+            data: {
+                name,
+                isEnabled,
+                graphJson,
+                eventType,
+            }
+        });
+        
+        botManager.eventGraphManager.updateGraph(parseInt(botId), updatedGraph);
+        
+        res.json(updatedGraph);
+    } catch (error) {
+        console.error(`[API Error] /event-graphs/:graphId PUT:`, error);
+        res.status(500).json({ error: 'Ошибка при обновлении графа событий.' });
+    }
+});
+
+router.post('/:botId/visual-editor/save', authorize('management:edit'), async (req, res) => {
 });
 
 module.exports = router;
