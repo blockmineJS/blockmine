@@ -20,14 +20,14 @@ export const createCoreSlice = (set, get) => ({
             return;
         }
 
-        const isDevelopment = process.env.NODE_ENV === 'development';
-        
-        const socketUrl = isDevelopment ? 'http://localhost:3001' : window.location.origin;
+        const socketUrl = window.location.origin;
 
         console.log(`[Socket] Попытка подключения к: ${socketUrl}`);
 
         const newSocket = io(socketUrl, {
             auth: { token },
+            autoConnect: false,
+            reconnection: true,
             transports: ['websocket'], 
         });
         
