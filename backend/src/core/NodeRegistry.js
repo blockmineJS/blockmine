@@ -40,7 +40,7 @@ class NodeRegistry {
     }
 
     this.nodes.set(nodeConfig.type, nodeConfig);
-    console.log(`Registered node type: ${nodeConfig.type}`);
+    //console.log(`Registered node type: ${nodeConfig.type}`);
   }
 
   /**

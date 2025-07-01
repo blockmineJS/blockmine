@@ -40,7 +40,7 @@ class CommandManager {
 
                     if (config.name) {
                         this.commandTemplates.set(config.name, config);
-                        console.log(`[CommandManager] Шаблон для команды "${config.name}" успешно загружен.`);
+                       // console.log(`[CommandManager] Шаблон для команды "${config.name}" успешно загружен.`);
                     }
                 }
             }
