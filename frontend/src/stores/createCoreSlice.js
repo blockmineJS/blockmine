@@ -74,17 +74,15 @@ export const createCoreSlice = (set, get) => ({
     appendLog: (botId, log) => {
         set(state => {
             const currentLogs = state.botLogs[botId] || [];
-            // Убедимся, что лог - это объект с ID для избежания дублирования
             const newLog = typeof log === 'object' && log !== null ? log : { id: Date.now() + Math.random(), content: log };
             const newLogs = [...currentLogs, newLog];
 
-            // Оптимизация: проверяем дубликаты по ID, если они есть
             const uniqueLogs = Array.from(new Map(newLogs.map(item => [item.id, item])).values());
 
             return {
                 botLogs: {
                     ...state.botLogs,
-                    [botId]: uniqueLogs.slice(-500) // Храним последние 500 логов
+                    [botId]: uniqueLogs.slice(-500)
                 }
             };
         });

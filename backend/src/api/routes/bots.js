@@ -293,18 +293,48 @@ router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async
 
 router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {
     try {
-        const botId = parseInt(req.params.botId);
-        
-        const commandTemplates = commandManager.getCommandTemplates();
-        const templatesMap = new Map(commandTemplates.map(t => [t.name, t]));
+        const botId = parseInt(req.params.botId, 10);
+        if (isNaN(botId)) return res.status(400).json({ error: 'Неверный ID бота' });
 
-        let dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 100;
+        const searchQuery = req.query.search || '';
 
-        const dbCommandNames = new Set(dbCommands.map(cmd => cmd.name));
+        const userSkip = (page - 1) * pageSize;
+
+        const whereClause = {
+            botId,
+        };
+
+        if (searchQuery) {
+            whereClause.username = {
+                contains: searchQuery,
+            };
+        }
+
+        const [dbCommands, groups, allPermissions] = await Promise.all([
+            prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] }),
+            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
+            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
+        ]);
+
+        const [users, usersCount] = await Promise.all([
+            prisma.user.findMany({
+                where: whereClause,
+                include: { groups: { include: { group: true } } },
+                orderBy: { username: 'asc' },
+                take: pageSize,
+                skip: userSkip,
+            }),
+            prisma.user.count({ where: whereClause })
+        ]);
+
+        const templatesMap = new Map(commandManager.getCommandTemplates().map(t => [t.name, t]));
+        let dbCommandsFromDb = await prisma.command.findMany({ where: { botId } });
+
         const commandsToCreate = [];
-
-        for (const template of commandTemplates) {
-            if (!dbCommandNames.has(template.name)) {
+        for (const template of templatesMap.values()) {
+            if (!dbCommandsFromDb.some(cmd => cmd.name === template.name)) {
                 let permissionId = null;
                 if (template.permissions) {
                     const permission = await prisma.permission.upsert({
@@ -336,10 +366,10 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 
         if (commandsToCreate.length > 0) {
             await prisma.command.createMany({ data: commandsToCreate });
-            dbCommands = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+            dbCommandsFromDb = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
         }
 
-        const finalCommands = dbCommands.map(cmd => {
+        const finalCommands = dbCommandsFromDb.map(cmd => {
             const template = templatesMap.get(cmd.name);
             let args = [];
 
@@ -351,7 +381,15 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
                     args = [];
                 }
             } else {
-                args = template ? template.args : [];
+                if (template && template.args && template.args.length > 0) {
+                    args = template.args;
+                } else {
+                    try {
+                        args = JSON.parse(cmd.argumentsJson || '[]');
+                    } catch (e) {
+                        args = [];
+                    }
+                }
             }
 
             return {
@@ -361,24 +399,6 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
                 allowedChatTypes: JSON.parse(cmd.allowedChatTypes || '[]'),
             };
         })
-
-        const page = parseInt(req.query.page) || 1;
-        const pageSize = parseInt(req.query.pageSize) || 100;
-
-        const userSkip = (page - 1) * pageSize;
-
-        const [groups, users, allPermissions, usersCount] = await Promise.all([
-            prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
-            prisma.user.findMany({
-                where: { botId },
-                include: { groups: { include: { group: true } } },
-                orderBy: { username: 'asc' },
-                take: pageSize,
-                skip: userSkip,
-            }),
-            prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } }),
-            prisma.user.count({ where: { botId } })
-        ]);
 
         res.json({
             groups,
@@ -835,7 +855,6 @@ router.post('/:botId/commands/import', authorize('management:edit'), async (req,
         let commandName = importData.name;
         let counter = 1;
 
-        // Check for name conflicts and append a suffix if needed
         while (await prisma.command.findFirst({ where: { botId, name: commandName } })) {
             commandName = `${importData.name}_imported_${counter}`;
             counter++;
@@ -875,7 +894,7 @@ router.post('/:botId/commands/import', authorize('management:edit'), async (req,
                 name: commandName,
                 description: importData.description,
                 aliases: importData.aliases,
-                permissionId: null, // Permissions are not imported directly for security
+                permissionId: null,
                 cooldown: importData.cooldown,
                 allowedChatTypes: importData.allowedChatTypes,
                 isVisual: importData.isVisual,

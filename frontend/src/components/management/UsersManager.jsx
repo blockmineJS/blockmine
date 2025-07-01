@@ -91,8 +91,8 @@ export default function UsersManager({
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>Пользователи</CardTitle>
-                        <CardDescription>Список всех пользователей, которые взаимодействовали с ботом.</CardDescription>
+                <CardTitle>Пользователи</CardTitle>
+                <CardDescription>Список всех пользователей, которые взаимодействовали с ботом.</CardDescription>
                     </div>
                     <div className="relative w-full max-w-sm">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
