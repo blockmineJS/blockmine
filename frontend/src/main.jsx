@@ -19,6 +19,7 @@ import ManagementPage from "./pages/ManagementPage";
 import VisualEditorPage from "./pages/Bot/VisualEditorPage";
 import EventGraphsPage from "./pages/Bot/EventGraphsPage";
 import PluginDetailPage from "./pages/PluginDetailPage";
+import PluginIdePage from "./pages/Bot/PluginIdePage";
 import ServersPage from "./pages/ServersPage";
 import TasksPage from "./pages/TasksPage";
 import AdminPage from "./pages/AdminPage";
@@ -54,12 +55,12 @@ function ProtectedLayout() {
     const fetchTasks = useAppStore(state => state.fetchTasks);
 
     useEffect(() => {
-        if (isAuthenticated) {
-            connectSocket();
-            fetchInitialData();
-            fetchTasks();
-        }
-    }, [isAuthenticated]);
+      if (isAuthenticated) {
+          connectSocket();
+          fetchInitialData();
+          fetchTasks();
+      }
+  }, [isAuthenticated]);
 
     if (needsSetup) {
         return <Navigate to="/setup" replace />;
@@ -101,6 +102,7 @@ const router = createBrowserRouter([
                   { path: "console", element: <ConsoleTab /> },
                   { path: "plugins", element: <PluginsTab /> },
                   { path: "plugins/view/:pluginName", element: <PluginDetailPage /> },
+                  { path: "plugins/edit/:pluginName", element: <ProtectedRoute requiredPermission="plugin:develop"><PluginIdePage /></ProtectedRoute> },
                   { path: "settings", element: <ConfigurationPage /> },
                   { path: "management", element: <ProtectedRoute requiredPermission="management:view"><ManagementPage /></ProtectedRoute> },
                   { path: "commands/visual/:commandId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },

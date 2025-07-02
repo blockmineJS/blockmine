@@ -47,7 +47,6 @@ export const createAuthSlice = (set, get) => ({
         });
         localStorage.setItem('authToken', data.token);
         set({ token: data.token, user: data.user, isAuthenticated: true });
-        get().connectSocket(); 
     },
 
     setupAdmin: async (username, password) => {
@@ -63,7 +62,6 @@ export const createAuthSlice = (set, get) => ({
             isAuthenticated: true,
             needsSetup: false
         });
-        get().connectSocket();
     },
     
     logout: () => {
