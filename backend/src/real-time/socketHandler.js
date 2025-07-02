@@ -15,7 +15,6 @@ function initializeSocket(httpServer) {
     }
 
     io = new Server(httpServer, {
-        path: "/socket.io/",
         cors: corsOptions
     });
 
