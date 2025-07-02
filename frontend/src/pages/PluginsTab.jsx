@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2 } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
 import { useAppStore } from '@/stores/appStore';
+import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
 
 export default function PluginsTab() {
     const { botId } = useParams();
@@ -29,12 +30,17 @@ export default function PluginsTab() {
     const updatePlugin = useAppStore(state => state.updatePlugin);
     const installPluginFromPath = useAppStore(state => state.installPluginFromPath);
     const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
+    const forkPlugin = useAppStore(state => state.forkPlugin);
+    const createIdePlugin = useAppStore(state => state.createIdePlugin);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
     const [isUpdating, setIsUpdating] = useState(null);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isForking, setIsForking] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -52,6 +58,28 @@ export default function PluginsTab() {
         setIsCheckingUpdates(true);
         await checkForUpdates(intBotId);
         setIsCheckingUpdates(false);
+    };
+    
+    const handleCreatePlugin = async ({ name, template }) => {
+        try {
+            const newPlugin = await createIdePlugin(intBotId, { name, template });
+            if (newPlugin) {
+                navigate(`/bots/${intBotId}/plugins/edit/${newPlugin.name}`);
+            }
+        } catch (error) {
+        }
+    };
+    
+    const handleForkPlugin = async (plugin) => {
+        setIsForking(true);
+        try {
+            const forkedPlugin = await forkPlugin(intBotId, plugin.name);
+            if (forkedPlugin) {
+                navigate(`/bots/${intBotId}/plugins/edit/${forkedPlugin.name}`);
+            }
+        } finally {
+            setIsForking(false);
+        }
     };
     
     const handleUpdatePlugin = async (pluginId) => {
@@ -99,6 +127,10 @@ export default function PluginsTab() {
                         </DialogTrigger>
                         <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                     </Dialog>
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
+                        <Code2 className="mr-2 h-4 w-4" />
+                        Создать плагин
+                    </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     <InstalledPluginsView 
@@ -111,6 +143,7 @@ export default function PluginsTab() {
                         onDeletePlugin={(plugin) => deletePlugin(intBotId, plugin.id, plugin.name)}
                         onUpdatePlugin={handleUpdatePlugin}
                         onSaveSettings={handlePluginOperationSuccess}
+                        onForkPlugin={handleForkPlugin}
                     />
                 </div>
             </TabsContent>
@@ -122,6 +155,12 @@ export default function PluginsTab() {
                     onInstallSuccess={handlePluginOperationSuccess}
                 />
             </TabsContent>
+
+            <CreatePluginDialog 
+                open={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+                onCreate={handleCreatePlugin}
+            />
         </Tabs>
     );
 }
