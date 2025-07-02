@@ -148,4 +148,37 @@ export const createPluginSlice = (set, get) => ({
          await get().fetchInstalledPlugins(botId);
          await get().checkForUpdates(botId);
     },
+
+    forkPlugin: async (botId, pluginName) => {
+        try {
+            const forkedPlugin = await apiHelper(
+                `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
+                { method: 'POST' },
+                `Плагин "${pluginName}" успешно скопирован.`
+            );
+            await get().fetchInstalledPlugins(botId);
+            return forkedPlugin;
+        } catch (error) {
+            console.error(`Ошибка при создании копии плагина ${pluginName}:`, error);
+            throw error;
+        }
+    },
+
+    createIdePlugin: async (botId, { name, template }) => {
+        try {
+            const newPlugin = await apiHelper(
+                `/api/bots/${botId}/plugins/ide/create`,
+                { 
+                    method: 'POST',
+                    body: JSON.stringify({ name, template })
+                },
+                `Плагин "${name}" успешно создан.`
+            );
+            await get().fetchInstalledPlugins(botId);
+            return newPlugin;
+        } catch (error) {
+            console.error(`Ошибка при создании плагина ${name}:`, error);
+            throw error;
+        }
+    },
 });

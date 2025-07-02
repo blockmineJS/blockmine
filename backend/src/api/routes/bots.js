@@ -10,6 +10,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
 const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
+const pluginIdeRouter = require('./pluginIde');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -22,6 +23,7 @@ const router = express.Router();
 
 router.use(authenticate);
 router.use('/:botId/event-graphs', eventGraphsRouter);
+router.use('/:botId/plugins/ide', pluginIdeRouter);
 
 async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     const initialData = {

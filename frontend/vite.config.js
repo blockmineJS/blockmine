@@ -1,4 +1,3 @@
-
 import path from "path"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
@@ -19,10 +18,6 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-      },
-      '/socket.io': {
-        target: 'ws://localhost:3001',
-        ws: true,
       },
     },
   },
