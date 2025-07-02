@@ -1,4 +1,3 @@
-
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -49,12 +48,16 @@ router.post('/setup', async (req, res) => {
         let newUser; 
 
         await prisma.$transaction(async (tx) => {
+            const adminPermissions = ALL_PERMISSIONS
+                .map(p => p.id)
+                .filter(id => id !== '*' && id !== 'plugin:develop');
+                
             const adminRole = await tx.panelRole.upsert({
                 where: { name: 'Admin' },
                 update: {},
                 create: {
                     name: 'Admin',
-                    permissions: JSON.stringify(['*'])
+                    permissions: JSON.stringify(adminPermissions)
                 },
             });
 
@@ -265,6 +268,7 @@ const ALL_PERMISSIONS = [
     { id: 'plugin:settings:view', label: 'Просмотр настроек плагинов' },
     { id: 'plugin:settings:edit', label: 'Редактирование настроек плагинов' },
     { id: 'plugin:browse', label: 'Просмотр каталога плагинов' },
+    { id: 'plugin:develop', label: 'Разработка и редактирование плагинов (IDE)' },
     { id: 'server:list', label: 'Просмотр серверов' },
     { id: 'server:create', label: 'Создание серверов' },
     { id: 'server:delete', label: 'Удаление серверов' },
@@ -442,4 +446,7 @@ router.delete('/roles/:id', authenticate, authorize('panel:role:delete'), async 
     }
 });
 
-module.exports = router;
+module.exports = {
+    router,
+    ALL_PERMISSIONS,
+};

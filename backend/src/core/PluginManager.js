@@ -209,10 +209,14 @@ class PluginManager {
              throw new Error('Ошибка при удалении данных плагина из БД. Файлы не были удалены.');
         }
 
-        if (plugin.sourceType === 'GITHUB' || plugin.sourceType === 'IMPORTED') {
+        if (plugin.path && plugin.path.startsWith(PLUGINS_BASE_DIR)) {
             try {
-                await fse.remove(plugin.path);
-                console.log(`[PluginManager] Папка плагина ${plugin.path} успешно удалена.`);
+                if (await fse.pathExists(plugin.path)) {
+                    await fse.remove(plugin.path);
+                    console.log(`[PluginManager] Папка плагина ${plugin.path} успешно удалена.`);
+                } else {
+                    console.log(`[PluginManager] Папка плагина ${plugin.path} не найдена, удаление не требуется.`);
+                }
             } catch (fileError) {
                 console.error(`Не удалось удалить папку плагина ${plugin.path}:`, fileError);
             }

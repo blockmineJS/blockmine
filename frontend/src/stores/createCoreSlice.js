@@ -1,3 +1,4 @@
+
 import { io } from 'socket.io-client';
 import { apiHelper } from '@/lib/api';
 
@@ -27,11 +28,12 @@ export const createCoreSlice = (set, get) => ({
             return;
         }
 
-        const socketUrl = window.location.origin;
+        const socketUrl = 'http://localhost:3001';
 
         console.log(`[Socket] Попытка подключения к: ${socketUrl}`);
 
         const newSocket = io(socketUrl, {
+            path: "/socket.io/",
             auth: { token },
             reconnection: true,
             transports: ['websocket'], 
@@ -92,4 +94,5 @@ export const createCoreSlice = (set, get) => ({
             state.botLogs[botId] = uniqueLogs.slice(-500);
         });
     },
+
 });

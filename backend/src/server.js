@@ -3,24 +3,22 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { PrismaClient } = require('@prisma/client');
 
-const config = require('./config'); 
+const config = require('./config');
 const { initializeSocket } = require('./real-time/socketHandler');
 const { botManager, pluginManager } = require('./core/services');
-
 
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
 const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
-const authRoutes = require('./api/routes/auth');
+const { router: authRoutes, ALL_PERMISSIONS } = require('./api/routes/auth');
 const searchRoutes = require('./api/routes/search');
 const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
-
-
 
 const app = express();
 const server = http.createServer(app);
@@ -76,7 +74,48 @@ app.get(/^(?!\/api).*/, (req, res) => {
     }
 });
 
+async function runStartupMigrations() {
+    const prisma = new PrismaClient();
+    try {
+        // 1. Migrate legacy '*' permission for Admin role
+        const adminRole = await prisma.panelRole.findUnique({ where: { name: 'Admin' } });
+        if (adminRole) {
+            const permissions = JSON.parse(adminRole.permissions);
+            if (permissions.includes('*')) {
+                const newPermissions = ALL_PERMISSIONS
+                    .map(p => p.id)
+                    .filter(id => id !== '*' && id !== 'plugin:develop');
+                
+                await prisma.panelRole.update({
+                    where: { id: adminRole.id },
+                    data: { permissions: JSON.stringify(newPermissions) }
+                });
+            }
+        }
+
+        // 2. Ensure root user (ID 1) has all permissions
+        const rootUser = await prisma.panelUser.findUnique({ where: { id: 1 }, include: { role: true } });
+        if (rootUser && rootUser.role) {
+            const allPermissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
+            const currentPermissions = JSON.parse(rootUser.role.permissions);
+
+            if (JSON.stringify(allPermissions.sort()) !== JSON.stringify(currentPermissions.sort())) {
+                 await prisma.panelRole.update({
+                    where: { id: rootUser.role.id },
+                    data: { permissions: JSON.stringify(allPermissions) }
+                });
+                console.log(`[Migration] Права для root-пользователя "${rootUser.username}" (ID: 1) были синхронизированы.`);
+            }
+        }
+    } catch (error) {
+        console.error('[Migration] Ошибка во время миграции прав:', error);
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
 async function startServer() {
+    await runStartupMigrations();
     return new Promise((resolve) => {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);

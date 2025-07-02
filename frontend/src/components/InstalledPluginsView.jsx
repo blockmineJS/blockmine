@@ -1,16 +1,20 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles } from 'lucide-react';
+import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy } from 'lucide-react';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 
-function InstalledPluginCard({ plugin, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings }) {
+function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork }) {
+    const navigate = useNavigate();
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
     const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
+    const isEditable = plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE';
+    const isForkable = plugin.sourceType === 'GITHUB';
 
     const isNew = useMemo(() => {
         if (!plugin.createdAt) return false;
@@ -58,6 +62,26 @@ function InstalledPluginCard({ plugin, updateInfo, onToggle, onDelete, onUpdate,
             </div>
 
             <div className="flex items-center gap-2 shrink-0 ml-4">
+                {isEditable && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
+                                <Code className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Редактировать код</p></TooltipContent>
+                    </Tooltip>
+                )}
+                {isForkable && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => onFork(plugin)}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Создать локальную копию для редактирования</p></TooltipContent>
+                    </Tooltip>
+                )}
                 {hasSettings && (
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -95,7 +119,8 @@ export default function InstalledPluginsView({
     onTogglePlugin, 
     onDeletePlugin, 
     onUpdatePlugin, 
-    onSaveSettings 
+    onSaveSettings,
+    onForkPlugin
 }) {
     const [selectedPlugin, setSelectedPlugin] = useState(null);
     const [filter, setFilter] = useState('all');
@@ -142,11 +167,13 @@ export default function InstalledPluginsView({
                             <InstalledPluginCard
                                 key={p.id}
                                 plugin={p}
+                                botId={bot.id}
                                 updateInfo={updates[p.sourceUri]}
                                 onToggle={onTogglePlugin}
                                 onDelete={() => setPluginToDelete(p)}
                                 onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
                                 onOpenSettings={setSelectedPlugin}
+                                onFork={onForkPlugin}
                             />
                         ))
                     ) : (
