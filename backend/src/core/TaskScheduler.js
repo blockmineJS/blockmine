@@ -1,8 +1,6 @@
 const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const BotManager = require('./BotManager');
-
-const prisma = new PrismaClient();
 
 class TaskScheduler {
     constructor() {
@@ -111,6 +109,13 @@ class TaskScheduler {
         if (updatedTask.isEnabled) {
             this.scheduleTask(updatedTask);
         }
+    }
+
+    shutdown() {
+        console.log('[TaskScheduler] Остановка всех запланированных задач...');
+        this.scheduledJobs.forEach(job => job.stop());
+        this.scheduledJobs.clear();
+        console.log('[TaskScheduler] Все задачи остановлены.');
     }
 }
 

@@ -9,17 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 const pinColors = {
   Exec: '#ffffff',
-  Boolean: '#dc2626', // red-600
-  String: '#db2777', // pink-600
-  Number: '#2563eb', // blue-600
-  User: '#f59e0b', // amber-500
-  Array: '#3b82f6', // blue-500
-  Wildcard: '#6b7280', // gray-500
-  Object: '#9333ea', // purple-600
+  Boolean: '#dc2626',
+  String: '#db2777',
+  Number: '#2563eb',
+  User: '#f59e0b',
+  Array: '#3b82f6',
+  Wildcard: '#6b7280',
+  Object: '#9333ea',
 };
 
 function CustomNode({ data, type, id: nodeId }) {
-  // Получаем полную конфигурацию этой ноды из нашего store
   const availableNodes = useVisualEditorStore(state => state.availableNodes);
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
   const edges = useVisualEditorStore(state => state.edges);
@@ -67,7 +66,7 @@ function CustomNode({ data, type, id: nodeId }) {
             });
         }
     } else if (type === 'logic:operation' && data.operation !== 'NOT') {
-        baseInputs = []; // Очищаем базовые, чтобы создать динамически
+        baseInputs = [];
         const pinCount = data.pinCount || 2;
         for (let i = 0; i < pinCount; i++) {
             baseInputs.push({
@@ -79,13 +78,11 @@ function CustomNode({ data, type, id: nodeId }) {
     } else if (type === 'logic:operation' && data.operation === 'NOT') {
         baseInputs = baseInputs.filter(p => p.id === 'a');
     } else if (type === 'flow:branch' && data.advanced) {
-      // В расширенном режиме удаляем "condition", если он есть
       const conditionIndex = baseInputs.findIndex(p => p.id === 'condition');
       if (conditionIndex !== -1) {
         baseInputs.splice(conditionIndex, 1);
       }
 
-      // Добавляем динамические пины
       for (let i = 0; i < (data.pinCount || 0); i++) {
         baseInputs.push({
           id: `pin_${i}`,
@@ -94,7 +91,6 @@ function CustomNode({ data, type, id: nodeId }) {
         });
       }
     } else if (type === 'flow:branch' && !data.advanced) {
-        // В простом режиме, убедимся что condition на месте, а динамических пинов нет
         if (!baseInputs.find(p => p.id === 'condition')) {
             baseInputs.push({ id: 'condition', name: 'Condition', type: 'Boolean', required: true });
         }
@@ -233,22 +229,22 @@ function CustomNode({ data, type, id: nodeId }) {
                       onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
                     />
                   )}
-                  {!hasConnection && pin.id === 'persist' && editorType === 'event' && (
-                    <Select value={data[pin.id] || 'false'} onValueChange={(value) => updateNodeData(nodeId, { [pin.id]: value })}>
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">True</SelectItem>
-                        <SelectItem value="false">False</SelectItem>
-                      </SelectContent>
+                  {!hasConnection && pin.type === 'Boolean' && (
+                    <Select value={String(data[pin.id] === undefined ? false : data[pin.id])} onValueChange={(value) => updateNodeData(nodeId, { [pin.id]: value === 'true' })}>
+                        <SelectTrigger className="w-[100px] bg-slate-900 border-slate-500">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="true">True</SelectItem>
+                            <SelectItem value="false">False</SelectItem>
+                        </SelectContent>
                     </Select>
                   )}
                 </div>
               );
             })}
             {type === 'data:string_literal' && (
-              <div className="p-2">
+              <div className="p-2 w-full">
                 <AutosizeInput
                   className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden w-full"
                   value={data.value || ''}

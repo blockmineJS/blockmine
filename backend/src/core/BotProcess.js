@@ -160,6 +160,7 @@ process.on('message', async (message) => {
                 version: config.server.version,
                 auth: 'offline',
                 hideErrors: false,
+                chat: 'enabled',
             };
 
             if (config.proxyHost && config.proxyPort) {
@@ -482,6 +483,10 @@ process.on('message', async (message) => {
                     process.send({ type: 'bot_ready' });
                     process.send({ type: 'status', status: 'running' });
                 }
+            });
+
+            bot.on('death', () => {
+                sendEvent('botDied', { user: { username: bot.username } });
             });
 
             bot.on('kicked', (reason) => {

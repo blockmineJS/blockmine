@@ -536,18 +536,27 @@ class GraphExecutionEngine {
           }
 
           case 'string:contains': {
-              const haystack = String(await this.resolvePinValue(node, 'haystack', ''));
-              const needle = String(await this.resolvePinValue(node, 'needle', ''));
-              const caseSensitive = await this.resolvePinValue(node, 'case_sensitive', true);
-              result = caseSensitive ? haystack.includes(needle) : haystack.toLowerCase().includes(needle.toLowerCase());
+              if (pinId === 'result') {
+                  const haystack = String(await this.resolvePinValue(node, 'haystack', ''));
+                  const needle = String(await this.resolvePinValue(node, 'needle', ''));
+                  const caseSensitive = await this.resolvePinValue(node, 'case_sensitive', false);
+
+                  if (caseSensitive) {
+                      return haystack.includes(needle);
+                  } else {
+                      return haystack.toLowerCase().includes(needle.toLowerCase());
+                  }
+              }
               break;
           }
           case 'string:matches': {
-              const str = String(await this.resolvePinValue(node, 'input', ''));
-              const regexStr = String(await this.resolvePinValue(node, 'regex', ''));
-              try {
-                  result = new RegExp(regexStr).test(str);
-              } catch (e) { result = false; }
+              if (pinId === 'result') {
+                  const str = String(await this.resolvePinValue(node, 'string', ''));
+                  const regexStr = String(await this.resolvePinValue(node, 'regex', ''));
+                  try {
+                      result = new RegExp(regexStr).test(str);
+                  } catch (e) { result = false; }
+              }
               break;
           }
           case 'data:string_literal':
