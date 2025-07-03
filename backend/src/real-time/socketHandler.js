@@ -5,17 +5,14 @@ let io;
 
 function initializeSocket(httpServer) {
     const corsOptions = {
-        methods: ["GET", "POST"]
+        origin: true,
+        methods: ["GET", "POST"],
+        credentials: true
     };
 
-    if (config.server.allowExternalAccess) {
-        corsOptions.origin = "*";
-    } else {
-        corsOptions.origin = "http://localhost:5173";
-    }
-
     io = new Server(httpServer, {
-        cors: corsOptions
+        cors: corsOptions,
+        transports: ['websocket', 'polling']
     });
 
     io.on('connection', (socket) => {
@@ -25,7 +22,7 @@ function initializeSocket(httpServer) {
         });
     });
     
-    console.log('Socket.IO инициализирован с CORS для:', corsOptions.origin);
+    console.log('Socket.IO инициализирован с динамическим CORS.');
     return io;
 }
 
