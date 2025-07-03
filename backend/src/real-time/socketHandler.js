@@ -16,13 +16,14 @@ function initializeSocket(httpServer) {
     });
 
     io.on('connection', (socket) => {
-        console.log('Socket.IO: Пользователь подключен -', socket.id);
+        // console.log(`[Socket.IO] Пользователь подключен: ${socket.id}. Всего клиентов: ${io.engine.clientsCount}`);
+        
         socket.on('disconnect', () => {
-            console.log('Socket.IO: Пользователь отключен -', socket.id);
+            // console.log(`[Socket.IO] Пользователь отключен: ${socket.id}. Всего клиентов: ${io.engine.clientsCount}`);
         });
     });
     
-    console.log('Socket.IO инициализирован с динамическим CORS.');
+    // console.log('Socket.IO инициализирован с динамическим CORS.');
     return io;
 }
 
