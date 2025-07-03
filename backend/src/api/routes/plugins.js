@@ -7,12 +7,10 @@ const { pluginManager } = require('../../core/services');
 const prisma = new PrismaClient();
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
 
-router.use(authenticate);
-
 const getCacheBustedUrl = (url) => `${url}?t=${new Date().getTime()}`;
 
 
-router.get('/catalog', authorize('plugin:browse'), async (req, res) => {
+router.get('/catalog', async (req, res) => {
     try {
         const response = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
         
@@ -29,7 +27,7 @@ router.get('/catalog', authorize('plugin:browse'), async (req, res) => {
     }
 });
 
-router.post('/check-updates/:botId', authorize('plugin:update'), async (req, res) => {
+router.post('/check-updates/:botId', authenticate, authorize('plugin:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         
@@ -45,7 +43,7 @@ router.post('/check-updates/:botId', authorize('plugin:update'), async (req, res
     }
 });
 
-router.post('/update/:pluginId', authorize('plugin:update'), async (req, res) => {
+router.post('/update/:pluginId', authenticate, authorize('plugin:update'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const updatedPlugin = await pluginManager.updatePlugin(pluginId);
@@ -55,7 +53,7 @@ router.post('/update/:pluginId', authorize('plugin:update'), async (req, res) =>
     }
 });
 
-router.get('/catalog/:name', authorize('plugin:browse'), async (req, res) => {
+router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;
         
