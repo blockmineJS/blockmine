@@ -149,6 +149,9 @@ class EventGraphManager {
             case 'playerLeft':
                 context.user = args.user;
                 break;
+            case 'botDied':
+                context.user = args.user;
+                break;
             case 'tick':
                 break;
             case 'entitySpawn':

@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./lib/prisma');
 
 const config = require('./config');
 const { initializeSocket } = require('./real-time/socketHandler');
@@ -75,9 +75,7 @@ app.get(/^(?!\/api).*/, (req, res) => {
 });
 
 async function runStartupMigrations() {
-    const prisma = new PrismaClient();
     try {
-        // 1. Migrate legacy '*' permission for Admin role
         const adminRole = await prisma.panelRole.findUnique({ where: { name: 'Admin' } });
         if (adminRole) {
             const permissions = JSON.parse(adminRole.permissions);
@@ -93,7 +91,6 @@ async function runStartupMigrations() {
             }
         }
 
-        // 2. Ensure root user (ID 1) has all permissions
         const rootUser = await prisma.panelUser.findUnique({ where: { id: 1 }, include: { role: true } });
         if (rootUser && rootUser.role) {
             const allPermissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
@@ -109,8 +106,6 @@ async function runStartupMigrations() {
         }
     } catch (error) {
         console.error('[Migration] Ошибка во время миграции прав:', error);
-    } finally {
-        await prisma.$disconnect();
     }
 }
 
@@ -145,26 +140,35 @@ async function startServer() {
     });
 }
 
-const gracefulShutdown = (signal) => {
-    console.log(`[Shutdown] Получен сигнал ${signal}. Начинаем завершение...`);
-    
+
+const gracefulShutdown = async (signal) => {
+    console.log(`[Shutdown] Получен сигнал ${signal}. Начинаем корректное завершение...`);
+
+    TaskScheduler.shutdown();
+
     const botIds = Array.from(botManager.bots.keys());
     if (botIds.length > 0) {
         console.log(`[Shutdown] Остановка ${botIds.length} активных ботов...`);
-        for (const botId of botIds) {
-            botManager.stopBot(botId);
-        }
+        await Promise.all(botIds.map(botId => botManager.stopBot(botId)));
+        console.log('[Shutdown] Все боты остановлены.');
     }
 
-    server.close(() => {
-        console.log('[Shutdown] HTTP сервер закрыт. Завершение процесса.');
-        process.exit(0);
-    });
+    const io = require('./real-time/socketHandler').getIO();
+    if (io) {
+        io.close(async () => {
+            console.log('[Shutdown] WebSocket сервер закрыт.');
+            
+            await new Promise(resolve => server.close(resolve));
+            console.log('[Shutdown] HTTP сервер закрыт.');
 
-    setTimeout(() => {
-        console.error('[Shutdown] Не удалось закрыть соединения вовремя, принудительное завершение.');
-        process.exit(1);
-    }, 5000);
+            const prisma = require('./lib/prisma');
+            await prisma.$disconnect();
+            console.log('[Shutdown] Соединение с БД закрыто.');
+
+            console.log('[Shutdown] Корректное завершение выполнено.');
+            process.exit(0);
+        });
+    }
 };
 
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2 (nodemon)'));

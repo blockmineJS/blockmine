@@ -1,5 +1,5 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const path = require('path');
 const fs = require('fs/promises');
 const { botManager, pluginManager } = require('../../core/services');
@@ -16,7 +16,6 @@ const multer = require('multer');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 
-const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
@@ -878,7 +877,6 @@ router.post('/:botId/commands/import', authorize('management:edit'), async (req,
             const graph = JSON.parse(finalGraphJson);
             const nodeIdMap = new Map();
 
-            // Рандомизация ID узлов
             if (graph.nodes) {
                 graph.nodes.forEach(node => {
                     const oldId = node.id;
@@ -888,7 +886,6 @@ router.post('/:botId/commands/import', authorize('management:edit'), async (req,
                 });
             }
 
-            // Обновление и рандомизация ID связей
             if (graph.connections) {
                 graph.connections.forEach(conn => {
                     conn.id = `edge-${randomUUID()}`;

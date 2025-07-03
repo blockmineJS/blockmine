@@ -876,6 +876,20 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'event:botDied',
+      label: '💀 Бот умер',
+      category: 'События',
+      description: 'Срабатывает, когда бот умирает.',
+      graphType: event,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec' },
+        ]
+      }
+    });
+
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
   }
 

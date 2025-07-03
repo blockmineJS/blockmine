@@ -1,7 +1,7 @@
 const { fork } = require('child_process');
 const path = require('path');
 const { getIO } = require('../real-time/socketHandler');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const pidusage = require('pidusage');
 const DependencyService = require('./DependencyService');
 const config = require('../config');
@@ -16,7 +16,6 @@ const GraphExecutionEngine = require('./GraphExecutionEngine');
 
 const UserService = require('./UserService');
 
-const prisma = new PrismaClient();
 const cooldowns = new Map();
 const warningCache = new Map();
 const WARNING_COOLDOWN = 10 * 1000;
