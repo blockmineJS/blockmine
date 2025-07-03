@@ -1,5 +1,23 @@
 import { toast } from '@/hooks/use-toast';
 import { apiHelper } from '@/lib/api';
+import { produce } from 'immer';
+
+const executePluginOperation = async (get, botId, apiEndpoint, params, successMessage) => {
+    try {
+        const result = await apiHelper(apiEndpoint, params, successMessage);
+        await get().fetchInstalledPlugins(botId);
+        return result;
+    } catch (error) {
+        console.error(`[PluginOperation] Failed: ${apiEndpoint}`, {
+            botId,
+            endpoint: apiEndpoint,
+            params: params.body ? JSON.parse(params.body) : {},
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
 
 export const createPluginSlice = (set, get) => ({
     installedPlugins: {},
@@ -149,36 +167,37 @@ export const createPluginSlice = (set, get) => ({
          await get().checkForUpdates(botId);
     },
 
-    forkPlugin: async (botId, pluginName) => {
-        try {
-            const forkedPlugin = await apiHelper(
-                `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
-                { method: 'POST' },
-                `Плагин "${pluginName}" успешно скопирован.`
-            );
-            await get().fetchInstalledPlugins(botId);
-            return forkedPlugin;
-        } catch (error) {
-            console.error(`Ошибка при создании копии плагина ${pluginName}:`, error);
-            throw error;
-        }
+    createIdePlugin: async (botId, { name, template }) => {
+        return executePluginOperation(
+            get,
+            botId,
+            `/api/bots/${botId}/plugins/ide/create`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ name, template })
+            },
+            `Плагин "${name}" успешно создан.`
+        );
     },
 
-    createIdePlugin: async (botId, { name, template }) => {
-        try {
-            const newPlugin = await apiHelper(
-                `/api/bots/${botId}/plugins/ide/create`,
-                { 
-                    method: 'POST',
-                    body: JSON.stringify({ name, template })
-                },
-                `Плагин "${name}" успешно создан.`
-            );
-            await get().fetchInstalledPlugins(botId);
-            return newPlugin;
-        } catch (error) {
-            console.error(`Ошибка при создании плагина ${name}:`, error);
-            throw error;
-        }
+    updatePluginManifest: async (botId, pluginName, manifestData) => {
+        set(produce((draft) => {
+            const plugin = draft.installedPlugins.find((p) => p.name === pluginName && p.botId === botId);
+            if (plugin) {
+                plugin.name = manifestData.name;
+                plugin.version = manifestData.version;
+                plugin.description = manifestData.description;
+            }
+        }));
+    },
+
+    forkPlugin: async (botId, pluginName) => {
+        return executePluginOperation(
+            get,
+            botId,
+            `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
+            { method: 'POST' },
+            `Копия плагина "${pluginName}" успешно создана.`
+        );
     },
 });
