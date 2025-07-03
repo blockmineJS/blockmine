@@ -254,20 +254,14 @@ class BotManager {
     }
 
     getFullState() {
-        const statuses = {};
-        this.bots.forEach((childProcess, botId) => {
-             if (childProcess && !childProcess.killed) {
-                 statuses[botId] = 'running';
-             }
-        });
-        const logs = {};
-        this.logCache.forEach((logArray, botId) => {
-            logs[botId] = logArray;
-        });
-        return { statuses, logs };
+        return {
+            statuses: Object.fromEntries(Array.from(this.bots.entries()).map(([id, child]) => [id, child.killed ? 'stopped' : 'running'])),
+            logs: Object.fromEntries(this.logCache)
+        };
     }
 
     emitStatusUpdate(botId, status, message = null) {
+        // console.log(`[BotManager] Отправка статуса для бота ${botId}: status=${status}, message=${message || 'null'}`);
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
         getIO().emit('bot:status', { botId, status, message });
     }

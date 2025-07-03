@@ -50,17 +50,22 @@ function Root() {
 function ProtectedLayout() {
     const isAuthenticated = useAppStore(state => state.isAuthenticated);
     const needsSetup = useAppStore(state => state.needsSetup);
+
     const connectSocket = useAppStore(state => state.connectSocket);
+    const disconnectSocket = useAppStore(state => state.disconnectSocket);
     const fetchInitialData = useAppStore(state => state.fetchInitialData);
     const fetchTasks = useAppStore(state => state.fetchTasks);
 
     useEffect(() => {
-      if (isAuthenticated) {
-          connectSocket();
-          fetchInitialData();
-          fetchTasks();
-      }
-  }, [isAuthenticated]);
+        if (isAuthenticated) {
+            connectSocket();
+            fetchInitialData();
+            fetchTasks();
+        }
+        return () => {
+            disconnectSocket();
+        }
+    }, [isAuthenticated, connectSocket, disconnectSocket, fetchInitialData, fetchTasks]);
 
     if (needsSetup) {
         return <Navigate to="/setup" replace />;

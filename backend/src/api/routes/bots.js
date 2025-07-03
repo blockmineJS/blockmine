@@ -173,16 +173,26 @@ router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
-        if (!botConfig) return res.status(404).json({ error: 'Бот не найден' });
-        const result = await botManager.startBot(botConfig);
-        res.json(result);
-    } catch (error) { res.status(500).json({ error: 'Ошибка при запуске бота: ' + error.message }); }
+        if (!botConfig) {
+            return res.status(404).json({ success: false, message: 'Бот не найден' });
+        }
+        botManager.startBot(botConfig);
+        res.status(202).json({ success: true, message: 'Команда на запуск отправлена.' });
+    } catch (error) { 
+        console.error(`[API] Ошибка запуска бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при запуске бота: ' + error.message }); 
+    }
 });
 
 router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
-    const botId = parseInt(req.params.id, 10);
-    const result = botManager.stopBot(botId);
-    res.json(result);
+    try {
+        const botId = parseInt(req.params.id, 10);
+        botManager.stopBot(botId);
+        res.status(202).json({ success: true, message: 'Команда на остановку отправлена.' });
+    } catch (error) {
+        console.error(`[API] Ошибка остановки бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при остановке бота: ' + error.message });
+    }
 });
 
 router.post('/:id/chat', authorize('bot:interact'), (req, res) => {

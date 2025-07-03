@@ -11,42 +11,32 @@ export const createCoreSlice = (set, get) => ({
     appVersion: '',
 
     connectSocket: () => {
-        const currentSocket = get().socket;
-        if (currentSocket && (currentSocket.connected || currentSocket.connecting)) {
-            console.log("[Socket] Подключение уже в процессе или установлено. Новое не создается.");
+        const existingSocket = get().socket;
+        if (existingSocket && (existingSocket.connected || existingSocket.connecting)) {
+            console.log('[Socket] Соединение уже установлено или в процессе.');
             return;
-        }
-
-        if (currentSocket) {
-            currentSocket.disconnect();
         }
 
         const token = get().token;
         if (!token) {
-            console.log("[Socket] Подключение отложено: нет токена.");
+            console.log('[Socket] Подключение отложено, нет токена.');
             return;
         }
 
-        const socketUrl = window.location.origin;
-
-        console.log(`[Socket] Попытка подключения к: ${socketUrl}`);
-
-        const newSocket = io(socketUrl, {
+        const newSocket = io(window.location.origin, {
             path: "/socket.io/",
             auth: { token },
             reconnectionAttempts: 5,
             reconnectionDelay: 2000,
-            transports: ['websocket'], 
-        });
-        
-        newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
-        newSocket.on('disconnect', (reason) => console.log('Socket.IO отключен:', reason));
-        newSocket.on('connect_error', (err) => {
-            console.warn(`[Socket] Ошибка подключения (попытка переподключения): ${err.message}`);
+            transports: ['websocket', 'polling'], 
         });
 
+        newSocket.on('connect', () => console.log('Socket.IO подключен:', newSocket.id));
+        newSocket.on('disconnect', (reason) => console.log('Socket.IO отключен:', reason));
+        newSocket.on('connect_error', (err) => console.warn(`[Socket] Ошибка подключения: ${err.message}`));
+
         newSocket.on('bot:status', ({ botId, status, message }) => {
-            set(state => { state.botStatuses[botId] = status; });
+            set(state => ({ botStatuses: { ...state.botStatuses, [botId]: status } }));
             if (message) get().appendLog(botId, `[SYSTEM] ${message}`);
         });
         newSocket.on('bot:log', ({ botId, log }) => get().appendLog(botId, log));
@@ -56,6 +46,14 @@ export const createCoreSlice = (set, get) => ({
         });
         
         set({ socket: newSocket });
+    },
+
+    disconnectSocket: () => {
+        const socket = get().socket;
+        if (socket) {
+            socket.disconnect();
+            set({ socket: null });
+        }
     },
 
     fetchInitialData: async () => {
