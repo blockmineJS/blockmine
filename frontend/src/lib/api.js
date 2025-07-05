@@ -31,9 +31,11 @@ export const apiHelper = async (url, options = {}, successMessage) => {
 
         if (!response.ok) {
             if (response.status === 401) {
-                const { logout } = useAppStore.getState();
-                logout();
-                return null;
+                if (!url.endsWith('/api/auth/login')) {
+                    const { logout } = useAppStore.getState();
+                    logout();
+                }
+                throw new Error(data.error || 'Ошибка авторизации');
             }
             throw new Error(data.error || 'Произошла неизвестная ошибка на сервере');
         }

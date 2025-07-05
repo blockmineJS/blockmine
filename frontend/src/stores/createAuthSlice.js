@@ -41,12 +41,17 @@ export const createAuthSlice = (set, get) => ({
     },
 
     login: async (username, password) => {
-        const data = await apiHelper('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username, password }),
-        });
-        localStorage.setItem('authToken', data.token);
-        set({ token: data.token, user: data.user, isAuthenticated: true });
+        try {
+            const data = await apiHelper('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password }),
+            });
+            localStorage.setItem('authToken', data.token);
+            set({ token: data.token, user: data.user, isAuthenticated: true });
+        } catch (error) {
+            console.error("Login failed:", error);
+            throw error;
+        }
     },
 
     setupAdmin: async (username, password) => {
