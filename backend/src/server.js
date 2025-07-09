@@ -57,6 +57,7 @@ app.use('/api/bots', botRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/permissions', permissionsRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 
 app.use(express.static(frontendPath));
