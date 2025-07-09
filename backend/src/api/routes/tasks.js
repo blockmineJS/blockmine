@@ -31,9 +31,19 @@ router.get('/', authorize('task:list'), async (req, res) => {
 
 router.post('/', authorize('task:create'), async (req, res) => {
     try {
-        const taskData = { ...req.body, cronPattern: normalizeCronPattern(req.body.cronPattern) };
+        const { runOnStartup, cronPattern, ...restOfBody } = req.body;
+        const taskData = { ...restOfBody, runOnStartup: !!runOnStartup };
+
+        if (runOnStartup) {
+            taskData.cronPattern = null; 
+        } else {
+            taskData.cronPattern = normalizeCronPattern(cronPattern);
+        }
+
         const newTask = await prisma.scheduledTask.create({ data: taskData });
-        TaskScheduler.scheduleTask(newTask);
+        if (!runOnStartup) {
+            TaskScheduler.scheduleTask(newTask);
+        }
         res.status(201).json(newTask);
     } catch (error) {
         console.error("[API /tasks] Ошибка создания задачи:", error);
@@ -46,6 +56,13 @@ router.put('/:id', authorize('task:edit'), async (req, res) => {
     try {
         const { id, createdAt, updatedAt, lastRun, ...dataToUpdate } = req.body;
         
+        if (typeof dataToUpdate.runOnStartup !== 'undefined') {
+            dataToUpdate.runOnStartup = !!dataToUpdate.runOnStartup;
+            if (dataToUpdate.runOnStartup) {
+                dataToUpdate.cronPattern = null;
+            }
+        }
+
         if (dataToUpdate.cronPattern) {
             dataToUpdate.cronPattern = normalizeCronPattern(dataToUpdate.cronPattern);
         }

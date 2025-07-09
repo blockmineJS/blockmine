@@ -11,12 +11,17 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from '@/stores/appStore';
 
-const ACTIONS = [
+const ALL_ACTIONS = [
     { value: 'START_BOT', label: 'Запустить бота' },
     { value: 'STOP_BOT', label: 'Остановить бота' },
     { value: 'RESTART_BOT', label: 'Перезапустить бота' },
     { value: 'SEND_COMMAND', label: 'Отправить команду' },
 ];
+
+const STARTUP_ACTIONS = [
+    { value: 'START_BOT', label: 'Запустить бота' },
+];
+
 
 const generateCron = (simpleConfig) => {
     const { intervalType, intervalValue, time } = simpleConfig;
@@ -48,6 +53,7 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
     const [targetBotIds, setTargetBotIds] = useState([]);
     const [command, setCommand] = useState('');
     const [open, setOpen] = useState(false);
+    const [runOnStartup, setRunOnStartup] = useState(false);
     
     const [isAdvancedMode, setIsAdvancedMode] = useState(false);
     const [cronPattern, setCronPattern] = useState('* * * * *');
@@ -64,18 +70,26 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
     }, [simpleConfig, isAdvancedMode]);
 
     useEffect(() => {
+        if (runOnStartup) {
+            setAction('START_BOT');
+        }
+    }, [runOnStartup]);
+
+    useEffect(() => {
         if (task) {
             setName(task.name);
             setAction(task.action);
             setTargetBotIds(JSON.parse(task.targetBotIds || '[]'));
             setCommand(JSON.parse(task.payload || '{}').command || '');
             setCronPattern(task.cronPattern);
-            setIsAdvancedMode(true); 
+            setRunOnStartup(task.runOnStartup || false);
+            setIsAdvancedMode(!!task.cronPattern); 
         } else {
             setName('');
             setAction('SEND_COMMAND');
             setTargetBotIds([]);
             setCommand('');
+            setRunOnStartup(false);
             setIsAdvancedMode(false);
             const initialSimpleConfig = { intervalType: 'days', intervalValue: 1, time: '12:00' };
             setSimpleConfig(initialSimpleConfig);
@@ -92,20 +106,27 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
         const payload = action === 'SEND_COMMAND' ? { command } : {};
         onSubmit({
             name,
-            cronPattern,
+            cronPattern: runOnStartup ? null : cronPattern,
             action,
             targetBotIds: JSON.stringify(targetBotIds),
             payload: JSON.stringify(payload),
+            runOnStartup,
         });
     };
 
     const botOptions = [{ id: 'ALL', username: 'Все боты' }, ...bots];
+    const availableActions = runOnStartup ? STARTUP_ACTIONS : ALL_ACTIONS;
 
     return (
         <DialogContent className="max-w-2xl">
             <DialogHeader>
                 <DialogTitle>{task ? 'Редактировать задачу' : 'Создать новую задачу'}</DialogTitle>
-                <DialogDescription>Задачи выполняются по расписанию для выбранных ботов.</DialogDescription>
+                <DialogDescription>
+                    {runOnStartup
+                        ? 'Эта задача будет выполнена один раз при каждом запуске панели.'
+                        : 'Задачи выполняются по расписанию для выбранных ботов.'
+                    }
+                </DialogDescription>
             </DialogHeader>
             <form id="task-form" onSubmit={handleSubmit} className="space-y-6 py-4">
                 <div className="space-y-2">
@@ -113,54 +134,72 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                     <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
                 </div>
                 
-                <div className="space-y-3 p-4 border rounded-lg">
-                    <div className="flex items-center justify-between">
-                        <Label>Расписание</Label>
-                        <div className="flex items-center space-x-2">
-                            <Label htmlFor="advanced-mode" className="text-sm">Продвинутый режим</Label>
-                            <Switch id="advanced-mode" checked={isAdvancedMode} onCheckedChange={setIsAdvancedMode} />
-                        </div>
+                <div className="flex items-center space-x-2 rounded-lg border p-3 shadow-sm">
+                    <Switch
+                        id="runOnStartup"
+                        checked={runOnStartup}
+                        onCheckedChange={setRunOnStartup}
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                        <Label htmlFor="runOnStartup">
+                            Выполнять при запуске панели
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                            Задача будет выполнена один раз при каждом старте/перезапуске панели.
+                        </p>
                     </div>
-
-                    {isAdvancedMode ? (
-                        <div>
-                            <Input value={cronPattern} onChange={e => setCronPattern(e.target.value)} placeholder="* * * * *" required />
-                             <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline mt-1 inline-block">
-                                Помощь по cron-паттернам
-                            </a>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-3 gap-2 items-end">
-                             <div className="space-y-1">
-                                <Label>Повторять каждые</Label>
-                                <Input type="number" min="1" value={simpleConfig.intervalValue} onChange={e => handleSimpleConfigChange('intervalValue', parseInt(e.target.value) || 1)} />
-                            </div>
-                            <div className="space-y-1">
-                                <Label> </Label>
-                                <Select value={simpleConfig.intervalType} onValueChange={val => handleSimpleConfigChange('intervalType', val)}>
-                                    <SelectTrigger><SelectValue/></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="minutes">Минут</SelectItem>
-                                        <SelectItem value="hours">Часов</SelectItem>
-                                        <SelectItem value="days">Дней</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label>Время запуска</Label>
-                                <Input type="time" value={simpleConfig.time} onChange={e => handleSimpleConfigChange('time', e.target.value)} disabled={simpleConfig.intervalType === 'minutes'} />
-                            </div>
-                        </div>
-                    )}
                 </div>
+                
+                {!runOnStartup && (
+                    <div className="space-y-3 p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <Label>Расписание</Label>
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor="advanced-mode" className="text-sm">Продвинутый режим</Label>
+                                <Switch id="advanced-mode" checked={isAdvancedMode} onCheckedChange={setIsAdvancedMode} />
+                            </div>
+                        </div>
+
+                        {isAdvancedMode ? (
+                            <div>
+                                <Input value={cronPattern} onChange={e => setCronPattern(e.target.value)} placeholder="* * * * *" required />
+                                <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline mt-1 inline-block">
+                                    Помощь по cron-паттернам
+                                </a>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-2 items-end">
+                                <div className="space-y-1">
+                                    <Label>Повторять каждые</Label>
+                                    <Input type="number" min="1" value={simpleConfig.intervalValue} onChange={e => handleSimpleConfigChange('intervalValue', parseInt(e.target.value) || 1)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label> </Label>
+                                    <Select value={simpleConfig.intervalType} onValueChange={val => handleSimpleConfigChange('intervalType', val)}>
+                                        <SelectTrigger><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="minutes">Минут</SelectItem>
+                                            <SelectItem value="hours">Часов</SelectItem>
+                                            <SelectItem value="days">Дней</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Время запуска</Label>
+                                    <Input type="time" value={simpleConfig.time} onChange={e => handleSimpleConfigChange('time', e.target.value)} disabled={simpleConfig.intervalType === 'minutes'} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Действие</Label>
-                        <Select value={action} onValueChange={setAction} required>
+                        <Select value={action} onValueChange={setAction} required disabled={runOnStartup}>
                             <SelectTrigger><SelectValue placeholder="Выберите действие" /></SelectTrigger>
                             <SelectContent>
-                                {ACTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                                {availableActions.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>

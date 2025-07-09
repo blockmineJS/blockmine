@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('../lib/prisma');
-const BotManager = require('./BotManager');
+const { botManager } = require('./services');
 
 class TaskScheduler {
     constructor() {
@@ -9,14 +9,24 @@ class TaskScheduler {
     }
 
     async initialize() {
-        console.log('[TaskScheduler] Загрузка и планирование активных задач из БД...');
-        const tasks = await prisma.scheduledTask.findMany({ where: { isEnabled: true } });
+        console.log('[TaskScheduler] Загрузка и планирование задач из БД...');
+        const allTasks = await prisma.scheduledTask.findMany();
         
-        tasks.forEach(task => {
+        const tasksToSchedule = allTasks.filter(task => task.isEnabled && task.cronPattern && cron.validate(task.cronPattern));
+        const tasksToRunOnStartup = allTasks.filter(task => task.isEnabled && task.runOnStartup);
+
+        tasksToSchedule.forEach(task => {
             this.scheduleTask(task);
         });
+        
+        console.log(`[TaskScheduler] Запланировано ${this.scheduledJobs.size} cron-задач.`);
 
-        console.log(`[TaskScheduler] Запланировано ${this.scheduledJobs.size} задач.`);
+        if (tasksToRunOnStartup.length > 0) {
+            console.log(`[TaskScheduler] Обнаружено ${tasksToRunOnStartup.length} задач для выполнения при запуске.`);
+            for (const task of tasksToRunOnStartup) {
+                setTimeout(() => this.executeTask(task), 2000);
+            }
+        }
     }
 
     async executeTask(task) {
@@ -44,27 +54,27 @@ class TaskScheduler {
                 switch (task.action) {
                     case 'START_BOT':
                         console.log(` -> Запуск бота ${botConfig.username}`);
-                        if (!BotManager.bots.has(botId)) await BotManager.startBot(botConfig);
+                        if (!botManager.bots.has(botId)) await botManager.startBot(botConfig);
                         break;
                     case 'STOP_BOT':
                         console.log(` -> Остановка бота ${botConfig.username}`);
-                        if (BotManager.bots.has(botId)) BotManager.stopBot(botId);
+                        if (botManager.bots.has(botId)) botManager.stopBot(botId);
                         break;
                     case 'RESTART_BOT':
                         console.log(` -> Перезапуск бота ${botConfig.username}`);
-                        if (BotManager.bots.has(botId)) {
-                            BotManager.stopBot(botId);
-                            setTimeout(() => BotManager.startBot(botConfig), 5000); 
+                        if (botManager.bots.has(botId)) {
+                            botManager.stopBot(botId);
+                            setTimeout(() => botManager.startBot(botConfig), 5000); 
                         } else {
-                            await BotManager.startBot(botConfig);
+                            await botManager.startBot(botConfig);
                         }
                         break;
                     case 'SEND_COMMAND':
-                        if (BotManager.bots.has(botId)) {
+                        if (botManager.bots.has(botId)) {
                             const payload = JSON.parse(task.payload || '{}');
                             if (payload.command) {
                                 console.log(` -> Отправка команды "${payload.command}" боту ${botConfig.username}`);
-                                BotManager.sendMessageToBot(botId, payload.command);
+                                botManager.sendMessageToBot(botId, payload.command);
                             }
                         }
                         break;
@@ -81,8 +91,10 @@ class TaskScheduler {
             this.unscheduleTask(task.id);
         }
 
-        if (!cron.validate(task.cronPattern)) {
-            console.error(`[TaskScheduler] Неверный cron-паттерн для задачи ID ${task.id}: ${task.cronPattern}`);
+        if (!task.cronPattern || !cron.validate(task.cronPattern)) {
+            if (!task.runOnStartup) {
+                 console.error(`[TaskScheduler] Неверный или отсутствующий cron-паттерн для задачи ID ${task.id}: ${task.cronPattern}`);
+            }
             return;
         }
 

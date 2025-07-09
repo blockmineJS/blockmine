@@ -8,8 +8,8 @@ import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
 
 const ansiConverter = new AnsiToHtml({
-    fg: '#e5e7eb',
-    bg: '#111827',
+    fg: 'var(--ansi-fg, #e5e7eb)',
+    bg: 'var(--ansi-bg, #111827)',
     newline: true,
     escapeXML: true,
 });
@@ -69,12 +69,13 @@ export default function ConsoleTab() {
             <div 
                 ref={logContainerRef} 
                 onScroll={handleScroll}
-                className="flex-1 p-4 overflow-y-auto font-mono text-sm bg-black"
+                className="flex-1 p-4 overflow-y-auto font-mono text-sm"
+                style={{ '--ansi-fg': 'hsl(var(--foreground))', '--ansi-bg': 'hsl(var(--background))' }}
             >
                 {logs.map((log, index) => {
                     const logContent = typeof log === 'object' && log !== null && log.content ? log.content : (typeof log === 'string' ? log : '');
                     return (
-                        <div key={index} className="leading-relaxed whitespace-pre-wrap break-all">
+                        <div key={index} className="log-line leading-relaxed whitespace-pre-wrap break-all">
                             <div dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(logContent) }} />
                         </div>
                     );
