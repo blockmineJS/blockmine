@@ -253,9 +253,19 @@ class BotManager {
     }
 
     getFullState() {
+        const statuses = {};
+        for (const [id, child] of this.bots.entries()) {
+            statuses[id] = child.killed ? 'stopped' : 'running';
+        }
+
+        const logs = {};
+        for (const [botId, logArray] of this.logCache.entries()) {
+            logs[botId] = logArray;
+        }
+
         return {
-            statuses: Object.fromEntries(Array.from(this.bots.entries()).map(([id, child]) => [id, child.killed ? 'stopped' : 'running'])),
-            logs: Object.fromEntries(this.logCache)
+            statuses,
+            logs,
         };
     }
 
@@ -265,11 +275,15 @@ class BotManager {
         getIO().emit('bot:status', { botId, status, message });
     }
     
-    appendLog(botId, log) {
+    appendLog(botId, logContent) {
+        const logEntry = {
+            id: Date.now() + Math.random(),
+            content: logContent,
+        };
         const currentLogs = this.logCache.get(botId) || [];
-        const newLogs = [...currentLogs.slice(-499), log];
+        const newLogs = [...currentLogs.slice(-499), logEntry];
         this.logCache.set(botId, newLogs);
-        getIO().emit('bot:log', { botId, log });
+        getIO().emit('bot:log', { botId, log: logEntry });
     }
 
     async startBot(botConfig) {
@@ -705,4 +719,4 @@ class BotManager {
     }
 }
 
-module.exports = BotManager;
+module.exports = new BotManager();

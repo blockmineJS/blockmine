@@ -71,8 +71,15 @@ export const createCoreSlice = (set, get) => ({
                 state.bots = botsData || [];
                 state.servers = serversData || [];
                 state.botStatuses = stateData.statuses || {};
-                state.botLogs = stateData.logs || {};
                 state.appVersion = versionData.version || '';
+
+                const serverLogs = stateData.logs || {};
+                for (const botId in serverLogs) {
+                    const clientLogs = state.botLogs[botId] || [];
+                    const combinedLogs = [...clientLogs, ...serverLogs[botId]];
+                    const uniqueLogs = Array.from(new Map(combinedLogs.map(item => [item.id, item])).values());
+                    state.botLogs[botId] = uniqueLogs.slice(-500);
+                }
             });
         } catch (error) {
              console.error("Не удалось загрузить начальные данные:", error.message);

@@ -13,7 +13,7 @@ import { apiHelper } from '@/lib/api';
 
 const cronInfoCache = new Map();
 
-const CronInfo = ({ pattern, isEnabled }) => {
+const CronInfo = ({ pattern, isEnabled, runOnStartup }) => {
     const [display, setDisplay] = useState({ nextRun: '...', human: '...' });
 
     useEffect(() => {
@@ -21,6 +21,16 @@ const CronInfo = ({ pattern, isEnabled }) => {
             if (!isEnabled) {
                 setDisplay({ nextRun: 'Отключено', human: 'Отключено' });
                 return;
+            }
+
+            if (runOnStartup && !pattern) {
+                setDisplay({ nextRun: 'При старте', human: 'Выполняется при запуске панели' });
+                return;
+            }
+
+            if (!pattern) {
+                 setDisplay({ nextRun: 'n/a', human: 'Нет расписания' });
+                 return;
             }
 
             const cacheKey = pattern;
@@ -53,7 +63,7 @@ const CronInfo = ({ pattern, isEnabled }) => {
             <TableCell>
                 <div className="flex flex-col">
                     <span>{display.human}</span>
-                    <span className="text-xs text-muted-foreground font-mono">{pattern}</span>
+                    {pattern && <span className="text-xs text-muted-foreground font-mono">{pattern}</span>}
                 </div>
             </TableCell>
             <TableCell>{display.nextRun}</TableCell>
@@ -163,7 +173,7 @@ export default function TasksPage() {
                                         <TableCell><Switch checked={task.isEnabled} onCheckedChange={(checked) => handleToggle(task, checked)} /></TableCell>
                                         <TableCell className="font-medium">{task.name}</TableCell>
                                         
-                                        <CronInfo pattern={task.cronPattern} isEnabled={task.isEnabled} />
+                                        <CronInfo pattern={task.cronPattern} isEnabled={task.isEnabled} runOnStartup={task.runOnStartup} />
 
                                         <TableCell><Badge variant="secondary">{actionLabels[task.action] || task.action}</Badge></TableCell>
                                         <TableCell className="text-right">

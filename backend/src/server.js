@@ -116,8 +116,6 @@ async function startServer() {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);
 
-            botManager.initialize();
-            
             if (HOST === '0.0.0.0') {
                 const networkInterfaces = os.networkInterfaces();
                 console.log('Панель управления доступна по следующим адресам:');

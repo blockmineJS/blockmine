@@ -1,7 +1,6 @@
-const BotManager = require('./BotManager');
+const botManager = require('./BotManager');
 const PluginManager = require('./PluginManager');
 
-const botManager = new BotManager();
 const pluginManager = new PluginManager(botManager);
 
 botManager.initialize();
