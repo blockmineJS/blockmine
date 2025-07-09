@@ -5,6 +5,7 @@ import { createBotActionsSlice } from './createBotActionsSlice';
 import { createPluginSlice } from './createPluginSlice';
 import { createTaskSlice } from './createTaskSlice';
 import { createAuthSlice } from './createAuthSlice';
+import { createThemeSlice } from './createThemeSlice';
 
 export const useAppStore = create(
     immer((...a) => ({
@@ -13,5 +14,6 @@ export const useAppStore = create(
         ...createPluginSlice(...a),
         ...createTaskSlice(...a),
         ...createAuthSlice(...a),
+        ...createThemeSlice(...a),
     }))
 );

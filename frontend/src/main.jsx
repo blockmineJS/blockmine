@@ -126,7 +126,7 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <div className="dark text-foreground bg-background">
+    <div className="text-foreground bg-background">
         <RouterProvider router={router} />
         <Toaster />
     </div>
