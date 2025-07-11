@@ -12,7 +12,7 @@ const { parseArguments } = require('./system/parseArguments');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 const NodeRegistry = require('./NodeRegistry');
 
-const UserService = require('./ipc/UserService.stub.js');
+const UserService = require('./UserService');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
 
 let bot = null;
@@ -208,51 +208,7 @@ process.on('message', async (message) => {
                 sendMessage: (type, message, username) => bot.messageQueue.enqueue(type, message, username),
                 sendMessageAndWaitForReply: (command, patterns, timeout) => bot.messageQueue.enqueueAndWait(command, patterns, timeout),
                 getUser: async (username) => {
-                    const userData = await UserService.getUser(username, bot.config.id, bot.config);
-                    if (!userData) return null;
-
-                    const permissions = userData.permissionsSet ? Array.from(userData.permissionsSet) : [];
-
-                    return {
-                        id: userData.id,
-                        username: userData.username,
-                        isOwner: userData.isOwner,
-                        isBlacklisted: userData.isBlacklisted,
-                        permissions: permissions,
-                        groups: userData.groups,
-                        hasPermission: (permissionName) => {
-                            if (userData.isOwner) return true;
-                            if (!permissionName) return false;
-
-                            if (permissions.includes(permissionName)) {
-                                return true;
-                            }
-
-                            const permissionParts = permissionName.split('.');
-                            if (permissionParts.length > 1) {
-                                const domain = permissionParts[0];
-                                const wildcard = `${domain}.*`;
-                                if (permissions.includes(wildcard)) {
-                                    return true;
-                                }
-                            }
-                            
-                            if (permissions.includes('*')) {
-                                return true;
-                            }
-
-                            return false;
-                        },
-                        hasGroup: (groupName) => userData.hasGroup(groupName),
-                        addGroup: (group) => bot.api.performUserAction(username, 'addGroup', { group }),
-                        removeGroup: (group) => bot.api.performUserAction(username, 'removeGroup', { group }),
-                        addPermission: (permission) => bot.api.performUserAction(username, 'addPermission', { permission }),
-                        removePermission: (permission) => bot.api.performUserAction(username, 'removePermission', { permission }),
-                        getGroups: () => bot.api.performUserAction(username, 'getGroups'),
-                        getPermissions: () => bot.api.performUserAction(username, 'getPermissions'),
-                        isBlacklisted: () => bot.api.performUserAction(username, 'isBlacklisted'),
-                        setBlacklisted: (value) => bot.api.performUserAction(username, 'setBlacklisted', { value }),
-                    };
+                    return await UserService.getUser(username, bot.config.id, bot.config);
                 },
                 registerPermissions: (permissions) => PermissionManager.registerPermissions(bot.config.id, permissions),
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
