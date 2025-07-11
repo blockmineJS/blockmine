@@ -399,6 +399,7 @@ router.post('/:pluginName/manifest', resolvePluginPath, async (req, res) => {
                 name: newManifest.name,
                 version: newManifest.version,
                 description: newManifest.description,
+                manifest: JSON.stringify(newManifest.botpanel || {}),
             }
         });
 
