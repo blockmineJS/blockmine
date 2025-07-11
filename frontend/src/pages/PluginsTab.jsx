@@ -40,6 +40,7 @@ export default function PluginsTab() {
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isForking, setIsForking] = useState(false);
+    const [activeTab, setActiveTab] = useState('installed');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -54,10 +55,20 @@ export default function PluginsTab() {
         }
     }, [bot, intBotId, fetchInstalledPlugins, fetchPluginCatalog]);
 
+    useEffect(() => {
+        if (activeTab === 'installed' && bot && installedPlugins.length > 0 && !isLoading) {
+            checkForUpdates(intBotId, false);
+        }
+    }, [installedPlugins.length, isLoading, activeTab, bot, intBotId, checkForUpdates]);
+
     const handleCheckForUpdates = async () => {
         setIsCheckingUpdates(true);
-        await checkForUpdates(intBotId);
+        await checkForUpdates(intBotId, true);
         setIsCheckingUpdates(false);
+    };
+
+    const handleTabChange = (value) => {
+        setActiveTab(value);
     };
     
     const handleCreatePlugin = async ({ name, template }) => {
@@ -105,7 +116,7 @@ export default function PluginsTab() {
     if (!bot) return null;
 
     return (
-        <Tabs defaultValue="browser" className="h-full flex flex-col">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col">
             <CardHeader className="shrink-0">
                 <CardTitle>Управление плагинами</CardTitle>
                 <CardDescription>Управляйте установленными плагинами или просматривайте каталог для установки новых.</CardDescription>
@@ -132,6 +143,7 @@ export default function PluginsTab() {
                         Создать плагин
                     </Button>
                 </div>
+                
                 <div className="flex-1 overflow-y-auto">
                     <InstalledPluginsView 
                         bot={bot} 
