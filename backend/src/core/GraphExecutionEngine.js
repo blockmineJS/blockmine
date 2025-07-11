@@ -397,6 +397,8 @@ class GraphExecutionEngine {
               result = this.context.variables.hasOwnProperty(varName) ? this.context.variables[varName] : null;
               break;
           
+
+
           case 'data:get_argument': {
             const args = this.context.args || {};
             const argName = node.data?.argumentName || '';
@@ -640,6 +642,27 @@ class GraphExecutionEngine {
               const arr = await this.resolvePinValue(node, 'array', []);
               const element = await this.resolvePinValue(node, 'element', null);
               result = Array.isArray(arr) ? arr.indexOf(element) : -1;
+              break;
+          }
+          case 'array:contains': {
+              const arr = await this.resolvePinValue(node, 'array', []);
+              const element = await this.resolvePinValue(node, 'element', null);
+              if (Array.isArray(arr)) {
+                  const index = arr.indexOf(element);
+                  this.memo.set(`${node.id}:index`, index);
+                  if (pinId === 'result') {
+                      result = index !== -1;
+                  } else if (pinId === 'index') {
+                      result = index;
+                  }
+              } else {
+                  this.memo.set(`${node.id}:index`, -1);
+                  if (pinId === 'result') {
+                      result = false;
+                  } else if (pinId === 'index') {
+                      result = -1;
+                  }
+              }
               break;
           }
           case 'flow:for_each': {
