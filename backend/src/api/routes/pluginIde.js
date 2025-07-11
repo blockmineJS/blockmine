@@ -608,18 +608,23 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
             
             let branchExists = false;
             try {
-                cp.execSync(`git ls-remote --heads origin ${branch}`, { stdio: 'pipe' });
-                branchExists = true;
-                console.log(`[Plugin IDE] Ветка ${branch} уже существует, переключаемся на неё`);
+                cp.execSync(`git checkout -b ${branch}`, { stdio: 'pipe' });
+                console.log(`[Plugin IDE] Создана новая ветка ${branch}`);
             } catch (e) {
-                console.log(`[Plugin IDE] Ветка ${branch} не существует, создаём новую`);
-            }
-            
-            if (branchExists) {
-                cp.execSync(`git checkout -b ${branch} origin/${branch}`);
-                cp.execSync(`git pull origin ${branch}`);
-            } else {
-                cp.execSync(`git checkout -b ${branch}`);
+                try {
+                    cp.execSync(`git checkout ${branch}`, { stdio: 'pipe' });
+                    console.log(`[Plugin IDE] Переключились на существующую ветку ${branch}`);
+                } catch (e2) {
+                    try {
+                        cp.execSync(`git fetch origin ${branch}`, { stdio: 'pipe' });
+                        cp.execSync(`git checkout -b ${branch} origin/${branch}`, { stdio: 'pipe' });
+                        branchExists = true;
+                        console.log(`[Plugin IDE] Создана ветка ${branch} из удаленной`);
+                    } catch (e3) {
+                        cp.execSync(`git checkout -B ${branch}`, { stdio: 'pipe' });
+                        console.log(`[Plugin IDE] Принудительно создана ветка ${branch}`);
+                    }
+                }
             }
             
             const files = await fse.readdir(req.pluginPath);
