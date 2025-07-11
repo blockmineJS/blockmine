@@ -171,11 +171,12 @@ model GroupPermission {
 model ScheduledTask {
   id           Int        @id @default(autoincrement())
   name         String
-  cronPattern  String
+  cronPattern  String?
   action       String
   targetBotIds String // джсон массив ID ботов или "ALL"
   payload      String?    @default("{}") // джсон для доп данных, например, команды
   isEnabled    Boolean    @default(true)
+  runOnStartup Boolean    @default(false)
   lastRun      DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
