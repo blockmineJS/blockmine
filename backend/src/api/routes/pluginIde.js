@@ -12,10 +12,8 @@ const router = express.Router({ mergeParams: true });
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 
-// All routes in this file require plugin development permission
 router.use(authenticate, authorize('plugin:develop'));
 
-// Middleware to resolve plugin path and ensure it's safe
 const resolvePluginPath = async (req, res, next) => {
     try {
         const { botId, pluginName } = req.params;
@@ -26,7 +24,6 @@ const resolvePluginPath = async (req, res, next) => {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         const pluginPath = path.resolve(botPluginsDir, pluginName);
 
-        // Security check: ensure the resolved path is still within the bot's plugins directory
         if (!pluginPath.startsWith(botPluginsDir)) {
             return res.status(403).json({ error: 'Доступ запрещен: попытка доступа за пределы директории плагина.' });
         }
@@ -35,7 +32,6 @@ const resolvePluginPath = async (req, res, next) => {
             return res.status(404).json({ error: 'Директория плагина не найдена.' });
         }
         
-        // Attach the safe path to the request object
         req.pluginPath = pluginPath;
         next();
     } catch (error) {
@@ -52,7 +48,7 @@ router.post('/create', async (req, res) => {
             version = '1.0.0',
             description = '',
             author = '',
-            template = 'empty' // 'empty' or 'command'
+            template = 'empty'
         } = req.body;
 
         if (!name) {
@@ -387,7 +383,6 @@ router.post('/:pluginName/manifest', resolvePluginPath, async (req, res) => {
         
         await fse.writeJson(manifestPath, newManifest, { spaces: 2 });
         
-        // Also update the DB record
         await prisma.installedPlugin.updateMany({
             where: {
                 botId: parseInt(req.params.botId),
@@ -436,6 +431,15 @@ router.post('/:pluginName/fork', resolvePluginPath, async (req, res) => {
         
         packageJson.name = newName;
         packageJson.description = `(Forked from ${pluginName}) ${packageJson.description || ''}`;
+        
+        if (!packageJson.botpanel) {
+            packageJson.botpanel = {};
+        }
+        packageJson.botpanel.originalRepository = {
+            type: 'git',
+            url: currentPlugin.sourceUri
+        };
+        
         await fse.writeJson(packageJsonPath, packageJson, { spaces: 2 });
         
         const forkedPlugin = await prisma.installedPlugin.create({
@@ -448,7 +452,7 @@ router.post('/:pluginName/fork', resolvePluginPath, async (req, res) => {
                 sourceType: 'LOCAL_IDE',
                 sourceUri: newPath,
                 manifest: JSON.stringify(packageJson.botpanel || {}),
-                isEnabled: false // Forked plugins are disabled by default
+                isEnabled: false
             }
         });
 
@@ -457,6 +461,89 @@ router.post('/:pluginName/fork', resolvePluginPath, async (req, res) => {
     } catch (error) {
         console.error(`[Plugin IDE Error] /fork POST for ${req.params.pluginName}:`, error);
         res.status(500).json({ error: 'Не удалось скопировать плагин.' });
+    }
+});
+
+router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
+    const cp = require('child_process');
+    const { branch = 'main', commitMessage = 'Changes from local edit' } = req.body;
+
+    if (!branch) {
+        return res.status(400).json({ error: 'Название ветки обязательно.' });
+    }
+
+    try {
+        cp.execSync('git --version');
+    } catch (e) {
+        return res.status(400).json({ error: 'Git не установлен на этой системе. Пожалуйста, установите Git для создания PR.' });
+    }
+
+    try {
+        const manifestPath = path.join(req.pluginPath, 'package.json');
+        const packageJson = await fse.readJson(manifestPath);
+        const originalRepo = packageJson.botpanel?.originalRepository?.url;
+
+        if (!originalRepo) {
+            return res.status(400).json({ error: 'URL оригинального репозитория не найден в манифесте.' });
+        }
+
+        const parseRepo = (url) => {
+            const match = url.match(/(?:git\+)?https?:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\.git)?/);
+            return match ? { owner: match[1], repo: match[2] } : null;
+        };
+
+        const repoInfo = parseRepo(originalRepo);
+        if (!repoInfo) {
+            return res.status(400).json({ error: 'Неверный формат URL репозитория.' });
+        }
+
+        const cwd = req.pluginPath;
+        const tempDir = path.join(cwd, '..', `temp-${Date.now()}`);
+
+        try {
+            cp.execSync(`git clone ${originalRepo} "${tempDir}"`, { stdio: 'inherit' });
+            
+            process.chdir(tempDir);
+            
+            cp.execSync(`git checkout -b ${branch}`);
+            
+            const files = await fse.readdir(req.pluginPath);
+            for (const file of files) {
+                if (file !== '.git') {
+                    const sourcePath = path.join(req.pluginPath, file);
+                    const destPath = path.join(tempDir, file);
+                    await fse.copy(sourcePath, destPath, { overwrite: true });
+                }
+            }
+            
+            cp.execSync('git add .');
+            try {
+                cp.execSync(`git commit -m "${commitMessage}"`);
+            } catch (e) {
+                if (e.message.includes('nothing to commit')) {
+                    return res.status(400).json({ error: 'Нет изменений для коммита.' });
+                }
+                throw e;
+            }
+
+            cp.execSync(`git push -u origin ${branch}`);
+
+            const prUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/compare/main...${branch}`;
+
+            res.json({ success: true, prUrl });
+            
+        } finally {
+            try {
+                process.chdir(req.pluginPath);
+                await fse.remove(tempDir);
+            } catch (cleanupError) {
+                console.error('Cleanup error:', cleanupError);
+            }
+        }
+
+    } catch (error) {
+        console.error('[Plugin IDE Error] /create-pr:', error);
+        res.status(500).json({ error: 'Не удалось создать PR: ' + error.message });
     }
 });
 

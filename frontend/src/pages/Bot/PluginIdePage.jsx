@@ -12,6 +12,10 @@ import { toast } from '@/hooks/use-toast';
 import ManifestEditor from '@/components/ide/ManifestEditor';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import path from 'path-browserify';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Github } from 'lucide-react';
 
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
@@ -22,6 +26,13 @@ export default function PluginIdePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [nodeToDelete, setNodeToDelete] = useState(null);
     const [inlineAction, setInlineAction] = useState(null); // { mode, node }
+    const [isPrDialogOpen, setIsPrDialogOpen] = useState(false);
+    const [prForm, setPrForm] = useState({ 
+        branch: `feature/local-changes-${new Date().toISOString().slice(0, 16).replace(/[:-]/g, '-')}`, 
+        commitMessage: 'Changes from local edit', 
+        originalRepo: '' 
+    });
+    const [isPrLoading, setIsPrLoading] = useState(false);
 
     const fetchStructure = useCallback(async () => {
         setIsLoading(true);
@@ -156,6 +167,53 @@ export default function PluginIdePage() {
             default: return 'plaintext';
         }
     };
+
+    const fetchManifest = useCallback(async () => {
+        try {
+            const data = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/manifest`);
+            return data;
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить manifest.' });
+            return null;
+        }
+    }, [botId, pluginName]);
+
+    const handleOpenPrDialog = async () => {
+        const manifest = await fetchManifest();
+        if (manifest && manifest.botpanel?.originalRepository?.url) {
+            setPrForm(prev => ({ 
+                ...prev, 
+                originalRepo: manifest.botpanel.originalRepository.url
+            }));
+        } else {
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Оригинальный репозиторий не найден. Убедитесь, что это forked плагин.' });
+            return;
+        }
+        setIsPrDialogOpen(true);
+    };
+
+    const handlePrFormChange = (e) => {
+        setPrForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleCreatePr = async () => {
+        setIsPrLoading(true);
+        try {
+            const response = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/create-pr`, {
+                method: 'POST',
+                body: JSON.stringify(prForm),
+            });
+            if (response.success) {
+                window.open(response.prUrl, '_blank');
+                toast({ title: 'Успех', description: 'PR успешно создан и открыт.' });
+                setIsPrDialogOpen(false);
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
+        } finally {
+            setIsPrLoading(false);
+        }
+    };
     
     return (
         <div className="h-full w-full flex flex-col p-4 gap-4">
@@ -164,10 +222,16 @@ export default function PluginIdePage() {
                     <h1 className="text-2xl font-bold">Редактор плагина: {pluginName}</h1>
                     <p className="text-muted-foreground">Редактирование для бота #{botId}</p>
                 </div>
-                <Button onClick={handleSave} disabled={!isDirty || !selectedFile}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Сохранить
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleOpenPrDialog}>
+                        <Github className="h-4 w-4 mr-2" />
+                        Создать PR
+                    </Button>
+                    <Button onClick={handleSave} disabled={!isDirty || !selectedFile}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Сохранить
+                    </Button>
+                </div>
             </header>
             <ResizablePanelGroup direction="horizontal" className="flex-grow rounded-lg border">
                 <ResizablePanel defaultSize={20} minSize={15}>
@@ -229,6 +293,40 @@ export default function PluginIdePage() {
                     confirmText="Да, удалить"
                 />
             )}
+
+            <Dialog open={isPrDialogOpen} onOpenChange={setIsPrDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Создать Pull Request</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        {prForm.originalRepo && (
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">Репозиторий:</Label>
+                                <div className="text-sm font-mono bg-muted p-2 rounded">
+                                    {prForm.originalRepo}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Изменения будут отправлены в новую ветку этого репозитория
+                                </div>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="branch" className="text-right">Название ветки</Label>
+                            <Input id="branch" name="branch" value={prForm.branch} onChange={handlePrFormChange} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="commitMessage" className="text-right">Сообщение коммита</Label>
+                            <Input id="commitMessage" name="commitMessage" value={prForm.commitMessage} onChange={handlePrFormChange} className="col-span-3" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleCreatePr} disabled={isPrLoading || !prForm.branch}>
+                            {isPrLoading ? 'Создание...' : 'Создать и открыть PR'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 } 
