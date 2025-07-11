@@ -371,7 +371,7 @@ router.post('/:pluginName/manifest', resolvePluginPath, async (req, res) => {
         }
 
         const currentManifest = await fse.readJson(manifestPath);
-        const { name, version, description, author } = req.body;
+        const { name, version, description, author, repositoryUrl } = req.body;
 
         const newManifest = {
             ...currentManifest,
@@ -380,6 +380,13 @@ router.post('/:pluginName/manifest', resolvePluginPath, async (req, res) => {
             description: description,
             author: author,
         };
+
+        if (repositoryUrl) {
+            newManifest.repository = {
+                type: 'git',
+                url: repositoryUrl
+            };
+        }
         
         await fse.writeJson(manifestPath, newManifest, { spaces: 2 });
         
@@ -432,10 +439,7 @@ router.post('/:pluginName/fork', resolvePluginPath, async (req, res) => {
         packageJson.name = newName;
         packageJson.description = `(Forked from ${pluginName}) ${packageJson.description || ''}`;
         
-        if (!packageJson.botpanel) {
-            packageJson.botpanel = {};
-        }
-        packageJson.botpanel.originalRepository = {
+        packageJson.repository = {
             type: 'git',
             url: currentPlugin.sourceUri
         };
@@ -466,7 +470,7 @@ router.post('/:pluginName/fork', resolvePluginPath, async (req, res) => {
 
 router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
     const cp = require('child_process');
-    const { branch = 'main', commitMessage = 'Changes from local edit' } = req.body;
+    const { branch = 'main', commitMessage = 'Changes from local edit', repositoryUrl } = req.body;
 
     if (!branch) {
         return res.status(400).json({ error: 'Название ветки обязательно.' });
@@ -481,18 +485,29 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
     try {
         const manifestPath = path.join(req.pluginPath, 'package.json');
         const packageJson = await fse.readJson(manifestPath);
-        const originalRepo = packageJson.botpanel?.originalRepository?.url;
+        let originalRepo = packageJson.repository?.url;
+
+        if (repositoryUrl) {
+            originalRepo = repositoryUrl;
+            
+            packageJson.repository = {
+                type: 'git',
+                url: repositoryUrl
+            };
+            await fse.writeJson(manifestPath, packageJson, { spaces: 2 });
+        }
 
         if (!originalRepo) {
-            return res.status(400).json({ error: 'URL оригинального репозитория не найден в манифесте.' });
+            return res.status(400).json({ error: 'URL репозитория не указан.' });
         }
+        const cleanRepoUrl = originalRepo.replace(/^git\+/, '');
 
         const parseRepo = (url) => {
             const match = url.match(/(?:git\+)?https?:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\.git)?/);
-            return match ? { owner: match[1], repo: match[2] } : null;
+            return match ? { owner: match[1], repo: match[2].replace(/\.git$/, '') } : null;
         };
 
-        const repoInfo = parseRepo(originalRepo);
+        const repoInfo = parseRepo(cleanRepoUrl);
         if (!repoInfo) {
             return res.status(400).json({ error: 'Неверный формат URL репозитория.' });
         }
@@ -501,7 +516,7 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
         const tempDir = path.join(cwd, '..', `temp-${Date.now()}`);
 
         try {
-            cp.execSync(`git clone ${originalRepo} "${tempDir}"`, { stdio: 'inherit' });
+            cp.execSync(`git clone ${cleanRepoUrl} "${tempDir}"`, { stdio: 'inherit' });
             
             process.chdir(tempDir);
             
@@ -528,7 +543,7 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
 
             cp.execSync(`git push -u origin ${branch}`);
 
-            const prUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/compare/main...${branch}`;
+            const prUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${branch}`;
 
             res.json({ success: true, prUrl });
             

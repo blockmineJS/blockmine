@@ -32,7 +32,13 @@ export default function ManifestEditor({ botId, pluginName }) {
         try {
             await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/manifest`, {
                 method: 'POST',
-                body: JSON.stringify(manifest),
+                body: JSON.stringify({
+                    name: manifest.name,
+                    version: manifest.version,
+                    description: manifest.description,
+                    author: manifest.author,
+                    repositoryUrl: manifest.repositoryUrl || manifest.repository?.url || ''
+                }),
             });
             toast({ title: 'Успех!', description: 'package.json успешно обновлен.' });
         } catch (error) {
@@ -55,6 +61,14 @@ export default function ManifestEditor({ botId, pluginName }) {
         setManifest(prev => ({...prev, [id]: value }));
     }
 
+    const handleRepositoryUrlChange = (e) => {
+        const value = e.target.value;
+        setManifest(prev => ({
+            ...prev,
+            repositoryUrl: value
+        }));
+    }
+
     return (
         <div className="p-4 space-y-4">
             <div className="space-y-1">
@@ -68,6 +82,19 @@ export default function ManifestEditor({ botId, pluginName }) {
             <div className="space-y-1">
                 <Label htmlFor="author">Автор</Label>
                 <Input id="author" value={manifest.author || ''} onChange={handleInputChange} />
+            </div>
+            
+            <div className="space-y-1">
+                <Label htmlFor="repositoryUrl">URL репозитория</Label>
+                <Input 
+                    id="repositoryUrl" 
+                    placeholder="https://github.com/user/repo.git" 
+                    value={manifest.repository?.url || manifest.repositoryUrl || ''} 
+                    onChange={handleRepositoryUrlChange} 
+                />
+                <p className="text-sm text-muted-foreground">
+                    Нужен для создания Pull Request'ов в оригинальный репозиторий
+                </p>
             </div>
             
             <Button onClick={handleSave} disabled={isSaving}>

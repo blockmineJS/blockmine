@@ -180,15 +180,13 @@ export default function PluginIdePage() {
 
     const handleOpenPrDialog = async () => {
         const manifest = await fetchManifest();
-        if (manifest && manifest.botpanel?.originalRepository?.url) {
-            setPrForm(prev => ({ 
-                ...prev, 
-                originalRepo: manifest.botpanel.originalRepository.url
-            }));
-        } else {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Оригинальный репозиторий не найден. Убедитесь, что это forked плагин.' });
-            return;
-        }
+        const repoUrl = manifest?.repository?.url || '';
+        
+        setPrForm(prev => ({ 
+            ...prev, 
+            originalRepo: repoUrl
+        }));
+        
         setIsPrDialogOpen(true);
     };
 
@@ -201,7 +199,11 @@ export default function PluginIdePage() {
         try {
             const response = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/create-pr`, {
                 method: 'POST',
-                body: JSON.stringify(prForm),
+                body: JSON.stringify({
+                    branch: prForm.branch,
+                    commitMessage: prForm.commitMessage,
+                    repositoryUrl: prForm.originalRepo
+                }),
             });
             if (response.success) {
                 window.open(response.prUrl, '_blank');
@@ -299,29 +301,33 @@ export default function PluginIdePage() {
                     <DialogHeader>
                         <DialogTitle>Создать Pull Request</DialogTitle>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        {prForm.originalRepo && (
-                            <div className="space-y-2">
-                                <Label className="text-sm font-medium">Репозиторий:</Label>
-                                <div className="text-sm font-mono bg-muted p-2 rounded">
-                                    {prForm.originalRepo}
-                                </div>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="originalRepo">URL репозитория</Label>
+                            <Input 
+                                id="originalRepo" 
+                                name="originalRepo" 
+                                value={prForm.originalRepo} 
+                                onChange={handlePrFormChange} 
+                                placeholder="https://github.com/user/repo.git"
+                            />
+                            {prForm.originalRepo && (
                                 <div className="text-sm text-muted-foreground">
                                     Изменения будут отправлены в новую ветку этого репозитория
                                 </div>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="branch" className="text-right">Название ветки</Label>
-                            <Input id="branch" name="branch" value={prForm.branch} onChange={handlePrFormChange} className="col-span-3" />
+                            )}
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="commitMessage" className="text-right">Сообщение коммита</Label>
-                            <Input id="commitMessage" name="commitMessage" value={prForm.commitMessage} onChange={handlePrFormChange} className="col-span-3" />
+                        <div className="space-y-2">
+                            <Label htmlFor="branch">Название ветки</Label>
+                            <Input id="branch" name="branch" value={prForm.branch} onChange={handlePrFormChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="commitMessage">Сообщение коммита</Label>
+                            <Input id="commitMessage" name="commitMessage" value={prForm.commitMessage} onChange={handlePrFormChange} />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={handleCreatePr} disabled={isPrLoading || !prForm.branch}>
+                        <Button onClick={handleCreatePr} disabled={isPrLoading || !prForm.branch || !prForm.originalRepo}>
                             {isPrLoading ? 'Создание...' : 'Создать и открыть PR'}
                         </Button>
                     </DialogFooter>
