@@ -420,7 +420,7 @@ class BotManager {
         });
 
         child.on('error', (err) => this.appendLog(botConfig.id, `[PROCESS FATAL] ${err.stack}`));
-        child.stdout.on('data', (data) => console.log(data));
+        child.stdout.on('data', (data) => console.log(data.toString()));
         child.stderr.on('data', (data) => this.appendLog(botConfig.id, `[STDERR] ${data.toString()}`));
         
         child.on('exit', (code, signal) => {
