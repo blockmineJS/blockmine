@@ -62,12 +62,14 @@ class PluginManager {
         return newPlugin;
     }
 
-    async installFromGithub(botId, repoUrl, prismaClient = prisma) {
+    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
 
-        const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
-        if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
+        if (!isUpdate) {
+            const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
+            if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
+        }
 
         try {
             const url = new URL(repoUrl);
@@ -149,7 +151,12 @@ class PluginManager {
             sourceUri: sourceUri || directoryPath,
             manifest: JSON.stringify(packageJson.botpanel || {}),
         };
-        return prismaClient.installedPlugin.create({ data: pluginData });
+        
+        return prismaClient.installedPlugin.upsert({
+            where: { botId_name: { botId, name: packageJson.name } },
+            update: pluginData,
+            create: pluginData,
+        });
     }
 
     async deletePlugin(pluginId) {
@@ -268,7 +275,7 @@ class PluginManager {
         await this.deletePlugin(pluginId);
         console.log(`[PluginManager] Старая версия ${plugin.name} удалена, устанавливаем новую...`);
         
-        return await this.installFromGithub(botId, repoUrl);
+        return await this.installFromGithub(botId, repoUrl, prisma, true);
     }
 }
 
