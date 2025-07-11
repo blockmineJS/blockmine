@@ -665,6 +665,65 @@ class GraphExecutionEngine {
               }
               break;
           }
+
+
+          case 'object:create': {
+              if (node.data?.advanced) {
+                  try {
+                      result = JSON.parse(node.data.jsonValue || '{}');
+                  } catch (e) {
+                      console.error('Ошибка парсинга JSON в object:create:', e);
+                      result = {};
+                  }
+              } else {
+                  const numPins = node.data?.pinCount || 0;
+                  const obj = {};
+                  for (let i = 0; i < numPins; i++) {
+                      const key = node.data[`key_${i}`];
+                      if (key) {
+                          obj[key] = await this.resolvePinValue(node, `value_${i}`);
+                      }
+                  }
+                  result = obj;
+              }
+              break;
+          }
+          case 'object:get': {
+              const obj = await this.resolvePinValue(node, 'object', {});
+              const key = await this.resolvePinValue(node, 'key', '');
+              result = obj[key] ?? defaultValue;
+              break;
+          }
+          case 'object:set': {
+              const obj = await this.resolvePinValue(node, 'object', {});
+              const key = await this.resolvePinValue(node, 'key', '');
+              const val = await this.resolvePinValue(node, 'value');
+              const newObj = { ...obj };
+              newObj[key] = val;
+              result = newObj;
+              break;
+          }
+          case 'object:delete': {
+              const obj = await this.resolvePinValue(node, 'object', {});
+              const key = await this.resolvePinValue(node, 'key', '');
+              const newObj = { ...obj };
+              delete newObj[key];
+              result = newObj;
+              break;
+          }
+          case 'object:has_key': {
+              const obj = await this.resolvePinValue(node, 'object', {});
+              const key = await this.resolvePinValue(node, 'key', '');
+              const exists = obj.hasOwnProperty(key);
+              this.memo.set(`${node.id}:value`, exists ? obj[key] : null);
+              if (pinId === 'result') {
+                  result = exists;
+              } else if (pinId === 'value') {
+                  result = this.memo.get(`${node.id}:value`);
+              }
+              break;
+          }
+
           case 'flow:for_each': {
             if (pinId === 'element') {
                 result = this.memo.get(`${node.id}:element`);

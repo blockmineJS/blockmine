@@ -815,6 +815,91 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'object:create',
+      label: '🏗️ Создать объект',
+      category: 'Объект',
+      description: 'Создает объект из пар ключ-значение.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'object', name: 'Объект', type: 'Object' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'object:get',
+      label: '📤 Получить значение',
+      category: 'Объект',
+      description: 'Получает значение по ключу из объекта.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'object', name: 'Объект', type: 'Object', required: true },
+          { id: 'key', name: 'Ключ', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'value', name: 'Значение', type: 'Any' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'object:set',
+      label: '➕ Добавить/Изменить ключ',
+      category: 'Объект',
+      description: 'Добавляет или изменяет значение по ключу в объекте.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'object', name: 'Объект', type: 'Object', required: true },
+          { id: 'key', name: 'Ключ', type: 'String', required: true },
+          { id: 'value', name: 'Значение', type: 'Any', required: true }
+        ],
+        outputs: [
+          { id: 'new_object', name: 'Новый объект', type: 'Object' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'object:delete',
+      label: '➖ Удалить ключ',
+      category: 'Объект',
+      description: 'Удаляет ключ из объекта.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'object', name: 'Объект', type: 'Object', required: true },
+          { id: 'key', name: 'Ключ', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'new_object', name: 'Новый объект', type: 'Object' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'object:has_key',
+      label: '🔍 Проверить ключ',
+      category: 'Объект',
+      description: 'Проверяет наличие ключа в объекте и возвращает значение.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'object', name: 'Объект', type: 'Object', required: true },
+          { id: 'key', name: 'Ключ', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Найден', type: 'Boolean' },
+          { id: 'value', name: 'Значение', type: 'Any' }
+        ]
+      }
+    });
+
       this.registerNodeType({
       type: 'data:get_server_players',
       label: '👥 Список игроков',
