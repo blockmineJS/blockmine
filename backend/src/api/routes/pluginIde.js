@@ -293,6 +293,28 @@ router.post('/:pluginName/file', resolvePluginPath, async (req, res) => {
         }
         
         await fse.writeFile(safePath, content, 'utf-8');
+        
+        if (relativePath === 'package.json' || relativePath.endsWith('/package.json')) {
+            try {
+                const packageJson = JSON.parse(content);
+                await prisma.installedPlugin.updateMany({
+                    where: {
+                        botId: parseInt(req.params.botId),
+                        path: req.pluginPath,
+                    },
+                    data: {
+                        name: packageJson.name || req.params.pluginName,
+                        version: packageJson.version || '1.0.0',
+                        description: packageJson.description || '',
+                        manifest: JSON.stringify(packageJson.botpanel || {}),
+                    }
+                });
+                console.log(`[Plugin IDE] Manifest обновлен для плагина ${req.params.pluginName} после сохранения package.json`);
+            } catch (manifestError) {
+                console.error(`[Plugin IDE] Ошибка обновления manifest для ${req.params.pluginName}:`, manifestError);
+            }
+        }
+        
         res.status(200).json({ message: 'Файл успешно сохранен.' });
         
     } catch (error) {
