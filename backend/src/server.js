@@ -83,7 +83,7 @@ async function runStartupMigrations() {
             if (permissions.includes('*')) {
                 const newPermissions = ALL_PERMISSIONS
                     .map(p => p.id)
-                    .filter(id => id !== '*' && id !== 'plugin:develop');
+                    .filter(id => id !== '*');
                 
                 await prisma.panelRole.update({
                     where: { id: adminRole.id },
