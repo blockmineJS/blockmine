@@ -52,7 +52,7 @@ class User {
 
     hasPermission(permissionName) {
         if (this.isOwner) return true;
-        if (!permissionName) return true;
+        if (!permissionName) return false;
 
         if (this.permissionsSet.has(permissionName)) {
             return true;

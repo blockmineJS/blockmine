@@ -357,6 +357,12 @@ class BotManager {
                     case 'register_group':
                         await this.handleGroupRegistration(botId, message.groupConfig);
                         break;
+                    case 'register_permissions':
+                        await this.handlePermissionsRegistration(botId, message);
+                        break;
+                    case 'add_permissions_to_group':
+                        await this.handleAddPermissionsToGroup(botId, message);
+                        break;
                     case 'request_user_action':
                         const { requestId, payload } = message;
                         const { targetUsername, action, data } = payload;
@@ -602,6 +608,66 @@ class BotManager {
             this.invalidateConfigCache(botId);
         } catch (error) {
             console.error(`[BotManager] Ошибка при регистрации группы '${groupConfig.name}':`, error);
+        }
+    }
+
+    async handlePermissionsRegistration(botId, message) {
+        try {
+            const { permissions } = message;
+            for (const perm of permissions) {
+                if (!perm.name || !perm.owner) {
+                    console.warn(`[BotManager] Пропущено право без имени или владельца для бота ${botId}:`, perm);
+                    continue;
+                }
+                await prisma.permission.upsert({
+                    where: { botId_name: { botId, name: perm.name } },
+                    update: { description: perm.description },
+                    create: {
+                        botId,
+                        name: perm.name,
+                        description: perm.description || '',
+                        owner: perm.owner,
+                    },
+                });
+            }
+            this.invalidateConfigCache(botId);
+        } catch (error) {
+            console.error(`[BotManager] Ошибка при регистрации прав для бота ${botId}:`, error);
+        }
+    }
+
+    async handleAddPermissionsToGroup(botId, message) {
+        try {
+            const { groupName, permissionNames } = message;
+            
+            const group = await prisma.group.findUnique({
+                where: { botId_name: { botId, name: groupName } }
+            });
+
+            if (!group) {
+                console.warn(`[BotManager] Попытка добавить права в несуществующую группу "${groupName}" для бота ID ${botId}.`);
+                return;
+            }
+
+            for (const permName of permissionNames) {
+                const permission = await prisma.permission.findUnique({
+                    where: { botId_name: { botId, name: permName } }
+                });
+
+                if (permission) {
+                    await prisma.groupPermission.upsert({
+                        where: { groupId_permissionId: { groupId: group.id, permissionId: permission.id } },
+                        update: {},
+                        create: { groupId: group.id, permissionId: permission.id },
+                    });
+                } else {
+                    console.warn(`[BotManager] Право "${permName}" не найдено для бота ID ${botId} при добавлении в группу "${groupName}".`);
+                }
+            }
+            
+            this.invalidateConfigCache(botId);
+        } catch (error) {
+            console.error(`[BotManager] Ошибка при добавлении прав в группу "${message.groupName}" для бота ${botId}:`, error);
         }
     }
 
