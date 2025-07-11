@@ -67,8 +67,8 @@ class PluginManager {
         await fse.mkdir(botPluginsDir, { recursive: true });
 
         if (!isUpdate) {
-            const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
-            if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
+        const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
+        if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
         }
 
         try {

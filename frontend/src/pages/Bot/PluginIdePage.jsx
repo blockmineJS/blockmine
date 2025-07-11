@@ -205,12 +205,32 @@ export default function PluginIdePage() {
                     repositoryUrl: prForm.originalRepo
                 }),
             });
+            
+            console.log('PR Response:', response);
+            
             if (response.success) {
-                window.open(response.prUrl, '_blank');
-                toast({ title: 'Успех', description: 'PR успешно создан и открыт.' });
+                console.log('Opening PR URL:', response.prUrl);
+                const opened = window.open(response.prUrl, '_blank');
+                
+                if (!opened) {
+                    console.warn('Popup blocked by browser');
+                    toast({ 
+                        title: 'PR создан', 
+                        description: `${response.message}. Откройте ссылку: ${response.prUrl}`,
+                        duration: 10000 
+                    });
+                } else {
+                    toast({ 
+                        title: 'Успех', 
+                        description: response.message || 'PR успешно создан и открыт.' 
+                    });
+                }
                 setIsPrDialogOpen(false);
+            } else {
+                toast({ variant: 'destructive', title: 'Ошибка', description: 'Неожиданный ответ от сервера' });
             }
         } catch (error) {
+            console.error('PR Error:', error);
             toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
         } finally {
             setIsPrLoading(false);

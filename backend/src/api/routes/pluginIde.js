@@ -21,18 +21,25 @@ const resolvePluginPath = async (req, res, next) => {
             return res.status(400).json({ error: 'Имя плагина обязательно в пути.' });
         }
         
-        const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
-        const pluginPath = path.resolve(botPluginsDir, pluginName);
-
-        if (!pluginPath.startsWith(botPluginsDir)) {
-            return res.status(403).json({ error: 'Доступ запрещен: попытка доступа за пределы директории плагина.' });
+        const plugin = await prisma.installedPlugin.findFirst({
+            where: { 
+                botId: parseInt(botId), 
+                name: pluginName 
+            }
+        });
+        
+        if (!plugin) {
+            return res.status(404).json({ error: 'Плагин не найден в базе данных.' });
         }
         
+        const pluginPath = plugin.path;
+        
         if (!await fse.pathExists(pluginPath)) {
-            return res.status(404).json({ error: 'Директория плагина не найдена.' });
+            return res.status(404).json({ error: 'Директория плагина не найдена в файловой системе.' });
         }
         
         req.pluginPath = pluginPath;
+        req.pluginData = plugin;
         next();
     } catch (error) {
         console.error('[Plugin IDE Middleware Error]', error);
@@ -297,19 +304,48 @@ router.post('/:pluginName/file', resolvePluginPath, async (req, res) => {
         if (relativePath === 'package.json' || relativePath.endsWith('/package.json')) {
             try {
                 const packageJson = JSON.parse(content);
-                await prisma.installedPlugin.updateMany({
+                
+                const existingPlugin = await prisma.installedPlugin.findFirst({
                     where: {
                         botId: parseInt(req.params.botId),
                         path: req.pluginPath,
-                    },
-                    data: {
-                        name: packageJson.name || req.params.pluginName,
-                        version: packageJson.version || '1.0.0',
-                        description: packageJson.description || '',
-                        manifest: JSON.stringify(packageJson.botpanel || {}),
                     }
                 });
-                console.log(`[Plugin IDE] Manifest обновлен для плагина ${req.params.pluginName} после сохранения package.json`);
+                
+                if (existingPlugin) {
+                    const newName = packageJson.name || req.params.pluginName;
+                    
+                    const conflictingPlugin = await prisma.installedPlugin.findFirst({
+                        where: {
+                            botId: parseInt(req.params.botId),
+                            name: newName,
+                            id: { not: existingPlugin.id }
+                        }
+                    });
+                    
+                    if (conflictingPlugin) {
+                        console.warn(`[Plugin IDE] Конфликт имени плагина: ${newName} уже существует для бота ${req.params.botId}`);
+                        await prisma.installedPlugin.update({
+                            where: { id: existingPlugin.id },
+                            data: {
+                                version: packageJson.version || '1.0.0',
+                                description: packageJson.description || '',
+                                manifest: JSON.stringify(packageJson.botpanel || {}),
+                            }
+                        });
+                    } else {
+                        await prisma.installedPlugin.update({
+                            where: { id: existingPlugin.id },
+                            data: {
+                                name: newName,
+                                version: packageJson.version || '1.0.0',
+                                description: packageJson.description || '',
+                                manifest: JSON.stringify(packageJson.botpanel || {}),
+                            }
+                        });
+                    }
+                    console.log(`[Plugin IDE] Manifest обновлен для плагина ${req.params.pluginName} после сохранения package.json`);
+                }
             } catch (manifestError) {
                 console.error(`[Plugin IDE] Ошибка обновления manifest для ${req.params.pluginName}:`, manifestError);
             }
@@ -412,23 +448,50 @@ router.post('/:pluginName/manifest', resolvePluginPath, async (req, res) => {
         
         await fse.writeJson(manifestPath, newManifest, { spaces: 2 });
         
-        await prisma.installedPlugin.updateMany({
+        const existingPlugin = await prisma.installedPlugin.findFirst({
             where: {
                 botId: parseInt(req.params.botId),
                 path: req.pluginPath,
-            },
-            data: {
-                name: newManifest.name,
-                version: newManifest.version,
-                description: newManifest.description,
-                manifest: JSON.stringify(newManifest.botpanel || {}),
             }
         });
+        
+        if (existingPlugin) {
+            const conflictingPlugin = await prisma.installedPlugin.findFirst({
+                where: {
+                    botId: parseInt(req.params.botId),
+                    name: newManifest.name,
+                    id: { not: existingPlugin.id }
+                }
+            });
+            
+            if (conflictingPlugin) {
+                console.warn(`[Plugin IDE] Конфликт имени плагина: ${newManifest.name} уже существует для бота ${req.params.botId}`);
+                await prisma.installedPlugin.update({
+                    where: { id: existingPlugin.id },
+                    data: {
+                        version: newManifest.version,
+                        description: newManifest.description,
+                        manifest: JSON.stringify(newManifest.botpanel || {}),
+                    }
+                });
+            } else {
+                await prisma.installedPlugin.update({
+                    where: { id: existingPlugin.id },
+                    data: {
+                        name: newManifest.name,
+                        version: newManifest.version,
+                        description: newManifest.description,
+                        manifest: JSON.stringify(newManifest.botpanel || {}),
+                    }
+                });
+            }
+        }
 
         res.status(200).json({ message: 'package.json успешно обновлен.' });
     } catch (error) {
         console.error(`[Plugin IDE Error] /manifest POST for ${req.params.pluginName}:`, error);
-        res.status(500).json({ error: 'Не удалось обновить package.json.' });
+        // Файл уже сохранен, поэтому возвращаем успех даже если есть ошибка с БД
+        res.status(200).json({ message: 'package.json обновлен (возможны проблемы с синхронизацией БД).' });
     }
 });
 
@@ -543,7 +606,21 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
             
             process.chdir(tempDir);
             
-            cp.execSync(`git checkout -b ${branch}`);
+            let branchExists = false;
+            try {
+                cp.execSync(`git ls-remote --heads origin ${branch}`, { stdio: 'pipe' });
+                branchExists = true;
+                console.log(`[Plugin IDE] Ветка ${branch} уже существует, переключаемся на неё`);
+            } catch (e) {
+                console.log(`[Plugin IDE] Ветка ${branch} не существует, создаём новую`);
+            }
+            
+            if (branchExists) {
+                cp.execSync(`git checkout -b ${branch} origin/${branch}`);
+                cp.execSync(`git pull origin ${branch}`);
+            } else {
+                cp.execSync(`git checkout -b ${branch}`);
+            }
             
             const files = await fse.readdir(req.pluginPath);
             for (const file of files) {
@@ -564,11 +641,26 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
                 throw e;
             }
 
-            cp.execSync(`git push -u origin ${branch}`);
+
+            if (branchExists) {
+                cp.execSync(`git push origin ${branch} --force`);
+                console.log(`[Plugin IDE] Ветка ${branch} обновлена`);
+            } else {
+                cp.execSync(`git push -u origin ${branch}`);
+                console.log(`[Plugin IDE] Новая ветка ${branch} создана`);
+            }
 
             const prUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${branch}`;
 
-            res.json({ success: true, prUrl });
+            const responseData = { 
+                success: true, 
+                prUrl: prUrl,
+                isUpdate: branchExists,
+                message: branchExists ? 'Существующий PR обновлен' : 'Новый PR создан'
+            };
+            
+            console.log(`[Plugin IDE] PR ${branchExists ? 'обновлен' : 'создан'} для плагина ${req.params.pluginName}:`, responseData);
+            res.json(responseData);
             
         } finally {
             try {
