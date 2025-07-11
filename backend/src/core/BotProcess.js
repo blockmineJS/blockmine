@@ -514,11 +514,13 @@ process.on('message', async (message) => {
             });
 
             bot.on('entitySpawn', (entity) => {
+                if (!isReady) return;
                 const serialized = serializeEntity(entity);
                 sendEvent('entitySpawn', { entity: serialized });
             });
 
             bot.on('entityMoved', (entity) => {
+                if (!isReady) return;
                 const now = Date.now();
                 const lastSent = entityMoveThrottles.get(entity.id);
                 if (!lastSent || now - lastSent > 500) {
@@ -528,6 +530,7 @@ process.on('message', async (message) => {
             });
 
             bot.on('entityGone', (entity) => {
+                if (!isReady) return;
                 sendEvent('entityGone', { entity: serializeEntity(entity) });
                 entityMoveThrottles.delete(entity.id);
             });
@@ -536,7 +539,7 @@ process.on('message', async (message) => {
                 sendLog('[Event: spawn] Бот заспавнился в мире.');
                 setTimeout(() => {
                     isReady = true;
-                    sendLog('[BotProcess] Бот готов к приему событий playerJoined/playerLeft.');
+                    sendLog('[BotProcess] Бот готов к приему событий.');
                 }, 3000);
             });
         } catch (err) {
