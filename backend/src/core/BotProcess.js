@@ -211,8 +211,39 @@ process.on('message', async (message) => {
                     const userData = await UserService.getUser(username, bot.config.id, bot.config);
                     if (!userData) return null;
 
+                    const permissions = userData.permissionsSet ? Array.from(userData.permissionsSet) : [];
+
                     return {
-                        ...userData,
+                        id: userData.id,
+                        username: userData.username,
+                        isOwner: userData.isOwner,
+                        isBlacklisted: userData.isBlacklisted,
+                        permissions: permissions,
+                        groups: userData.groups,
+                        hasPermission: (permissionName) => {
+                            if (userData.isOwner) return true;
+                            if (!permissionName) return false;
+
+                            if (permissions.includes(permissionName)) {
+                                return true;
+                            }
+
+                            const permissionParts = permissionName.split('.');
+                            if (permissionParts.length > 1) {
+                                const domain = permissionParts[0];
+                                const wildcard = `${domain}.*`;
+                                if (permissions.includes(wildcard)) {
+                                    return true;
+                                }
+                            }
+                            
+                            if (permissions.includes('*')) {
+                                return true;
+                            }
+
+                            return false;
+                        },
+                        hasGroup: (groupName) => userData.hasGroup(groupName),
                         addGroup: (group) => bot.api.performUserAction(username, 'addGroup', { group }),
                         removeGroup: (group) => bot.api.performUserAction(username, 'removeGroup', { group }),
                         addPermission: (permission) => bot.api.performUserAction(username, 'addPermission', { permission }),
