@@ -143,6 +143,11 @@ function CustomNode({ data, type, id: nodeId }) {
     <Card className="min-w-64 bg-slate-800 border-slate-600 text-white">
       <CardHeader className="bg-slate-700 p-2 rounded-t-lg">
         <CardTitle className="text-sm text-center">{nodeConfig.name || nodeConfig.label}</CardTitle>
+        {nodeConfig.description && (
+          <p className="text-xs text-slate-300 text-center mt-1 leading-tight">
+            {nodeConfig.description}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="p-2 flex flex-col">
         {type === 'data:cast' && (
@@ -190,6 +195,7 @@ function CustomNode({ data, type, id: nodeId }) {
                 </Select>
             </div>
         )}
+
         {false && type === 'math:random_number' && (
           <div className="p-2 space-y-2">
             <div>

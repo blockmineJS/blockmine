@@ -454,7 +454,7 @@ class NodeRegistry {
     this.registerNodeType({
       type: 'data:array_literal',
       label: '📋 Массив',
-      category: 'Данные',
+      category: 'Массив',
       description: 'Создает массив из элементов.',
       graphType: all,
       dynamicPins: true,
@@ -500,7 +500,7 @@ class NodeRegistry {
     this.registerNodeType({
       type: 'data:length',
       label: '📏 Размер (длина)',
-      category: 'Данные',
+      category: 'Массив',
       graphType: 'all',
       description: 'Возвращает количество элементов в массиве или длину строки.',
       pins: {
@@ -715,7 +715,7 @@ class NodeRegistry {
     this.registerNodeType({
       type: 'array:get_random_element',
       label: '🎲 Случайный элемент',
-      category: 'Данные',
+      category: 'Массив',
       graphType: 'all',
       description: 'Возвращает случайный элемент из массива и его индекс.',
       pins: {
@@ -730,6 +730,92 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'array:contains',
+      label: '🔍 Массив: Содержит',
+      category: 'Массив',
+      description: 'Проверяет, содержит ли массив указанный элемент и возвращает его индекс.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'element', name: 'Элемент', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Найден', type: 'Boolean' },
+          { id: 'index', name: 'Индекс', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:get_by_index',
+      label: '📦 Элемент по индексу',
+      category: 'Массив',
+      description: 'Получает элемент массива по его индексу.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'index', name: 'Индекс', type: 'Number', required: true }
+        ],
+        outputs: [
+          { id: 'element', name: 'Элемент', type: 'Any' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:add_element',
+      label: '➕ Добавить элемент',
+      category: 'Массив',
+      description: 'Добавляет элемент в конец массива.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'element', name: 'Элемент', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Новый массив', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:remove_by_index',
+      label: '➖ Удалить по индексу',
+      category: 'Массив',
+      description: 'Удаляет элемент из массива по его индексу.',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'index', name: 'Индекс', type: 'Number', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Новый массив', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:find_index',
+      label: '🔍 Найти индекс',
+      category: 'Массив',
+      description: 'Находит индекс элемента в массиве (или -1 если не найден).',
+      graphType: all,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'element', name: 'Элемент', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'index', name: 'Индекс', type: 'Number' }
+        ]
+      }
+    });
+
+      this.registerNodeType({
       type: 'data:get_server_players',
       label: '👥 Список игроков',
       category: 'Данные',
@@ -810,20 +896,6 @@ class NodeRegistry {
         }
     });
     
-    // Переменные
-    this.registerNodeType({
-      type: 'variable:get',
-      label: '📤 Получить переменную',
-      category: 'Переменные',
-      description: 'Получает значение переменной графа.',
-      graphType: event,
-      pins: {
-          inputs: [],
-          outputs: [
-              { id: 'value', name: 'Значение', type: 'Wildcard' }
-          ]
-      }
-    });
 
     this.registerNodeType({
       type: 'user:get_groups',
