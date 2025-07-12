@@ -30,12 +30,9 @@ export default function PluginDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
     const { toast } = useToast();
 
-    // Симулируем дополнительные данные
     const [stats] = useState({
-        rating: 4.5,
-        reviews: 128,
         weeklyDownloads: 1234,
-        lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 дней назад
+        lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         license: 'MIT',
         size: '2.4 MB'
     });
@@ -121,7 +118,6 @@ export default function PluginDetailPage() {
         );
     }
 
-    // Галерея скриншотов (заглушки)
     const screenshots = [
         'https://via.placeholder.com/800x600/1e293b/64748b?text=Screenshot+1',
         'https://via.placeholder.com/800x600/1e293b/64748b?text=Screenshot+2',
@@ -130,7 +126,6 @@ export default function PluginDetailPage() {
 
     return (
         <div className="h-full overflow-y-auto">
-            {/* Герой секция с градиентом */}
             <div className="relative bg-gradient-to-br from-primary/20 via-purple-600/20 to-pink-600/20 p-8">
                 <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,rgba(255,255,255,0.6))]" />
                 
@@ -151,19 +146,6 @@ export default function PluginDetailPage() {
                             
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                                 <span>от {plugin.author}</span>
-                                <Separator orientation="vertical" className="h-4" />
-                                <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star 
-                                            key={i} 
-                                            className={cn(
-                                                "h-4 w-4",
-                                                i < Math.floor(stats.rating) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"
-                                            )}
-                                        />
-                                    ))}
-                                    <span className="ml-1">{stats.rating} ({stats.reviews})</span>
-                                </div>
                                 <Separator orientation="vertical" className="h-4" />
                                 <span>v{plugin.latestTag.replace('v','')}</span>
                             </div>
@@ -247,7 +229,6 @@ export default function PluginDetailPage() {
                 </div>
             </div>
 
-            {/* Статистика */}
             <div className="max-w-6xl mx-auto p-8">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <Card className="text-center p-4">
@@ -272,13 +253,11 @@ export default function PluginDetailPage() {
                     </Card>
                 </div>
 
-                {/* Табы с контентом */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="overview">Обзор</TabsTrigger>
                         <TabsTrigger value="screenshots">Скриншоты</TabsTrigger>
                         <TabsTrigger value="changelog">Изменения</TabsTrigger>
-                        <TabsTrigger value="reviews">Отзывы</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="overview" className="mt-6">
@@ -383,19 +362,6 @@ export default function PluginDetailPage() {
                                         </ul>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    
-                    <TabsContent value="reviews" className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Отзывы пользователей</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-center text-muted-foreground py-8">
-                                    Отзывы пока недоступны
-                                </p>
                             </CardContent>
                         </Card>
                     </TabsContent>
