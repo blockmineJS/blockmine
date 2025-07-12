@@ -1,16 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy } from 'lucide-react';
+import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy, LayoutGrid, List, Package, Activity, GitBranch, CheckCircle2, AlertCircle, Clock, Gauge } from 'lucide-react';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { cn } from '@/lib/utils';
+import * as Icons from 'lucide-react';
 
-function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork }) {
+const IconComponent = ({ name, ...props }) => {
+    if (!name) return <Package {...props} />;
+    if (name.startsWith('/') || name.startsWith('http')) return <img src={name} alt="plugin icon" {...props} />;
+    const iconName = name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+    const LucideIcon = Icons[iconName] || Package;
+    return <LucideIcon {...props} />;
+};
+
+function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork, viewMode = 'grid' }) {
     const navigate = useNavigate();
+    const [isHovered, setIsHovered] = useState(false);
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
     const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
     const isEditable = plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE';
@@ -24,94 +37,324 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
         return (now - installDate) < oneDay;
     }, [plugin.createdAt]);
 
-    return (
-        <div className="flex items-start gap-4 p-4 border-b transition-colors hover:bg-muted/50 last:border-b-0">
-            <div className="flex-grow">
-                <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-lg">{plugin.name}</h3>
+    const lastUpdated = useMemo(() => {
+        if (!plugin.updatedAt) return null;
+        const date = new Date(plugin.updatedAt);
+        const days = Math.floor((Date.now() - date) / (1000 * 60 * 60 * 24));
+        if (days === 0) return 'Сегодня';
+        if (days === 1) return 'Вчера';
+        if (days < 7) return `${days} дней назад`;
+        if (days < 30) return `${Math.floor(days / 7)} недель назад`;
+        return `${Math.floor(days / 30)} месяцев назад`;
+    }, [plugin.updatedAt]);
+
+    if (viewMode === 'list') {
+        return (
+            <div 
+                className={cn(
+                    "relative flex items-start gap-4 p-4 border rounded-lg transition-all duration-300",
+                    "hover:border-primary/50 hover:bg-muted/50 hover:shadow-md",
+                    plugin.isEnabled ? "border-green-600/30 bg-green-950/20" : "opacity-80",
+                    isHovered && "transform scale-[1.01]"
+                )}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+            >
+                {plugin.isEnabled && (
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-500 to-green-700 rounded-l-lg" />
+                )}
+                
+                <div className={cn(
+                    "relative shrink-0 mt-1 transition-transform duration-300",
+                    isHovered && "scale-110 rotate-3"
+                )}>
+                    <IconComponent 
+                        name={plugin.manifest?.icon} 
+                        className={cn(
+                            "h-12 w-12",
+                            plugin.isEnabled ? "text-primary" : "text-muted-foreground",
+                            isHovered && "drop-shadow-glow"
+                        )} 
+                    />
                     {isNew && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    )}
+                </div>
+
+                <div className="flex-grow min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <h3 className={cn(
+                            "font-semibold text-lg transition-colors",
+                            isHovered && "gradient-text"
+                        )}>{plugin.name}</h3>
+                        {isNew && (
+                            <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Новое
+                            </Badge>
+                        )}
+                        {updateInfo && (
+                            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 text-xs animate-pulse">
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                Обновление
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        от <span className="font-medium text-primary/90">{plugin.author || 'Неизвестный автор'}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{plugin.description || 'Нет описания.'}</p>
+                    
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
+                        <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'outline'} className="text-xs">
+                            {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
+                            {plugin.sourceType}
+                        </Badge>
+                        {plugin.manifest?.categories?.map(category => (
+                            <Badge key={category} variant="secondary" className="text-xs">
+                                {category}
+                            </Badge>
+                        ))}
+                        {lastUpdated && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {lastUpdated}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                    {updateInfo && (
+                        <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
+                            onClick={() => onUpdate.handle(plugin.id)} 
+                            disabled={isUpdatingThisPlugin}
+                        >
+                            {isUpdatingThisPlugin ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <ArrowUpCircle className="h-4 w-4 mr-1" />
+                                    v{updateInfo.recommendedVersion}
+                                </>
+                            )}
+                        </Button>
+                    )}
+                    <div className="flex gap-1">
+                        {isEditable && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
+                                        <Code className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Редактировать код</TooltipContent>
+                            </Tooltip>
+                        )}
+                        {isForkable && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFork(plugin)}>
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Создать локальную копию</TooltipContent>
+                            </Tooltip>
+                        )}
+                        {hasSettings && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
+                                        <Settings className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Настройки</TooltipContent>
+                            </Tooltip>
+                        )}
                         <Tooltip>
-                            <TooltipTrigger>
-                                <Badge variant="success" className="bg-green-600/80 hover:bg-green-600">
-                                    <Sparkles className="h-3 w-3 mr-1" />
-                                    Новое
-                                </Badge>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Установлен менее 24 часов назад</TooltipContent>
+                            <TooltipContent>Удалить</TooltipContent>
+                        </Tooltip>
+                    </div>
+                    <Switch
+                        checked={plugin.isEnabled}
+                        onCheckedChange={(checked) => onToggle(plugin, checked)}
+                        className="ml-2"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <Card 
+            className={cn(
+                "relative overflow-hidden transition-all duration-300 plugin-card-hover group h-full",
+                "hover:border-primary/50 hover:shadow-xl",
+                plugin.isEnabled ? "border-green-600/50" : "opacity-80"
+            )}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <div className={cn(
+                "absolute inset-0 opacity-0 transition-opacity duration-300",
+                "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
+                isHovered && "opacity-100"
+            )} />
+            
+            {plugin.isEnabled && (
+                <div className="absolute top-0 right-0 bg-gradient-to-bl from-green-600 to-green-700 text-white p-6 rounded-bl-[40px] shadow-lg z-10">
+                    <Power className="h-5 w-5 absolute top-2 right-2" />
+                </div>
+            )}
+            
+            {(isNew || updateInfo) && (
+                <div className="absolute top-2 left-2 z-10 space-y-1">
+                    {isNew && (
+                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 flex">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Новое
+                        </Badge>
+                    )}
+                    {updateInfo && (
+                        <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 flex animate-pulse">
+                            <ArrowUpCircle className="h-3 w-3 mr-1" />
+                            Обновление
+                        </Badge>
+                    )}
+                </div>
+            )}
+            
+            <CardHeader className="relative z-10">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                        <IconComponent 
+                            name={plugin.manifest?.icon} 
+                            className={cn(
+                                "h-10 w-10 transition-all duration-300",
+                                plugin.isEnabled ? "text-primary" : "text-muted-foreground",
+                                isHovered && "scale-110 rotate-3 drop-shadow-glow"
+                            )} 
+                        />
+                        <div>
+                            <CardTitle className={cn(
+                                "text-xl transition-all duration-300",
+                                isHovered && "gradient-text"
+                            )}>
+                                {plugin.name}
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                                от {plugin.author || 'Неизвестный автор'}
+                            </CardDescription>
+                        </div>
+                    </div>
+                    <Switch
+                        checked={plugin.isEnabled}
+                        onCheckedChange={(checked) => onToggle(plugin, checked)}
+                        className="mt-1"
+                    />
+                </div>
+            </CardHeader>
+            
+            <CardContent className="relative z-10 space-y-4">
+                <p className="text-sm text-muted-foreground line-clamp-3">
+                    {plugin.description || 'Нет описания.'}
+                </p>
+                
+                <div className="flex flex-wrap gap-1">
+                    <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
+                    <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'outline'} className="text-xs">
+                        {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
+                        {plugin.sourceType}
+                    </Badge>
+                    {plugin.manifest?.categories?.map(category => (
+                        <Badge key={category} variant="secondary" className="text-xs">
+                            {category}
+                        </Badge>
+                    ))}
+                </div>
+                
+                {lastUpdated && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Обновлено {lastUpdated}
+                    </div>
+                )}
+            </CardContent>
+            
+            <CardFooter className="relative z-10 flex flex-col gap-3 mt-auto pt-4 border-t">
+                {updateInfo && (
+                    <Button 
+                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
+                        size="sm"
+                        onClick={() => onUpdate.handle(plugin.id)} 
+                        disabled={isUpdatingThisPlugin}
+                    >
+                        {isUpdatingThisPlugin ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Обновление...
+                            </>
+                        ) : (
+                            <>
+                                <ArrowUpCircle className="mr-2 h-4 w-4" />
+                                Обновить до v{updateInfo.recommendedVersion}
+                            </>
+                        )}
+                    </Button>
+                )}
+                
+                <div className="flex gap-2 w-full">
+                    {isEditable && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
+                                    <Code className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Редактировать код</TooltipContent>
                         </Tooltip>
                     )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    от <span className="font-semibold">
-                        {plugin.displayName || plugin.name}
-                    </span>
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">{plugin.description || 'Нет описания.'}</p>
-                
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <Badge variant="outline">v{plugin.version}</Badge>
-                    <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'default'}>{plugin.sourceType}</Badge>
-                    {plugin.manifest?.categories?.map(category => (
-                         <Badge key={category} variant="secondary">{category}</Badge>
-                    ))}
-                    {updateInfo && (
-                        <Button size="sm" variant="ghost" className="h-auto px-2 py-1 text-green-400 hover:bg-green-900/50 hover:text-green-300" onClick={() => onUpdate.handle(plugin.id)} disabled={isUpdatingThisPlugin}>
-                            {isUpdatingThisPlugin ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ArrowUpCircle className="h-4 w-4 mr-1" />}
-                            Обновить до v{updateInfo.recommendedVersion}
-                        </Button>
+                    {isForkable && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => onFork(plugin)}>
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Создать копию</TooltipContent>
+                        </Tooltip>
                     )}
+                    {hasSettings && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
+                                    <Settings className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Настройки</TooltipContent>
+                        </Tooltip>
+                    )}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Удалить</TooltipContent>
+                    </Tooltip>
                 </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 ml-4">
-                {isEditable && (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
-                                <Code className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Редактировать код</p></TooltipContent>
-                    </Tooltip>
-                )}
-                {isForkable && (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => onFork(plugin)}>
-                                <Copy className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Создать локальную копию для редактирования</p></TooltipContent>
-                    </Tooltip>
-                )}
-                {hasSettings && (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
-                                <Settings className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Настройки плагина</p></TooltipContent>
-                    </Tooltip>
-                )}
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
-                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Удалить (только выключенный плагин)</p></TooltipContent>
-                </Tooltip>
-                <Switch
-                    checked={plugin.isEnabled}
-                    onCheckedChange={(checked) => onToggle(plugin, checked)}
-                    aria-label={plugin.isEnabled ? 'Выключить плагин' : 'Включить плагин'}
-                />
-            </div>
-        </div>
+            </CardFooter>
+        </Card>
     );
 }
-
 
 export default function InstalledPluginsView({ 
     bot, 
@@ -126,15 +369,20 @@ export default function InstalledPluginsView({
 }) {
     const [selectedPlugin, setSelectedPlugin] = useState(null);
     const [filter, setFilter] = useState('all');
+    const [viewMode, setViewMode] = useState('grid');
     const [pluginToDelete, setPluginToDelete] = useState(null);
 
     const stats = useMemo(() => {
         const enabled = installedPlugins.filter(p => p.isEnabled).length;
+        const local = installedPlugins.filter(p => p.sourceType === 'LOCAL' || p.sourceType === 'LOCAL_IDE').length;
+        const github = installedPlugins.filter(p => p.sourceType === 'GITHUB').length;
         return {
             total: installedPlugins.length,
             enabled: enabled,
             disabled: installedPlugins.length - enabled,
             updates: Object.keys(updates).length,
+            local,
+            github
         };
     }, [installedPlugins, updates]);
 
@@ -147,7 +395,11 @@ export default function InstalledPluginsView({
             case 'disabled':
                 return sorted.filter(p => !p.isEnabled);
             case 'updates':
-                 return sorted.filter(p => updates[p.sourceUri]);
+                return sorted.filter(p => updates[p.sourceUri]);
+            case 'local':
+                return sorted.filter(p => p.sourceType === 'LOCAL' || p.sourceType === 'LOCAL_IDE');
+            case 'github':
+                return sorted.filter(p => p.sourceType === 'GITHUB');
             default:
                 return sorted;
         }
@@ -155,32 +407,199 @@ export default function InstalledPluginsView({
 
     return (
         <TooltipProvider delayDuration={100}>
-            <div className="p-4 flex flex-col h-full">
-                <div className="flex items-center gap-2 mb-4 shrink-0">
-                    <Button variant={filter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('all')}>Все ({stats.total})</Button>
-                    <Button variant={filter === 'enabled' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('enabled')}><Power className="mr-1 h-4 w-4"/>Включенные ({stats.enabled})</Button>
-                    <Button variant={filter === 'disabled' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('disabled')}><PowerOff className="mr-1 h-4 w-4"/>Выключенные ({stats.disabled})</Button>
-                    {stats.updates > 0 && <Button variant={filter === 'updates' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('updates')} className="text-green-400"><ArrowUpCircle className="mr-1 h-4 w-4"/>С обновлениями ({stats.updates})</Button>}
+            <div className="flex flex-col h-full">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-muted/30 border-b">
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <Package className="h-5 w-5 text-primary" />
+                            <div>
+                                <p className="text-2xl font-bold">{stats.total}</p>
+                                <p className="text-xs text-muted-foreground">Всего</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <Power className="h-5 w-5 text-green-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-green-500">{stats.enabled}</p>
+                                <p className="text-xs text-muted-foreground">Активно</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <PowerOff className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                                <p className="text-2xl font-bold">{stats.disabled}</p>
+                                <p className="text-xs text-muted-foreground">Выключено</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <ArrowUpCircle className="h-5 w-5 text-blue-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-blue-500">{stats.updates}</p>
+                                <p className="text-xs text-muted-foreground">Обновлений</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <Code className="h-5 w-5 text-purple-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-purple-500">{stats.local}</p>
+                                <p className="text-xs text-muted-foreground">Локальные</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <GitBranch className="h-5 w-5 text-orange-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-orange-500">{stats.github}</p>
+                                <p className="text-xs text-muted-foreground">GitHub</p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4 border-b">
+                    <div className="flex items-center gap-2">
+                        <Button 
+                            variant={filter === 'all' ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => setFilter('all')}
+                            className={cn(filter === 'all' && "bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:text-white")}
+                        >
+                            Все ({stats.total})
+                        </Button>
+                        <Button 
+                            variant={filter === 'enabled' ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => setFilter('enabled')}
+                            className={cn(filter === 'enabled' && "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:text-white")}
+                        >
+                            <Power className="mr-1 h-4 w-4"/>
+                            Включенные ({stats.enabled})
+                        </Button>
+                        <Button 
+                            variant={filter === 'disabled' ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => setFilter('disabled')}
+                        >
+                            <PowerOff className="mr-1 h-4 w-4"/>
+                            Выключенные ({stats.disabled})
+                        </Button>
+                        {stats.updates > 0 && (
+                            <Button 
+                                variant={filter === 'updates' ? 'secondary' : 'ghost'} 
+                                size="sm" 
+                                onClick={() => setFilter('updates')} 
+                                className={cn(
+                                    "animate-pulse",
+                                    filter === 'updates' && "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:text-white"
+                                )}
+                            >
+                                <ArrowUpCircle className="mr-1 h-4 w-4"/>
+                                Обновления ({stats.updates})
+                            </Button>
+                        )}
+                        <Button 
+                            variant={filter === 'local' ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => setFilter('local')}
+                            className={cn(filter === 'local' && "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:text-white")}
+                        >
+                            <Code className="mr-1 h-4 w-4"/>
+                            Локальные ({stats.local})
+                        </Button>
+                        <Button 
+                            variant={filter === 'github' ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => setFilter('github')}
+                            className={cn(filter === 'github' && "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:text-white")}
+                        >
+                            <GitBranch className="mr-1 h-4 w-4"/>
+                            GitHub ({stats.github})
+                        </Button>
+                    </div>
+                    
+                    <Tabs value={viewMode} onValueChange={setViewMode}>
+                        <TabsList>
+                            <TabsTrigger value="grid" className="flex items-center gap-2">
+                                <LayoutGrid className="h-4 w-4" />
+                                Сетка
+                            </TabsTrigger>
+                            <TabsTrigger value="list" className="flex items-center gap-2">
+                                <List className="h-4 w-4" />
+                                Список
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto border rounded-lg">
+                <div className="flex-1 overflow-y-auto p-4">
                     {sortedAndFilteredPlugins.length > 0 ? (
-                        sortedAndFilteredPlugins.map((p) => (
-                            <InstalledPluginCard
-                                key={p.id}
-                                plugin={p}
-                                botId={bot.id}
-                                updateInfo={updates[p.sourceUri]}
-                                onToggle={onTogglePlugin}
-                                onDelete={() => setPluginToDelete(p)}
-                                onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
-                                onOpenSettings={setSelectedPlugin}
-                                onFork={onForkPlugin}
-                            />
-                        ))
+                        viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in slide-in-from-bottom duration-500">
+                                {sortedAndFilteredPlugins.map((plugin, index) => (
+                                    <div
+                                        key={plugin.id}
+                                        className="animate-in slide-in-from-bottom duration-300"
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                    >
+                                        <InstalledPluginCard
+                                            plugin={plugin}
+                                            botId={bot.id}
+                                            updateInfo={updates[plugin.sourceUri]}
+                                            onToggle={onTogglePlugin}
+                                            onDelete={() => setPluginToDelete(plugin)}
+                                            onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
+                                            onOpenSettings={setSelectedPlugin}
+                                            onFork={onForkPlugin}
+                                            viewMode={viewMode}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {sortedAndFilteredPlugins.map((plugin) => (
+                                    <InstalledPluginCard
+                                        key={plugin.id}
+                                        plugin={plugin}
+                                        botId={bot.id}
+                                        updateInfo={updates[plugin.sourceUri]}
+                                        onToggle={onTogglePlugin}
+                                        onDelete={() => setPluginToDelete(plugin)}
+                                        onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
+                                        onOpenSettings={setSelectedPlugin}
+                                        onFork={onForkPlugin}
+                                        viewMode={viewMode}
+                                    />
+                                ))}
+                            </div>
+                        )
                     ) : (
-                        <div className="flex items-center justify-center h-full text-center p-10 text-muted-foreground">
-                            Нет плагинов, соответствующих фильтру.
+                        <div className="flex flex-col items-center justify-center h-full text-center p-10">
+                            <Package className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />
+                            <h3 className="text-xl font-semibold text-muted-foreground">Нет плагинов</h3>
+                            <p className="text-sm text-muted-foreground mt-2">
+                                {filter === 'all' 
+                                    ? 'У вас пока нет установленных плагинов'
+                                    : 'Нет плагинов, соответствующих выбранному фильтру'}
+                            </p>
+                            {filter !== 'all' && (
+                                <Button 
+                                    variant="outline" 
+                                    className="mt-4"
+                                    onClick={() => setFilter('all')}
+                                >
+                                    Показать все плагины
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>

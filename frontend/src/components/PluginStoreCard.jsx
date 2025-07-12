@@ -11,8 +11,6 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const [isHovered, setIsHovered] = useState(false);
     
-    const downloads = plugin.downloads || Math.floor(Math.random() * 1000) + 100;
-
     return (
         <TooltipProvider delayDuration={100}>
             <Card 
@@ -101,7 +99,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
-                            <span>{downloads}</span>
+                            <span>{plugin.downloads || 0}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Download className="h-3 w-3" />
