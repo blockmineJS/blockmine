@@ -420,6 +420,10 @@ process.on('message', async (message) => {
                 messageHandledByCustomParser = false;
                 const rawMessageText = jsonMsg.toString();
                 bot.events.emit('core:raw_message', rawMessageText, jsonMsg);
+                
+                sendEvent('raw_message', {
+                    rawText: rawMessageText
+                });
             });
 
             bot.events.on('chat:message', (data) => {

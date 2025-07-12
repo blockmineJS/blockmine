@@ -129,7 +129,23 @@ class NodeRegistry {
                 { id: 'username', type: 'String', name: 'Игрок' },
                 { id: 'message', type: 'String', name: 'Сообщение' },
                 { id: 'chatType', type: 'String', name: 'Тип чата' },
-                { id: 'raw', type: 'String', name: 'Raw JSON' },
+            ]
+        }
+    });
+
+    this.registerNodeType({
+        type: 'event:raw_message',
+        name: 'Событие: Голое сообщение',
+        label: '📝 Голое сообщение',
+        description: 'Срабатывает при получении любого сообщения в сыром виде (до парсинга).',
+        category: 'События',
+        graphType: event,
+        isEvent: true,
+        pins: {
+            inputs: [],
+            outputs: [
+                { id: 'exec', type: 'Exec', name: 'Выполнить' },
+                { id: 'rawText', type: 'String', name: 'Сырой текст' },
             ]
         }
     });
