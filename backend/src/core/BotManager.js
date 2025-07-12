@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const { decrypt } = require('./utils/crypto');
 const EventGraphManager = require('./EventGraphManager');
 const nodeRegistry = require('./NodeRegistry');
-const GraphExecutionEngine = require('./GraphExecutionEngine');
+
 
 const UserService = require('./UserService');
 
@@ -53,7 +53,6 @@ class BotManager {
         this.nodeRegistry = nodeRegistry;
         this.pendingPlayerListRequests = new Map();
         this.playerListCache = new Map();
-        this.graphEngine = new GraphExecutionEngine(this.nodeRegistry, this);
         this.eventGraphManager = null;
 
         getInstanceId();
@@ -270,7 +269,6 @@ class BotManager {
     }
 
     emitStatusUpdate(botId, status, message = null) {
-        // console.log(`[BotManager] Отправка статуса для бота ${botId}: status=${status}, message=${message || 'null'}`);
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
         getIO().emit('bot:status', { botId, status, message });
     }
@@ -505,40 +503,7 @@ class BotManager {
                 cooldowns.set(cooldownKey, now);
             }
 
-            if (dbCommand.isVisual) {
-                const graph = dbCommand.graphJson;
-                if (graph) {
-                    const players = await this.getPlayerList(botId);
-                    console.log('[BotManager] Received player list for graph:', players);
-
-                    const botAPI = {
-                        sendMessage: (type, message, recipient) => {
-                            this.sendMessageToBot(botId, message, type, recipient);
-                        },
-                        executeCommand: (command) => {
-                            this.sendServerCommandToBot(botId, command);
-                        },
-                    };
-
-                    const graphContext = {
-                        bot: botAPI,
-                        botId: botId,
-                        user,
-                        args,
-                        typeChat,
-                        players,
-                    };
-                    
-                    try {
-                        const resultContext = await this.graphEngine.execute(graph, graphContext, 'command');
-                    } catch (e) {
-                        console.error(`[BotManager] Ошибка выполнения визуальной команды '${commandName}':`, e);
-                        this.sendMessageToBot(botId, 'Произошла внутренняя ошибка при выполнении команды.', 'private', username);
-                    }
-                }
-            } else {
-                child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
-            }
+            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
 
         } catch (error) {
             console.error(`[BotManager] Command validation error for botId: ${botId}`, {
