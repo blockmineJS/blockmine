@@ -50,10 +50,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                {isPopular && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-red-500 rounded-l-lg" />
-                )}
-                
                 <div className={cn(
                     "relative shrink-0 mt-1 transition-transform duration-300",
                     isHovered && "scale-110 rotate-3"
@@ -65,9 +61,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             isHovered && "drop-shadow-glow"
                         )} 
                     />
-                    {isPopular && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" />
-                    )}
                 </div>
                 
                 <div className="flex-grow min-w-0">
@@ -130,15 +123,22 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Badge>
                         )}
                         
-                        <div className={cn(
-                            "transition-all duration-300",
-                            isAnimating && "animate-bounce"
-                        )}>
-                            <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-0.5 text-xs">
-                                <ArrowDownToLine className="h-3 w-3" />
-                                <span className="font-semibold">{plugin.downloads || 0}</span>
-                            </Badge>
-                        </div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className={cn(
+                                    "transition-all duration-300",
+                                    isAnimating && "animate-bounce"
+                                )}>
+                                    <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-help">
+                                        <ArrowDownToLine className="h-3 w-3" />
+                                        <span className="font-semibold">{plugin.downloads || 0}</span>
+                                    </Badge>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Всего загрузок: {plugin.downloads || 0}</p>
+                            </TooltipContent>
+                        </Tooltip>
                         
                         {hasDependencies && (
                             <Tooltip>
