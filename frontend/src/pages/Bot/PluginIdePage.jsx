@@ -9,23 +9,21 @@ import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
 import FileTree from '@/components/ide/FileTree';
 import { toast } from '@/hooks/use-toast';
-import ManifestEditor from '@/components/ide/ManifestEditor';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import path from 'path-browserify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Github } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { X } from 'lucide-react';
 
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
     const [structure, setStructure] = useState([]);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [fileContent, setFileContent] = useState('');
-    const [isDirty, setIsDirty] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [nodeToDelete, setNodeToDelete] = useState(null);
-    const [inlineAction, setInlineAction] = useState(null); // { mode, node }
+    const [inlineAction, setInlineAction] = useState(null);
     const [isPrDialogOpen, setIsPrDialogOpen] = useState(false);
     const [prForm, setPrForm] = useState({ 
         branch: `feature/local-changes-${new Date().toISOString().slice(0, 16).replace(/[:-]/g, '-')}`, 
@@ -33,6 +31,9 @@ export default function PluginIdePage() {
         originalRepo: '' 
     });
     const [isPrLoading, setIsPrLoading] = useState(false);
+
+    const [openTabs, setOpenTabs] = useState([]);
+    const [activeTab, setActiveTab] = useState(null);
 
     const fetchStructure = useCallback(async () => {
         setIsLoading(true);
@@ -51,11 +52,12 @@ export default function PluginIdePage() {
     }, [fetchStructure]);
 
     const handleSelectFile = async (file) => {
-        if (isDirty) {
-            if (!window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите продолжить?')) {
-                return;
-            }
+        const existingTab = openTabs.find(tab => tab.path === file.path);
+        if (existingTab) {
+            setActiveTab(file.path);
+            return;
         }
+
         try {
             const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/file?path=${encodeURIComponent(file.path)}`, {
                 headers: {
@@ -68,9 +70,9 @@ export default function PluginIdePage() {
             }
 
             const content = await response.text();
-            setSelectedFile(file);
-            setFileContent(content);
-            setIsDirty(false);
+            const newTab = { ...file, content, isDirty: false };
+            setOpenTabs(prev => [...prev, newTab]);
+            setActiveTab(file.path);
         } catch (error) {
             console.error('Failed to load file content:', error);
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить файл.' });
@@ -92,13 +94,39 @@ export default function PluginIdePage() {
         }
     };
 
+    const handleMoveFile = async (sourcePath, targetPath) => {
+        try {
+            await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/fs`, {
+                method: 'POST',
+                body: JSON.stringify({ operation: 'move', path: sourcePath, newPath: targetPath }),
+            });
+            await fetchStructure();
+            
+            setOpenTabs(prev => prev.map(tab => {
+                if (tab.path === sourcePath) {
+                    return { ...tab, path: targetPath, name: path.basename(targetPath) };
+                }
+                return tab;
+            }));
+            
+            toast({ title: 'Успех!', description: `Файл перемещен в "${path.dirname(targetPath)}"` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось переместить файл: ${error.message}`});
+            throw error;
+        }
+    };
+
     const handleDeleteNode = async () => {
         if (!nodeToDelete) return;
         await handleFileOperation('delete', nodeToDelete.path);
         
-        if (selectedFile && selectedFile.path.startsWith(nodeToDelete.path)) {
-            setSelectedFile(null);
-            setFileContent('');
+        const affectedTabs = openTabs.filter(tab => tab.path.startsWith(nodeToDelete.path));
+        if (affectedTabs.length > 0) {
+            const newTabs = openTabs.filter(tab => !tab.path.startsWith(nodeToDelete.path));
+            setOpenTabs(newTabs);
+            if (affectedTabs.some(tab => tab.path === activeTab)) {
+                setActiveTab(newTabs.length > 0 ? newTabs[newTabs.length - 1].path : null);
+            }
         }
         setNodeToDelete(null);
     };
@@ -127,9 +155,18 @@ export default function PluginIdePage() {
             }
             const newPath = path.join(path.dirname(node.path), newName);
             success = await handleFileOperation('rename', node.path, newPath);
-            if (success && selectedFile && selectedFile.path.startsWith(node.path)) {
-                const newSelectedFilePath = selectedFile.path.replace(node.path, newPath);
-                setSelectedFile(prev => ({...prev, path: newSelectedFilePath, name: path.basename(newSelectedFilePath)}));
+            if (success) {
+                setOpenTabs(prev => prev.map(tab => {
+                    if (tab.path.startsWith(node.path)) {
+                        const newTabPath = tab.path.replace(node.path, newPath);
+                        return { ...tab, path: newTabPath, name: path.basename(newTabPath) };
+                    }
+                    return tab;
+                }));
+                if (activeTab && activeTab.startsWith(node.path)) {
+                    const newActiveTab = activeTab.replace(node.path, newPath);
+                    setActiveTab(newActiveTab);
+                }
             }
         } else if (mode === 'createFile' || mode === 'createFolder') {
             const parentPath = node.type === 'folder' ? node.path : path.dirname(node.path);
@@ -145,18 +182,55 @@ export default function PluginIdePage() {
     };
 
     const handleSave = async () => {
-        if (!selectedFile || !isDirty) return;
+        if (!activeTab) return;
+        const currentTab = openTabs.find(tab => tab.path === activeTab);
+        if (!currentTab || !currentTab.isDirty) return;
         try {
             await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/file`, {
                 method: 'POST',
-                body: JSON.stringify({ path: selectedFile.path, content: fileContent }),
+                body: JSON.stringify({ path: currentTab.path, content: currentTab.content }),
             });
-            setIsDirty(false);
-            toast({ title: 'Успех', description: `Файл ${selectedFile.name} сохранен.` });
+            setOpenTabs(prev => prev.map(tab => 
+                tab.path === activeTab ? { ...tab, isDirty: false } : tab
+            ));
+            toast({ title: 'Успех', description: `Файл ${currentTab.name} сохранен.` });
         } catch(e) {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить файл.' });
         }
     };
+
+    const handleCloseTab = (tabPath, e) => {
+        e.stopPropagation();
+        const tab = openTabs.find(t => t.path === tabPath);
+        if (tab.isDirty) {
+            if (!window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть вкладку?')) {
+                return;
+            }
+        }
+        const newTabs = openTabs.filter(t => t.path !== tabPath);
+        setOpenTabs(newTabs);
+        if (activeTab === tabPath) {
+            setActiveTab(newTabs.length > 0 ? newTabs[newTabs.length - 1].path : null);
+        }
+    };
+
+    const handleEditorChange = (value) => {
+        setOpenTabs(prev => prev.map(tab => 
+            tab.path === activeTab ? { ...tab, content: value, isDirty: true } : tab
+        ));
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's' && activeTab && openTabs.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSave();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown, true);
+        return () => document.removeEventListener('keydown', handleKeyDown, true);
+    }, [activeTab, openTabs]);
 
     const getLanguage = (filename) => {
         const extension = filename.split('.').pop();
@@ -249,14 +323,14 @@ export default function PluginIdePage() {
                         <Github className="h-4 w-4 mr-2" />
                         Создать PR
                     </Button>
-                    <Button onClick={handleSave} disabled={!isDirty || !selectedFile}>
+                    <Button onClick={handleSave} disabled={!activeTab || !openTabs.find(tab => tab.path === activeTab)?.isDirty}>
                         <Save className="h-4 w-4 mr-2" />
                         Сохранить
                     </Button>
                 </div>
             </header>
             <ResizablePanelGroup direction="horizontal" className="flex-grow rounded-lg border">
-                <ResizablePanel defaultSize={20} minSize={15}>
+                <ResizablePanel defaultSize={20} minSize={10}>
                     <Card className="h-full m-1 rounded-lg flex flex-col">
                         <CardHeader className="p-2 border-b">
                             <CardTitle className="text-base p-2">Файлы</CardTitle>
@@ -266,7 +340,7 @@ export default function PluginIdePage() {
                                 <FileTree 
                                     structure={structure} 
                                     onSelectFile={handleSelectFile} 
-                                    selectedFile={selectedFile}
+                                    selectedFile={openTabs.find(tab => tab.path === activeTab)}
                                     onDelete={setNodeToDelete}
                                     onRename={(node) => handleStartInlineAction('rename', node)}
                                     onCreateFile={(node) => handleStartInlineAction('createFile', node)}
@@ -274,34 +348,53 @@ export default function PluginIdePage() {
                                     inlineAction={inlineAction}
                                     onCommit={handleCommitInline}
                                     onCancel={handleCancelInline}
+                                    onMoveFile={handleMoveFile}
                                 />}
                         </CardContent>
                     </Card>
                 </ResizablePanel>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={55} minSize={30}>
-                    <Editor
-                        height="calc(100vh - 120px)"
-                        language={selectedFile ? getLanguage(selectedFile.name) : 'plaintext'}
-                        value={fileContent || ''}
-                        onChange={(value) => {
-                            setFileContent(value);
-                            setIsDirty(true);
-                        }}
-                        theme="vs-dark"
-                        options={{ minimap: { enabled: false } }}
-                    />
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={25} minSize={20}>
-                    <Card className="h-full m-1 rounded-lg">
-                       <CardHeader className="p-2 border-b">
-                           <CardTitle className="text-base p-2">package.json</CardTitle>
-                       </CardHeader>
-                       <CardContent className="overflow-y-auto">
-                           <ManifestEditor botId={botId} pluginName={pluginName} />
-                       </CardContent>
-                    </Card>
+                <ResizablePanel defaultSize={80} minSize={50}>
+                    {openTabs.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                            Выберите файл для редактирования
+                        </div>
+                    ) : (
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+                            <TabsList className="flex-shrink-0 justify-start overflow-x-auto">
+                                {openTabs.map(tab => (
+                                    <TabsTrigger key={tab.path} value={tab.path} className="group relative">
+                                        {tab.name}{tab.isDirty ? '*' : ''}
+                                        <X 
+                                            className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100" 
+                                            onClick={(e) => handleCloseTab(tab.path, e)} 
+                                        />
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                            {openTabs.map(tab => (
+                                <TabsContent key={tab.path} value={tab.path} className="flex-grow mt-0">
+                                    <Editor
+                                        height="100%"
+                                        language={getLanguage(tab.name)}
+                                        value={tab.content || ''}
+                                        onChange={handleEditorChange}
+                                        theme="vs-dark"
+                                        options={{ 
+                                            minimap: { enabled: false },
+                                            quickSuggestions: false,
+                                            suggestOnTriggerCharacters: false
+                                        }}
+                                        onMount={(editor) => {
+                                            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                                                handleSave();
+                                            });
+                                        }}
+                                    />
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+                    )}
                 </ResizablePanel>
             </ResizablePanelGroup>
 
