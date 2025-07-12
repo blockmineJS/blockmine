@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles } from 'lucide-react';
+import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { calculatePluginPopularity, getPopularityBadge } from '@/utils/pluginUtils';
 
-export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId }) {
+export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId, allPlugins = [] }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const [isHovered, setIsHovered] = useState(false);
     
-    const downloads = plugin.downloads || Math.floor(Math.random() * 1000) + 100;
+    const popularity = calculatePluginPopularity(plugin, allPlugins);
+    const popularityBadge = getPopularityBadge(popularity);
 
     return (
         <TooltipProvider delayDuration={100}>
@@ -36,11 +38,13 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                     </div>
                 )}
                 
-                {downloads > 500 && (
+                {popularityBadge && (
                     <div className="absolute top-2 left-2 z-10">
-                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                            Популярный
+                        <Badge className={cn("bg-gradient-to-r text-white border-0", popularityBadge.color)}>
+                            {popularityBadge.icon === 'TrendingUp' && <TrendingUp className="h-3 w-3 mr-1" />}
+                            {popularityBadge.icon === 'Sparkles' && <Sparkles className="h-3 w-3 mr-1" />}
+                            {popularityBadge.icon === 'Fire' && <Flame className="h-3 w-3 mr-1" />}
+                            {popularityBadge.text}
                         </Badge>
                     </div>
                 )}
@@ -99,10 +103,18 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                     </div>
                     
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            <span>{downloads}</span>
-                        </div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help">
+                                    <Users className="h-3 w-3" />
+                                    <span>{popularity.downloads}</span>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Всего загрузок: {popularity.downloads}</p>
+                                <p>~{popularity.downloadsPerDay} в день</p>
+                            </TooltipContent>
+                        </Tooltip>
                         <div className="flex items-center gap-1">
                             <Download className="h-3 w-3" />
                             <span>v{plugin.latestTag.replace('v','')}</span>
