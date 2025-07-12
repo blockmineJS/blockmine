@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, CheckCircle, Loader2, GitMerge, Server, Globe, Github, Puzzle, ArrowDownToLine, Star, Sparkles, TrendingUp } from 'lucide-react';
+import { Download, CheckCircle, Loader2, GitMerge, Server, Globe, Github, Puzzle, ArrowDownToLine, Star, Sparkles, TrendingUp, Flame } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { calculatePluginPopularity, getPopularityBadge } from '@/utils/pluginUtils';
 
 const IconComponent = ({ name, ...props }) => {
     if (!name) return <Puzzle {...props} />;
@@ -15,7 +16,7 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
-export default function PluginListItem({ plugin, isInstalled, isInstalling, onInstall, botId }) {
+export default function PluginListItem({ plugin, isInstalled, isInstalling, onInstall, botId, allPlugins = [] }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const hasSupportedHosts = plugin.supportedHosts && plugin.supportedHosts.length > 0;
 
@@ -23,7 +24,8 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
     const [isHovered, setIsHovered] = useState(false);
     const prevDownloads = useRef(plugin.downloads);
 
-    const isPopular = (plugin.downloads || 0) > 500;
+    const popularity = calculatePluginPopularity(plugin, allPlugins);
+    const popularityBadge = getPopularityBadge(popularity);
 
     useEffect(() => {
         if (plugin.downloads > prevDownloads.current) {
@@ -50,8 +52,18 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                {isPopular && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-red-500 rounded-l-lg" />
+                {popularityBadge && (
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b rounded-l-lg" style={{
+                        background: `linear-gradient(to bottom, ${
+                            popularityBadge.color.includes('purple') ? '#a855f7' :
+                            popularityBadge.color.includes('green') ? '#10b981' :
+                            '#f97316'
+                        }, ${
+                            popularityBadge.color.includes('purple') ? '#ec4899' :
+                            popularityBadge.color.includes('green') ? '#34d399' :
+                            '#ef4444'
+                        })`
+                    }} />
                 )}
                 
                 <div className={cn(
@@ -65,8 +77,12 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             isHovered && "drop-shadow-glow"
                         )} 
                     />
-                    {isPopular && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" />
+                    {popularityBadge && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse" style={{
+                            background: popularityBadge.color.includes('purple') ? '#a855f7' :
+                                       popularityBadge.color.includes('green') ? '#10b981' :
+                                       '#f97316'
+                        }} />
                     )}
                 </div>
                 
@@ -123,22 +139,32 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Badge>
                         )}
                         
-                        {isPopular && (
-                            <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs">
-                                <TrendingUp className="h-3 w-3 mr-1" />
-                                Популярный
+                        {popularityBadge && (
+                            <Badge className={cn("bg-gradient-to-r text-white border-0 text-xs", popularityBadge.color)}>
+                                {popularityBadge.icon === 'TrendingUp' && <TrendingUp className="h-3 w-3 mr-1" />}
+                                {popularityBadge.icon === 'Sparkles' && <Sparkles className="h-3 w-3 mr-1" />}
+                                {popularityBadge.icon === 'Fire' && <Flame className="h-3 w-3 mr-1" />}
+                                {popularityBadge.text}
                             </Badge>
                         )}
                         
-                        <div className={cn(
-                            "transition-all duration-300",
-                            isAnimating && "animate-bounce"
-                        )}>
-                            <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-0.5 text-xs">
-                                <ArrowDownToLine className="h-3 w-3" />
-                                <span className="font-semibold">{plugin.downloads || 0}</span>
-                            </Badge>
-                        </div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className={cn(
+                                    "transition-all duration-300",
+                                    isAnimating && "animate-bounce"
+                                )}>
+                                    <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-help">
+                                        <ArrowDownToLine className="h-3 w-3" />
+                                        <span className="font-semibold">{popularity.downloads}</span>
+                                    </Badge>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Всего загрузок: {popularity.downloads}</p>
+                                <p>~{popularity.downloadsPerDay} в день</p>
+                            </TooltipContent>
+                        </Tooltip>
                         
                         {hasDependencies && (
                             <Tooltip>
