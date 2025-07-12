@@ -1,13 +1,30 @@
 import { io } from 'socket.io-client';
 import { apiHelper } from '@/lib/api';
 
-const ensureLogId = (log, index) => {
-    if (log.id) return log;
-    return {
-        ...log,
-        id: `log-${log.timestamp || Date.now()}-${index}-${Math.random()}`
-    };
+
+const normalizeAndIdempotentLog = (log, index = 0) => {
+    const now = Date.now();
+    const random = Math.random();
+
+    if (typeof log !== 'object' || log === null) {
+        return {
+            id: `gen-primitive-${now}-${index}-${random}`,
+            content: log,
+            timestamp: now
+        };
+    }
+
+    const id = log.id || `gen-object-${log.timestamp || now}-${index}-${random}`;
+
+    const timestamp = log.timestamp || now;
+
+    if (log.content !== undefined) {
+        return { id, content: log.content, timestamp };
+    }
+
+    return { id, content: JSON.stringify(log), timestamp };
 };
+
 
 export const createCoreSlice = (set, get) => ({
     socket: null,
@@ -87,8 +104,8 @@ export const createCoreSlice = (set, get) => ({
                     const clientLogs = state.botLogs[botId] || [];
                     const serverLogsForBot = serverLogs[botId] || [];
 
-                    const combinedLogs = [...clientLogs, ...serverLogsForBot].map(ensureLogId);
-                    
+                    const combinedLogs = [...clientLogs, ...serverLogsForBot].map(normalizeAndIdempotentLog);
+
                     const uniqueLogs = Array.from(new Map(combinedLogs.map(log => [log.id, log])).values());
 
                     newBotLogs[botId] = uniqueLogs.slice(-1000);
@@ -117,18 +134,11 @@ export const createCoreSlice = (set, get) => ({
 
     appendLog: (botId, log) => {
         set(state => {
+            const newLog = normalizeAndIdempotentLog(log);
+
             const currentLogs = state.botLogs[botId] || [];
 
-            const newLog = (typeof log === 'object' && log !== null && log.id)
-                ? { timestamp: Date.now(), ...log }
-                : {
-                    id: `${Date.now()}-${Math.random()}`,
-                    content: (typeof log === 'object' && log !== null ? JSON.stringify(log) : log),
-                    timestamp: Date.now()
-                };
-
             const logExists = currentLogs.some(l => l.id === newLog.id);
-
             if (logExists) {
                 return;
             }
