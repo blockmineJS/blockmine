@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useParams } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, ArrowDown } from 'lucide-react';
+import { Send, ArrowDown, Trash2, AlertTriangle } from 'lucide-react';
 import AnsiToHtml from 'ansi-to-html';
 import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
@@ -19,7 +19,7 @@ const LogLine = React.memo(({ log, index }) => {
     const htmlContent = useMemo(() => ansiConverter.toHtml(logContent), [logContent]);
     
     return (
-        <div className="log-line leading-relaxed whitespace-pre-wrap break-all">
+        <div className="log-line leading-relaxed whitespace-pre-wrap break-all px-4 py-1">
             <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
     );
@@ -34,12 +34,33 @@ export default function ConsoleTab() {
     const botStatuses = useAppStore(state => state.botStatuses);
 
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
-    const logs = useMemo(() => botLogs[botId] || [], [botLogs, botId]);
+    const logs = useMemo(() => {
+        const allLogs = botLogs[botId] || [];
+        const maxLogs = allLogs.length > 5000 ? 500 : allLogs.length > 2000 ? 1000 : 2000;
+        return allLogs.slice(-maxLogs);
+    }, [botLogs, botId]);
     const status = bot ? botStatuses[bot.id] || 'stopped' : 'stopped';
 
     const [command, setCommand] = useState('');
     const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+    const [showPerformanceWarning, setShowPerformanceWarning] = useState(false);
     const logContainerRef = useRef(null);
+    const renderTimeRef = useRef(0);
+
+    const checkPerformance = useCallback(() => {
+        const startTime = performance.now();
+        return () => {
+            const endTime = performance.now();
+            const renderTime = endTime - startTime;
+            renderTimeRef.current = renderTime;
+            
+            if (renderTime > 100) {
+                setShowPerformanceWarning(true);
+            } else {
+                setShowPerformanceWarning(false);
+            }
+        };
+    }, []);
 
     const scrollToBottom = useCallback(() => {
         if (logContainerRef.current) {
@@ -47,16 +68,10 @@ export default function ConsoleTab() {
         }
     }, []);
 
-    useEffect(() => {
-        if (!isUserScrolledUp) {
-            requestAnimationFrame(scrollToBottom);
-        }
-    }, [logs, isUserScrolledUp, scrollToBottom]);
-
     const handleScroll = useCallback(() => {
         if (logContainerRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = logContainerRef.current;
-            const isAtBottom = scrollHeight - clientHeight <= scrollTop + 1;
+            const isAtBottom = scrollHeight - clientHeight <= scrollTop + 5;
             setIsUserScrolledUp(!isAtBottom);
         }
     }, []);
@@ -77,28 +92,87 @@ export default function ConsoleTab() {
         }
     };
 
+    const clearLogs = useCallback(() => {
+        useAppStore.setState(state => ({
+            ...state,
+            botLogs: {
+                ...state.botLogs,
+                [botId]: []
+            }
+        }));
+        setShowPerformanceWarning(false);
+    }, [botId]);
+
+    useEffect(() => {
+        setIsUserScrolledUp(false);
+    }, []);
+
+    useEffect(() => {
+        const measurePerformance = checkPerformance();
+        
+        if (!isUserScrolledUp) {
+            scrollToBottom();
+        }
+        
+        requestAnimationFrame(() => {
+            measurePerformance();
+        });
+    }, [logs.length, isUserScrolledUp, scrollToBottom, checkPerformance]);
+
     return (
         <div className="flex flex-col h-full w-full bg-background rounded-lg border border-border relative">
             <div 
-                ref={logContainerRef} 
-                onScroll={handleScroll}
-                className="flex-1 p-4 overflow-y-auto font-mono text-sm"
+                className="flex-1 overflow-hidden"
                 style={{ '--ansi-fg': 'hsl(var(--foreground))', '--ansi-bg': 'hsl(var(--background))' }}
             >
-                {logs.map((log, index) => (
-                    <LogLine key={log.id || index} log={log} index={index} />
-                ))}
+                <div 
+                    ref={logContainerRef}
+                    onScroll={handleScroll}
+                    className="h-full overflow-y-auto font-mono text-sm"
+                    style={{ 
+                        fontFamily: 'monospace',
+                        fontSize: '14px',
+                        backgroundColor: 'transparent'
+                    }}
+                >
+                    {logs.map((log, index) => (
+                        <LogLine key={log.id || index} log={log} index={index} />
+                    ))}
+                </div>
             </div>
             
-            {isUserScrolledUp && (
+            <div className="absolute top-2 right-2 flex gap-2">
+                {showPerformanceWarning && (
+                    <Button 
+                        className="rounded-full h-8 w-8 p-0 bg-yellow-500 hover:bg-yellow-600 text-white"
+                        variant="secondary"
+                        size="sm"
+                        title={`Медленный рендеринг: ${Math.round(renderTimeRef.current)}мс. Очистите логи для улучшения производительности.`}
+                    >
+                        <AlertTriangle className="h-4 w-4" />
+                    </Button>
+                )}
+                {isUserScrolledUp && (
+                    <Button 
+                        onClick={scrollToBottom}
+                        className="rounded-full h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
+                        variant="secondary"
+                        size="sm"
+                        title="Прокрутить вниз"
+                    >
+                        <ArrowDown className="h-4 w-4" />
+                    </Button>
+                )}
                 <Button 
-                    onClick={scrollToBottom}
-                    className="absolute bottom-20 right-8 rounded-full h-10 w-10 p-2"
+                    onClick={clearLogs}
+                    className="rounded-full h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
                     variant="secondary"
+                    size="sm"
+                    title="Очистить консоль"
                 >
-                    <ArrowDown />
+                    <Trash2 className="h-4 w-4" />
                 </Button>
-            )}
+            </div>
 
             <form onSubmit={handleSendCommand} className="flex-shrink-0 flex items-center gap-2 p-2 bg-muted/50 border-t border-border">
                 <Input
@@ -109,11 +183,12 @@ export default function ConsoleTab() {
                     disabled={status !== 'running'}
                     className="flex-1"
                 />
-                <Button
-                    type="submit"
-                    disabled={status !== 'running' || !command.trim()}
+                <Button 
+                    type="submit" 
+                    disabled={!command.trim() || status !== 'running'}
+                    size="sm"
                 >
-                    <Send />
+                    <Send className="h-4 w-4" />
                 </Button>
             </form>
         </div>
