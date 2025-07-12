@@ -250,6 +250,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                                             isInstalled={installedPluginUrls.has(plugin.repoUrl)}
                                             isInstalling={installingPlugins.has(plugin.id)}
                                             onInstall={handleInstall}
+                                            allPlugins={catalog}
                                         />
                                     </div>
                                 ))}
@@ -264,6 +265,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                                         isInstalled={installedPluginUrls.has(plugin.repoUrl)}
                                         isInstalling={installingPlugins.has(plugin.id)}
                                         onInstall={handleInstall}
+                                        allPlugins={catalog}
                                     />
                                 ))}
                             </div>
