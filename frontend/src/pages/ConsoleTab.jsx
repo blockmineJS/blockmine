@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,19 @@ const ansiConverter = new AnsiToHtml({
     escapeXML: true,
 });
 
+const LogLine = React.memo(({ log, index }) => {
+    const logContent = typeof log === 'object' && log !== null && log.content ? log.content : (typeof log === 'string' ? log : '');
+    const htmlContent = useMemo(() => ansiConverter.toHtml(logContent), [logContent]);
+    
+    return (
+        <div className="log-line leading-relaxed whitespace-pre-wrap break-all">
+            <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        </div>
+    );
+});
+
+LogLine.displayName = 'LogLine';
+
 export default function ConsoleTab() {
     const { botId } = useParams();
     const bots = useAppStore(state => state.bots);
@@ -28,25 +41,25 @@ export default function ConsoleTab() {
     const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
     const logContainerRef = useRef(null);
 
-    useEffect(() => {
-        if (!isUserScrolledUp && logContainerRef.current) {
+    const scrollToBottom = useCallback(() => {
+        if (logContainerRef.current) {
             logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
-    }, [logs, isUserScrolledUp]);
+    }, []);
 
-    const handleScroll = () => {
+    useEffect(() => {
+        if (!isUserScrolledUp) {
+            requestAnimationFrame(scrollToBottom);
+        }
+    }, [logs, isUserScrolledUp, scrollToBottom]);
+
+    const handleScroll = useCallback(() => {
         if (logContainerRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = logContainerRef.current;
             const isAtBottom = scrollHeight - clientHeight <= scrollTop + 1;
             setIsUserScrolledUp(!isAtBottom);
         }
-    };
-
-    const scrollToBottom = () => {
-        if (logContainerRef.current) {
-            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-        }
-    };
+    }, []);
 
     const handleSendCommand = async (e) => {
         e.preventDefault();
@@ -72,14 +85,9 @@ export default function ConsoleTab() {
                 className="flex-1 p-4 overflow-y-auto font-mono text-sm"
                 style={{ '--ansi-fg': 'hsl(var(--foreground))', '--ansi-bg': 'hsl(var(--background))' }}
             >
-                {logs.map((log, index) => {
-                    const logContent = typeof log === 'object' && log !== null && log.content ? log.content : (typeof log === 'string' ? log : '');
-                    return (
-                        <div key={index} className="log-line leading-relaxed whitespace-pre-wrap break-all">
-                            <div dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(logContent) }} />
-                        </div>
-                    );
-                })}
+                {logs.map((log, index) => (
+                    <LogLine key={log.id || index} log={log} index={index} />
+                ))}
             </div>
             
             {isUserScrolledUp && (
@@ -111,3 +119,4 @@ export default function ConsoleTab() {
         </div>
     );
 }
+
