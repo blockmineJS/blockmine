@@ -156,36 +156,41 @@ export default function PluginsTab() {
                     </div>
                 </div>
                 
-                <TabsList className="bg-muted/50 backdrop-blur-sm border border-border/50">
-                    <TabsTrigger value="installed" className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Установленные ({installedPlugins.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="browser" className="flex items-center gap-2">
-                        <Puzzle className="h-4 w-4" />
-                        Обзор
-                    </TabsTrigger>
-                </TabsList>
+                <div className="flex items-center justify-between mb-4">
+                    <TabsList className="bg-muted/50 backdrop-blur-sm border border-border/50">
+                        <TabsTrigger value="installed" className="flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            Установленные ({installedPlugins.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="browser" className="flex items-center gap-2">
+                            <Puzzle className="h-4 w-4" />
+                            Обзор
+                        </TabsTrigger>
+                    </TabsList>
+                    
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates} size="sm">
+                            <RefreshCw className={`mr-2 h-4 w-4 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
+                            Проверить обновления
+                        </Button>
+                        <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <FolderPlus className="mr-2 h-4 w-4" />
+                                    Установить локально
+                                </Button>
+                            </DialogTrigger>
+                            <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
+                        </Dialog>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+                            <Code2 className="mr-2 h-4 w-4" />
+                            Создать плагин
+                        </Button>
+                    </div>
+                </div>
             </div>
             
             <TabsContent value="installed" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
-                <div className="p-4 border-b flex items-center gap-2 shrink-0">
-                    <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates}>
-                        <RefreshCw className={`mr-2 h-4 w-4 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
-                        Проверить обновления
-                    </Button>
-                    <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline"><FolderPlus className="mr-2 h-4 w-4" />Установить локально</Button>
-                        </DialogTrigger>
-                        <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
-                    </Dialog>
-                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-                        <Code2 className="mr-2 h-4 w-4" />
-                        Создать плагин
-                    </Button>
-                </div>
-                
                 <div className="flex-1 overflow-y-auto">
                     <InstalledPluginsView 
                         bot={bot} 
