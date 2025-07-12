@@ -4,11 +4,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from './ui/badge';
 import { Cpu, MemoryStick } from 'lucide-react';
 
-const ProgressBar = ({ value, max, colorClass }) => {
+const ProgressBar = ({ value, max, colorClass, label }) => {
     const percentage = Math.min(100, (value / max) * 100);
     return (
-        <div className="w-full bg-muted rounded-full h-2">
-            <div className={`${colorClass} h-2 rounded-full`} style={{ width: `${percentage}%` }}></div>
+        <div className="space-y-2">
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-mono font-medium">{value.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+                <div 
+                    className={`${colorClass} h-2 rounded-full transition-all duration-300 ease-out`} 
+                    style={{ width: `${percentage}%` }}
+                />
+            </div>
         </div>
     );
 };
@@ -17,44 +26,63 @@ export default function ResourceUsageWidget({ bots, resourceUsage }) {
     const runningBots = bots.filter(bot => resourceUsage[bot.id]);
 
     return (
-        <Card className="h-full flex flex-col">
-            <CardHeader>
-                <CardTitle>Использование ресурсов</CardTitle>
-                <CardDescription>Нагрузка на CPU и использование RAM запущенными ботами.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow overflow-y-auto">
+        <div className="h-full flex flex-col">
+            <div className="mb-4">
+                <CardTitle className="text-base font-semibold">Использование ресурсов</CardTitle>
+                <CardDescription className="text-sm">Нагрузка на CPU и использование RAM запущенными ботами</CardDescription>
+            </div>
+            
+            <div className="flex-grow overflow-y-auto">
                 <div className="space-y-6">
                     {runningBots.length > 0 ? runningBots.map(bot => {
                         const usage = resourceUsage[bot.id];
                         return (
-                            <div key={bot.id}>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h4 className="font-semibold">{bot.username}</h4>
-                                    <Badge variant="secondary">ID: {bot.id}</Badge>
+                            <div key={bot.id} className="p-4 rounded-lg border bg-background/50 hover:bg-background/70 transition-colors">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="font-semibold text-foreground">{bot.username}</h4>
+                                    <Badge variant="outline" className="text-xs">ID: {bot.id}</Badge>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <Cpu className="h-4 w-4 text-muted-foreground" />
-                                        <div className="flex-grow">
-                                            <ProgressBar value={usage.cpu} max={100} colorClass="bg-blue-500" />
+                                        <div className="p-2 rounded-lg bg-blue-500/10">
+                                            <Cpu className="h-4 w-4 text-blue-500" />
                                         </div>
-                                        <span className="text-sm font-mono w-16 text-right">{usage.cpu.toFixed(1)}%</span>
+                                        <div className="flex-grow">
+                                            <ProgressBar 
+                                                value={usage.cpu} 
+                                                max={100} 
+                                                colorClass="bg-gradient-to-r from-blue-500 to-blue-600" 
+                                                label="CPU"
+                                            />
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <MemoryStick className="h-4 w-4 text-muted-foreground" />
-                                        <div className="flex-grow">
-                                            <ProgressBar value={usage.memory} max={500} colorClass="bg-green-500" />
+                                        <div className="p-2 rounded-lg bg-green-500/10">
+                                            <MemoryStick className="h-4 w-4 text-green-500" />
                                         </div>
-                                        <span className="text-sm font-mono w-16 text-right">{usage.memory.toFixed(1)} MB</span>
+                                        <div className="flex-grow">
+                                            <ProgressBar 
+                                                value={usage.memory} 
+                                                max={500} 
+                                                colorClass="bg-gradient-to-r from-green-500 to-emerald-600" 
+                                                label="RAM"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         );
                     }) : (
-                        <p className="text-sm text-muted-foreground text-center pt-8">Нет запущенных ботов для мониторинга.</p>
+                        <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                            <div className="p-4 rounded-full bg-muted/50 mb-4">
+                                <Cpu className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm text-muted-foreground font-medium">Нет запущенных ботов</p>
+                            <p className="text-xs text-muted-foreground mt-1">Запустите ботов для мониторинга ресурсов</p>
+                        </div>
                     )}
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
