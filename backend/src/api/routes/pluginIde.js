@@ -402,6 +402,33 @@ router.post('/:pluginName/fs', resolvePluginPath, async (req, res) => {
                 res.status(200).json({ message: 'Renamed successfully.' });
                 break;
 
+            case 'move':
+                if (!newPath) return res.status(400).json({ error: 'New path is required for move operation.' });
+                const safeMoveNewPath = path.resolve(req.pluginPath, newPath);
+                if (!safeMoveNewPath.startsWith(req.pluginPath)) return res.status(403).json({ error: 'Access denied: New path is outside of plugin directory.' });
+                if (!await fse.pathExists(safePath)) return res.status(404).json({ error: 'Source file or folder not found.' });
+                
+                if (safeMoveNewPath.startsWith(safePath + path.sep)) {
+                    return res.status(400).json({ error: 'Cannot move folder into itself.' });
+                }
+
+                let finalPath = safeMoveNewPath;
+                let counter = 1;
+                while (await fse.pathExists(finalPath)) {
+                    const ext = path.extname(safeMoveNewPath);
+                    const base = path.basename(safeMoveNewPath, ext);
+                    const dir = path.dirname(safeMoveNewPath);
+                    finalPath = path.join(dir, `${base} (${counter})${ext}`);
+                    counter++;
+                }
+                
+                await fse.move(safePath, finalPath);
+                res.status(200).json({ 
+                    message: 'Moved successfully.',
+                    newPath: path.relative(req.pluginPath, finalPath)
+                });
+                break;
+
             default:
                 res.status(400).json({ error: 'Invalid operation specified.' });
         }
