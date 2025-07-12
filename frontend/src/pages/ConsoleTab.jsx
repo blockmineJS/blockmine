@@ -34,11 +34,13 @@ export default function ConsoleTab() {
     const botStatuses = useAppStore(state => state.botStatuses);
 
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
+    
     const logs = useMemo(() => {
         const allLogs = botLogs[botId] || [];
         const maxLogs = allLogs.length > 5000 ? 500 : allLogs.length > 2000 ? 1000 : 2000;
         return allLogs.slice(-maxLogs);
     }, [botLogs, botId]);
+    
     const status = bot ? botStatuses[bot.id] || 'stopped' : 'stopped';
 
     const [command, setCommand] = useState('');
@@ -97,12 +99,13 @@ export default function ConsoleTab() {
         }
         lastLogCount.current = logs.length;
 
-        if (logs.length > 4000) {
+        const allLogsForBot = botLogs[botId] || [];
+        if (allLogsForBot.length > 4000) {
             setShowPerformanceWarning(true);
         } else {
             setShowPerformanceWarning(false);
         }
-    }, [logs.length, isUserScrolledUp, scrollToBottom]);
+    }, [logs.length, botLogs, botId, isUserScrolledUp, scrollToBottom]);
 
     return (
         <div className="flex flex-col h-full w-full bg-background rounded-lg border border-border relative">
