@@ -54,7 +54,7 @@ export default function ConsoleTab() {
             const renderTime = endTime - startTime;
             renderTimeRef.current = renderTime;
             
-            if (renderTime > 100) {
+            if (renderTime > 50) {
                 setShowPerformanceWarning(true);
             } else {
                 setShowPerformanceWarning(false);
@@ -114,9 +114,13 @@ export default function ConsoleTab() {
             scrollToBottom();
         }
         
-        requestAnimationFrame(() => {
+        const animationFrameId = requestAnimationFrame(() => {
             measurePerformance();
         });
+        
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
     }, [logs.length, isUserScrolledUp, scrollToBottom, checkPerformance]);
 
     return (

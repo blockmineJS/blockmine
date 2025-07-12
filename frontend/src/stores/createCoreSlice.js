@@ -121,9 +121,8 @@ export const createCoreSlice = (set, get) => ({
                     timestamp: Date.now()
                 };
             
-            const lastLog = currentLogs[currentLogs.length - 1];
-            if (lastLog && 
-                lastLog.id === newLog.id) {
+            const existingLogIndex = currentLogs.findIndex(l => l.id === newLog.id);
+            if (existingLogIndex !== -1) {
                 return state;
             }
             
