@@ -96,20 +96,37 @@ export default function PluginIdePage() {
 
     const handleMoveFile = async (sourcePath, targetPath) => {
         try {
-            await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/fs`, {
+            const response = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/fs`, {
                 method: 'POST',
                 body: JSON.stringify({ operation: 'move', path: sourcePath, newPath: targetPath }),
             });
             await fetchStructure();
             
+            const actualNewPath = response?.newPath || targetPath;
+            
             setOpenTabs(prev => prev.map(tab => {
                 if (tab.path === sourcePath) {
-                    return { ...tab, path: targetPath, name: path.basename(targetPath) };
+                    return { ...tab, path: actualNewPath, name: path.basename(actualNewPath) };
+                }
+                if (tab.path.startsWith(sourcePath + '/')) {
+                    const relativePath = tab.path.substring(sourcePath.length + 1);
+                    const newTabPath = path.join(actualNewPath, relativePath);
+                    return { ...tab, path: newTabPath, name: path.basename(newTabPath) };
                 }
                 return tab;
             }));
             
-            toast({ title: 'Успех!', description: `Файл перемещен в "${path.dirname(targetPath)}"` });
+            if (activeTab) {
+                if (activeTab === sourcePath) {
+                    setActiveTab(actualNewPath);
+                } else if (activeTab.startsWith(sourcePath + '/')) {
+                    const relativePath = activeTab.substring(sourcePath.length + 1);
+                    const newActivePath = path.join(actualNewPath, relativePath);
+                    setActiveTab(newActivePath);
+                }
+            }
+            
+            toast({ title: 'Успех!', description: `Файл перемещен в "${path.dirname(actualNewPath)}"` });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось переместить файл: ${error.message}`});
             throw error;
