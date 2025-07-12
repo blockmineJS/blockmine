@@ -1,6 +1,14 @@
 import { io } from 'socket.io-client';
 import { apiHelper } from '@/lib/api';
 
+const ensureLogId = (log, index) => {
+    if (log.id) return log;
+    return {
+        ...log,
+        id: `log-${log.timestamp || Date.now()}-${index}-${Math.random()}`
+    };
+};
+
 export const createCoreSlice = (set, get) => ({
     socket: null,
     bots: [],
@@ -79,10 +87,11 @@ export const createCoreSlice = (set, get) => ({
                     const clientLogs = state.botLogs[botId] || [];
                     const serverLogsForBot = serverLogs[botId] || [];
 
-                    const combinedLogs = [...clientLogs, ...serverLogsForBot];
+                    const combinedLogs = [...clientLogs, ...serverLogsForBot].map(ensureLogId);
+                    
                     const uniqueLogs = Array.from(new Map(combinedLogs.map(log => [log.id, log])).values());
 
-                    newBotLogs[botId] = uniqueLogs.slice(-1000); // Keep a reasonable limit
+                    newBotLogs[botId] = uniqueLogs.slice(-1000);
                 }
 
                 return {
