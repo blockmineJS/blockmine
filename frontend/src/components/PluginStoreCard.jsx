@@ -11,8 +11,6 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const [isHovered, setIsHovered] = useState(false);
     
-    // Симулируем рейтинг (в будущем может быть настоящий)
-    const rating = Math.floor(Math.random() * 2) + 3.5;
     const downloads = plugin.downloads || Math.floor(Math.random() * 1000) + 100;
 
     return (
@@ -26,21 +24,18 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                {/* Градиентный фон при наведении */}
                 <div className={cn(
                     "absolute inset-0 opacity-0 transition-opacity duration-300",
                     "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
                     isHovered && "opacity-100"
                 )} />
                 
-                {/* Метка установленного плагина */}
                 {isInstalled && (
                     <div className="absolute top-0 right-0 bg-gradient-to-bl from-green-600 to-green-700 text-white p-6 rounded-bl-[40px] shadow-lg z-10">
                         <Check className="h-5 w-5 absolute top-2 right-2" />
                     </div>
                 )}
                 
-                {/* Популярность */}
                 {downloads > 500 && (
                     <div className="absolute top-2 left-2 z-10">
                         <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
@@ -64,13 +59,8 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                                     )}
                                 </CardTitle>
                             </Link>
-                            <CardDescription className="flex items-center gap-2 mt-1">
+                            <CardDescription className="mt-1">
                                 <span>by {plugin.author}</span>
-                                {/* Рейтинг */}
-                                <div className="flex items-center gap-1">
-                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                    <span className="text-xs">{rating.toFixed(1)}</span>
-                                </div>
                             </CardDescription>
                         </div>
                         <Tooltip>
@@ -96,7 +86,6 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                         {plugin.description}
                     </p>
                     
-                    {/* Теги категорий */}
                     <div className="flex flex-wrap gap-1">
                         {plugin.categories?.map(tag => (
                             <Badge 
@@ -109,7 +98,6 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                         ))}
                     </div>
                     
-                    {/* Статистика */}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <Users className="h-3 w-3" />

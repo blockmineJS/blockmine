@@ -41,7 +41,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Все плагины');
     const [sortBy, setSortBy] = useState('popular');
-    const [viewMode, setViewMode] = useState('grid'); // 'grid' или 'list'
+    const [viewMode, setViewMode] = useState('grid');
     const [dependencyDialogState, setDependencyDialogState] = useState({
         isOpen: false, mainPlugin: null, dependencies: [],
     });
@@ -121,7 +121,6 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
             return matchesCategory && matchesSearch;
         });
 
-        // Сортировка
         switch(sortBy) {
             case 'newest':
                 filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -134,7 +133,6 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                 break;
             case 'popular':
             default:
-                // Комбинированная сортировка по загрузкам и дате
                 filtered.sort((a, b) => {
                     const scoreA = (a.downloads || 0) + (new Date(a.createdAt || 0).getTime() / 1000000000);
                     const scoreB = (b.downloads || 0) + (new Date(b.createdAt || 0).getTime() / 1000000000);
@@ -148,7 +146,6 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
 
     return (
         <div className="flex h-full">
-            {/* Боковая панель с категориями */}
             <aside className="w-64 border-r p-4 flex flex-col gap-4 shrink-0 bg-muted/30">
                 <div className="space-y-4">
                     <Input
@@ -196,7 +193,6 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                     </nav>
                 </div>
 
-                {/* Переключатель вида */}
                 <div className="border-t pt-4">
                     <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
@@ -213,7 +209,6 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                 </div>
             </aside>
 
-            {/* Основной контент */}
             <main className="flex-1 flex flex-col overflow-hidden">
                 <div className="p-6 shrink-0 bg-gradient-to-r from-background to-muted/20">
                     <div className="flex items-center justify-between">

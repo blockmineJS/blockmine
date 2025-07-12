@@ -23,8 +23,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
     const [isHovered, setIsHovered] = useState(false);
     const prevDownloads = useRef(plugin.downloads);
 
-    // Симулируем рейтинг
-    const rating = Math.floor(Math.random() * 2) + 3.5;
     const isPopular = (plugin.downloads || 0) > 500;
 
     useEffect(() => {
@@ -52,12 +50,10 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                {/* Градиентный акцент для популярных плагинов */}
                 {isPopular && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-red-500 rounded-l-lg" />
                 )}
                 
-                {/* Иконка плагина с эффектом */}
                 <div className={cn(
                     "relative shrink-0 mt-1 transition-transform duration-300",
                     isHovered && "scale-110 rotate-3"
@@ -90,18 +86,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Link>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                 <span>от <span className="font-medium text-primary/90">{plugin.author}</span></span>
-                                <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star 
-                                            key={i} 
-                                            className={cn(
-                                                "h-3 w-3",
-                                                i < Math.floor(rating) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"
-                                            )}
-                                        />
-                                    ))}
-                                    <span className="text-xs ml-1">({rating.toFixed(1)})</span>
-                                </div>
                             </div>
                         </div>
                         <Tooltip>
@@ -124,7 +108,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{plugin.description}</p>
                     
                     <div className="flex flex-wrap items-center gap-2">
-                        {/* Категории */}
                         {plugin.categories && plugin.categories.slice(0, 3).map(category => (
                             <Badge 
                                 key={category} 
@@ -140,7 +123,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Badge>
                         )}
                         
-                        {/* Популярность */}
                         {isPopular && (
                             <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs">
                                 <TrendingUp className="h-3 w-3 mr-1" />
@@ -148,7 +130,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Badge>
                         )}
                         
-                        {/* Загрузки */}
                         <div className={cn(
                             "transition-all duration-300",
                             isAnimating && "animate-bounce"
@@ -159,7 +140,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Badge>
                         </div>
                         
-                        {/* Зависимости */}
                         {hasDependencies && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -177,7 +157,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Tooltip>
                         )}
                         
-                        {/* Поддерживаемые хосты */}
                         {!hasSupportedHosts ? (
                             <Badge variant="outline" className="text-xs">
                                 <Globe className="h-3 w-3 mr-1" />
@@ -208,7 +187,6 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                     </div>
                 </div>
 
-                {/* Кнопка установки */}
                 <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
                     <Button 
                         size="sm"
