@@ -4,12 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus, Code2 } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
+import { cn } from '@/lib/utils';
 
 export default function PluginsTab() {
     const { botId } = useParams();
@@ -40,7 +41,10 @@ export default function PluginsTab() {
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isForking, setIsForking] = useState(false);
-    const [activeTab, setActiveTab] = useState('installed');
+    const [activeTab, setActiveTab] = useState(() => {
+        const saved = localStorage.getItem('plugins-active-tab');
+        return saved || 'installed';
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -69,6 +73,7 @@ export default function PluginsTab() {
 
     const handleTabChange = (value) => {
         setActiveTab(value);
+        localStorage.setItem('plugins-active-tab', value);
     };
     
     const handleCreatePlugin = async ({ name, template }) => {
@@ -117,14 +122,51 @@ export default function PluginsTab() {
 
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col">
-            <CardHeader className="shrink-0">
-                <CardTitle>Управление плагинами</CardTitle>
-                <CardDescription>Управляйте установленными плагинами или просматривайте каталог для установки новых.</CardDescription>
-                <TabsList className="mt-2">
-                    <TabsTrigger value="installed">Установленные ({installedPlugins.length})</TabsTrigger>
-                    <TabsTrigger value="browser">Обзор</TabsTrigger>
+            <div className="shrink-0 p-6 bg-gradient-to-br from-background via-muted/20 to-background border-b">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur-sm opacity-20" />
+                        <div className="relative bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg">
+                            <Puzzle className="h-6 w-6 text-white" />
+                        </div>
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                            Управление плагинами
+                        </h1>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Расширяйте возможности бота с помощью плагинов
+                        </p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                        <div className="flex items-center gap-1 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
+                            <Sparkles className="h-3 w-3 text-green-500" />
+                            <span className="text-xs font-medium text-green-600">
+                                {installedPlugins.length} установлено
+                            </span>
+                        </div>
+                        {Object.keys(updates).length > 0 && (
+                            <div className="flex items-center gap-1 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full animate-pulse">
+                                <Zap className="h-3 w-3 text-blue-500" />
+                                <span className="text-xs font-medium text-blue-600">
+                                    {Object.keys(updates).length} обновлений
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                <TabsList className="bg-muted/50 backdrop-blur-sm border border-border/50">
+                    <TabsTrigger value="installed" className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Установленные ({installedPlugins.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="browser" className="flex items-center gap-2">
+                        <Puzzle className="h-4 w-4" />
+                        Обзор
+                    </TabsTrigger>
                 </TabsList>
-            </CardHeader>
+            </div>
             
             <TabsContent value="installed" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
                 <div className="p-4 border-b flex items-center gap-2 shrink-0">
