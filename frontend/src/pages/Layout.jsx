@@ -19,8 +19,8 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     const hasPermission = useAppStore(state => state.hasPermission);
 
     const navLinkClasses = ({ isActive }) => cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent transition-colors",
-        isActive ? "bg-accent" : "transparent",
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+        isActive ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-blue-600" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
         isCollapsed && "justify-center"
     );
 
@@ -32,7 +32,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     );
 
     return (
-        <nav className="flex-grow flex flex-col gap-1 overflow-y-auto pr-2">
+        <nav className="flex-grow flex flex-col gap-1 overflow-y-auto p-4">
             <NavLink to="/" end onClick={onLinkClick} className={navLinkClasses}>
                 {iconAndText(<LayoutDashboard className="h-4 w-4 flex-shrink-0" />, "Дашборд")}
             </NavLink>
@@ -45,14 +45,34 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
             
             <Separator className="my-2" />
             
-            {!isCollapsed && <p className="px-3 py-1 text-xs font-semibold text-muted-foreground">БОТЫ</p>}
+            {!isCollapsed && (
+                <div className="px-3 py-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Боты</p>
+                </div>
+            )}
             {bots.map((bot) => (
                 <NavLink key={bot.id} to={`/bots/${bot.id}`} onClick={onLinkClick} className={({ isActive }) => cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                    isActive ? "bg-accent" : "transparent",
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all",
+                    isActive 
+                        ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     isCollapsed && "justify-center"
                 )}>
-                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", botStatuses[bot.id] === 'running' ? 'bg-green-500 animate-pulse' : 'bg-gray-600')} />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={cn(
+                            "w-2 h-2 rounded-full transition-all",
+                            botStatuses[bot.id] === 'running' 
+                                ? 'bg-green-500 animate-pulse' 
+                                : 'bg-gray-500'
+                        )} />
+                        {isCollapsed && (
+                            <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center">
+                                <span className="text-xs font-bold text-white">
+                                    {bot.username.charAt(0).toUpperCase()}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                     <div className={cn("flex flex-col overflow-hidden", isCollapsed && "hidden")}>
                         <span className="font-medium truncate">{bot.username}</span>
                         <span className="text-xs text-muted-foreground truncate">{bot.note || `${bot.server.host}:${bot.server.port}`}</span>
@@ -135,39 +155,99 @@ export default function Layout() {
     };
 
     const sidebarContent = (isCollapsed) => (
-        <div className="flex flex-col h-full p-2">
-            <div className={cn("p-2 mb-2 flex items-center", isCollapsed ? 'justify-center' : 'justify-between')}>
-                <div className={cn(isCollapsed && "hidden")}>
-                    <h2 className="text-lg font-semibold tracking-tight">BlockMine</h2>
-                    <p className="text-sm text-muted-foreground">Пользователь: {user?.username}</p>
+        <div className="flex flex-col h-full bg-gradient-to-b from-background via-muted/20 to-background">
+            <div className={cn("p-4 border-b border-border/50", isCollapsed ? 'text-center' : '')}>
+                <div className={cn("flex items-center", isCollapsed ? 'justify-center' : 'justify-between')}>
+                    <div className={cn("flex items-center gap-3", isCollapsed && "hidden")}> 
+                        <div className="relative">
+                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-10 h-10 rounded-lg shadow-lg bg-gradient-to-r from-blue-500 to-purple-500" style={{boxShadow: '0 0 24px 0 #6f6fff55'}} />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                BlockMine
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                {user?.username}
+                            </p>
+                        </div>
+                    </div>
+                    {!isCollapsed && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+                            className="hidden md:flex hover:bg-muted/50"
+                        >
+                            <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="hidden md:flex">
-                    {isSidebarCollapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
-                </Button>
+                {isCollapsed && (
+                    <div className="flex flex-col items-center mt-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsSidebarCollapsed(false)}
+                            className="mb-2 hover:bg-muted/50"
+                        >
+                            <ChevronsRight className="h-5 w-5" />
+                        </Button>
+                        <div className="relative mx-auto w-10 h-10">
+                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-10 h-10 rounded-lg shadow-lg bg-gradient-to-r from-blue-500 to-purple-500" style={{boxShadow: '0 0 24px 0 #6f6fff55'}} />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <SidebarNav onLinkClick={() => setIsSheetOpen(false)} isCollapsed={isCollapsed} />
             
-            <div className="mt-auto pt-2 border-t">
+            <div className="mt-auto p-4 border-t border-border/50 space-y-3">
                 {hasPermission('panel:user:list') && (
-                    <NavLink to="/admin" onClick={() => setIsSheetOpen(false)} className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent", isActive ? "bg-accent" : "transparent", isCollapsed && "justify-center")}>
+                    <NavLink 
+                        to="/admin" 
+                        onClick={() => setIsSheetOpen(false)} 
+                        className={({ isActive }) => cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            isActive 
+                                ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-purple-600" 
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                            isCollapsed && "justify-center"
+                        )}
+                    >
                         <ShieldCheck className="h-4 w-4 flex-shrink-0" />
                         <span className={cn(isCollapsed && "hidden")}>Администрирование</span>
                     </NavLink>
                 )}
                 {hasPermission('server:list') && (
-                    <NavLink to="/servers" onClick={() => setIsSheetOpen(false)} className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent", isActive ? "bg-accent" : "transparent", isCollapsed && "justify-center")}>
+                    <NavLink 
+                        to="/servers" 
+                        onClick={() => setIsSheetOpen(false)} 
+                        className={({ isActive }) => cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            isActive 
+                                ? "bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 text-blue-600" 
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                            isCollapsed && "justify-center"
+                        )}
+                    >
                         <Server className="h-4 w-4 flex-shrink-0" />
                         <span className={cn(isCollapsed && "hidden")}>Серверы</span>
                     </NavLink>
                 )}
                 
-                <div className={cn("flex flex-col gap-2 mt-2", isCollapsed ? "px-1" : "px-3")}>
+                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-3")}>
                     {hasPermission('bot:create') && (
                         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="w-full" size={isCollapsed ? "icon" : "default"}>
-                                    <PlusCircle className={cn(!isCollapsed && "mr-2", "h-4 w-4")} />
+                                <Button 
+                                    variant="outline" 
+                                    className={cn(
+                                        "w-full transition-all",
+                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
+                                    )}
+                                    size={isCollapsed ? "icon" : "default"}
+                                >
+                                    <PlusCircle className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                                     {!isCollapsed && "Создать бота"}
                                 </Button>
                             </DialogTrigger>
@@ -179,8 +259,15 @@ export default function Layout() {
                     {hasPermission('bot:import') && (
                         <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="w-full" size={isCollapsed ? "icon" : "default"}>
-                                    <Upload className={cn(!isCollapsed && "mr-2", "h-4 w-4")} />
+                                <Button 
+                                    variant="outline" 
+                                    className={cn(
+                                        "w-full transition-all",
+                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
+                                    )}
+                                    size={isCollapsed ? "icon" : "default"}
+                                >
+                                    <Upload className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                                     {!isCollapsed && "Импорт бота"}
                                 </Button>
                             </DialogTrigger>
@@ -193,13 +280,25 @@ export default function Layout() {
 
                 <ThemeToggle isCollapsed={isCollapsed} />
                 
-                <Button variant="ghost" className={cn("w-full justify-start px-3", isCollapsed && "justify-center")} onClick={handleLogout}>
-                    <LogOut className={cn(!isCollapsed && "mr-2", "h-4 w-4")}/>
+                <Button 
+                    variant="ghost" 
+                    className={cn(
+                        "w-full transition-all",
+                        isCollapsed ? "h-9 w-9 p-0 justify-center" : "justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )} 
+                    onClick={handleLogout}
+                >
+                    <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-2")}/>
                     {!isCollapsed && "Выйти"}
                 </Button>
                 
-                <div className={cn("mt-2 pt-2 border-t text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
-                    <a href="https://github.com/blockmineJS/blockmine" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">
+                <div className={cn("pt-2 border-t border-border/50 text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
+                    <a 
+                        href="https://github.com/blockmineJS/blockmine" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+                    >
                         <Github className="h-4 w-4" />
                         <span>BlockMine v{appVersion}</span>
                     </a>
