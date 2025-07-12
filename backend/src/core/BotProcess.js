@@ -19,23 +19,6 @@ let bot = null;
 const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
 
-const mineflayer = require('mineflayer');
-const { SocksClient } = require('socks');
-const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
-const { Vec3 } = require('vec3');
-const { PrismaClient } = require('@prisma/client');
-const { loadCommands } = require('./system/CommandRegistry');
-const { initializePlugins } = require('./PluginLoader');
-const MessageQueue = require('./MessageQueue');
-const Command = require('./system/Command');
-const { parseArguments } = require('./system/parseArguments');
-const GraphExecutionEngine = require('./GraphExecutionEngine');
-const NodeRegistry = require('./NodeRegistry');
-
-const UserService = require('./UserService');
-const PermissionManager = require('./ipc/PermissionManager.stub.js');
-
 const originalJSONParse = JSON.parse
 JSON.parse = function(text, reviver) {
   if (typeof text !== 'string') return originalJSONParse(text, reviver)
@@ -46,10 +29,6 @@ JSON.parse = function(text, reviver) {
     return originalJSONParse(fixed, reviver)
   }
 }
-
-let bot = null;
-const pendingRequests = new Map();
-const entityMoveThrottles = new Map();
 
 function sendLog(content) {
     if (process.send) {
