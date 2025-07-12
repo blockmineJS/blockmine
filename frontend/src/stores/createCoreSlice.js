@@ -70,23 +70,42 @@ export const createCoreSlice = (set, get) => ({
             ]);
             
             set(state => {
-                state.bots = botsData || [];
-                state.servers = serversData || [];
-                state.botStatuses = stateData.statuses || {};
-                state.appVersion = versionData.version || '';
-
                 const serverLogs = stateData.logs || {};
+                const newBotLogs = { ...state.botLogs };
+                
                 for (const botId in serverLogs) {
                     const clientLogs = state.botLogs[botId] || [];
+                    const serverLogsForBot = serverLogs[botId] || [];
                     
                     if (clientLogs.length === 0) {
-                        state.botLogs[botId] = serverLogs[botId].slice(-500);
+                        newBotLogs[botId] = serverLogsForBot.slice(-500);
+                    } else {
+                        const allLogs = [...clientLogs, ...serverLogsForBot];
+                        const uniqueLogs = allLogs.filter((log, index, self) => 
+                            index === self.findIndex(l => l.id === log.id || l.content === log.content)
+                        );
+                        newBotLogs[botId] = uniqueLogs.slice(-500);
                     }
                 }
+                
+                return {
+                    ...state,
+                    bots: botsData || [],
+                    servers: serversData || [],
+                    botStatuses: stateData.statuses || {},
+                    appVersion: versionData.version || '',
+                    botLogs: newBotLogs
+                };
             });
         } catch (error) {
              console.error("Не удалось загрузить начальные данные:", error.message);
-             set(state => { state.bots = []; state.servers = []; });
+             set(state => ({ 
+                 ...state,
+                 bots: [], 
+                 servers: [],
+                 botStatuses: {},
+                 appVersion: ''
+             }));
         }
     },
 
@@ -95,13 +114,19 @@ export const createCoreSlice = (set, get) => ({
             const currentLogs = state.botLogs[botId] || [];
             
             const newLog = (typeof log === 'object' && log !== null && log.id) 
-                ? log 
-                : { id: Date.now() + Math.random(), content: (typeof log === 'object' && log !== null ? JSON.stringify(log) : log) };
-            
-            newLog.timestamp = Date.now();
+                ? { ...log, timestamp: Date.now() }
+                : { 
+                    id: Date.now() + Math.random(), 
+                    content: (typeof log === 'object' && log !== null ? JSON.stringify(log) : log),
+                    timestamp: Date.now()
+                };
             
             const lastLog = currentLogs[currentLogs.length - 1];
-            if (lastLog && lastLog.content === newLog.content && (Date.now() - lastLog.timestamp) < 100) {
+            if (lastLog && 
+                lastLog.content === newLog.content && 
+                lastLog.timestamp && 
+                newLog.timestamp && 
+                (newLog.timestamp - lastLog.timestamp) < 100) {
                 return state;
             }
             
