@@ -41,7 +41,9 @@ export const createCoreSlice = (set, get) => ({
             set(state => ({ botStatuses: { ...state.botStatuses, [botId]: status } }));
             if (message) get().appendLog(botId, `[SYSTEM] ${message}`);
         });
+        
         newSocket.on('bot:log', ({ botId, log }) => get().appendLog(botId, log));
+        
         newSocket.on('bots:usage', (usageData) => {
             const usageMap = usageData.reduce((acc, usage) => ({ ...acc, [usage.botId]: usage }), {});
             set({ resourceUsage: usageMap });
@@ -76,9 +78,10 @@ export const createCoreSlice = (set, get) => ({
                 const serverLogs = stateData.logs || {};
                 for (const botId in serverLogs) {
                     const clientLogs = state.botLogs[botId] || [];
-                    const combinedLogs = [...clientLogs, ...serverLogs[botId]];
-                    const uniqueLogs = Array.from(new Map(combinedLogs.map(item => [item.id, item])).values());
-                    state.botLogs[botId] = uniqueLogs.slice(-500);
+                    
+                    if (clientLogs.length === 0) {
+                        state.botLogs[botId] = serverLogs[botId].slice(-500);
+                    }
                 }
             });
         } catch (error) {
@@ -90,15 +93,29 @@ export const createCoreSlice = (set, get) => ({
     appendLog: (botId, log) => {
         set(state => {
             const currentLogs = state.botLogs[botId] || [];
+            
             const newLog = (typeof log === 'object' && log !== null && log.id) 
                 ? log 
                 : { id: Date.now() + Math.random(), content: (typeof log === 'object' && log !== null ? JSON.stringify(log) : log) };
             
+            newLog.timestamp = Date.now();
+            
+            const lastLog = currentLogs[currentLogs.length - 1];
+            if (lastLog && lastLog.content === newLog.content && (Date.now() - lastLog.timestamp) < 100) {
+                return state;
+            }
+            
             const newLogs = [...currentLogs, newLog];
-
-            const uniqueLogs = Array.from(new Map(newLogs.map(item => [item.id, item])).values());
-
-            state.botLogs[botId] = uniqueLogs.slice(-500);
+            
+            const limitedLogs = newLogs.length > 500 ? newLogs.slice(-500) : newLogs;
+            
+            return {
+                ...state,
+                botLogs: {
+                    ...state.botLogs,
+                    [botId]: limitedLogs
+                }
+            };
         });
     },
 
