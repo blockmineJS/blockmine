@@ -31,19 +31,20 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
     };
 
     return (
-        <Card className="h-full flex flex-col">
-            <CardHeader>
-                <CardTitle>Все боты</CardTitle>
-                <CardDescription>Быстрое управление состоянием всех ботов в системе.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow overflow-hidden">
-                <div className="border rounded-lg h-full overflow-y-auto">
+        <div className="h-full flex flex-col">
+            <div className="mb-4">
+                <CardTitle className="text-base font-semibold">Все боты</CardTitle>
+                <CardDescription className="text-sm">Быстрое управление состоянием всех ботов в системе</CardDescription>
+            </div>
+            
+            <div className="flex-grow overflow-hidden">
+                <div className="border rounded-lg h-full overflow-y-auto bg-background/50">
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead>Бот</TableHead>
-                                <TableHead>Статус</TableHead>
-                                <TableHead className="text-right">Действия</TableHead>
+                            <TableRow className="hover:bg-muted/30">
+                                <TableHead className="font-semibold">Бот</TableHead>
+                                <TableHead className="font-semibold">Статус</TableHead>
+                                <TableHead className="text-right font-semibold">Действия</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -51,24 +52,63 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                                 const status = botStatuses[bot.id] || 'stopped';
                                 const isRunning = status === 'running';
                                 return (
-                                    <TableRow key={bot.id}>
+                                    <TableRow key={bot.id} className="hover:bg-muted/20 transition-colors">
                                         <TableCell className="font-medium">{bot.username}</TableCell>
                                         <TableCell>
-                                            <span className={`px-2 py-1 text-xs rounded-md ${isRunning ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
-                                                {status}
+                                            <span className={`px-3 py-1 text-xs rounded-full font-medium ${
+                                                isRunning 
+                                                    ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
+                                                    : 'bg-red-500/10 text-red-600 border border-red-500/20'
+                                            }`}>
+                                                {isRunning ? 'Запущен' : 'Остановлен'}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted/50">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem disabled={isRunning} onClick={() => handleAction(bot, 'start')}><Play className="mr-2"/>Запустить</DropdownMenuItem>
-                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'stop')} className="text-destructive"><Square className="mr-2"/>Остановить</DropdownMenuItem>
-                                                    <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'restart')}><RefreshCw className="mr-2"/>Перезапустить</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/console`)}><Terminal className="mr-2"/>Консоль</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/settings`)}><Settings className="mr-2"/>Настройки</DropdownMenuItem>
+                                                <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuItem 
+                                                        disabled={isRunning} 
+                                                        onClick={() => handleAction(bot, 'start')}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <Play className="mr-2 h-4 w-4" />
+                                                        Запустить
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        disabled={!isRunning} 
+                                                        onClick={() => handleAction(bot, 'stop')} 
+                                                        className="text-destructive cursor-pointer"
+                                                    >
+                                                        <Square className="mr-2 h-4 w-4" />
+                                                        Остановить
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        disabled={!isRunning} 
+                                                        onClick={() => handleAction(bot, 'restart')}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                                        Перезапустить
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        onClick={() => navigate(`/bots/${bot.id}/console`)}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <Terminal className="mr-2 h-4 w-4" />
+                                                        Консоль
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        onClick={() => navigate(`/bots/${bot.id}/settings`)}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <Settings className="mr-2 h-4 w-4" />
+                                                        Настройки
+                                                    </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -78,7 +118,7 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                         </TableBody>
                     </Table>
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
