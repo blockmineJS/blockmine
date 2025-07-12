@@ -1,9 +1,0 @@
-{
-  "name": "test_hello",
-  "description": "Тестовая визуальная команда",
-  "aliases": ["hello", "привет"],
-  "cooldown": 0,
-  "allowedChatTypes": ["chat", "private"],
-  "argumentsJson": "[]",
-  "graphJson": "{\"nodes\":[{\"id\":\"start_node_1\",\"type\":\"event:command\",\"position\":{\"x\":100,\"y\":100},\"data\":{}},{\"id\":\"send_message_1\",\"type\":\"action:send_message\",\"position\":{\"x\":400,\"y\":100},\"data\":{\"message\":\"Привет! Это сообщение от визуальной команды!\"}}],\"connections\":[{\"id\":\"conn_1\",\"sourceNodeId\":\"start_node_1\",\"sourcePinId\":\"exec\",\"targetNodeId\":\"send_message_1\",\"targetPinId\":\"exec\"},{\"id\":\"conn_2\",\"sourceNodeId\":\"start_node_1\",\"sourcePinId\":\"chat_type\",\"targetNodeId\":\"send_message_1\",\"targetPinId\":\"chat_type\"}]}"
-}
