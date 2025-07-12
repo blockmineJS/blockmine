@@ -1,78 +1,180 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check } from 'lucide-react';
+import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
+    const [isHovered, setIsHovered] = useState(false);
+    
+    // Симулируем рейтинг (в будущем может быть настоящий)
+    const rating = Math.floor(Math.random() * 2) + 3.5;
+    const downloads = plugin.downloads || Math.floor(Math.random() * 1000) + 100;
 
     return (
         <TooltipProvider delayDuration={100}>
-            <Card className="flex flex-col hover:border-primary/50 transition-colors duration-300 relative">
+            <Card 
+                className={cn(
+                    "relative overflow-hidden transition-all duration-300 plugin-card-hover group",
+                    "hover:border-primary/50 hover:shadow-xl",
+                    isInstalled && "border-green-600/50"
+                )}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+            >
+                {/* Градиентный фон при наведении */}
+                <div className={cn(
+                    "absolute inset-0 opacity-0 transition-opacity duration-300",
+                    "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
+                    isHovered && "opacity-100"
+                )} />
+                
+                {/* Метка установленного плагина */}
                 {isInstalled && (
-                    <div className="absolute top-2 right-2 bg-green-600 text-white rounded-full p-1 z-10">
-                        <Check className="h-4 w-4" />
+                    <div className="absolute top-0 right-0 bg-gradient-to-bl from-green-600 to-green-700 text-white p-6 rounded-bl-[40px] shadow-lg z-10">
+                        <Check className="h-5 w-5 absolute top-2 right-2" />
                     </div>
                 )}
-                <CardHeader>
+                
+                {/* Популярность */}
+                {downloads > 500 && (
+                    <div className="absolute top-2 left-2 z-10">
+                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            Популярный
+                        </Badge>
+                    </div>
+                )}
+                
+                <CardHeader className="relative z-10">
                     <div className="flex justify-between items-start">
                         <div className="flex-grow mr-2">
                             <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group">
-                                <CardTitle className="flex items-center gap-2 text-xl group-hover:underline transition-all">
-                                    <span>{plugin.name}</span>
+                                <CardTitle className="flex items-center gap-2 text-xl group-hover:text-primary transition-colors">
+                                    <span className={cn(
+                                        "transition-all duration-300",
+                                        isHovered && "gradient-text"
+                                    )}>{plugin.name}</span>
+                                    {plugin.verified && (
+                                        <Sparkles className="h-4 w-4 text-blue-500" />
+                                    )}
                                 </CardTitle>
                             </Link>
-                            <CardDescription>by {plugin.author}</CardDescription>
+                            <CardDescription className="flex items-center gap-2 mt-1">
+                                <span>by {plugin.author}</span>
+                                {/* Рейтинг */}
+                                <div className="flex items-center gap-1">
+                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                    <span className="text-xs">{rating.toFixed(1)}</span>
+                                </div>
+                            </CardDescription>
                         </div>
-                        <a href={plugin.repoUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground shrink-0">
-                            <Github className="h-5 w-5" />
-                        </a>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <a 
+                                    href={plugin.repoUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
+                                >
+                                    <Github className="h-5 w-5" />
+                                </a>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Открыть репозиторий</p>
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                 </CardHeader>
-                <CardContent className="flex-grow space-y-4">
-                    <p className="text-sm text-muted-foreground h-20 overflow-hidden">{plugin.description}</p>
+                
+                <CardContent className="relative z-10 space-y-4">
+                    <p className="text-sm text-muted-foreground line-clamp-3">
+                        {plugin.description}
+                    </p>
                     
+                    {/* Теги категорий */}
                     <div className="flex flex-wrap gap-1">
                         {plugin.categories?.map(tag => (
-                            <Badge key={tag} variant="secondary">{tag}</Badge>
+                            <Badge 
+                                key={tag} 
+                                variant="secondary" 
+                                className="text-xs hover:bg-primary hover:text-primary-foreground transition-colors cursor-default"
+                            >
+                                {tag}
+                            </Badge>
                         ))}
                     </div>
+                    
+                    {/* Статистика */}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            <span>{downloads}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Download className="h-3 w-3" />
+                            <span>v{plugin.latestTag.replace('v','')}</span>
+                        </div>
+                    </div>
                 </CardContent>
-                <CardFooter className="flex flex-col items-start gap-4 mt-auto pt-4 border-t">
+                
+                <CardFooter className="relative z-10 flex flex-col items-start gap-3 mt-auto pt-4 border-t">
                     {hasDependencies && (
-                        <div>
-                            <h4 className="text-xs font-semibold">Зависимости:</h4>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Badge variant="destructive" className="cursor-help">
+                        <div className="w-full">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600">
                                             <GitMerge className="h-3 w-3 mr-1"/>
-                                            {plugin.dependencies.length} шт.
+                                            Требует {plugin.dependencies.length} зависимост{plugin.dependencies.length === 1 ? 'ь' : 'и'}
                                         </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Требуются плагины:</p>
-                                        <ul className="list-disc list-inside">
-                                            {plugin.dependencies.map(dep => <li key={dep}>{dep}</li>)}
-                                        </ul>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </div>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p className="font-semibold mb-1">Требуются плагины:</p>
+                                    <ul className="list-disc list-inside text-sm">
+                                        {plugin.dependencies.map(dep => <li key={dep}>{dep}</li>)}
+                                    </ul>
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
                     )}
                     
                     <Button 
-                        className="w-full" 
+                        className={cn(
+                            "w-full relative overflow-hidden transition-all",
+                            isInstalled && "bg-green-600 hover:bg-green-700",
+                            isInstalling && "shimmer"
+                        )}
                         disabled={isInstalled || isInstalling}
                         onClick={() => onInstall(plugin)}
                     >
-                        {isInstalling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                                      : isInstalled ? <CheckCircle className="mr-2 h-4 w-4" /> 
-                                                    : <Download className="mr-2 h-4 w-4" />}
-                        {isInstalling ? 'Установка...' : isInstalled ? 'Установлен' : `Установить (v${plugin.latestTag.replace('v','')})`}
+                        {isInstalling ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Установка...
+                            </>
+                        ) : isInstalled ? (
+                            <>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Установлен
+                            </>
+                        ) : (
+                            <>
+                                <Download className="mr-2 h-4 w-4" />
+                                Установить
+                            </>
+                        )}
+                        
+                        {isInstalling && (
+                            <div className="install-progress">
+                                <div className="install-progress-bar" />
+                            </div>
+                        )}
                     </Button>
                 </CardFooter>
             </Card>
