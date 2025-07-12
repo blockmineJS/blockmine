@@ -102,11 +102,12 @@ class NodeRegistry {
       label: '▶️ При выполнении команды',
       category: 'События',
       description: 'Стартовая точка для графа команды.',
-      graphType: command,
+      graphType: 'all',
       pins: {
         inputs: [],
         outputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec' },
+          { id: 'command_name', name: 'Имя команды', type: 'String' },
           { id: 'user', name: 'Пользователь', type: 'User' },
           { id: 'args', name: 'Аргументы', type: 'Object' },
           { id: 'chat_type', name: 'Тип чата', type: 'String' }

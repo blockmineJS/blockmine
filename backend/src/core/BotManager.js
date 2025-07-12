@@ -503,6 +503,15 @@ class BotManager {
                 cooldowns.set(cooldownKey, now);
             }
 
+            if (this.eventGraphManager) {
+                this.eventGraphManager.handleEvent(botId, 'command', {
+                    commandName: dbCommand.name,
+                    user: { username },
+                    args,
+                    typeChat
+                });
+            }
+
             child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
 
         } catch (error) {

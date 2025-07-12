@@ -219,6 +219,34 @@ class GraphExecutionEngine {
             await this.traverse(node, 'completed');
             break;
           }
+          case 'flow:while': {
+            let iteration = 0;
+            const maxIterations = 1000;
+            
+            try {
+                while (iteration < maxIterations) {
+                    const condition = await this.resolvePinValue(node, 'condition', false);
+                    if (!condition) break;
+                    
+                    this.memo.set(`${node.id}:iteration`, iteration);
+                    this.clearLoopBodyMemo(node);
+                    await this.traverse(node, 'loop_body');
+                    iteration++;
+                }
+                
+                if (iteration >= maxIterations) {
+                    console.warn(`[GraphExecutionEngine] Цикл while достиг максимального количества итераций (${maxIterations})`);
+                }
+            } catch (e) {
+                if (e instanceof BreakLoopSignal) {
+                } else {
+                    throw e;
+                }
+            }
+            
+            await this.traverse(node, 'completed');
+            break;
+          }
           case 'flow:sequence': {
               const pinCount = node.data?.pinCount || 2;
               for (let i = 0; i < pinCount; i++) {
@@ -375,7 +403,7 @@ class GraphExecutionEngine {
           case 'event:command':
               if (pinId === 'args') result = this.context.args || {};
               else if (pinId === 'user') result = this.context.user || {};
-              else if (pinId === 'chat_type') result = this.context.typeChat || 'local';
+              else if (pinId === 'chat_type') result = this.context.typeChat || 'chat';
               else result = this.context[pinId];
               break;
           case 'event:chat':
@@ -399,8 +427,13 @@ class GraphExecutionEngine {
               break;
           
           case 'data:get_variable':
-              const varName = node.data?.variableName || '';
-              result = this.context.variables.hasOwnProperty(varName) ? this.context.variables[varName] : null;
+              const varName = node.data?.variableName || node.data?.selectedVariable || '';
+              if (!varName) {
+                  console.warn('[GraphExecutionEngine] data:get_variable: не указано имя переменной', node.data);
+                  result = null;
+              } else {
+                  result = this.context.variables.hasOwnProperty(varName) ? this.context.variables[varName] : null;
+              }
               break;
           
 
@@ -471,16 +504,12 @@ class GraphExecutionEngine {
           case 'logic:operation': {
             const op = node.data?.operation || 'AND';
             const inputs = [];
-            for (const key in node.data) {
-                if (key.startsWith('pin_')) {
-                    inputs.push(await this.resolvePinValue(node, key, false));
-                }
+            const pinCount = node.data?.pinCount || 2;
+            
+            for (let i = 0; i < pinCount; i++) {
+                const value = await this.resolvePinValue(node, `pin_${i}`, false);
+                inputs.push(value);
             }
-            if (inputs.length === 0) {
-                inputs.push(await this.resolvePinValue(node, 'a', false));
-                inputs.push(await this.resolvePinValue(node, 'b', false));
-            }
-
 
             switch (op) {
                 case 'AND': result = inputs.every(Boolean); break;
@@ -738,6 +767,12 @@ class GraphExecutionEngine {
             }
             break;
           }
+          case 'flow:while': {
+            if (pinId === 'iteration') {
+                result = this.memo.get(`${node.id}:iteration`);
+            }
+            break;
+          }
           
           case 'string:equals': {
               const strA = String(await this.resolvePinValue(node, 'a', ''));
@@ -797,6 +832,13 @@ class GraphExecutionEngine {
     }
 
     return false;
+  }
+
+  hasConnection(node, pinId) {
+      if (!this.activeGraph || !this.activeGraph.connections) return false;
+      return this.activeGraph.connections.some(conn => 
+          conn.targetNodeId === node.id && conn.targetPinId === pinId
+      );
   }
 }
 

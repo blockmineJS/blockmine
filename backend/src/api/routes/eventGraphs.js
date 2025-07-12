@@ -121,7 +121,17 @@ router.put('/:graphId',
 
           const parsedGraph = JSON.parse(graphJson);
           const eventNodes = parsedGraph.nodes.filter(node => node.type.startsWith('event:'));
-          const eventTypes = eventNodes.map(node => node.type.split(':')[1]);
+          const eventTypes = [...new Set(eventNodes.map(node => node.type.split(':')[1]))];
+          
+          const existingGraph = await prisma.eventGraph.findUnique({
+              where: { id: parseInt(graphId) },
+              include: { triggers: true }
+          });
+          
+          const existingEventTypes = existingGraph?.triggers?.map(t => t.eventType) || [];
+          
+          const eventTypesToDelete = existingEventTypes.filter(et => !eventTypes.includes(et));
+          const eventTypesToCreate = eventTypes.filter(et => !existingEventTypes.includes(et));
           
           dataToUpdate.triggers = {
               deleteMany: {},

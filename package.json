@@ -48,6 +48,7 @@
     "monaco-editor": "^0.52.2",
     "multer": "^2.0.1",
     "node-cron": "^4.1.0",
+    "openrouter-kit": "^0.1.65",
     "pidusage": "^3.0.2",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
@@ -58,7 +59,8 @@
     "slugify": "^1.6.6",
     "socket.io": "^4.7.5",
     "socks": "^2.8.5",
-    "sonner": "^2.0.5"
+    "sonner": "^2.0.5",
+    "systeminformation": "^5.27.7"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
