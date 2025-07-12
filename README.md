@@ -131,6 +131,7 @@
 git clone https://github.com/blockmineJS/blockmine.git
 cd blockmine
 npm install
+npm run build
 ```
 
 ### 2. Запуск в режиме разработки
