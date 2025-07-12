@@ -23,7 +23,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
     const [isHovered, setIsHovered] = useState(false);
     const prevDownloads = useRef(plugin.downloads);
 
-    const isPopular = (plugin.downloads || 0) > 500;
+    const isPopular = plugin.isTop3;
 
     useEffect(() => {
         if (plugin.downloads > prevDownloads.current) {
@@ -78,7 +78,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                                     "font-semibold text-lg group-hover:text-primary transition-colors inline-flex items-center gap-2",
                                     isHovered && "gradient-text"
                                 )}>
-                                    {plugin.name}
+                                    {plugin.displayName || plugin.name}
                                     {plugin.verified && (
                                         <Sparkles className="h-4 w-4 text-blue-500" />
                                     )}
@@ -126,7 +126,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                         {isPopular && (
                             <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs">
                                 <TrendingUp className="h-3 w-3 mr-1" />
-                                Популярный
+                                Популярное
                             </Badge>
                         )}
                         

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, CheckCircle, Loader2, Github, ArrowLeft, Star, Users, Clock, GitBranch, Package, Shield, TrendingUp, Code2, FileText, ExternalLink, Heart, Share2 } from 'lucide-react';
+import { Download, CheckCircle, Loader2, Github, ArrowLeft, Star, Users, Clock, GitBranch, Package, Shield, TrendingUp, Code2, FileText, ExternalLink, Heart, Share2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
@@ -28,13 +28,11 @@ export default function PluginDetailPage() {
     const [isInstalling, setIsInstalling] = useState(false);
     const [isForking, setIsForking] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [changelog, setChangelog] = useState('');
     const { toast } = useToast();
 
     const [stats] = useState({
-        weeklyDownloads: 1234,
-        lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        license: 'MIT',
-        size: '2.4 MB'
+        lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     });
 
     useEffect(() => {
@@ -44,7 +42,44 @@ export default function PluginDetailPage() {
                 const response = await fetch(`/api/plugins/catalog/${pluginName}`);
                 if (!response.ok) throw new Error('Плагин не найден');
                 const data = await response.json();
+                
+                // Загружаем актуальную статистику скачиваний
+                try {
+                    const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
+                    if (statsResponse.ok) {
+                        const statsData = await statsResponse.json();
+                        const pluginStats = statsData?.plugins?.find(p => p.pluginName === data.name);
+                        if (pluginStats) {
+                            data.downloads = pluginStats.downloadCount;
+                        }
+                    }
+                } catch (statsError) {
+                    console.warn('Не удалось загрузить статистику:', statsError.message);
+                }
+                
                 setPlugin(data);
+                
+                // Загружаем описание последнего релиза из GitHub
+                try {
+                    const urlParts = new URL(data.repoUrl);
+                    const pathParts = urlParts.pathname.split('/').filter(p => p);
+                    
+                    if (pathParts.length >= 2) {
+                        const owner = pathParts[0];
+                        const repo = pathParts[1].replace('.git', '');
+                        
+                        // Получаем последний релиз через GitHub API
+                        const releasesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
+                        if (releasesResponse.ok) {
+                            const releaseData = await releasesResponse.json();
+                            if (releaseData.body) {
+                                setChangelog(releaseData.body);
+                            }
+                        }
+                    }
+                } catch (releaseError) {
+                    console.warn('Не удалось загрузить описание релиза:', releaseError.message);
+                }
             } catch (error) {
                 toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
             } finally {
@@ -118,12 +153,6 @@ export default function PluginDetailPage() {
         );
     }
 
-    const screenshots = [
-        'https://via.placeholder.com/800x600/1e293b/64748b?text=Screenshot+1',
-        'https://via.placeholder.com/800x600/1e293b/64748b?text=Screenshot+2',
-        'https://via.placeholder.com/800x600/1e293b/64748b?text=Screenshot+3',
-    ];
-
     return (
         <div className="h-full overflow-y-auto">
             <div className="relative bg-gradient-to-br from-primary/20 via-purple-600/20 to-pink-600/20 p-8">
@@ -138,7 +167,7 @@ export default function PluginDetailPage() {
                     <div className="flex flex-col md:flex-row gap-6 items-start">
                         <div className="flex-grow">
                             <div className="flex items-center gap-3 mb-2">
-                                <h1 className="text-4xl font-bold gradient-text">{plugin.name}</h1>
+                                <h1 className="text-4xl font-bold gradient-text">{plugin.displayName || plugin.name}</h1>
                                 {plugin.verified && (
                                     <Shield className="h-6 w-6 text-blue-500" />
                                 )}
@@ -213,50 +242,28 @@ export default function PluginDetailPage() {
                                     Форк
                                 </Button>
                             </div>
-                            
-                            <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" className="flex-1">
-                                    <Heart className="mr-2 h-4 w-4" />
-                                    Нравится
-                                </Button>
-                                <Button variant="ghost" size="sm" className="flex-1">
-                                    <Share2 className="mr-2 h-4 w-4" />
-                                    Поделиться
-                                </Button>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div className="max-w-6xl mx-auto p-8">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                     <Card className="text-center p-4">
                         <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
                         <p className="text-2xl font-bold">{plugin.downloads || 0}</p>
                         <p className="text-sm text-muted-foreground">Всего загрузок</p>
                     </Card>
                     <Card className="text-center p-4">
-                        <Download className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                        <p className="text-2xl font-bold">{stats.weeklyDownloads}</p>
-                        <p className="text-sm text-muted-foreground">За неделю</p>
-                    </Card>
-                    <Card className="text-center p-4">
                         <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
                         <p className="text-2xl font-bold">{formatDate(stats.lastUpdated)}</p>
                         <p className="text-sm text-muted-foreground">Обновлено</p>
-                    </Card>
-                    <Card className="text-center p-4">
-                        <Package className="h-8 w-8 mx-auto mb-2 text-purple-500" />
-                        <p className="text-2xl font-bold">{stats.size}</p>
-                        <p className="text-sm text-muted-foreground">Размер</p>
                     </Card>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="overview">Обзор</TabsTrigger>
-                        <TabsTrigger value="screenshots">Скриншоты</TabsTrigger>
                         <TabsTrigger value="changelog">Изменения</TabsTrigger>
                     </TabsList>
                     
@@ -284,18 +291,8 @@ export default function PluginDetailPage() {
                                     </CardHeader>
                                     <CardContent className="space-y-3 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Лицензия</span>
-                                            <Badge variant="outline">{stats.license}</Badge>
-                                        </div>
-                                        <Separator />
-                                        <div className="flex justify-between">
                                             <span className="text-muted-foreground">Версия</span>
                                             <span>{plugin.latestTag}</span>
-                                        </div>
-                                        <Separator />
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Язык</span>
-                                            <span>JavaScript</span>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -324,44 +321,27 @@ export default function PluginDetailPage() {
                         </div>
                     </TabsContent>
                     
-                    <TabsContent value="screenshots" className="mt-6">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            {screenshots.map((src, index) => (
-                                <Card key={index} className="overflow-hidden group cursor-pointer">
-                                    <div className="relative aspect-video">
-                                        <img 
-                                            src={src} 
-                                            alt={`Screenshot ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                        />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <ExternalLink className="h-8 w-8 text-white" />
-                                        </div>
-                                    </div>
-                                </Card>
-                            ))}
-                        </div>
-                    </TabsContent>
-                    
                     <TabsContent value="changelog" className="mt-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>История изменений</CardTitle>
+                                <CardTitle>Описание релиза</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2 mb-2">
-                                            <Badge>v{plugin.latestTag.replace('v','')}</Badge>
-                                            <span className="text-sm text-muted-foreground">{formatDate(stats.lastUpdated)}</span>
-                                        </h4>
-                                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                            <li>Улучшена производительность</li>
-                                            <li>Исправлены мелкие ошибки</li>
-                                            <li>Добавлена поддержка новых команд</li>
-                                        </ul>
+                                {changelog ? (
+                                    <div className="prose prose-invert max-w-none">
+                                        <ReactMarkdown>
+                                            {changelog}
+                                        </ReactMarkdown>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                        <p>Описание релиза не найдено</p>
+                                        <p className="text-sm mt-2">
+                                            Описание может быть добавлено в GitHub релиз плагина
+                                        </p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>

@@ -42,7 +42,9 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    от <span className="font-medium text-primary/90">{plugin.author || 'Неизвестный автор'}</span>
+                    от <span className="font-semibold">
+                        {plugin.displayName || plugin.name}
+                    </span>
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">{plugin.description || 'Нет описания.'}</p>
                 

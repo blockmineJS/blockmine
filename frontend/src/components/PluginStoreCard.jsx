@@ -36,11 +36,11 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                     </div>
                 )}
                 
-                {downloads > 500 && (
+                {plugin.isTop3 && (
                     <div className="absolute top-2 left-2 z-10">
                         <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
                             <TrendingUp className="h-3 w-3 mr-1" />
-                            Популярный
+                            Популярное
                         </Badge>
                     </div>
                 )}
@@ -53,7 +53,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                                     <span className={cn(
                                         "transition-all duration-300",
                                         isHovered && "gradient-text"
-                                    )}>{plugin.name}</span>
+                                    )}>{plugin.displayName || plugin.name}</span>
                                     {plugin.verified && (
                                         <Sparkles className="h-4 w-4 text-blue-500" />
                                     )}
