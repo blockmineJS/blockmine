@@ -379,7 +379,13 @@ class GraphExecutionEngine {
               else result = this.context[pinId];
               break;
           case 'event:chat':
-              if (pinId === 'user') result = { username: this.context.username };
+              if (pinId === 'username') result = this.context.username;
+              else if (pinId === 'message') result = this.context.message;
+              else if (pinId === 'chatType') result = this.context.chat_type;
+              else result = this.context[pinId];
+              break;
+          case 'event:raw_message':
+              if (pinId === 'rawText') result = this.context.rawText;
               else result = this.context[pinId];
               break;
           case 'event:playerJoined':

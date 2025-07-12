@@ -145,6 +145,9 @@ class EventGraphManager {
                 context.message = args.message;
                 context.chat_type = args.chatType;
                 break;
+            case 'raw_message':
+                context.rawText = args.rawText;
+                break;
             case 'playerJoined':
             case 'playerLeft':
                 context.user = args.user;
