@@ -115,7 +115,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
             const searchLower = searchQuery.toLowerCase();
             const matchesCategory = selectedCategory === 'Все плагины' || (plugin.categories && plugin.categories.includes(selectedCategory));
             const matchesSearch = !searchQuery || 
-                plugin.name.toLowerCase().includes(searchLower) || 
+                (plugin.displayName || plugin.name).toLowerCase().includes(searchLower) || 
                 plugin.description.toLowerCase().includes(searchLower) ||
                 plugin.author.toLowerCase().includes(searchLower);
             return matchesCategory && matchesSearch;
@@ -133,11 +133,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                 break;
             case 'popular':
             default:
-                filtered.sort((a, b) => {
-                    const scoreA = (a.downloads || 0) + (new Date(a.createdAt || 0).getTime() / 1000000000);
-                    const scoreB = (b.downloads || 0) + (new Date(b.createdAt || 0).getTime() / 1000000000);
-                    return scoreB - scoreA;
-                });
+                filtered.sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
                 break;
         }
 

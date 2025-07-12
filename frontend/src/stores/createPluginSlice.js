@@ -72,9 +72,17 @@ export const createPluginSlice = (set, get) => {
                     console.warn("Не удалось загрузить статистику скачиваний плагинов:", statsError.message);
                 }
 
-                const enrichedCatalog = (catalogData || []).map(plugin => ({
+                // Сортируем плагины по количеству скачиваний для определения топ 3
+                const sortedPlugins = (catalogData || []).map(plugin => ({
                     ...plugin,
                     downloads: statsMap.get(plugin.name) || 0,
+                })).sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
+
+                // Добавляем информацию о топ 3
+                const enrichedCatalog = sortedPlugins.map((plugin, index) => ({
+                    ...plugin,
+                    isTop3: index < 3,
+                    topPosition: index + 1,
                 }));
 
                 set({ pluginCatalog: enrichedCatalog, isCatalogLoading: false });
