@@ -56,6 +56,7 @@ class EventGraphManager {
                         name: graph.name,
                         nodes: parsedGraph.nodes,
                         connections: parsedGraph.connections,
+                        variables: parsedGraph.variables || [],
                     });
                 }
             } catch (e) {
@@ -119,7 +120,25 @@ class EventGraphManager {
         initialContext.botId = botId;
         initialContext.players = players;
         initialContext.botState = eventArgs.botState || {};
-        initialContext.variables = { ...(this.graphStates.get(stateKey) || {}) };
+        
+        const savedVariables = { ...(this.graphStates.get(stateKey) || {}) };
+        
+        if (graph.variables && Array.isArray(graph.variables)) {
+            for (const v of graph.variables) {
+                if (!savedVariables.hasOwnProperty(v.name)) {
+                    let val;
+                    switch (v.type) {
+                        case 'number': val = Number(v.value) || 0; break;
+                        case 'boolean': val = v.value === 'true'; break;
+                        case 'array': try { val = Array.isArray(JSON.parse(v.value)) ? JSON.parse(v.value) : []; } catch { val = []; } break;
+                        default: val = v.value;
+                    }
+                    savedVariables[v.name] = val;
+                }
+            }
+        }
+        
+        initialContext.variables = savedVariables;
 
         try {
             const finalContext = await this.graphEngine.execute(graph, initialContext, eventType);
@@ -160,6 +179,12 @@ class EventGraphManager {
             case 'entityMoved':
             case 'entityGone':
                 context.entity = args.entity;
+                break;
+            case 'command':
+                context.command_name = args.commandName;
+                context.user = args.user;
+                context.args = args.args;
+                context.chat_type = args.typeChat;
                 break;
         }
         return context;
