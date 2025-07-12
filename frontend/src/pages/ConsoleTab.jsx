@@ -136,7 +136,7 @@ export default function ConsoleTab() {
                     }}
                 >
                     {logs.map((log, index) => (
-                        <LogLine key={log.id || index} log={log} index={index} />
+                        <LogLine key={`${botId}-${log.id || index}-${log.timestamp || index}`} log={log} index={index} />
                     ))}
                 </div>
             </div>
