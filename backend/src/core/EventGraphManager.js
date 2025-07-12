@@ -1,13 +1,14 @@
 const { PrismaClient } = require('@prisma/client');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
+const nodeRegistry = require('./NodeRegistry');
 
 const prisma = new PrismaClient();
 
 class EventGraphManager {
     constructor(botManager) {
         this.botManager = botManager;
-        this.graphEngine = botManager.graphEngine;
+        this.graphEngine = new GraphExecutionEngine(nodeRegistry, botManager);
         this.activeGraphs = new Map();
-        // Хранилище для состояний (переменных) каждого графа
         this.graphStates = new Map();
     }
 
@@ -26,7 +27,6 @@ class EventGraphManager {
                 const parsedGraph = JSON.parse(graph.graphJson);
                 if (!parsedGraph.nodes) continue;
 
-                // Инициализация начального состояния переменных для этого графа
                 const initialState = {};
                 if (graph.variables) {
                     try {
@@ -69,7 +69,6 @@ class EventGraphManager {
 
     unloadGraphsForBot(botId) {
         this.activeGraphs.delete(botId);
-        // Также очищаем состояния при выгрузке
         for (const key of this.graphStates.keys()) {
             if (key.startsWith(`${botId}-`)) {
                 this.graphStates.delete(key);
