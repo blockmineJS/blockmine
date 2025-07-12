@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -369,7 +369,10 @@ export default function InstalledPluginsView({
 }) {
     const [selectedPlugin, setSelectedPlugin] = useState(null);
     const [filter, setFilter] = useState('all');
-    const [viewMode, setViewMode] = useState('grid');
+    const [viewMode, setViewMode] = useState(() => {
+        const saved = localStorage.getItem('installed-plugins-view-mode');
+        return saved || 'grid';
+    });
     const [pluginToDelete, setPluginToDelete] = useState(null);
 
     const stats = useMemo(() => {
@@ -404,6 +407,10 @@ export default function InstalledPluginsView({
                 return sorted;
         }
     }, [installedPlugins, filter, updates]);
+
+    useEffect(() => {
+        localStorage.setItem('installed-plugins-view-mode', viewMode);
+    }, [viewMode]);
 
     return (
         <TooltipProvider delayDuration={100}>

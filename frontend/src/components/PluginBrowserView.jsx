@@ -41,7 +41,10 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Все плагины');
     const [sortBy, setSortBy] = useState('popular');
-    const [viewMode, setViewMode] = useState('grid');
+    const [viewMode, setViewMode] = useState(() => {
+        const saved = localStorage.getItem('plugin-browser-view-mode');
+        return saved || 'grid';
+    });
     const [dependencyDialogState, setDependencyDialogState] = useState({
         isOpen: false, mainPlugin: null, dependencies: [],
     });
@@ -49,6 +52,10 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     useEffect(() => {
         fetchPluginCatalog();
     }, [fetchPluginCatalog]);
+
+    useEffect(() => {
+        localStorage.setItem('plugin-browser-view-mode', viewMode);
+    }, [viewMode]);
 
     const installSinglePlugin = async (pluginToInstall) => {
         if (!pluginToInstall) return;
