@@ -82,7 +82,7 @@ export const createCoreSlice = (set, get) => ({
                     } else {
                         const allLogs = [...clientLogs, ...serverLogsForBot];
                         const uniqueLogs = allLogs.filter((log, index, self) => 
-                            index === self.findIndex(l => l.id === log.id || l.content === log.content)
+                            index === self.findIndex(l => l.id === log.id)
                         );
                         newBotLogs[botId] = uniqueLogs.slice(-500);
                     }
@@ -123,10 +123,7 @@ export const createCoreSlice = (set, get) => ({
             
             const lastLog = currentLogs[currentLogs.length - 1];
             if (lastLog && 
-                lastLog.content === newLog.content && 
-                lastLog.timestamp && 
-                newLog.timestamp && 
-                (newLog.timestamp - lastLog.timestamp) < 100) {
+                lastLog.id === newLog.id) {
                 return state;
             }
             
