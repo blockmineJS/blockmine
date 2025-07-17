@@ -1,0 +1,16 @@
+{
+  "header": "# История версий\n\n",
+  "types": [
+    { "type": "feat",     "section": "✨ Новые возможности" },
+    { "type": "fix",      "section": "🐛 Исправления" },
+    { "type": "perf",     "section": "⚡ Производительность" },
+    { "type": "refactor", "section": "🛠 Рефакторинг" },
+    { "type": "build",    "section": "🏗 Сборка" },
+    { "type": "chore",    "hidden": true },
+    { "type": "docs",     "hidden": true },
+    { "type": "style",    "hidden": true },
+    { "type": "test",     "hidden": true }
+  ],
+  "commitPartial": ".changelog/commit.hbs",
+  "skip": { "tag": true }
+}

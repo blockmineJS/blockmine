@@ -12,6 +12,7 @@ import GlobalSearch from '@/components/GlobalSearch';
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
+import ChangelogDialog from '@/components/ChangelogDialog';
 
 const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     const bots = useAppStore(state => state.bots);
@@ -42,6 +43,21 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                     {iconAndText(<Clock className="h-4 w-4 flex-shrink-0" />, "Планировщик")}
                 </NavLink>
             )}
+
+            <Button 
+                variant="ghost"
+                className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    isCollapsed && "justify-center"
+                )}
+                onClick={async () => {
+                    await useAppStore.getState().fetchChangelog();
+                    useAppStore.setState({ showChangelogDialog: true });
+                    onLinkClick();
+                }}
+            >
+                {iconAndText(<Github className="h-4 w-4 flex-shrink-0" />, "История версий")}
+            </Button>
             
             <Separator className="my-2" />
             
@@ -302,11 +318,21 @@ export default function Layout() {
                         <Github className="h-4 w-4" />
                         <span>BlockMine v{appVersion}</span>
                     </a>
+                    <Button
+                        variant="link"
+                        size="sm"
+                        className="text-xs h-auto p-0 mt-1 text-muted-foreground hover:text-primary"
+                        onClick={async () => {
+                            await useAppStore.getState().fetchChangelog();
+                            useAppStore.setState({ showChangelogDialog: true });
+                        }}
+                    >
+                        Что нового?
+                    </Button>
                 </div>
             </div>
         </div>
     );
-
 
     return (
         <div className={cn(
@@ -335,6 +361,8 @@ export default function Layout() {
             <main className="overflow-y-auto">
                 <Outlet />
             </main>
+            
+            <ChangelogDialog />
         </div>
     );
 }

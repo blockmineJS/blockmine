@@ -35,6 +35,8 @@ export const createCoreSlice = (set, get) => ({
     resourceUsage: {},
     appVersion: '',
     botUIExtensions: {},
+    changelog: '',
+    showChangelogDialog: false,
 
     connectSocket: () => {
         const existingSocket = get().socket;
@@ -97,6 +99,16 @@ export const createCoreSlice = (set, get) => ({
                 apiHelper('/api/version')
             ]);
 
+            const currentVersion = versionData.version || '';
+            const lastShownVersion = localStorage.getItem('lastShownVersion');
+            
+            
+                if (currentVersion && currentVersion !== lastShownVersion) {
+                    await get().fetchChangelog();
+                    set({ showChangelogDialog: true });
+                    localStorage.setItem('lastShownVersion', currentVersion);
+                }
+
             set(state => {
                 const serverLogs = stateData.logs || {};
                 const newBotLogs = { ...state.botLogs };
@@ -117,7 +129,7 @@ export const createCoreSlice = (set, get) => ({
                     bots: botsData || [],
                     servers: serversData || [],
                     botStatuses: stateData.statuses || {},
-                    appVersion: versionData.version || '',
+                    appVersion: currentVersion,
                     botLogs: newBotLogs
                 };
             });
@@ -163,5 +175,23 @@ export const createCoreSlice = (set, get) => ({
 
             state.botLogs[botId] = limitedLogs;
         });
+    },
+
+    fetchChangelog: async () => {
+        try {
+            const response = await fetch('/api/changelog');
+            if (!response.ok) {
+                throw new Error('Failed to fetch changelog');
+            }
+            const text = await response.text();
+            set({ changelog: text });
+        } catch (error) {
+            console.error('Не удалось загрузить changelog:', error);
+            set({ changelog: '' });
+        }
+    },
+
+    closeChangelogDialog: () => {
+        set({ showChangelogDialog: false });
     },
 });

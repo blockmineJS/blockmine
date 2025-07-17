@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/appStore';
 import ToggleButton from '@mui/material/ToggleButton';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
+import ChangelogDialog from '@/components/ChangelogDialog';
 
 const getInitialDarkMode = () => {
     const storedTheme = localStorage.getItem('theme');
@@ -54,6 +55,7 @@ function App() {
                 </ToggleButton>
             </div>
             <RouterProvider router={router} />
+            <ChangelogDialog />
         </ThemeProvider>
     );
 }
