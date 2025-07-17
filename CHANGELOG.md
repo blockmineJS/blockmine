@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.11.2](https://github.com/blockmineJS/blockmine/compare/v1.11.1...v1.11.2) (2025-07-17)
+
+
+### 🐛 Исправления
+
+* тест. автор в чейнджлоге ([7607929](https://github.com/blockmineJS/blockmine/commit/7607929ae26035cc0e12bec1eae3612be1845227))
+
 ### [1.11.1](https://github.com/blockmineJS/blockmine/compare/v1.11.0...v1.11.1) (2025-07-17)
 
 
