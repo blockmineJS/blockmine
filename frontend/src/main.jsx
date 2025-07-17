@@ -24,7 +24,7 @@ import ServersPage from "./pages/ServersPage";
 import TasksPage from "./pages/TasksPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from '@/components/ProtectedRoute';
-
+import PluginUIPage from "./pages/Bot/PluginUIPage";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -112,6 +112,7 @@ const router = createBrowserRouter([
                   { path: "management", element: <ProtectedRoute requiredPermission="management:view"><ManagementPage /></ProtectedRoute> },
                   { path: "commands/visual/:commandId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
                   { path: "events", element: <ProtectedRoute requiredPermission="management:edit"><EventGraphsPage /></ProtectedRoute> },
+                  { path: "plugins/ui/:pluginName/:pluginPath", element: <PluginUIPage /> }, 
                   { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> }
               ]
             },

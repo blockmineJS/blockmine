@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { ReactFlowProvider } from 'reactflow';
-import VisualEditorCanvas from './VisualEditorCanvas';
+const VisualEditorCanvas = React.lazy(() => import('./VisualEditorCanvas'));
 
 const VisualEditorPage = () => {
   return (
     <ReactFlowProvider>
-      <VisualEditorCanvas />
+      <Suspense fallback={<div>Loading...</div>}>
+        <VisualEditorCanvas />
+      </Suspense>
     </ReactFlowProvider>
   );
 };

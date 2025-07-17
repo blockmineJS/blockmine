@@ -1,68 +1,70 @@
 import React from 'react';
+import Card from '@mui/material/Card';
+import CardHeader from '@mui/material/CardHeader';
+import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
 
 export default function BotCard({ bot, status, logs, onStart, onStop, onEdit, onDelete }) {
-    const statusColor = status === 'running' ? 'text-green-500' : 'text-red-500';
     const isRunning = status === 'running';
+    const statusColor = isRunning ? 'success' : 'error';
 
     return (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden flex flex-col">
-            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-start">
-                <div>
-                    <h2 className="text-xl font-bold text-gray-800">{bot.username}</h2>
-                    <p className="text-sm text-gray-500">
-                        {bot.server.name} ({bot.server.host}:{bot.server.port})
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                     <button 
-                        onClick={() => onEdit(bot)}
-                        disabled={isRunning}
-                        className="text-sm bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        title="Редактировать"
-                    >
-                        ✏️
-                    </button>
-                     <button 
-                        onClick={() => onDelete(bot.id)}
-                        disabled={isRunning}
-                        className="text-sm bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        title="Удалить"
-                    >
-                        🗑️
-                    </button>
-                </div>
-            </div>
-
-            <div className="p-4 flex-grow">
-                <p className="mb-4">
-                    Статус: <span className={`font-semibold ${statusColor}`}>{status}</span>
-                </p>
-                
-                <div className="bg-gray-900 text-white font-mono text-xs p-3 rounded-md h-48 overflow-y-auto flex flex-col-reverse">
-                    <div className="flex-shrink-0">
-                        {logs.map((log, index) => (
-                            <p key={index} className="whitespace-pre-wrap">{log}</p>
-                        ))}
+        <Card sx={{ display: 'flex', flexDirection: 'column', marginBottom: 2 }}>
+            <CardHeader
+                title={bot.username}
+                subheader={`${bot.server.name} (${bot.server.host}:${bot.server.port})`}
+                action={
+                    <div>
+                        <Tooltip title="Редактировать">
+                            <IconButton onClick={() => onEdit(bot)} disabled={isRunning}>
+                                <EditIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Удалить">
+                            <IconButton onClick={() => onDelete(bot.id)} disabled={isRunning}>
+                                <DeleteIcon />
+                            </IconButton>
+                        </Tooltip>
                     </div>
+                }
+            />
+            <CardContent sx={{ flexGrow: 1 }}>
+                <p>Статус: <span style={{ fontWeight: 'bold', color: statusColor === 'success' ? '#4caf50' : '#f44336' }}>{status}</span></p>
+                <div style={{ backgroundColor: '#1a202c', color: '#fff', fontFamily: 'monospace', fontSize: '0.75rem', padding: '0.75rem', borderRadius: '0.375rem', height: '12rem', overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse' }}>
+                    {logs.map((log, index) => (
+                        <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{log}</p>
+                    ))}
                 </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex gap-4">
-                <button 
+            </CardContent>
+            <CardActions>
+                <Button
+                    startIcon={<PlayCircleOutlineIcon />}
                     onClick={() => onStart(bot.id)}
                     disabled={isRunning}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
+                    variant="contained"
+                    color="primary"
+                    sx={{ width: '50%' }}
                 >
                     Запустить
-                </button>
-                <button 
+                </Button>
+                <Button
+                    startIcon={<StopCircleIcon />}
                     onClick={() => onStop(bot.id)}
                     disabled={!isRunning}
-                    className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
+                    variant="contained"
+                    color="error"
+                    sx={{ width: '50%' }}
                 >
                     Остановить
-                </button>
-            </div>
-        </div>
+                </Button>
+            </CardActions>
+        </Card>
     );
 }

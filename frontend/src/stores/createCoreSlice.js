@@ -34,6 +34,7 @@ export const createCoreSlice = (set, get) => ({
     botLogs: {},
     resourceUsage: {},
     appVersion: '',
+    botUIExtensions: {},
 
     connectSocket: () => {
         const existingSocket = get().socket;
@@ -129,6 +130,20 @@ export const createCoreSlice = (set, get) => ({
                  botStatuses: {},
                  appVersion: ''
              }));
+        }
+    },
+
+    fetchUIExtensions: async (botId) => {
+        try {
+            const extensions = await apiHelper(`/api/bots/${botId}/ui-extensions`);
+            set(state => {
+                state.botUIExtensions[botId] = extensions;
+            });
+        } catch (error) {
+            console.error(`Не удалось загрузить UI расширения для бота ${botId}:`, error);
+            set(state => {
+                state.botUIExtensions[botId] = [];
+            });
         }
     },
 

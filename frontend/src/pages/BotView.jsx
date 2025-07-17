@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles } from 'lucide-react';
@@ -7,6 +7,9 @@ import ExportBotDialog from '@/components/ExportBotDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
+import * as Icons from 'lucide-react';
+
+const EMPTY_EXTENSIONS = [];
 
 export default function BotView() {
     const { botId } = useParams();
@@ -25,10 +28,19 @@ export default function BotView() {
     const stopBot = useAppStore(state => state.stopBot);
     const deleteBot = useAppStore(state => state.deleteBot);
     const hasPermission = useAppStore(state => state.hasPermission);
+    const fetchUIExtensions = useAppStore(state => state.fetchUIExtensions);
+
+    const uiExtensions = useAppStore(state => state.botUIExtensions[botId] || EMPTY_EXTENSIONS);
 
     const bot = useMemo(() => {
         return bots.find(b => b.id === parseInt(botId));
     }, [bots, botId]);
+
+    useEffect(() => {
+        if (botId) {
+            fetchUIExtensions(parseInt(botId, 10));
+        }
+    }, [botId]);
 
     const handleDeleteConfirm = async () => {
         if (!bot) return;
@@ -122,6 +134,24 @@ export default function BotView() {
                                 <Puzzle className="h-4 w-4" />
                                 Плагины
                             </NavLink>
+                             {uiExtensions.map(ext => {
+                                const IconComponent = Icons[ext.icon] || Icons.Puzzle;
+                                return (
+                                    <NavLink
+                                        key={ext.id}
+                                        to={`plugins/ui/${ext.pluginName}/${ext.path}`}
+                                        className={({isActive}) => cn(
+                                            "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                            isActive 
+                                                ? "bg-background text-foreground shadow-sm" 
+                                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                        )}
+                                    >
+                                        <IconComponent className="h-4 w-4" />
+                                        {ext.label}
+                                    </NavLink>
+                                );
+                            })}
                             <NavLink 
                                 to="settings" 
                                 className={({isActive}) => cn(

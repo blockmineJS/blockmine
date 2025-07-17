@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import { useToast } from "@/hooks/use-toast";
 import PluginStoreCard from './PluginStoreCard';
 
-export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess }) {
+
+export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess, open, onClose }) {
     const [catalog, setCatalog] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [installingPluginId, setInstallingPluginId] = useState(null);
@@ -46,20 +52,18 @@ export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess
     const installedPluginNames = new Set(installedPlugins.map(p => p.name));
 
     return (
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-            <DialogHeader>
-                <DialogTitle>Обзор официальных плагинов</DialogTitle>
-                <DialogDescription>
-                    Выберите плагин для установки. Он будет загружен из официального репозитория GitHub.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow overflow-y-auto pr-4">
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+            <DialogTitle>Обзор официальных плагинов</DialogTitle>
+            <DialogContent>
+                <p>Выберите плагин для установки. Он будет загружен из официального репозитория GitHub.</p>
                 {isLoading ? (
-                    <div className="flex items-center justify-center h-full">Загрузка каталога...</div>
+                    <div className="flex items-center justify-center h-full">
+                        <CircularProgress />
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {catalog.map(plugin => (
-                            <PluginStoreCard 
+                            <PluginStoreCard
                                 key={plugin.id}
                                 plugin={plugin}
                                 isInstalled={installedPluginNames.has(plugin.name)}
@@ -69,7 +73,12 @@ export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess
                         ))}
                     </div>
                 )}
-            </div>
-        </DialogContent>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} color="primary">
+                    Закрыть
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 }

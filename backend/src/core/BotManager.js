@@ -1,6 +1,5 @@
 const { fork } = require('child_process');
 const path = require('path');
-const { getIO } = require('../real-time/socketHandler');
 const prisma = require('../lib/prisma');
 const pidusage = require('pidusage');
 const DependencyService = require('./DependencyService');
@@ -12,8 +11,6 @@ const crypto = require('crypto');
 const { decrypt } = require('./utils/crypto');
 const EventGraphManager = require('./EventGraphManager');
 const nodeRegistry = require('./NodeRegistry');
-
-
 const UserService = require('./UserService');
 
 const cooldowns = new Map();
@@ -54,6 +51,7 @@ class BotManager {
         this.pendingPlayerListRequests = new Map();
         this.playerListCache = new Map();
         this.eventGraphManager = null;
+        this.uiSubscriptions = new Map();
 
         getInstanceId();
         setInterval(() => this.updateAllResourceUsage(), 5000);
@@ -66,6 +64,55 @@ class BotManager {
         if (!this.eventGraphManager) {
             this.eventGraphManager = new EventGraphManager(this);
         }
+    }
+
+    subscribeToPluginUi(botId, pluginName, socket) {
+        if (!this.uiSubscriptions.has(botId)) {
+            this.uiSubscriptions.set(botId, new Map());
+        }
+        const botSubscriptions = this.uiSubscriptions.get(botId);
+
+        if (!botSubscriptions.has(pluginName)) {
+            botSubscriptions.set(pluginName, new Set());
+        }
+        const pluginSubscribers = botSubscriptions.get(pluginName);
+
+        pluginSubscribers.add(socket);
+        console.log(`[UI Sub] Сокет ${socket.id} подписался на ${pluginName} для бота ${botId}. Всего подписчиков: ${pluginSubscribers.size}`);
+
+        const botProcess = this.bots.get(botId);
+        if (botProcess && !botProcess.killed) {
+            botProcess.send({ type: 'plugin:ui:start-updates', pluginName });
+        }
+    }
+
+    unsubscribeFromPluginUi(botId, pluginName, socket) {
+        const botSubscriptions = this.uiSubscriptions.get(botId);
+        if (!botSubscriptions) return;
+
+        const pluginSubscribers = botSubscriptions.get(pluginName);
+        if (!pluginSubscribers) return;
+
+        pluginSubscribers.delete(socket);
+        console.log(`[UI Sub] Сокет ${socket.id} отписался от ${pluginName} для бота ${botId}. Осталось: ${pluginSubscribers.size}`);
+
+        if (pluginSubscribers.size === 0) {
+            const botProcess = this.bots.get(botId);
+            if (botProcess && !botProcess.killed) {
+                botProcess.send({ type: 'plugin:ui:stop-updates', pluginName });
+            }
+            botSubscriptions.delete(pluginName);
+        }
+    }
+
+    handleSocketDisconnect(socket) {
+        this.uiSubscriptions.forEach((botSubscriptions, botId) => {
+            botSubscriptions.forEach((pluginSubscribers, pluginName) => {
+                if (pluginSubscribers.has(socket)) {
+                    this.unsubscribeFromPluginUi(botId, pluginName, socket);
+                }
+            });
+        });
     }
 
     async loadConfigForBot(botId) {
@@ -107,6 +154,7 @@ class BotManager {
     }
 
     reloadBotConfigInRealTime(botId) {
+        const { getIO } = require('../real-time/socketHandler');
         this.invalidateConfigCache(botId);
         const child = this.bots.get(botId);
         if (child && !child.killed) {
@@ -213,6 +261,7 @@ class BotManager {
     }
 
     async updateAllResourceUsage() {
+        const { getIO } = require('../real-time/socketHandler');
         if (this.bots.size === 0) {
             if (this.resourceUsage.size > 0) {
                 this.resourceUsage.clear();
@@ -269,11 +318,13 @@ class BotManager {
     }
 
     emitStatusUpdate(botId, status, message = null) {
+        const { getIO } = require('../real-time/socketHandler');
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
         getIO().emit('bot:status', { botId, status, message });
     }
     
     appendLog(botId, logContent) {
+        const { getIO } = require('../real-time/socketHandler');
         const logEntry = {
             id: Date.now() + Math.random(),
             content: logContent,
@@ -331,6 +382,17 @@ class BotManager {
 
         child.botConfig = botConfig;
 
+        child.api = {
+            sendMessage: (type, message, username) => {
+                if (!child.killed) {
+                    child.send({ type: 'chat', payload: { message, chatType: type, username } });
+                }
+            },
+            sendLog: (message) => {
+                this.appendLog(botConfig.id, message);
+            }
+        };
+
         child.on('message', async (message) => {
             const botId = botConfig.id;
             try {
@@ -339,6 +401,21 @@ class BotManager {
                         if (this.eventGraphManager) {
                             this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
                         }
+                        break;
+                    case 'plugin:data': {
+                        const { plugin: pluginName, payload } = message;
+                        const botSubscriptions = this.uiSubscriptions.get(botId);
+                        if (!botSubscriptions) break;
+
+                        const pluginSubscribers = botSubscriptions.get(pluginName);
+                        if (pluginSubscribers && pluginSubscribers.size > 0) {
+                            pluginSubscribers.forEach(socket => {
+                                socket.emit('plugin:ui:dataUpdate', { data: payload });
+                            });
+                        }
+                        break;
+                    }
+                    case 'plugin:stopped':
                         break;
                     case 'log':
                         this.appendLog(botId, message.content);
@@ -442,6 +519,7 @@ class BotManager {
         await this.eventGraphManager.loadGraphsForBot(botConfig.id);
         
         this.triggerHeartbeat();
+        const { getIO } = require('../real-time/socketHandler');
         getIO().emit('bot:status', { botId: botConfig.id, status: 'starting' });
         return child;
     }
@@ -659,7 +737,7 @@ class BotManager {
     sendMessageToBot(botId, message, chatType = 'command', username = null) {
         const child = this.bots.get(botId);
         if (child) {
-            child.send({ type: 'chat', payload: { message, chatType, username } });
+            child.api.sendMessage(chatType, message, username);
             return { success: true };
         }
         return { success: false, message: 'Бот не найден или не запущен' };

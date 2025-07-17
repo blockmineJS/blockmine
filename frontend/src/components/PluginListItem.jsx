@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Download, CheckCircle, Loader2, GitMerge, Server, Globe, Github, Puzzle, ArrowDownToLine, Star, Sparkles, TrendingUp } from 'lucide-react';
+import Badge from '@mui/material/Badge';
+import Button from '@mui/material/Button';
+import { Download as DownloadIcon, CheckCircle as CheckCircleIcon, Loader as LoaderIcon, GitMerge as GitMergeIcon, Server as ServerIcon, Globe as GlobeIcon, Github as GithubIcon, Puzzle as PuzzleIcon, ArrowDown as ArrowDownIcon, Star as StarIcon, Sparkles as SparklesIcon, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import * as Icons from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 
 const IconComponent = ({ name, ...props }) => {
@@ -186,43 +185,24 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                         )}
                     </div>
                 </div>
-
-                <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
-                    <Button 
-                        size="sm"
-                        className={cn(
-                            "min-w-[120px] relative overflow-hidden transition-all",
-                            isInstalled && "bg-green-600 hover:bg-green-700",
-                            isInstalling && "shimmer"
-                        )}
+<div className="flex flex-col items-end gap-2 shrink-0 ml-4">
+                    <Button
+                        size="small"
+                        variant="contained"
+                        endIcon={isInstalling ? <LoaderIcon className="animate-spin" /> : (isInstalled ? <CheckCircleIcon /> : <DownloadIcon />)}
+                        color={isInstalled ? "success" : "primary"}
                         disabled={isInstalled || isInstalling}
                         onClick={() => onInstall(plugin)}
+                        sx={{
+                            minWidth: "120px",
+                            animation: isInstalling ? 'shimmer 1.5s infinite' : 'none',
+                        }}
                     >
-                        {isInstalling ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Установка
-                            </>
-                        ) : isInstalled ? (
-                            <>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Установлен
-                            </>
-                        ) : (
-                            <>
-                                <Download className="mr-2 h-4 w-4" />
-                                Установить
-                            </>
-                        )}
-                        
-                        {isInstalling && (
-                            <div className="install-progress">
-                                <div className="install-progress-bar" />
-                            </div>
-                        )}
+                        {isInstalling ? 'Установка' : (isInstalled ? 'Установлен' : 'Установить')}
                     </Button>
-                    <span className="text-xs text-muted-foreground">v{plugin.latestTag.replace('v','')}</span>
+                    <span className="text-xs text-muted-foreground">v{plugin.latestTag.replace('v', '')}</span>
                 </div>
+
             </div>
         </TooltipProvider>
     );

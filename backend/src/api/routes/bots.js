@@ -1085,4 +1085,180 @@ router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async 
 router.post('/:botId/visual-editor/save', authorize('management:edit'), async (req, res) => {
 });
 
+router.get('/:botId/ui-extensions', authorize('plugin:list'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const enabledPlugins = await prisma.installedPlugin.findMany({
+            where: { botId: botId, isEnabled: true }
+        });
+
+        const extensions = [];
+        for (const plugin of enabledPlugins) {
+            if (plugin.manifest) {
+                try {
+                    const manifest = JSON.parse(plugin.manifest);
+                    if (manifest.uiExtensions && Array.isArray(manifest.uiExtensions)) {
+                        manifest.uiExtensions.forEach(ext => {
+                            extensions.push({
+                                pluginName: plugin.name,
+                                ...ext
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.error(`Ошибка парсинга манифеста для плагина ${plugin.name}:`, e);
+                }
+            }
+        }
+        res.json(extensions);
+    } catch (error) {
+        res.status(500).json({ error: 'Не удалось получить расширения интерфейса' });
+    }
+});
+
+router.get('/:botId/plugins/:pluginName/ui-content/:path', authorize('plugin:list'), async (req, res) => {
+    const { botId, pluginName, path: uiPath } = req.params;
+    const numericBotId = parseInt(botId, 10);
+
+    try {
+        const plugin = await prisma.installedPlugin.findFirst({
+            where: { botId: numericBotId, name: pluginName, isEnabled: true }
+        });
+
+        if (!plugin) {
+            return res.status(404).json({ error: `Активный плагин "${pluginName}" не найден для этого бота.` });
+        }
+
+        const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+        const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
+        const defaultSettings = {};
+
+        if (manifest.settings) {
+            for (const key in manifest.settings) {
+                const config = manifest.settings[key];
+                if (config.type === 'json_file' && config.defaultPath) {
+                    const configFilePath = path.join(plugin.path, config.defaultPath);
+                    try {
+                        const fileContent = await fs.readFile(configFilePath, 'utf-8');
+                        defaultSettings[key] = JSON.parse(fileContent);
+                    } catch (e) { defaultSettings[key] = {}; }
+                } else {
+                    try { defaultSettings[key] = JSON.parse(config.default || 'null'); } 
+                    catch { defaultSettings[key] = config.default; }
+                }
+            }
+        }
+        const finalSettings = { ...defaultSettings, ...savedSettings };
+        
+        const mainFilePath = manifest.main || 'index.js';
+        const pluginEntryPoint = path.join(plugin.path, mainFilePath);
+        
+        delete require.cache[require.resolve(pluginEntryPoint)];
+        const pluginModule = require(pluginEntryPoint);
+
+        if (typeof pluginModule.getUiPageContent !== 'function') {
+            return res.status(501).json({ error: `Плагин "${pluginName}" не предоставляет кастомный UI контент.` });
+        }
+        
+        const botProcess = botManager.bots.get(numericBotId);
+        const botApi = botProcess ? botProcess.api : null;
+        
+        const content = await pluginModule.getUiPageContent({
+            path: uiPath,
+            bot: botApi,
+            botId: numericBotId,
+            settings: finalSettings
+        });
+
+        if (content === null) {
+            return res.status(404).json({ error: `Для пути "${uiPath}" не найдено содержимого в плагине "${pluginName}".` });
+        }
+
+        res.json(content);
+
+    } catch (error) {
+        console.error(`[UI Content] Ошибка при получении контента для плагина "${pluginName}":`, error);
+        res.status(500).json({ error: error.message || 'Внутренняя ошибка сервера.' });
+    }
+});
+
+
+router.post('/:botId/plugins/:pluginName/action', authorize('plugin:list'), async (req, res) => {
+    const { botId, pluginName } = req.params;
+    const { actionName, payload } = req.body;
+    const numericBotId = parseInt(botId, 10);
+
+    if (!actionName) {
+        return res.status(400).json({ error: 'Необходимо указать "actionName".' });
+    }
+
+    try {
+        const botProcess = botManager.bots.get(numericBotId);
+        
+        if (!botProcess) {
+            return res.status(404).json({ error: 'Бот не найден или не запущен.' });
+        }
+
+        const plugin = await prisma.installedPlugin.findFirst({
+            where: { botId: numericBotId, name: pluginName, isEnabled: true }
+        });
+
+        if (!plugin) {
+            return res.status(404).json({ error: `Активный плагин с таким именем "${pluginName}" не найден.` });
+        }
+
+        const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+        const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
+        const defaultSettings = {};
+
+        if (manifest.settings) {
+            for (const key in manifest.settings) {
+                const config = manifest.settings[key];
+                 if (config.type === 'json_file' && config.defaultPath) {
+                    const configFilePath = path.join(plugin.path, config.defaultPath);
+                    try {
+                        const fileContent = await fs.readFile(configFilePath, 'utf-8');
+                        defaultSettings[key] = JSON.parse(fileContent);
+                    } catch (e) { 
+                        console.error(`[Action] Не удалось прочитать defaultPath для ${pluginName}: ${e.message}`);
+                        defaultSettings[key] = {}; 
+                    }
+                } else {
+                    try { 
+                        defaultSettings[key] = JSON.parse(config.default || 'null'); 
+                    } catch { 
+                        defaultSettings[key] = config.default; 
+                    }
+                }
+            }
+        }
+        const finalSettings = { ...defaultSettings, ...savedSettings };
+
+        const mainFilePath = manifest.main || 'index.js';
+        const pluginPath = path.join(plugin.path, mainFilePath);
+        
+        delete require.cache[require.resolve(pluginPath)];
+        const pluginModule = require(pluginPath);
+
+        if (typeof pluginModule.handleAction !== 'function') {
+            return res.status(501).json({ error: `Плагин "${pluginName}" не поддерживает обработку действий.` });
+        }
+        
+        const result = await pluginModule.handleAction({
+            botProcess: botProcess,
+            botId: numericBotId,
+            action: actionName,
+            payload: payload,
+            settings: finalSettings
+        });
+
+        res.json({ success: true, message: 'Действие выполнено.', result: result || null });
+
+    } catch (error) {
+        console.error(`Ошибка выполнения действия "${actionName}" для плагина "${pluginName}":`, error);
+        res.status(500).json({ error: error.message || 'Внутренняя ошибка сервера.' });
+    }
+});
+
+
 module.exports = router;
