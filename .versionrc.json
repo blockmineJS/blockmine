@@ -11,8 +11,8 @@
     { "type": "style",    "hidden": true },
     { "type": "test",     "hidden": true }
   ],
-  "commitPartial": "{{> commitBody}}",
   "writerOpts": {
-    "commitPartial": "{{#if scope}}**{{scope}}:** {{/if}}{{subject}} ([{{hash}}](https://github.com/blockmineJS/blockmine/commit/{{hash}})) - _{{authorName}}_\n"
+    "commitPartial": ".changelog/commit.hbs"
   }
+}
 }
