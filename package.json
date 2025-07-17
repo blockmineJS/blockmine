@@ -1,6 +1,6 @@
 {
   "name": "blockmine",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "description": "Мощная панель управления ботами для Майнкрафта.",
   "author": "merka",
   "license": "MIT",
@@ -27,7 +27,12 @@
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "postinstall": "npm install --workspace=frontend --ignore-scripts && prisma generate --schema=./backend/prisma/schema.prisma",
     "build": "npm run build --workspace=frontend",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "husky",
+    "release": "standard-version",
+    "release:minor": "standard-version --release-as minor",
+    "release:patch": "standard-version --release-as patch",
+    "release:major": "standard-version --release-as major"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -63,6 +68,15 @@
     "systeminformation": "^5.27.7"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "concurrently": "^8.2.2",
+    "husky": "^9.1.7",
+    "standard-version": "^9.5.0"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   }
 }
