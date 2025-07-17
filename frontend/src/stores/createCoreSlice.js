@@ -105,12 +105,12 @@ export const createCoreSlice = (set, get) => ({
             
             console.log('[fetchInitialData] Версия:', currentVersion, 'Последняя показанная:', lastShownVersion);
             
-            if (currentVersion && currentVersion !== lastShownVersion) {
-                console.log('[fetchInitialData] Новая версия обнаружена! Загружаем changelog');
-                get().fetchChangelog();
-                set({ showChangelogDialog: true });
-                localStorage.setItem('lastShownVersion', currentVersion);
-            }
+                if (currentVersion && currentVersion !== lastShownVersion) {
+                    console.log('[fetchInitialData] Новая версия обнаружена! Загружаем changelog');
+                    await get().fetchChangelog();
+                    set({ showChangelogDialog: true });
+                    localStorage.setItem('lastShownVersion', currentVersion);
+                }
 
             set(state => {
                 const serverLogs = stateData.logs || {};
