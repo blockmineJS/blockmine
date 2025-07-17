@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.11.3](https://github.com/blockmineJS/blockmine/compare/v1.11.2...v1.11.3) (2025-07-17)
+
+
+### 🐛 Исправления
+
+* test2 ([e322121](https://github.com/blockmineJS/blockmine/commit/e322121ed8110fcbffde9a00adc644917ff4523a))
+
 ### [1.11.2](https://github.com/blockmineJS/blockmine/compare/v1.11.1...v1.11.2) (2025-07-17)
 
 
