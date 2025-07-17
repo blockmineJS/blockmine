@@ -12,7 +12,6 @@ export default function ChangelogDialog() {
     const appVersion = useAppStore(state => state.appVersion);
     const closeChangelogDialog = useAppStore(state => state.closeChangelogDialog);
     
-    console.log('[ChangelogDialog] Render:', { showChangelogDialog, changelog: changelog?.substring(0, 50), appVersion });
     return (
         <Dialog open={showChangelogDialog} onOpenChange={closeChangelogDialog}>
             <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">

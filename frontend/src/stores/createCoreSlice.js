@@ -92,7 +92,6 @@ export const createCoreSlice = (set, get) => ({
 
     fetchInitialData: async () => {
         try {
-            console.log('[fetchInitialData] Начинаем загрузку начальных данных');
             const [botsData, serversData, stateData, versionData] = await Promise.all([
                 apiHelper('/api/bots'),
                 apiHelper('/api/servers'),
@@ -103,10 +102,8 @@ export const createCoreSlice = (set, get) => ({
             const currentVersion = versionData.version || '';
             const lastShownVersion = localStorage.getItem('lastShownVersion');
             
-            console.log('[fetchInitialData] Версия:', currentVersion, 'Последняя показанная:', lastShownVersion);
             
                 if (currentVersion && currentVersion !== lastShownVersion) {
-                    console.log('[fetchInitialData] Новая версия обнаружена! Загружаем changelog');
                     await get().fetchChangelog();
                     set({ showChangelogDialog: true });
                     localStorage.setItem('lastShownVersion', currentVersion);
@@ -182,13 +179,11 @@ export const createCoreSlice = (set, get) => ({
 
     fetchChangelog: async () => {
         try {
-            console.log('[fetchChangelog] Загружаем changelog с /api/changelog');
             const response = await fetch('/api/changelog');
             if (!response.ok) {
                 throw new Error('Failed to fetch changelog');
             }
             const text = await response.text();
-            console.log('[fetchChangelog] Получен changelog:', text.substring(0, 100) + '...');
             set({ changelog: text });
         } catch (error) {
             console.error('Не удалось загрузить changelog:', error);
