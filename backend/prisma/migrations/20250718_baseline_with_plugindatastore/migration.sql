@@ -1,1 +1,0 @@
--- This is an empty migration to baseline the database with PluginDataStore table
