@@ -133,21 +133,13 @@ router.post('/recovery/verify', async (req, res) => {
             return res.status(401).json({ error: 'Неверный код восстановления' });
         }
         
-        const adminRole = await prisma.panelRole.findFirst({
-            where: { name: 'Admin' }
-        });
-        
-        if (!adminRole) {
-            return res.status(404).json({ error: 'Роль администратора не найдена' });
-        }
-        
         const rootUser = await prisma.panelUser.findFirst({
-            where: { roleId: adminRole.id },
-            orderBy: { id: 'asc' }
+            orderBy: { id: 'asc' },
+            include: { role: true }
         });
         
         if (!rootUser) {
-            return res.status(404).json({ error: 'Администратор не найден' });
+            return res.status(404).json({ error: 'В системе нет ни одного пользователя. Выполните первоначальную настройку.' });
         }
         
         const tokenId = crypto.randomBytes(16).toString('hex');
