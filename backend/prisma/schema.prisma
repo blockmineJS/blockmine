@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:C:\\Users\\user\\.blockmine\\blockmine.db"
 }
 
 model Server {
@@ -17,117 +17,108 @@ model Server {
 }
 
 model Bot {
-  id       Int    @id @default(autoincrement())
-  username String @unique
-  password String?
-  prefix   String? @default("@")
-  note     String?
-  owners   String? @default("")
-
-  server   Server @relation(fields: [serverId], references: [id])
-  serverId Int
-
-  proxyHost     String?
-  proxyPort     Int?
-  proxyUsername String?
-  proxyPassword String?
-
-  installedPlugins InstalledPlugin[]
-  users            User[]
-  groups           Group[]
-  permissions      Permission[]
+  id               Int               @id @default(autoincrement())
+  username         String            @unique
+  password         String?
+  prefix           String?           @default("@")
+  note             String?
+  serverId         Int
+  proxyHost        String?
+  proxyPort        Int?
+  proxyUsername    String?
+  proxyPassword    String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  owners           String?           @default("")
+  server           Server            @relation(fields: [serverId], references: [id])
   commands         Command[]
   eventGraphs      EventGraph[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  groups           Group[]
+  installedPlugins InstalledPlugin[]
+  permissions      Permission[]
+  pluginData       PluginDataStore[]
+  users            User[]
 }
 
-
 model InstalledPlugin {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   botId       Int
-  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
   name        String
   version     String
   description String?
   sourceType  String
   sourceUri   String?
   path        String
-  isEnabled   Boolean @default(true)
-
-  manifest String?
-  settings String? @default("{}")
-
-  createdAt DateTime @default(now())
+  isEnabled   Boolean  @default(true)
+  manifest    String?
+  settings    String?  @default("{}")
+  createdAt   DateTime @default(now())
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, name])
 }
 
 model Command {
-  id               Int     @id @default(autoincrement())
+  id               Int         @id @default(autoincrement())
   botId            Int
-  bot              Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
   name             String
-  isEnabled        Boolean @default(true)
-  cooldown         Int     @default(0)
-  aliases          String  @default("[]")
+  isEnabled        Boolean     @default(true)
+  cooldown         Int         @default(0)
+  aliases          String      @default("[]")
   description      String?
   owner            String?
   permissionId     Int?
-  permission       Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
-  allowedChatTypes String  @default("[\"chat\", \"private\"]")
-
-  isVisual         Boolean @default(false)
-  argumentsJson    String? @default("[]")
-  graphJson        String? @default("null")
+  allowedChatTypes String      @default("[\"chat\", \"private\"]")
+  isVisual         Boolean     @default(false)
+  argumentsJson    String?     @default("[]")
+  graphJson        String?     @default("null")
+  permission       Permission? @relation(fields: [permissionId], references: [id])
+  bot              Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, name])
 }
 
 model EventGraph {
-  id          Int     @id @default(autoincrement())
-  botId       Int
-  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
-  name        String
-  isEnabled   Boolean @default(true)
-  graphJson   String? @default("null")
-  variables   String? @default("[]")
-
-  triggers    EventTrigger[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int            @id @default(autoincrement())
+  botId     Int
+  name      String
+  isEnabled Boolean        @default(true)
+  graphJson String?        @default("null")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  variables String?        @default("[]")
+  bot       Bot            @relation(fields: [botId], references: [id], onDelete: Cascade)
+  triggers  EventTrigger[]
 
   @@unique([botId, name])
 }
 
 model EventTrigger {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   graphId   Int
+  eventType String
   graph     EventGraph @relation(fields: [graphId], references: [id], onDelete: Cascade)
-  eventType String   // e.g., "entitySpawn", "chat"
 
   @@unique([graphId, eventType])
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   username      String
-  isBlacklisted Boolean   @default(false)
+  isBlacklisted Boolean     @default(false)
   botId         Int
-  bot           Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot           Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
   groups        UserGroup[]
 
   @@unique([botId, username])
 }
 
 model Group {
-  id          Int             @id @default(autoincrement())
+  id          Int               @id @default(autoincrement())
   name        String
-  owner       String          @default("system")
+  owner       String            @default("system")
   botId       Int
-  bot         Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot         Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   permissions GroupPermission[]
   users       UserGroup[]
 
@@ -135,70 +126,76 @@ model Group {
 }
 
 model Permission {
-  id          Int             @id @default(autoincrement())
+  id          Int               @id @default(autoincrement())
   name        String
   description String?
-  owner       String          @default("system")
+  owner       String            @default("system")
   botId       Int
-  bot         Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  commands    Command[]
   groups      GroupPermission[]
-  commands    Command[] 
+  bot         Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, name])
 }
 
-
 model UserGroup {
-  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId  Int
-  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId Int
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, groupId])
 }
 
 model GroupPermission {
-  group        Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId      Int
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   permissionId Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  group        Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionId])
 }
 
-
-
 model ScheduledTask {
-  id           Int        @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   name         String
   cronPattern  String?
   action       String
-  targetBotIds String // джсон массив ID ботов или "ALL"
-  payload      String?    @default("{}") // джсон для доп данных, например, команды
-  isEnabled    Boolean    @default(true)
-  runOnStartup Boolean    @default(false)
+  targetBotIds String
+  payload      String?   @default("{}")
+  isEnabled    Boolean   @default(true)
+  runOnStartup Boolean   @default(false)
   lastRun      DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model PanelUser {
-  id           Int      @id @default(autoincrement())
-  uuid         String   @unique @default(uuid())
-  username     String   @unique
-  passwordHash String  
-  role         PanelRole @relation(fields: [roleId], references: [id])
+  id           Int       @id @default(autoincrement())
+  uuid         String    @unique @default(uuid())
+  username     String    @unique
+  passwordHash String
   roleId       Int
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
+  role         PanelRole @relation(fields: [roleId], references: [id])
 }
 
-// Роли пользователей (Admin, Moderator, Viewer)
 model PanelRole {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique 
-  
-  // Храним права как джсон строку.  SQLite не поддерживает массивы.
-  // Пример: '["bot:create", "bot:delete", "user:manage"]'
-  permissions String   @default("[]") 
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  permissions String      @default("[]")
   users       PanelUser[]
+}
+
+model PluginDataStore {
+  id         Int      @id @default(autoincrement())
+  pluginName String
+  botId      Int
+  key        String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bot        Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@unique([pluginName, botId, key])
 }

@@ -53,6 +53,17 @@ router.post('/update/:pluginId', authenticate, authorize('plugin:update'), async
     }
 });
 
+router.post('/:id/clear-data', authenticate, authorize('plugin:settings:edit'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.id);
+        await pluginManager.clearPluginData(pluginId);
+        res.status(200).json({ message: 'Данные плагина успешно очищены.' });
+    } catch (error) {
+        console.error(`[API Error] /plugins/:id/clear-data:`, error);
+        res.status(500).json({ error: error.message || 'Не удалось очистить данные плагина.' });
+    }
+});
+
 router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;

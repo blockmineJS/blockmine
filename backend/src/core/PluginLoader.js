@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const { execSync } = require('child_process');
 const fssync = require('fs');
+const PluginStore = require('../plugins/PluginStore');
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -29,7 +30,7 @@ async function ensurePluginDependencies(pluginPath, pluginName) {
     }
 }
 
-async function initializePlugins(bot, installedPlugins = []) {
+async function initializePlugins(bot, installedPlugins = [], prisma) {
     if (!installedPlugins || installedPlugins.length === 0) return;
     
     const sendLog = bot.sendLog || console.log;
@@ -67,6 +68,7 @@ async function initializePlugins(bot, installedPlugins = []) {
                 }
                 
                 const finalSettings = { ...defaultSettings, ...savedSettings };
+                const store = new PluginStore(prisma, bot.config.id, plugin.name);
                 
                 const mainFile = manifest.main || 'index.js';
                 const entryPointPath = path.join(plugin.path, mainFile);
@@ -78,9 +80,9 @@ async function initializePlugins(bot, installedPlugins = []) {
                     const pluginModule = require(normalizedPath);
                     
                     if (typeof pluginModule === 'function') {
-                        pluginModule(bot, { settings: finalSettings });
+                        pluginModule(bot, { settings: finalSettings, store });
                     } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-                        pluginModule.onLoad(bot, { settings: finalSettings });
+                        pluginModule.onLoad(bot, { settings: finalSettings, store });
                     } else {
                         sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
                     }
@@ -100,9 +102,9 @@ async function initializePlugins(bot, installedPlugins = []) {
                                 // Повторная попытка загрузки
                                 const pluginModule = require(normalizedPath);
                                 if (typeof pluginModule === 'function') {
-                                    pluginModule(bot, { settings: finalSettings });
+                                    pluginModule(bot, { settings: finalSettings, store });
                                 } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-                                    pluginModule.onLoad(bot, { settings: finalSettings });
+                                    pluginModule.onLoad(bot, { settings: finalSettings, store });
                                 }
                             } catch (installError) {
                                 sendLog(`[PluginLoader] Не удалось установить модуль ${missingModule} в папку плагина ${plugin.name}: ${installError.message}`);

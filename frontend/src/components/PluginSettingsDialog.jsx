@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Save, Code } from 'lucide-react';
+import { Edit, Save, Code, Trash2, Loader2 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiHelper } from '@/lib/api';
 
@@ -141,6 +141,7 @@ function SettingField({ settingKey, config, value, onChange }) {
 
 export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSaveSuccess }) {
     const [settings, setSettings] = useState(null);
+    const [isClearing, setIsClearing] = useState(false);
     const { toast } = useToast();
     const manifestSettings = plugin.manifest?.settings || {};
 
@@ -175,6 +176,18 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         }
     };
 
+    const handleClearData = async () => {
+        if (confirm(`Вы уверены, что хотите удалить все данные плагина "${plugin.name}"? Это действие необратимо.`)) {
+            setIsClearing(true);
+            try {
+                await apiHelper(`/api/plugins/${plugin.id}/clear-data`, { method: 'POST' }, 'Данные плагина успешно очищены.');
+            } catch (error) {
+            } finally {
+                setIsClearing(false);
+            }
+        }
+    };
+
     return (
         <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -198,9 +211,23 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                     )
                 )}
             </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
-                <Button onClick={handleSave}>Сохранить</Button>
+            <DialogFooter className="sm:justify-between">
+                <Button 
+                    variant="destructive"
+                    onClick={handleClearData}
+                    disabled={isClearing}
+                >
+                    {isClearing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Очистить данные
+                </Button>
+                <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
+                    <Button onClick={handleSave}>Сохранить</Button>
+                </div>
             </DialogFooter>
         </DialogContent>
     );

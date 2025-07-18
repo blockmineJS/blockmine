@@ -277,6 +277,25 @@ class PluginManager {
         
         return await this.installFromGithub(botId, repoUrl, prisma, true);
     }
+
+    async clearPluginData(pluginId) {
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) {
+            throw new Error('Плагин не найден.');
+        }
+
+        console.log(`[PluginManager] Очистка данных для плагина ${plugin.name} (Bot ID: ${plugin.botId})`);
+
+        const { count } = await prisma.pluginDataStore.deleteMany({
+            where: {
+                pluginName: plugin.name,
+                botId: plugin.botId,
+            },
+        });
+
+        console.log(`[PluginManager] Удалено ${count} записей из хранилища.`);
+        return { count };
+    }
 }
 
 module.exports = PluginManager;
