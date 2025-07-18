@@ -16,6 +16,8 @@ const UserService = require('./UserService');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
 
 let bot = null;
+const prisma = new PrismaClient();
+const pluginUiState = new Map();
 const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
 
@@ -34,8 +36,7 @@ function sendEvent(eventName, eventArgs) {
     }
 }
 
-async function fetchNewConfig(botId) {
-    const prisma = new PrismaClient();
+async function fetchNewConfig(botId, prisma) {
     try {
         const botData = await prisma.bot.findUnique({
             where: { id: botId },
@@ -55,8 +56,6 @@ async function fetchNewConfig(botId) {
     } catch (error) {
         sendLog(`[fetchNewConfig] Error: ${error.message}`);
         return null;
-    } finally {
-        await prisma.$disconnect();
     }
 }
 
@@ -129,7 +128,17 @@ function handleIncomingCommand(type, username, message) {
 }
 
 process.on('message', async (message) => {
-    if (message.type === 'user_action_response') {
+        if (message.type === 'plugin:ui:start-updates') {
+            const { pluginName } = message;
+            const state = pluginUiState.get(pluginName);
+            if (state && process.send) {
+                process.send({
+                    type: 'plugin:data',
+                    plugin: pluginName,
+                    payload: state
+                });
+            }
+        } else if (message.type === 'user_action_response') {
         if (pendingRequests.has(message.requestId)) {
             const { resolve, reject } = pendingRequests.get(message.requestId);
             if (message.error) {
@@ -193,6 +202,8 @@ process.on('message', async (message) => {
 
             bot = mineflayer.createBot(botOptions);
 
+            bot.pluginUiState = pluginUiState;
+
             let isReady = false;
 
             bot.events = new EventEmitter();
@@ -214,8 +225,7 @@ process.on('message', async (message) => {
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
                 addPermissionsToGroup: (groupName, permissionNames) => PermissionManager.addPermissionsToGroup(bot.config.id, groupName, permissionNames),
                 installedPlugins: installedPluginNames,
-                registerCommand: async (command) => { // похуй. пляшем
-                    const prisma = new PrismaClient();
+                registerCommand: async (command) => { 
                     try {
                         let permissionId = null;
                         if (command.permissions) {
@@ -231,7 +241,7 @@ process.on('message', async (message) => {
                             if (permission) {
                                 permissionId = permission.id;
                             } else {
-                                sendLog(`[API] Внимание: право "${command.permissions}" не найдено для команды "${command.name}". Команда будет создана без привязанного права.`);
+                                sendLog(`[API] Внимание: право \"${command.permissions}\" не найдено для команды \"${command.name}\". Команда будет создана без привязанного права.`);
                             }
                         }
 
@@ -281,7 +291,7 @@ process.on('message', async (message) => {
                                  }
                              });
                          }
-                         sendLog(`[API] Команда "${command.name}" от плагина "${command.owner}" зарегистрирована в процессе.`);
+                         sendLog(`[API] Команда \"${command.name}\" от плагина \"${command.owner}\" зарегистрирована в процессе.`);
 
                          if (!bot.commands) bot.commands = new Map();
                          bot.commands.set(command.name, command);
@@ -292,8 +302,6 @@ process.on('message', async (message) => {
                          }
                     } catch (error) {
                         sendLog(`[API] Ошибка при регистрации команды: ${error.message}`);
-                    } finally {
-                        await prisma.$disconnect();
                     }
                 },
                 performUserAction: (username, action, data = {}) => {
@@ -331,6 +339,20 @@ process.on('message', async (message) => {
                     if (bot && position) {
                         bot.lookAt(position);
                     }
+                },
+                sendUiUpdate: (pluginName, stateUpdate) => {
+                    const currentState = pluginUiState.get(pluginName) || {};
+                    const newState = { ...currentState, ...stateUpdate };
+                    pluginUiState.set(pluginName, newState);
+                    
+
+                    if (process.send) {
+                        process.send({
+                            type: 'plugin:data',
+                            plugin: pluginName,
+                            payload: newState
+                        });
+                    }
                 }
             };
 
@@ -346,9 +368,7 @@ process.on('message', async (message) => {
 
             bot.commands = await loadCommands();
 
-            const prisma = new PrismaClient();
             const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
-            await prisma.$disconnect();
 
             for (const dbCommand of dbCommands) {
                 if (!dbCommand.isEnabled) {
@@ -406,7 +426,7 @@ process.on('message', async (message) => {
                 }
             }
             
-            await initializePlugins(bot, config.plugins);
+            await initializePlugins(bot, config.plugins, prisma);
             sendLog('[System] Все системы инициализированы.');
 
             let messageHandledByCustomParser = false;
@@ -540,13 +560,13 @@ process.on('message', async (message) => {
     } else if (message.type === 'config:reload') {
         sendLog('[System] Received config:reload command. Reloading configuration...');
         try {
-            const newConfig = await fetchNewConfig(bot.config.id);
+            const newConfig = await fetchNewConfig(bot.config.id, prisma);
             if (newConfig) {
                 bot.config = { ...bot.config, ...newConfig };
                 const newCommands = await loadCommands();
                 const newPlugins = bot.config.plugins;
                 bot.commands = newCommands;
-                await initializePlugins(bot, newPlugins, true);
+                await initializePlugins(bot, newPlugins, prisma);
                 sendLog('[System] Bot configuration and plugins reloaded successfully.');
             } else {
                 sendLog('[System] Failed to fetch new configuration.');
@@ -610,14 +630,14 @@ process.on('message', async (message) => {
         }
     } else if (message.type === 'plugins:reload') {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
-        const newConfig = await fetchNewConfig(bot.config.id);
-        if (newConfig) {
-            bot.config.plugins = newConfig.installedPlugins;
-            bot.commands.clear();
-            await loadCommands(bot, newConfig.commands);
-            await initializePlugins(bot, newConfig.installedPlugins);
-            sendLog('[System] Плагины успешно перезагружены.');
-        } else {
+            const newConfig = await fetchNewConfig(bot.config.id, prisma);
+            if (newConfig) {
+                bot.config.plugins = newConfig.installedPlugins;
+                bot.commands.clear();
+                await loadCommands(bot, newConfig.commands);
+                await initializePlugins(bot, newConfig.installedPlugins, prisma);
+                sendLog('[System] Плагины успешно перезагружены.');
+            } else {
             sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
         }
     } else if (message.type === 'server_command') {

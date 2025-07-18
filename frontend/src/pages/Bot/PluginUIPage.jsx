@@ -5,7 +5,6 @@ import { useAppStore } from '@/stores/appStore';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
 
-// Импорт UI компонентов, которые мы будем рендерить
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +38,6 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
     const gridSpanClass = schema.gridSpan ? `md:col-span-${schema.gridSpan}` : '';
 
     switch (schema.type) {
-        // --- Контейнеры ---
         case 'Stack':
             return <div className={`flex flex-col gap-${schema.gap || 4} ${gridSpanClass}`}>{renderChildren(schema.children)}</div>;
         case 'Grid':
@@ -62,14 +60,63 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
         case 'AccordionItem':
             return <AccordionItem value={schema.value}><AccordionTrigger>{schema.label}</AccordionTrigger><AccordionContent>{renderChildren(schema.children)}</AccordionContent></AccordionItem>;
         
-        // --- Отображение данных ---
         case 'Statistic':
             return <div className="p-2"><p className="text-sm text-muted-foreground">{schema.label}</p><p className="text-2xl font-bold">{data[schema.dataKey]}</p></div>;
         case 'Table':
+            const tableData = data[schema.dataKey] || [];
+            const rowKeyField = schema.rowKey || 'id';
             return (
                 <Table>
-                    <TableHeader><TableRow>{schema.columns.map(col => <TableHead key={col.accessor}>{col.header}</TableHead>)}</TableRow></TableHeader>
-                    <TableBody>{(data[schema.dataKey] || []).map((row, rowIndex) => <TableRow key={rowIndex}>{schema.columns.map(col => <TableCell key={col.accessor}>{row[col.accessor]}</TableCell>)}</TableRow>)}</TableBody>
+                    <TableHeader>
+                        <TableRow>
+                            {schema.columns.map(col => (
+                                <TableHead key={col.dataKey || col.header}>{col.header}</TableHead>
+                            ))}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {tableData.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={schema.columns.length} className="text-center text-muted-foreground">
+                                    Нет данных для отображения
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            tableData.map((row, rowIndex) => {
+                                const rowKey = row[rowKeyField] || rowIndex;
+                                return (
+                                    <TableRow key={rowKey}>
+                                        {schema.columns.map(col => {
+                                            if (col.type === 'actions' && col.actions) {
+                                                return (
+                                                    <TableCell key={col.dataKey || 'actions'}>
+                                                        {col.actions.map(action => (
+                                                            <Button
+                                                                key={action.action}
+                                                                size="sm"
+                                                                variant={action.variant || 'outline'}
+                                                                onClick={() => onAction(action.action, { [action.row_id_key]: row[action.row_id_key] })}
+                                                                disabled={actionLoading === action.action}
+                                                            >
+                                                                {actionLoading === action.action && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                                {action.label}
+                                                            </Button>
+                                                        ))}
+                                                    </TableCell>
+                                                );
+                                            }
+                                            const cellValue = row[col.dataKey];
+                                            return (
+                                                <TableCell key={col.dataKey || col.header}>
+                                                    {cellValue !== undefined ? String(cellValue) : '-'}
+                                                </TableCell>
+                                            );
+                                        })}
+                                    </TableRow>
+                                );
+                            })
+                        )}
+                    </TableBody>
                 </Table>
             );
         case 'LogViewer':
@@ -100,7 +147,6 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
                 </div>
             );
 
-        // --- Элементы управления ---
         case 'Button':
             return <Button variant={schema.variant || 'outline'} onClick={() => onAction(schema.action, data[schema.payloadKey])} disabled={actionLoading === schema.action || schema.disabled}>{actionLoading === schema.action && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{schema.label}</Button>;
         case 'ToggleButton':
@@ -117,7 +163,6 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
             };
             return <form onSubmit={handleFormSubmit} className="space-y-4">{renderChildren(schema.children)}<Button type="submit" disabled={actionLoading === schema.action}>{actionLoading === schema.action && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{schema.submitLabel || "Сохранить"}</Button></form>;
         
-        // --- Поля ввода ---
         case 'Input':
             return <div className="space-y-2"><Label htmlFor={schema.component_id}>{schema.label}</Label><Input id={schema.component_id} type={schema.inputType || 'text'} value={data[schema.dataKey] || ''} onChange={(e) => onDataChange(schema.dataKey, e.target.value)} /></div>;
         case 'Textarea':
@@ -154,7 +199,18 @@ export default function PluginUIPage() {
         try {
             const data = await apiHelper(`/api/bots/${botId}/plugins/${pluginName}/ui-content/${pluginPath}`);
             setPageSchema(data.layout);
-            setPageData(data.data);
+            setPageData(prevData => {
+                if (!prevData) return data.data;
+                const merged = { ...data.data };
+                for (const key in prevData) {
+                    if (Array.isArray(prevData[key]) && prevData[key].length > 0) {
+                        merged[key] = prevData[key];
+                    } else if (prevData[key] !== undefined && prevData[key] !== null) {
+                        merged[key] = prevData[key];
+                    }
+                }
+                return merged;
+            });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить содержимое страницы плагина.' });
         } finally {
@@ -163,28 +219,36 @@ export default function PluginUIPage() {
     }, [botId, pluginName, pluginPath, toast]);
     
     useEffect(() => {
-        fetchContent();
-        if (!socket) return;
-        
-        socket.emit('plugin:ui:subscribe', { botId: parseInt(botId), pluginName, path: pluginPath });
+        if (!socket) {
+            fetchContent();
+            return;
+        }
         
         const handleDataUpdate = (update) => {
             setPageData(prevData => {
+                if (!prevData) return update;
+                
                 let newData = { ...prevData };
                 if (update.logMessage) {
-                    const logKey = Object.keys(prevData).find(k => k.endsWith('logs')); // Ищем ключ, заканчивающийся на 'logs'
+                    const logKey = Object.keys(prevData).find(k => k.endsWith('logs'));
                     if (logKey) {
                         newData[logKey] = [...(prevData[logKey] || []), update.logMessage];
                     }
                 }
-                if (update.data) {
-                    newData = { ...newData, ...update.data };
+                if (update && !update.logMessage) {
+                    newData = { ...newData, ...update };
                 }
                 return newData;
             });
         };
 
         socket.on('plugin:ui:dataUpdate', handleDataUpdate);
+        
+        socket.emit('plugin:ui:subscribe', { botId: parseInt(botId), pluginName, path: pluginPath });
+        
+        setTimeout(() => {
+            fetchContent();
+        }, 100);
 
         return () => {
             socket.emit('plugin:ui:unsubscribe', { botId: parseInt(botId), pluginName, path: pluginPath });
@@ -206,7 +270,6 @@ export default function PluginUIPage() {
                 setPageData(prevData => ({ ...prevData, ...response.result }));
             }
         } catch (error) {
-            // apiHelper уже показывает ошибку
         } finally {
             setActionLoading(null);
         }

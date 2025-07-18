@@ -410,7 +410,7 @@ class BotManager {
                         const pluginSubscribers = botSubscriptions.get(pluginName);
                         if (pluginSubscribers && pluginSubscribers.size > 0) {
                             pluginSubscribers.forEach(socket => {
-                                socket.emit('plugin:ui:dataUpdate', { data: payload });
+                                socket.emit('plugin:ui:dataUpdate', payload);
                             });
                         }
                         break;
