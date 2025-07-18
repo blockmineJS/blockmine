@@ -1,6 +1,13 @@
 # История версий
 
 
+## [1.13.0](https://github.com/blockmineJS/blockmine/compare/v1.12.0...v1.13.0) (2025-07-18)
+
+
+### ✨ Новые возможности
+
+* возможность сбрасывать пароль рут аккаунта ([e23181d](https://github.com/blockmineJS/blockmine/commit/e23181d29dbe730ff882d654b8ec0e80a1f007bc))
+
 ## [1.12.0](https://github.com/blockmineJS/blockmine/compare/v1.11.5...v1.12.0) (2025-07-18)
 
 
