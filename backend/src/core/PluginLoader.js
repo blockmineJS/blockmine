@@ -14,10 +14,12 @@ async function ensurePluginDependencies(pluginPath, pluginName) {
             const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
             if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0) {
                 console.log(`[PluginLoader] У плагина ${pluginName} есть зависимости, устанавливаем их...`);
+                const shell = process.platform === 'win32' ? process.env.ComSpec : '/bin/sh';
                 try {
-                    execSync('npm install', { 
-                        cwd: pluginPath, 
-                        stdio: 'pipe' 
+                    execSync('npm install', {
+                        cwd: pluginPath,
+                        stdio: 'pipe',
+                        shell: shell
                     });
                     console.log(`[PluginLoader] Зависимости для плагина ${pluginName} установлены`);
                 } catch (installError) {
@@ -92,10 +94,12 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                         if (moduleMatch) {
                             const missingModule = moduleMatch[1];
                             sendLog(`[PluginLoader] Попытка установки недостающего модуля ${missingModule} в папку плагина ${plugin.name}`);
+                            const shell = process.platform === 'win32' ? process.env.ComSpec : '/bin/sh';
                             try {
-                                execSync(`npm install ${missingModule}`, { 
-                                    cwd: plugin.path, 
-                                    stdio: 'pipe' 
+                                execSync(`npm install ${missingModule}`, {
+                                    cwd: plugin.path,
+                                    stdio: 'pipe',
+                                    shell: shell
                                 });
                                 sendLog(`[PluginLoader] Модуль ${missingModule} успешно установлен в папку плагина ${plugin.name}, повторная попытка загрузки`);
                                 
