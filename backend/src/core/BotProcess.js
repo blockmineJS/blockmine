@@ -20,6 +20,7 @@ const prisma = new PrismaClient();
 const pluginUiState = new Map();
 const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
+let connectionTimeout = null;
 
 function sendLog(content) {
     if (process.send) {
@@ -201,6 +202,13 @@ process.on('message', async (message) => {
             }
 
             bot = mineflayer.createBot(botOptions);
+
+            connectionTimeout = setTimeout(() => {
+                if (bot && !bot.player) {
+                    sendLog('[System] Таймаут подключения к серверу (30 секунд). Завершение работы...');
+                    process.exit(1);
+                }
+            }, 30000);
 
             bot.pluginUiState = pluginUiState;
 
@@ -489,6 +497,10 @@ process.on('message', async (message) => {
             });
             
             bot.on('login', () => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
                 sendLog('[Event: login] Успешно залогинился!');
                 if (process.send) {
                     process.send({ type: 'bot_ready' });
@@ -507,9 +519,19 @@ process.on('message', async (message) => {
                 process.exit(0);
             });
 
-            bot.on('error', (err) => sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`));
+            bot.on('error', (err) => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
+                sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`);
+            });
             
             bot.on('end', (reason) => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
                 sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
                 process.exit(0);
             });
@@ -575,6 +597,10 @@ process.on('message', async (message) => {
             sendLog(`[System] Error reloading configuration: ${error.message}`);
         }
     } else if (message.type === 'stop') {
+        if (connectionTimeout) {
+            clearTimeout(connectionTimeout);
+            connectionTimeout = null;
+        }
         if (bot) bot.quit();
         else process.exit(0);
     } else if (message.type === 'chat') {
@@ -651,6 +677,23 @@ process.on('unhandledRejection', (reason, promise) => {
     const errorMsg = `[FATAL] Необработанная ошибка процесса: ${reason?.stack || reason}`;
     sendLog(errorMsg);
     process.exit(1);
+});
+
+process.on('SIGTERM', () => {
+    sendLog('[System] Получен сигнал SIGTERM. Завершение работы...');
+    if (bot) {
+        try {
+            bot.quit();
+        } catch (error) {
+            sendLog(`[System] Ошибка при корректном завершении бота: ${error.message}`);
+        }
+    }
+    process.exit(0);
+});
+
+process.on('SIGKILL', () => {
+    sendLog('[System] Получен сигнал SIGKILL. Принудительное завершение...');
+    process.exit(0);
 });
 
 function serializeEntity(entity) {

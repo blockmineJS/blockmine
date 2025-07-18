@@ -727,7 +727,20 @@ class BotManager {
         const child = this.bots.get(botId);
         if (child) {
             this.eventGraphManager.unloadGraphsForBot(botId);
+            
             child.send({ type: 'stop' });
+            
+            setTimeout(() => {
+                if (!child.killed) {
+                    console.log(`[BotManager] Принудительное завершение процесса бота ${botId}`);
+                    try {
+                        child.kill('SIGKILL');
+                    } catch (error) {
+                        console.error(`[BotManager] Ошибка при принудительном завершении бота ${botId}:`, error);
+                    }
+                }
+            }, 5000);
+            
             this.botConfigs.delete(botId);
             return { success: true };
         }
