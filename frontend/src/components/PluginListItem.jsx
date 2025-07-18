@@ -2,15 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Badge from '@mui/material/Badge';
 import Button from '@mui/material/Button';
-import { Download as DownloadIcon, CheckCircle as CheckCircleIcon, Loader as LoaderIcon, GitMerge as GitMergeIcon, Server as ServerIcon, Globe as GlobeIcon, Github as GithubIcon, Puzzle as PuzzleIcon, ArrowDown as ArrowDownIcon, Star as StarIcon, Sparkles as SparklesIcon, TrendingUp as TrendingUpIcon } from 'lucide-react';
+import { Download as DownloadIcon, CheckCircle as CheckCircleIcon, Loader as LoaderIcon, GitMerge as GitMergeIcon, Server as ServerIcon, Globe as GlobeIcon, Github as GithubIcon, Puzzle as PuzzleIcon, ArrowDownToLine, Star as StarIcon, Sparkles as SparklesIcon, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const IconComponent = ({ name, ...props }) => {
-    if (!name) return <Puzzle {...props} />;
+    if (!name) return <PuzzleIcon {...props} />;
     if (name.startsWith('/') || name.startsWith('http')) return <img src={name} alt="plugin icon" {...props} />;
     const iconName = name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
-    const LucideIcon = Icons[iconName] || Puzzle;
+    const LucideIcon = Icons[iconName] || PuzzleIcon;
     return <LucideIcon {...props} />;
 };
 
@@ -72,7 +78,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                                 )}>
                                     {plugin.displayName || plugin.name}
                                     {plugin.verified && (
-                                        <Sparkles className="h-4 w-4 text-blue-500" />
+                                        <SparklesIcon className="h-4 w-4 text-blue-500" />
                                     )}
                                 </h3>
                             </Link>
@@ -88,7 +94,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                                     rel="noopener noreferrer" 
                                     className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
                                 >
-                                    <Github className="h-5 w-5" />
+                                    <GithubIcon className="h-5 w-5" />
                                 </a>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -117,7 +123,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                         
                         {isPopular && (
                             <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs">
-                                <TrendingUp className="h-3 w-3 mr-1" />
+                                <TrendingUpIcon className="h-3 w-3 mr-1" />
                                 Популярное
                             </Badge>
                         )}
@@ -143,7 +149,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600 text-xs">
-                                        <GitMerge className="h-3 w-3 mr-1" />
+                                        <GitMergeIcon className="h-3 w-3 mr-1" />
                                         {plugin.dependencies.length}
                                     </Badge>
                                 </TooltipTrigger>
@@ -158,7 +164,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                         
                         {!hasSupportedHosts ? (
                             <Badge variant="outline" className="text-xs">
-                                <Globe className="h-3 w-3 mr-1" />
+                                <GlobeIcon className="h-3 w-3 mr-1" />
                                 Любой
                             </Badge>
                         ) : plugin.supportedHosts.length <= 3 ? (
@@ -171,7 +177,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Badge variant="outline" className="cursor-help text-xs">
-                                        <Server className="h-3 w-3 mr-1" />
+                                        <ServerIcon className="h-3 w-3 mr-1" />
                                         {plugin.supportedHosts.length}
                                     </Badge>
                                 </TooltipTrigger>

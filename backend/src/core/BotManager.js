@@ -460,7 +460,7 @@ class BotManager {
                                 case 'removePermission':
                                     break;
                                 case 'getGroups':
-                                    result = user.groups;
+                                    result = user.groups ? user.groups.map(g => g.group.name) : [];
                                     break;
                                 case 'getPermissions':
                                     result = Array.from(user.permissionsSet);

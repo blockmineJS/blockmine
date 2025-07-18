@@ -169,13 +169,17 @@ class User {
             
             if (!defaultGroup) {
                 console.warn(`[UserService] Дефолтная группа 'User' не найдена для бота ID ${botId}. Пользователь будет создан без группы.`);
-                userInstance = await prisma.user.create({
-                    data: { username: lowerUsername, botId },
+                userInstance = await prisma.user.upsert({
+                    where: { botId_username: { botId, username: lowerUsername } },
+                    update: {},
+                    create: { username: lowerUsername, botId },
                     include: { groups: { include: { group: { include: { permissions: { include: { permission: true } } } } } } },
                 });
             } else {
-                 userInstance = await prisma.user.create({
-                    data: {
+                 userInstance = await prisma.user.upsert({
+                    where: { botId_username: { botId, username: lowerUsername } },
+                    update: {},
+                    create: {
                         username: lowerUsername,
                         botId,
                         groups: { create: { groupId: defaultGroup.id } }
