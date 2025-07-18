@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
 import { useToast } from '@/hooks/use-toast';
@@ -17,17 +17,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PowerOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-/**
- * Компонент-рекурсия, который строит DOM по JSON-схеме.
- * @param {object} schema - Описание компонента из JSON.
- * @param {object} data - Объект с данными для всех компонентов.
- * @param {function} onAction - Функция для вызова действий на бэкенде.
- * @param {function} onDataChange - Функция для обновления локального состояния данных (для полей ввода).
- * @param {string|null} actionLoading - Имя действия, которое в данный момент выполняется.
- */
+
 const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading }) => {
     if (!schema) return null;
 
@@ -188,11 +181,19 @@ export default function PluginUIPage() {
     const { botId, pluginName, pluginPath } = useParams();
     const { toast } = useToast();
     const socket = useAppStore(state => state.socket);
+    const botStatuses = useAppStore(state => state.botStatuses);
+    const startBot = useAppStore(state => state.startBot);
+    const navigate = useNavigate();
 
     const [pageSchema, setPageSchema] = useState(null);
     const [pageData, setPageData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(null);
+    const [isStartingBot, setIsStartingBot] = useState(false);
+
+    const botStatus = botStatuses[parseInt(botId)];
+    const isBotRunning = botStatus === 'running';
+    const shouldShowStartMessage = !isBotRunning && !isStartingBot;
 
     const fetchContent = useCallback(async () => {
         setLoading(true);
@@ -256,6 +257,15 @@ export default function PluginUIPage() {
         };
     }, [botId, pluginName, pluginPath, socket, fetchContent]);
 
+    useEffect(() => {
+        if (isBotRunning && isStartingBot) {
+            const timer = setTimeout(() => {
+                setIsStartingBot(false);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isBotRunning, isStartingBot]);
+
     const handleAction = async (actionName, payload = {}) => {
         setActionLoading(actionName);
         try {
@@ -281,6 +291,54 @@ export default function PluginUIPage() {
 
     if (loading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+
+    if (isStartingBot) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
+                    <h2 className="text-xl font-semibold text-muted-foreground">Запуск бота...</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Пожалуйста, подождите, бот подключается к серверу.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (shouldShowStartMessage) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                    <PowerOff className="h-16 w-16 text-muted-foreground mx-auto" />
+                    <h2 className="text-xl font-semibold text-muted-foreground">Бот не запущен</h2>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                        Для работы с интерфейсом плагина необходимо запустить бота. 
+                    </p>
+                    <Button 
+                        onClick={async () => {
+                            setIsStartingBot(true);
+                            try {
+                                await startBot(parseInt(botId));
+                            } catch (error) {
+                                setIsStartingBot(false);
+                                toast({ 
+                                    variant: 'destructive', 
+                                    title: 'Ошибка', 
+                                    description: 'Не удалось запустить бота.' 
+                                });
+                            }
+                        }}
+                        disabled={isStartingBot}
+                        className="mt-4"
+                    >
+                        {isStartingBot && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isStartingBot ? 'Запуск...' : 'Запустить'}
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     if (!pageSchema || !pageData) {
