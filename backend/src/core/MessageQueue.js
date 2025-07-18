@@ -33,7 +33,16 @@ class MessageQueue {
     enqueue(chatType, message, username = null) {
         const typeConfig = this.chatTypes[chatType];
         if (!typeConfig) return;
-        this._enqueue({ type: 'simple', chatType, ...typeConfig, message, username });
+
+        if (Array.isArray(message)) {
+            for (const msg of message) {
+                if (typeof msg === 'string' && msg.trim().length > 0) {
+                    this._enqueue({ type: 'simple', chatType, ...typeConfig, message: msg, username });
+                }
+            }
+        } else if (typeof message === 'string') {
+            this._enqueue({ type: 'simple', chatType, ...typeConfig, message, username });
+        }
     }
 
     enqueueAndWait(command, patterns, timeout) {
