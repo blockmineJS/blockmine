@@ -1,15 +1,20 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const config = require('../../config');
 const { authenticate, authorize } = require('../middleware/auth');
+const path = require('path');
+const os = require('os');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 const JWT_SECRET = config.security.jwtSecret;
 const JWT_EXPIRES_IN = '7d';
+
+const activeResetTokens = new Map();
 
 /**
  * @route   GET /api/auth/status
@@ -24,6 +29,16 @@ router.get('/status', async (req, res) => {
         console.error('[Auth Status Error]', error);
         res.status(500).json({ error: 'Не удалось проверить статус сервера' });
     }
+});
+
+/**
+ * @route   GET /api/auth/config-path
+ * @desc    Получить путь к конфигурационному файлу
+ * @access  Public
+ */
+router.get('/config-path', (req, res) => {
+    const configPath = path.join(os.homedir(), '.blockmine', 'config.json');
+    res.json({ configPath });
 });
 
 /**
@@ -97,6 +112,139 @@ router.post('/setup', async (req, res) => {
         }
         console.error('[Setup Error]', error);
         res.status(500).json({ error: 'Не удалось создать администратора' });
+    }
+});
+
+/**
+ * @route   POST /api/auth/recovery/verify
+ * @desc    Проверка кода восстановления
+ * @access  Public
+ */
+router.post('/recovery/verify', async (req, res) => {
+    try {
+        const { recoveryCode } = req.body;
+        
+        if (!recoveryCode) {
+            return res.status(400).json({ error: 'Код восстановления обязателен' });
+        }
+        
+        if (recoveryCode !== config.security.adminRecoveryCode) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return res.status(401).json({ error: 'Неверный код восстановления' });
+        }
+        
+        const adminRole = await prisma.panelRole.findFirst({
+            where: { name: 'Admin' }
+        });
+        
+        if (!adminRole) {
+            return res.status(404).json({ error: 'Роль администратора не найдена' });
+        }
+        
+        const rootUser = await prisma.panelUser.findFirst({
+            where: { roleId: adminRole.id },
+            orderBy: { id: 'asc' }
+        });
+        
+        if (!rootUser) {
+            return res.status(404).json({ error: 'Администратор не найден' });
+        }
+        
+        const tokenId = crypto.randomBytes(16).toString('hex');
+        const resetToken = jwt.sign(
+            { 
+                userId: rootUser.id,
+                type: 'password-reset',
+                tokenId: tokenId,
+                timestamp: Date.now()
+            },
+            JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+        
+        activeResetTokens.set(tokenId, {
+            userId: rootUser.id,
+            createdAt: Date.now(),
+            used: false
+        });
+        
+        setTimeout(() => {
+            activeResetTokens.delete(tokenId);
+        }, 5 * 60 * 1000);
+        
+        res.json({ 
+            success: true,
+            username: rootUser.username,
+            resetToken
+        });
+        
+    } catch (error) {
+        console.error('[Recovery Verify Error]', error);
+        res.status(500).json({ error: 'Ошибка при проверке кода восстановления' });
+    }
+});
+
+/**
+ * @route   POST /api/auth/recovery/reset
+ * @desc    Сброс пароля с использованием токена
+ * @access  Public (с валидным токеном сброса)
+ */
+router.post('/recovery/reset', async (req, res) => {
+    try {
+        const { resetToken, newPassword } = req.body;
+        
+        if (!resetToken || !newPassword) {
+            return res.status(400).json({ error: 'Токен и новый пароль обязательны' });
+        }
+        
+        if (newPassword.length < 4) {
+            return res.status(400).json({ error: 'Пароль должен быть не менее 4 символов' });
+        }
+        
+        let decoded;
+        try {
+            decoded = jwt.verify(resetToken, JWT_SECRET);
+            if (decoded.type !== 'password-reset') {
+                throw new Error('Invalid token type');
+            }
+            
+            const tokenInfo = activeResetTokens.get(decoded.tokenId);
+            if (!tokenInfo) {
+                throw new Error('Token not found in active tokens');
+            }
+            
+            if (tokenInfo.used) {
+                throw new Error('Token already used');
+            }
+            
+            if (tokenInfo.userId !== decoded.userId) {
+                throw new Error('Token userId mismatch');
+            }
+            
+        } catch (err) {
+            return res.status(401).json({ error: 'Недействительный или истекший токен' });
+        }
+        
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        const updatedUser = await prisma.panelUser.update({
+            where: { id: decoded.userId },
+            data: { passwordHash: hashedPassword },
+            select: { username: true }
+        });
+        
+        const tokenInfo = activeResetTokens.get(decoded.tokenId);
+        tokenInfo.used = true;
+        
+        activeResetTokens.delete(decoded.tokenId);
+        
+        res.json({ 
+            message: 'Пароль успешно сброшен', 
+            username: updatedUser.username 
+        });
+        
+    } catch (error) {
+        console.error('[Recovery Reset Error]', error);
+        res.status(500).json({ error: 'Ошибка при сбросе пароля' });
     }
 });
 
