@@ -58,7 +58,7 @@ export default function ConfigurationPage() {
         let updatedBotData = null;
         try {
             if (changes.bot) {
-                const dataToSend = { ...changes.bot };
+                const dataToSend = { ...allSettings.bot, ...changes.bot };
                 if (Array.isArray(dataToSend.owners)) {
                     dataToSend.owners = dataToSend.owners.join(',');
                 }
@@ -67,7 +67,7 @@ export default function ConfigurationPage() {
                 
                 updatedBotData = await apiHelper(`/api/bots/${botId}`, {
                     method: 'PUT',
-                    body: JSON.stringify(dataToSend),
+                    body: dataToSend,
                 });
             }
             

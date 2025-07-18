@@ -32,9 +32,6 @@ export default function ImportBotDialog({ onImportSuccess, onCancel }) {
             const data = await apiHelper('/api/bots/import', {
                 method: 'POST',
                 body: formData,
-                headers: {
-                    'Content-Type': undefined 
-                }
             }, `Бот успешно импортирован.`);
             
             onImportSuccess(data);

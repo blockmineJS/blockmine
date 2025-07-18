@@ -1,26 +1,39 @@
+
 import { useAppStore } from '@/stores/appStore';
 import { toast } from '@/hooks/use-toast';
 
 export const apiHelper = async (url, options = {}, successMessage) => {
     const token = useAppStore.getState().token;
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
+    const finalOptions = { ...options };
 
+    finalOptions.headers = { ...options.headers };
     if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        finalOptions.headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const finalOptions = { ...options, headers };
-
-    if (finalOptions.body && typeof finalOptions.body === 'object') {
+    if (finalOptions.body instanceof FormData) {
+    } else if (finalOptions.body && typeof finalOptions.body === 'object') {
         finalOptions.body = JSON.stringify(finalOptions.body);
+        finalOptions.headers['Content-Type'] = 'application/json';
+    } else if (finalOptions.body && typeof finalOptions.body === 'string') {
+        finalOptions.headers['Content-Type'] = 'application/json';
     }
 
     try {
         const response = await fetch(url, finalOptions);
 
+        const contentType = response.headers.get('Content-Type');
+        if (contentType?.includes('application/zip') || contentType?.includes('application/octet-stream')) {
+             if (!response.ok) {
+                try {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Ошибка при скачивании файла.');
+                } catch(e) {
+                     throw new Error(`Ошибка при скачивании файла: ${response.statusText}`);
+                }
+            }
+            return await response.blob();
+        }
 
         if (response.status === 204 || response.headers.get("content-length") === "0") {
             if (successMessage) toast({ title: "Успех!", description: successMessage });
@@ -49,7 +62,6 @@ export const apiHelper = async (url, options = {}, successMessage) => {
         } else if (error.message.includes('Невалидный токен')) {
             const { logout } = useAppStore.getState();
             logout();
-            return null;
         } else {
             toast({ variant: "destructive", title: "Ошибка", description: error.message });
         }

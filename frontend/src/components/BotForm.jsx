@@ -31,7 +31,7 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                 password: '', 
                 prefix: bot.prefix || '@',
                 note: bot.note || '',
-                serverId: bot.serverId?.toString() || '',
+                serverId: bot.serverId ? bot.serverId.toString() : '',
                 owners: bot.owners ? bot.owners.split(',').map(s => s.trim()).filter(Boolean) : [],
                 proxyHost: bot.proxyHost || '',
                 proxyPort: bot.proxyPort || '',
