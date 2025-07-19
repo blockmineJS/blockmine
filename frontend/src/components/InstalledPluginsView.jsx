@@ -13,6 +13,13 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
 
+const cardStyles = {
+    card: "relative overflow-hidden transition-all duration-300 group h-full flex flex-col",
+    header: "pb-3",
+    content: "flex-1 space-y-3 pb-3",
+    footer: "pt-3 border-t space-y-3"
+};
+
 const IconComponent = ({ name, ...props }) => {
     if (!name) return <Package {...props} />;
     if (name.startsWith('/') || name.startsWith('http')) return <img src={name} alt="plugin icon" {...props} />;
@@ -53,27 +60,22 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             <div 
                 className={cn(
                     "relative flex items-start gap-4 p-4 border rounded-lg transition-all duration-300",
-                    "hover:border-primary/50 hover:bg-muted/50 hover:shadow-md",
-                    plugin.isEnabled ? "border-green-600/30 bg-green-950/20" : "opacity-80",
-                    isHovered && "transform scale-[1.01]"
+                    "hover:border-primary/50 hover:bg-muted/50",
+                    plugin.isEnabled ? "border-green-600/30 bg-green-950/5" : "opacity-80"
                 )}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
                 {plugin.isEnabled && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-500 to-green-700 rounded-l-lg" />
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-500 to-green-600 rounded-l-lg" />
                 )}
                 
-                <div className={cn(
-                    "relative shrink-0 mt-1 transition-transform duration-300",
-                    isHovered && "scale-110 rotate-3"
-                )}>
+                <div className="relative shrink-0 mt-1">
                     <IconComponent 
                         name={plugin.manifest?.icon} 
                         className={cn(
-                            "h-12 w-12",
-                            plugin.isEnabled ? "text-primary" : "text-muted-foreground",
-                            isHovered && "drop-shadow-glow"
+                            "h-10 w-10",
+                            plugin.isEnabled ? "text-primary" : "text-muted-foreground"
                         )} 
                     />
                     {isNew && (
@@ -83,10 +85,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
 
                 <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className={cn(
-                            "font-semibold text-lg transition-colors",
-                            isHovered && "gradient-text"
-                        )}>{plugin.name}</h3>
+                        <h3 className="font-semibold text-lg truncate">{plugin.name}</h3>
                         {isNew && (
                             <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
                                 <Sparkles className="h-3 w-3 mr-1" />
@@ -111,7 +110,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
                             {plugin.sourceType}
                         </Badge>
-                        {plugin.manifest?.categories?.map(category => (
+                        {plugin.manifest?.categories?.slice(0, 2).map(category => (
                             <Badge key={category} variant="secondary" className="text-xs">
                                 {category}
                             </Badge>
@@ -196,35 +195,27 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
     return (
         <Card 
             className={cn(
-                "relative overflow-hidden transition-all duration-300 plugin-card-hover group h-full",
-                "hover:border-primary/50 hover:shadow-xl",
-                plugin.isEnabled ? "border-green-600/50" : "opacity-80"
+                cardStyles.card,
+                "hover:border-primary/50 hover:shadow-lg",
+                plugin.isEnabled ? "border-green-600/30 bg-green-950/5" : "opacity-80"
             )}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className={cn(
-                "absolute inset-0 opacity-0 transition-opacity duration-300",
-                "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
-                isHovered && "opacity-100"
-            )} />
-            
             {plugin.isEnabled && (
-                <div className="absolute top-0 right-0 bg-gradient-to-bl from-green-600 to-green-700 text-white p-6 rounded-bl-[40px] shadow-lg z-10">
-                    <Power className="h-5 w-5 absolute top-2 right-2" />
-                </div>
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-600" />
             )}
             
             {(isNew || updateInfo) && (
-                <div className="absolute top-2 left-2 z-10 space-y-1">
+                <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
                     {isNew && (
-                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 flex">
+                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
                             <Sparkles className="h-3 w-3 mr-1" />
                             Новое
                         </Badge>
                     )}
                     {updateInfo && (
-                        <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 flex animate-pulse">
+                        <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 text-xs animate-pulse">
                             <ArrowUpCircle className="h-3 w-3 mr-1" />
                             Обновление
                         </Badge>
@@ -232,25 +223,27 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 </div>
             )}
             
-            <CardHeader className="relative z-10">
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                        <IconComponent 
-                            name={plugin.manifest?.icon} 
-                            className={cn(
-                                "h-10 w-10 transition-all duration-300",
-                                plugin.isEnabled ? "text-primary" : "text-muted-foreground",
-                                isHovered && "scale-110 rotate-3 drop-shadow-glow"
-                            )} 
-                        />
-                        <div>
-                            <CardTitle className={cn(
-                                "text-xl transition-all duration-300",
-                                isHovered && "gradient-text"
-                            )}>
+            <CardHeader className={cardStyles.header}>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="relative shrink-0">
+                            <IconComponent 
+                                name={plugin.manifest?.icon} 
+                                className={cn(
+                                    "h-10 w-10 transition-all duration-300",
+                                    plugin.isEnabled ? "text-primary" : "text-muted-foreground",
+                                    isHovered && "scale-110"
+                                )} 
+                            />
+                            {isNew && (
+                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <CardTitle className="text-lg truncate">
                                 {plugin.name}
                             </CardTitle>
-                            <CardDescription className="mt-1">
+                            <CardDescription className="text-sm truncate">
                                 от {plugin.author || 'Неизвестный автор'}
                             </CardDescription>
                         </div>
@@ -258,13 +251,13 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     <Switch
                         checked={plugin.isEnabled}
                         onCheckedChange={(checked) => onToggle(plugin, checked)}
-                        className="mt-1"
+                        className="shrink-0"
                     />
                 </div>
             </CardHeader>
             
-            <CardContent className="relative z-10 space-y-4">
-                <p className="text-sm text-muted-foreground line-clamp-3">
+            <CardContent className={cardStyles.content}>
+                <p className="text-sm text-muted-foreground line-clamp-2">
                     {plugin.description || 'Нет описания.'}
                 </p>
                 
@@ -274,7 +267,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
                         {plugin.sourceType}
                     </Badge>
-                    {plugin.manifest?.categories?.map(category => (
+                    {plugin.manifest?.categories?.slice(0, 1).map(category => (
                         <Badge key={category} variant="secondary" className="text-xs">
                             {category}
                         </Badge>
@@ -284,12 +277,12 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 {lastUpdated && (
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        Обновлено {lastUpdated}
+                        {lastUpdated}
                     </div>
                 )}
             </CardContent>
             
-            <CardFooter className="relative z-10 flex flex-col gap-3 mt-auto pt-4 border-t">
+            <CardFooter className={cardStyles.footer}>
                 {updateInfo && (
                     <Button 
                         className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
@@ -311,11 +304,11 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     </Button>
                 )}
                 
-                <div className="flex gap-2 w-full">
+                <div className="grid grid-cols-2 gap-2 w-full">
                     {isEditable && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
+                                <Button variant="outline" size="sm" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
                                     <Code className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -325,7 +318,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {isForkable && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" className="flex-1" onClick={() => onFork(plugin)}>
+                                <Button variant="outline" size="sm" onClick={() => onFork(plugin)}>
                                     <Copy className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -335,7 +328,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {hasSettings && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" className="flex-1" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
+                                <Button variant="outline" size="sm" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
                                     <Settings className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -344,7 +337,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     )}
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="outline" size="sm" className="flex-1" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                            <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
@@ -550,7 +543,7 @@ export default function InstalledPluginsView({
                 <div className="flex-1 overflow-y-auto p-4">
                     {sortedAndFilteredPlugins.length > 0 ? (
                         viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in slide-in-from-bottom duration-500">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {sortedAndFilteredPlugins.map((plugin, index) => (
                                     <div
                                         key={plugin.id}
@@ -572,7 +565,7 @@ export default function InstalledPluginsView({
                                 ))}
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {sortedAndFilteredPlugins.map((plugin) => (
                                     <InstalledPluginCard
                                         key={plugin.id}

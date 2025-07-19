@@ -204,9 +204,19 @@ export const createPluginSlice = (set, get) => {
         },
 
         updatePlugin: async (pluginId, botId) => {
-             await apiHelper(`/api/plugins/update/${pluginId}`, { method: 'POST' }, 'Плагин обновлен. Перезапустите бота.');
-             await get().fetchInstalledPlugins(botId);
-             await get().checkForUpdates(botId);
+            const pluginToUpdate = get().installedPlugins[botId]?.find(p => p.id === pluginId);
+
+            await apiHelper(`/api/plugins/update/${pluginId}`, { method: 'POST' }, 'Плагин обновлен. Перезапустите бота.');
+
+            if (pluginToUpdate) {
+                set(produce(draft => {
+                    if (draft.pluginUpdates[botId]?.[pluginToUpdate.sourceUri]) {
+                        delete draft.pluginUpdates[botId][pluginToUpdate.sourceUri];
+                    }
+                }));
+            }
+            
+            await get().fetchInstalledPlugins(botId);
         },
 
         createIdePlugin: async (botId, { name, template }) => {
