@@ -150,6 +150,21 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
             return res.status(400).json({ message: 'Неверный ID бота.' });
         }
 
+        if (dataToUpdate.username) {
+            const existingBot = await prisma.bot.findFirst({
+                where: {
+                    username: dataToUpdate.username,
+                    id: { not: botId }
+                }
+            });
+            
+            if (existingBot) {
+                return res.status(400).json({ 
+                    message: `Бот с именем "${dataToUpdate.username}" уже существует.` 
+                });
+            }
+        }
+
         const updatedBot = await prisma.bot.update({
             where: { id: botId },
             data: dataToUpdate,
@@ -164,6 +179,18 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
         res.json(updatedBot);
     } catch (error) {
         console.error('Error updating bot:', error);
+        console.error('Error details:', {
+            code: error.code,
+            meta: error.meta,
+            message: error.message
+        });
+        
+        if (error.code === 'P2002' && error.meta?.target?.includes('username')) {
+            return res.status(400).json({ 
+                message: 'Бот с таким именем уже существует. Выберите другое имя.' 
+            });
+        }
+        
         res.status(500).json({ message: `Не удалось обновить бота: ${error.message}` });
     }
 });
@@ -1103,27 +1130,41 @@ router.get('/:botId/event-graphs/:graphId', authorize('management:view'), async 
 router.post('/:botId/event-graphs', authorize('management:edit'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
-        const { name } = req.body;
+        const { name, description, graphJson, variables, eventType, isEnabled = true } = req.body;
 
         if (!name || typeof name !== 'string' || name.trim() === '') {
             return res.status(400).json({ error: 'Имя графа обязательно и должно быть непустой строкой' });
         }
 
-        const initialGraph = {
-            nodes: [],
-            connections: []
-        };
+        let graphJsonString;
+        if (graphJson) {
+            if (typeof graphJson === 'string') {
+                graphJsonString = graphJson;
+            } else {
+                graphJsonString = JSON.stringify(graphJson);
+            }
+        } else {
+            graphJsonString = JSON.stringify({
+                nodes: [],
+                connections: []
+            });
+        }
+
+        console.log('[API] Final graphJsonString:', graphJsonString);
 
         const newEventGraph = await prisma.eventGraph.create({
             data: {
                 botId,
                 name: name.trim(),
-                isEnabled: true,
-                graphJson: JSON.stringify(initialGraph),
-                variables: '[]'
+                description: description || '',
+                isEnabled: isEnabled,
+                graphJson: graphJsonString,
+                variables: variables || '[]',
+                eventType: eventType || 'custom'
             },
         });
 
+        console.log('[API] Created event graph:', newEventGraph);
         res.status(201).json(newEventGraph);
     } catch (error) {
         if (error.code === 'P2002') {
