@@ -1,6 +1,20 @@
 # История версий
 
 
+## [1.15.0](https://github.com/blockmineJS/blockmine/compare/v1.14.1...v1.15.0) (2025-07-19)
+
+
+### 🐛 Исправления
+
+* в настройках когда меняешь имя бота на уже существующее, не будет ошибки ([0849f43](https://github.com/blockmineJS/blockmine/commit/0849f43a3b76640c18b1c358a56fedd801bb54ca))
+* фикс парочки нод ([dd1a57e](https://github.com/blockmineJS/blockmine/commit/dd1a57e574d107a62934c3fe41aa0d4a1d90660f))
+
+
+### ✨ Новые возможности
+
+* новый функционал! Магазин графов! его можно найти в левом меню ([9e1c04c](https://github.com/blockmineJS/blockmine/commit/9e1c04cc1c512525b17591c72eb677d55e14b916))
+* теперь для плагинов можно делать команды/события в графовой структуре ([e101e46](https://github.com/blockmineJS/blockmine/commit/e101e46c3e5b3fad1a0a47a74a6d64526ee72880))
+
 ### [1.14.1](https://github.com/blockmineJS/blockmine/compare/v1.14.0...v1.14.1) (2025-07-19)
 
 ## [1.14.0](https://github.com/blockmineJS/blockmine/compare/v1.13.1...v1.14.0) (2025-07-19)
