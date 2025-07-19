@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Package } from 'lucide-react';
 import VariablesPanel from './VariablesPanel';
 
 const SettingsPanel = () => {
@@ -17,6 +17,8 @@ const SettingsPanel = () => {
   const updateArgument = useVisualEditorStore(state => state.updateArgument);
   const removeArgument = useVisualEditorStore(state => state.removeArgument);
   const permissions = useVisualEditorStore(state => state.permissions);
+  const availablePlugins = useVisualEditorStore(state => state.availablePlugins);
+  const updatePluginOwner = useVisualEditorStore(state => state.updatePluginOwner);
   const editorType = useVisualEditorStore(state => state.editorType);
 
   const isEventGraph = editorType === 'event';
@@ -81,6 +83,47 @@ const SettingsPanel = () => {
             onCheckedChange={(checked) => updateCommand({ isEnabled: checked })}
         />
         <Label htmlFor="is-enabled">Включено</Label>
+      </div>
+
+      <div>
+        <Label htmlFor="plugin-owner" className="flex items-center gap-2">
+          <Package className="h-4 w-4" />
+          Плагин-владелец
+        </Label>
+        <Select
+          value={command.pluginOwnerId ? command.pluginOwnerId.toString() : "none"}
+          onValueChange={(value) => {
+            const pluginId = value === 'none' ? null : parseInt(value);
+            updatePluginOwner(command.botId, pluginId);
+          }}
+        >
+          <SelectTrigger id="plugin-owner">
+            <SelectValue placeholder="Выберите плагин..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Нет (системный)</SelectItem>
+            {availablePlugins?.length > 0 ? (
+              availablePlugins
+                .filter(plugin => {
+                  const sourceType = plugin.sourceType?.toLowerCase();
+                  return sourceType === 'local' || sourceType === 'local_ide';
+                })
+                .map(plugin => (
+                  <SelectItem key={plugin.id} value={plugin.id.toString()}>
+                    {plugin.name} ({plugin.sourceType}) {plugin.isEnabled ? '(активен)' : '(неактивен)'}
+                  </SelectItem>
+                ))
+            ) : (
+              <SelectItem value="loading" disabled>Загрузка плагинов... ({availablePlugins?.length || 0} найдено)</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">
+          {availablePlugins?.length > 0 
+            ? `Привязка к локальному плагину позволит автоматически удалить ${isEventGraph ? 'граф' : 'команду'} при удалении плагина`
+            : 'Для назначения плагина-владельца требуются права plugin:list'
+          }
+        </p>
       </div>
 
       {!isEventGraph && (

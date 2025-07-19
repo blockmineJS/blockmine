@@ -25,6 +25,7 @@ export const useVisualEditorStore = create(
     connectingPin: null,
     variables: [],
     commandArguments: [],
+    availablePlugins: [],
 
     init: async (botId, id, type) => {
       set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
@@ -33,6 +34,13 @@ export const useVisualEditorStore = create(
           get().fetchAvailableNodes(botId, type),
           get().fetchPermissions(botId)
         ]);
+
+        let pluginsData = [];
+        try {
+          pluginsData = await apiHelper(`/api/plugins/bot/${botId}`);
+        } catch (error) {
+          console.warn('Не удалось загрузить плагины для назначения владельца:', error.message);
+        }
 
         let itemData, graph;
         let finalCommandState;
@@ -93,11 +101,14 @@ export const useVisualEditorStore = create(
 
         finalCommandState = { ...itemData, variables: finalVariables, triggers, arguments: commandArgs };
         graph = parsedGraph;
+        
+
 
         set({
             command: finalCommandState,
             availableNodes: availableNodesData,
             permissions: permissionsData,
+            availablePlugins: pluginsData,
             variables: finalVariables,
             commandArguments: commandArgs,
         });
@@ -238,6 +249,49 @@ export const useVisualEditorStore = create(
       set(state => {
         state.command = { ...state.command, ...updates };
       });
+    },
+
+    updatePluginOwner: async (botId, pluginId) => {
+      try {
+        const { command, editorType, nodes, edges, variables } = get();
+        const entityId = command.id;
+        const entityType = editorType === 'event' ? 'event-graphs' : 'commands';
+        
+
+        
+        const graphObject = {
+          nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+          connections: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
+            id,
+            sourceNodeId: source,
+            targetNodeId: target,
+            sourcePinId: sourceHandle,
+            targetPinId: targetHandle,
+          })),
+          variables: variables || []
+        };
+
+        const payload = {
+          pluginOwnerId: pluginId,
+          graphJson: JSON.stringify(graphObject)
+        };
+        
+        await apiHelper(`/api/bots/${botId}/${entityType}/${entityId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        
+        set(state => {
+          if (state.command) {
+            state.command.pluginOwnerId = pluginId;
+          }
+        });
+        
+        toast({ title: 'Успех', description: 'Плагин-владелец обновлен' });
+      } catch (error) {
+        console.error('Ошибка обновления плагина-владельца:', error);
+        toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось обновить плагин-владелец' });
+      }
     },
 
     addArgument: () => {
@@ -403,7 +457,10 @@ export const useVisualEditorStore = create(
           description,
           isEnabled,
           graphJson: JSON.stringify(graphObject),
+          pluginOwnerId: command.pluginOwnerId,
         };
+
+
 
         if (editorType === 'event') {
           payload.eventType = command.eventType;

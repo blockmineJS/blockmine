@@ -253,6 +253,20 @@ process.on('message', async (message) => {
                             }
                         }
 
+                        let pluginOwnerId = null;
+                        if (command.owner && command.owner.startsWith('plugin:')) {
+                            const pluginName = command.owner.replace('plugin:', '');
+                            const plugin = await prisma.installedPlugin.findFirst({
+                                where: {
+                                    botId: bot.config.id,
+                                    name: pluginName
+                                }
+                            });
+                            if (plugin) {
+                                pluginOwnerId = plugin.id;
+                            }
+                        }
+
                         const commandData = {
                             botId: bot.config.id,
                             name: command.name,
@@ -264,6 +278,7 @@ process.on('message', async (message) => {
                             aliases: JSON.stringify(command.aliases || []),
                             allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
                             argumentsJson: JSON.stringify(command.args || []),
+                            pluginOwnerId: pluginOwnerId,
                         };
 
                         await prisma.command.upsert({
@@ -338,6 +353,69 @@ process.on('message', async (message) => {
                             }
                         }, 10000);
                     });
+                },
+                registerEventGraph: async (graphData) => {
+                    try {
+                        let pluginOwnerId = null;
+                        if (graphData.owner && graphData.owner.startsWith('plugin:')) {
+                            const pluginName = graphData.owner.replace('plugin:', '');
+                            const plugin = await prisma.installedPlugin.findFirst({
+                                where: {
+                                    botId: bot.config.id,
+                                    name: pluginName
+                                }
+                            });
+                            if (plugin) {
+                                pluginOwnerId = plugin.id;
+                            }
+                        }
+
+                        const graphDataToSave = {
+                            botId: bot.config.id,
+                            name: graphData.name,
+                            isEnabled: graphData.isEnabled !== undefined ? graphData.isEnabled : true,
+                            graphJson: graphData.graphJson || JSON.stringify({ nodes: [], connections: [] }),
+                            variables: JSON.stringify(graphData.variables || []),
+                            pluginOwnerId: pluginOwnerId,
+                        };
+
+                        const eventGraph = await prisma.eventGraph.upsert({
+                            where: {
+                                botId_name: {
+                                    botId: bot.config.id,
+                                    name: graphData.name
+                                }
+                            },
+                            update: {
+                                isEnabled: graphDataToSave.isEnabled,
+                                graphJson: graphDataToSave.graphJson,
+                                variables: graphDataToSave.variables,
+                                pluginOwnerId: graphDataToSave.pluginOwnerId,
+                            },
+                            create: graphDataToSave,
+                        });
+
+                        if (graphData.triggers && Array.isArray(graphData.triggers)) {
+                            await prisma.eventTrigger.deleteMany({
+                                where: { graphId: eventGraph.id }
+                            });
+
+                            if (graphData.triggers.length > 0) {
+                                await prisma.eventTrigger.createMany({
+                                    data: graphData.triggers.map(eventType => ({
+                                        graphId: eventGraph.id,
+                                        eventType
+                                    }))
+                                });
+                            }
+                        }
+
+                        sendLog(`[API] Граф события "${graphData.name}" от плагина "${graphData.owner}" зарегистрирован.`);
+                        return eventGraph;
+                    } catch (error) {
+                        sendLog(`[API] Ошибка при регистрации графа события: ${error.message}`);
+                        throw error;
+                    }
                 },
                 executeCommand: (command) => {
                     sendLog(`[Graph] Выполнение серверной команды: ${command}`);

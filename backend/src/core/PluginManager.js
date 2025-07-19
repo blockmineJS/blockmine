@@ -54,6 +54,8 @@ class PluginManager {
         } catch(e) {
             console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
         }
+
+        await this.loadPluginGraphs(botId, newPlugin.id, directoryPath);
         
         if (this.botManager) {
             await this.botManager.reloadPlugins(botId);
@@ -112,6 +114,8 @@ class PluginManager {
             
             const packageJson = JSON.parse(await fse.readFile(path.join(localPath, 'package.json'), 'utf-8'));
             reportPluginDownload(packageJson.name);
+
+            await this.loadPluginGraphs(botId, newPlugin.id, localPath);
 
             if (this.botManager) {
                 await this.botManager.reloadPlugins(botId);
@@ -194,9 +198,14 @@ class PluginManager {
         try {
             await prisma.$transaction(async (tx) => {
                 const deletedCommands = await tx.command.deleteMany({
-                    where: { botId: plugin.botId, owner: pluginOwnerId },
+                    where: { botId: plugin.botId, pluginOwnerId: plugin.id },
                 });
                 if (deletedCommands.count > 0) console.log(`[DB Cleanup] Удалено команд: ${deletedCommands.count}`);
+
+                const deletedEventGraphs = await tx.eventGraph.deleteMany({
+                    where: { botId: plugin.botId, pluginOwnerId: plugin.id },
+                });
+                if (deletedEventGraphs.count > 0) console.log(`[DB Cleanup] Удалено графов событий: ${deletedEventGraphs.count}`);
 
                 const deletedPermissions = await tx.permission.deleteMany({
                     where: { botId: plugin.botId, owner: pluginOwnerId },
@@ -276,6 +285,99 @@ class PluginManager {
         console.log(`[PluginManager] Старая версия ${plugin.name} удалена, устанавливаем новую...`);
         
         return await this.installFromGithub(botId, repoUrl, prisma, true);
+    }
+
+    async loadPluginGraphs(botId, pluginId, pluginPath) {
+        const plugin = await prisma.installedPlugin.findUnique({
+            where: { id: pluginId }
+        });
+        
+        if (!plugin) {
+            console.error(`[PluginManager] Плагин с ID ${pluginId} не найден`);
+            return;
+        }
+        try {
+            const graphDir = path.join(pluginPath, 'graph');
+            if (!await fse.pathExists(graphDir)) {
+                console.log(`[PluginManager] Папка graph не найдена в плагине: ${graphDir}`);
+                return;
+            }
+
+            const graphFiles = await fse.readdir(graphDir);
+            const jsonFiles = graphFiles.filter(file => file.endsWith('.json'));
+
+            console.log(`[PluginManager] Найдено ${jsonFiles.length} файлов графов в плагине`);
+
+            for (const fileName of jsonFiles) {
+                try {
+                    const graphName = path.basename(fileName, '.json');
+                    const graphPath = path.join(graphDir, fileName);
+                    const graphData = await fse.readJson(graphPath);
+
+
+                    
+                    const hasCommandNode = graphData.nodes?.some(node => node.type === 'event:command');
+                    const hasEventNode = graphData.nodes?.some(node => node.type?.startsWith('event:') && node.type !== 'event:command');
+                    
+                    const isCommand = hasCommandNode;
+                    const isEventGraph = hasEventNode;
+
+                    if (isEventGraph) {
+                        const existingEventGraph = await prisma.eventGraph.findFirst({
+                            where: { botId, name: graphName }
+                        });
+
+                        if (existingEventGraph) {
+                            console.log(`[PluginManager] Граф события ${graphName} уже существует, пропускаем`);
+                            continue;
+                        }
+
+                        const newEventGraph = await prisma.eventGraph.create({
+                            data: {
+                                botId,
+                                name: graphName,
+                                graphJson: JSON.stringify(graphData),
+                                isEnabled: true,
+                                pluginOwnerId: pluginId
+                            }
+                        });
+
+                        console.log(`[PluginManager] Загружен граф события: ${graphName} (ID: ${newEventGraph.id})`);
+                    } else if (isCommand) {
+                        const existingCommand = await prisma.command.findFirst({
+                            where: { botId, name: graphName }
+                        });
+
+                        if (existingCommand) {
+                            console.log(`[PluginManager] Команда ${graphName} уже существует, пропускаем`);
+                            continue;
+                        }
+
+                        const newCommand = await prisma.command.create({
+                            data: {
+                                botId,
+                                name: graphName,
+                                command: graphData.command,
+                                graphJson: JSON.stringify(graphData),
+                                isEnabled: true,
+                                pluginOwnerId: pluginId,
+                                owner: `plugin:${plugin.name}`,
+                                isVisual: true
+                            }
+                        });
+
+                        console.log(`[PluginManager] Загружена команда: ${graphName} (ID: ${newCommand.id}) с pluginOwnerId: ${pluginId}`);
+                    } else {
+                        console.warn(`[PluginManager] Неизвестный тип графа в файле ${fileName}, пропускаем`);
+                    }
+
+                } catch (error) {
+                    console.error(`[PluginManager] Ошибка загрузки графа ${fileName}:`, error);
+                }
+            }
+        } catch (error) {
+            console.error(`[PluginManager] Ошибка загрузки графов плагина:`, error);
+        }
     }
 
     async clearPluginData(pluginId) {

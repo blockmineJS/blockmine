@@ -64,6 +64,89 @@ router.post('/:id/clear-data', authenticate, authorize('plugin:settings:edit'), 
     }
 });
 
+router.get('/:id/info', authenticate, authorize('plugin:list'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.id);
+        
+        const plugin = await prisma.installedPlugin.findUnique({
+            where: { id: pluginId },
+            include: {
+                commands: {
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        isEnabled: true,
+                        isVisual: true,
+                        owner: true
+                    }
+                },
+                eventGraphs: {
+                    select: {
+                        id: true,
+                        name: true,
+                        isEnabled: true,
+                        createdAt: true,
+                        updatedAt: true
+                    }
+                }
+            }
+        });
+
+        if (!plugin) {
+            return res.status(404).json({ error: 'Плагин не найден.' });
+        }
+
+        res.json(plugin);
+    } catch (error) {
+        console.error(`[API Error] /plugins/:id/info:`, error);
+        res.status(500).json({ error: 'Не удалось получить информацию о плагине.' });
+    }
+});
+
+router.get('/bot/:botId', authenticate, authorize('plugin:list'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.botId);
+        
+        const plugins = await prisma.installedPlugin.findMany({
+            where: { botId },
+            select: {
+                id: true,
+                name: true,
+                version: true,
+                description: true,
+                sourceType: true,
+                isEnabled: true,
+                commands: {
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        isEnabled: true,
+                        isVisual: true,
+                        owner: true
+                    }
+                },
+                eventGraphs: {
+                    select: {
+                        id: true,
+                        name: true,
+                        isEnabled: true,
+                        createdAt: true,
+                        updatedAt: true
+                    }
+                }
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        res.json(plugins);
+    } catch (error) {
+        console.error(`[API Error] /plugins/bot/:botId:`, error);
+        res.status(500).json({ error: 'Не удалось получить список плагинов.' });
+    }
+});
+
 router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;

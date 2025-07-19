@@ -97,7 +97,7 @@ function EventGraphList({ botId }) {
   const deleteEventGraph = async (graphId) => {
     try {
       await apiHelper(`/api/bots/${botId}/event-graphs/${graphId}`, { method: 'DELETE' });
-      fetchEventGraphs(); // Refresh list after deletion
+      fetchEventGraphs();
     } catch (error) {
       console.error("Не удалось удалить граф событий:", error);
     }
@@ -130,7 +130,6 @@ function EventGraphList({ botId }) {
         </div>
       </div>
       
-      {/* DIALOGS */}
       <CreateEventGraphDialog botId={botId} open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreated={fetchEventGraphs} />
       <ImportEventGraphDialog botId={botId} open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen} onImportSuccess={() => { setIsImportDialogOpen(false); fetchEventGraphs(); }}/>
       <ShareEventGraphDialog botId={botId} graphId={sharingGraphId} onCancel={() => setSharingGraphId(null)} />
@@ -144,6 +143,7 @@ function EventGraphList({ botId }) {
               <TableRow>
                 <TableHead className="w-[80px]">Статус</TableHead>
                 <TableHead>Название</TableHead>
+                <TableHead>Плагин</TableHead>
                 <TableHead>Триггеры</TableHead>
                 <TableHead>Статистика</TableHead>
                 <TableHead className="text-right">Действия</TableHead>
@@ -156,6 +156,15 @@ function EventGraphList({ botId }) {
                     <Switch checked={graph.isEnabled} onCheckedChange={() => handleToggle(graph)} disabled={isPending} />
                   </TableCell>
                   <TableCell className="font-medium">{graph.name}</TableCell>
+                  <TableCell>
+                    {graph.pluginOwner ? (
+                      <Badge variant="outline" className="text-xs">
+                        {graph.pluginOwner.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {(graph.triggers || []).map(trigger => (

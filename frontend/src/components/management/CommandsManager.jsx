@@ -154,20 +154,21 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
             <CardContent className="flex-grow overflow-y-auto">
                 <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[80px]">Статус</TableHead>
-                            <TableHead>Команда</TableHead>
-                            <TableHead>Источник</TableHead>
-                            <TableHead>Алиасы</TableHead>
-                            <TableHead>Типы чатов</TableHead>
-                            <TableHead>Право</TableHead>
-                            <TableHead className="w-[100px]">Кулдаун</TableHead>
-                            <TableHead>Действия</TableHead>
-                        </TableRow>
+                                                    <TableRow>
+                                <TableHead className="w-[80px]">Статус</TableHead>
+                                <TableHead>Команда</TableHead>
+                                <TableHead>Источник</TableHead>
+                                <TableHead>Плагин</TableHead>
+                                <TableHead>Алиасы</TableHead>
+                                <TableHead>Типы чатов</TableHead>
+                                <TableHead>Право</TableHead>
+                                <TableHead className="w-[100px]">Кулдаун</TableHead>
+                                <TableHead>Действия</TableHead>
+                            </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={8} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={9} className="text-center">Загрузка...</TableCell></TableRow>
                         ) : (
                             localCommands.map(command => (
                                 <TableRow key={command.id} onClick={() => handleOpenModal(command)} className="cursor-pointer transition-colors hover:bg-muted/50">
@@ -182,8 +183,17 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant={command.owner === OWNER_TYPES.SYSTEM ? 'secondary' : 'default'}>
-                                            {command.owner.replace('plugin:', '')}
+                                            {command.owner ? command.owner.replace('plugin:', '') : 'system'}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        {command.pluginOwner ? (
+                                            <Badge variant="outline" className="text-xs">
+                                                {command.pluginOwner.name}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-muted-foreground text-xs">-</span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1 max-w-[150px]">

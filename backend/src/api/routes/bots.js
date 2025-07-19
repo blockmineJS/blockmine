@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../../lib/prisma');
 const path = require('path');
 const fs = require('fs/promises');
+const fse = require('fs-extra');
 const { botManager, pluginManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
@@ -331,8 +332,7 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
             };
         }
 
-        const [dbCommands, groups, allPermissions] = await Promise.all([
-            prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] }),
+        const [groups, allPermissions] = await Promise.all([
             prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
             prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
         ]);
@@ -349,7 +349,20 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
         ]);
 
         const templatesMap = new Map(commandManager.getCommandTemplates().map(t => [t.name, t]));
-        let dbCommandsFromDb = await prisma.command.findMany({ where: { botId } });
+        let dbCommandsFromDb = await prisma.command.findMany({ 
+            where: { botId },
+            include: {
+                pluginOwner: {
+                    select: {
+                        id: true,
+                        name: true,
+                        version: true,
+                        sourceType: true
+                    }
+                }
+            },
+            orderBy: [{ owner: 'asc' }, { name: 'asc' }] 
+        });
 
         const commandsToCreate = [];
         for (const template of templatesMap.values()) {
@@ -385,7 +398,20 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 
         if (commandsToCreate.length > 0) {
             await prisma.command.createMany({ data: commandsToCreate });
-            dbCommandsFromDb = await prisma.command.findMany({ where: { botId }, orderBy: [{ owner: 'asc' }, { name: 'asc' }] });
+            dbCommandsFromDb = await prisma.command.findMany({ 
+                where: { botId },
+                include: {
+                    pluginOwner: {
+                        select: {
+                            id: true,
+                            name: true,
+                            version: true,
+                            sourceType: true
+                        }
+                    }
+                },
+                orderBy: [{ owner: 'asc' }, { name: 'asc' }] 
+            });
         }
 
         const finalCommands = dbCommandsFromDb.map(cmd => {
@@ -441,7 +467,7 @@ router.get('/:botId/management-data', authorize('management:view'), async (req, 
 router.put('/:botId/commands/:commandId', authorize('management:edit'), async (req, res) => {
     try {
         const commandId = parseInt(req.params.commandId, 10);
-        const { name, description, cooldown, aliases, permissionId, allowedChatTypes, isEnabled, argumentsJson, graphJson } = req.body;
+        const { name, description, cooldown, aliases, permissionId, allowedChatTypes, isEnabled, argumentsJson, graphJson, pluginOwnerId } = req.body;
 
         const dataToUpdate = {};
         if (name !== undefined) dataToUpdate.name = name;
@@ -453,11 +479,31 @@ router.put('/:botId/commands/:commandId', authorize('management:edit'), async (r
         if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
         if (argumentsJson !== undefined) dataToUpdate.argumentsJson = Array.isArray(argumentsJson) ? JSON.stringify(argumentsJson) : argumentsJson;
         if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
+        if (pluginOwnerId !== undefined) dataToUpdate.pluginOwnerId = pluginOwnerId;
 
         const updatedCommand = await prisma.command.update({
             where: { id: commandId },
             data: dataToUpdate,
         });
+
+        if (graphJson && updatedCommand.pluginOwnerId) {
+            try {
+                const plugin = await prisma.installedPlugin.findUnique({
+                    where: { id: updatedCommand.pluginOwnerId }
+                });
+                
+                if (plugin) {
+                    const graphDir = path.join(plugin.path, 'graph');
+                    await fse.mkdir(graphDir, { recursive: true });
+                    
+                    const graphFile = path.join(graphDir, `${updatedCommand.name}.json`);
+                    await fse.writeJson(graphFile, JSON.parse(graphJson), { spaces: 2 });
+                    console.log(`[API] Граф команды ${updatedCommand.name} сохранен в ${graphFile}`);
+                }
+            } catch (error) {
+                console.error(`[API] Ошибка сохранения графа в папку плагина:`, error);
+            }
+        }
 
         res.json(updatedCommand);
     } catch (error) {
@@ -776,7 +822,8 @@ router.post('/:botId/commands/visual', authorize('management:edit'), async (req,
                 allowedChatTypes: JSON.stringify(allowedChatTypes),
                 isVisual: true,
                 argumentsJson,
-                graphJson
+                graphJson,
+                pluginOwnerId: null
             }
         });
 
@@ -821,6 +868,25 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
             where: { id: commandId, botId },
             data: dataToUpdate
         });
+
+        if (graphJson && updatedCommand.pluginOwnerId) {
+            try {
+                const plugin = await prisma.installedPlugin.findUnique({
+                    where: { id: updatedCommand.pluginOwnerId }
+                });
+                
+                if (plugin) {
+                    const graphDir = path.join(plugin.path, 'graph');
+                    await fse.mkdir(graphDir, { recursive: true });
+                    
+                    const graphFile = path.join(graphDir, `${updatedCommand.name}.json`);
+                    await fse.writeJson(graphFile, JSON.parse(graphJson), { spaces: 2 });
+                    console.log(`[API] Граф команды ${updatedCommand.name} сохранен в ${graphFile}`);
+                }
+            } catch (error) {
+                console.error(`[API] Ошибка сохранения графа в папку плагина:`, error);
+            }
+        }
 
         botManager.reloadBotConfigInRealTime(botId);
         res.json(updatedCommand);
@@ -962,8 +1028,28 @@ router.post('/:botId/commands', authorize('management:edit'), async (req, res) =
                 argumentsJson,
                 graphJson,
                 owner: isVisual ? 'visual_editor' : 'manual',
+                pluginOwnerId: null
             }
         });
+
+        if (graphJson && graphJson !== 'null' && req.body.pluginOwnerId) {
+            try {
+                const plugin = await prisma.installedPlugin.findUnique({
+                    where: { id: req.body.pluginOwnerId }
+                });
+                
+                if (plugin) {
+                    const graphDir = path.join(plugin.path, 'graph');
+                    await fse.mkdir(graphDir, { recursive: true });
+                    
+                    const graphFile = path.join(graphDir, `${name}.json`);
+                    await fse.writeJson(graphFile, JSON.parse(graphJson), { spaces: 2 });
+                    console.log(`[API] Граф команды ${name} сохранен в ${graphFile}`);
+                }
+            } catch (error) {
+                console.error(`[API] Ошибка сохранения графа в папку плагина:`, error);
+            }
+        }
 
         botManager.reloadBotConfigInRealTime(botId);
         res.status(201).json(newCommand);
@@ -1066,7 +1152,7 @@ router.delete('/:botId/event-graphs/:graphId', authorize('management:edit'), asy
 
 router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async (req, res) => {
     const { botId, graphId } = req.params;
-    const { name, isEnabled, graphJson, variables } = req.body;
+    const { name, isEnabled, graphJson, variables, pluginOwnerId } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Поле name обязательно и должно быть непустой строкой.' });
@@ -1088,6 +1174,10 @@ router.put('/:botId/event-graphs/:graphId', authorize('management:edit'), async 
 
         if (variables !== undefined) {
             dataToUpdate.variables = Array.isArray(variables) ? JSON.stringify(variables) : variables;
+        }
+
+        if (pluginOwnerId !== undefined) {
+            dataToUpdate.pluginOwnerId = pluginOwnerId;
         }
 
         const updatedGraph = await prisma.eventGraph.update({

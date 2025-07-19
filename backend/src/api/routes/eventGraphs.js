@@ -4,6 +4,8 @@ const { PrismaClient } = require('@prisma/client');
 const { authorize } = require('../middleware/auth');
 const logger = require('../../lib/logger');
 const crypto = require('crypto');
+const fse = require('fs-extra');
+const path = require('path');
 
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
@@ -14,7 +16,17 @@ router.get('/',
     const { botId } = req.params;
     const eventGraphs = await prisma.eventGraph.findMany({ 
       where: { botId: parseInt(botId) },
-      include: { triggers: true },
+      include: { 
+        triggers: true,
+        pluginOwner: {
+          select: {
+            id: true,
+            name: true,
+            version: true,
+            sourceType: true
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -58,7 +70,8 @@ router.post('/',
             data: {
                 botId: parseInt(botId),
                 name,
-                graphJson: JSON.stringify(initialGraph)
+                graphJson: JSON.stringify(initialGraph),
+                pluginOwnerId: req.body.pluginOwnerId || null
             }
         });
         res.status(201).json(newGraph);
@@ -84,8 +97,20 @@ router.get('/:graphId',
     const { graphId } = req.params;
     const eventGraph = await prisma.eventGraph.findUnique({ 
       where: { id: parseInt(graphId) },
-      include: { triggers: true } 
+      include: { 
+        triggers: true,
+        pluginOwner: {
+          select: {
+            id: true,
+            name: true,
+            version: true,
+            sourceType: true
+          }
+        }
+      } 
     });
+    
+
     if (!eventGraph) {
       return res.status(404).json({ error: 'Event graph not found' });
     }
@@ -109,12 +134,15 @@ router.put('/:graphId',
     }
 
     const { graphId } = req.params;
-    const { name, isEnabled, graphJson, variables } = req.body;
+    const { name, isEnabled, graphJson, variables, pluginOwnerId } = req.body;
+    
+
 
     try {
       const dataToUpdate = {};
       if (name !== undefined) dataToUpdate.name = name;
       if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
+      if (pluginOwnerId !== undefined) dataToUpdate.pluginOwnerId = pluginOwnerId;
       
       if (graphJson !== undefined) {
           dataToUpdate.graphJson = graphJson;
@@ -148,6 +176,25 @@ router.put('/:graphId',
         data: dataToUpdate,
         include: { triggers: true },
       });
+
+      if (graphJson && updatedGraph.pluginOwnerId) {
+        try {
+          const plugin = await prisma.installedPlugin.findUnique({
+            where: { id: updatedGraph.pluginOwnerId }
+          });
+          
+          if (plugin) {
+            const graphDir = path.join(plugin.path, 'graph');
+            await fse.mkdir(graphDir, { recursive: true });
+            
+            const graphFile = path.join(graphDir, `${updatedGraph.name}.json`);
+            await fse.writeJson(graphFile, JSON.parse(graphJson), { spaces: 2 });
+            console.log(`[API] Граф события ${updatedGraph.name} сохранен в ${graphFile}`);
+          }
+        } catch (error) {
+          console.error(`[API] Ошибка сохранения графа события в папку плагина:`, error);
+        }
+      }
 
       res.json(updatedGraph);
     } catch (error) {

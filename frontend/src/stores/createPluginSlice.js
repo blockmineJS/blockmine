@@ -72,13 +72,11 @@ export const createPluginSlice = (set, get) => {
                     console.warn("Не удалось загрузить статистику скачиваний плагинов:", statsError.message);
                 }
 
-                // Сортируем плагины по количеству скачиваний для определения топ 3
                 const sortedPlugins = (catalogData || []).map(plugin => ({
                     ...plugin,
                     downloads: statsMap.get(plugin.name) || 0,
                 })).sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
 
-                // Добавляем информацию о топ 3
                 const enrichedCatalog = sortedPlugins.map((plugin, index) => ({
                     ...plugin,
                     isTop3: index < 3,
@@ -94,7 +92,7 @@ export const createPluginSlice = (set, get) => {
 
         fetchInstalledPlugins: async (botId) => {
             try {
-                const pluginsData = await apiHelper(`/api/bots/${botId}/plugins`);
+                const pluginsData = await apiHelper(`/api/plugins/bot/${botId}`);
                 
                 const parsedAndEnrichedPlugins = pluginsData.map(p => {
                     let manifest;
@@ -112,6 +110,8 @@ export const createPluginSlice = (set, get) => {
                         manifest,
                         author: catalogPlugin?.author || manifest.author || 'Неизвестный автор',
                         description: p.description || manifest.description || 'Нет описания',
+                        commands: p.commands || [],
+                        eventGraphs: p.eventGraphs || [],
                     };
                 });
 
@@ -120,7 +120,7 @@ export const createPluginSlice = (set, get) => {
                 });
             } catch (error) {
                 console.error("Не удалось загрузить плагины для бота", botId, error);
-                set(state => { state.installedPlugins[botId] = []; });
+                set(state => { state.installedPlugins[botId] = [] });
             }
         },
 

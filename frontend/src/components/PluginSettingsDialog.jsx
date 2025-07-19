@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Save, Code, Trash2, Loader2 } from 'lucide-react';
+import { Edit, Save, Code, Trash2, Loader2, Settings, Info } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiHelper } from '@/lib/api';
+import PluginDetailInfo from './PluginDetailInfo';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -189,46 +191,70 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     };
 
     return (
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[80vh]">
             <DialogHeader>
-                <DialogTitle>Настройки плагина: {plugin.name}</DialogTitle>
-                <DialogDescription>Изменения вступят в силу после перезапуска бота.</DialogDescription>
+                <DialogTitle>Плагин: {plugin.name}</DialogTitle>
+                <DialogDescription>Управление настройками и информацией о плагине</DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                {settings === null ? <p>Загрузка настроек...</p> : (
-                    Object.keys(manifestSettings).length > 0 ? (
-                        Object.entries(manifestSettings).map(([key, config]) => (
-                            <SettingField
-                                key={key}
-                                settingKey={key}
-                                config={config}
-                                value={settings[key]}
-                                onChange={handleSettingChange}
-                            />
-                        ))
-                    ) : (
-                        <p>У этого плагина нет настраиваемых параметров.</p>
-                    )
-                )}
-            </div>
-            <DialogFooter className="sm:justify-between">
-                <Button 
-                    variant="destructive"
-                    onClick={handleClearData}
-                    disabled={isClearing}
-                >
-                    {isClearing ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Очистить данные
-                </Button>
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
-                    <Button onClick={handleSave}>Сохранить</Button>
-                </div>
-            </DialogFooter>
+            
+            <Tabs defaultValue="settings" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="settings" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Настройки
+                    </TabsTrigger>
+                    <TabsTrigger value="info" className="flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Информация
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="settings" className="space-y-4">
+                    <div className="max-h-[50vh] overflow-y-auto pr-2">
+                        {settings === null ? <p>Загрузка настроек...</p> : (
+                            Object.keys(manifestSettings).length > 0 ? (
+                                Object.entries(manifestSettings).map(([key, config]) => (
+                                    <SettingField
+                                        key={key}
+                                        settingKey={key}
+                                        config={config}
+                                        value={settings[key]}
+                                        onChange={handleSettingChange}
+                                    />
+                                ))
+                            ) : (
+                                <p className="text-muted-foreground">У этого плагина нет настроек.</p>
+                            )
+                        )}
+                    </div>
+                    
+                    <DialogFooter className="justify-between sm:justify-between">
+                        <Button 
+                            variant="destructive"
+                            onClick={handleClearData}
+                            disabled={isClearing}
+                        >
+                            {isClearing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            Очистить данные
+                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
+                            <Button onClick={handleSave} disabled={settings === null}>
+                                <Save className="mr-2 h-4 w-4" />
+                                Сохранить
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </TabsContent>
+
+                <TabsContent value="info" className="max-h-[50vh] overflow-y-auto">
+                    <PluginDetailInfo plugin={plugin} botId={bot.id} />
+                </TabsContent>
+            </Tabs>
         </DialogContent>
     );
 }

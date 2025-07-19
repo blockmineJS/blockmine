@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy, LayoutGrid, List, Package, Activity, GitBranch, CheckCircle2, AlertCircle, Clock, Gauge } from 'lucide-react';
+import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy, LayoutGrid, List, Package, Activity, GitBranch, CheckCircle2, AlertCircle, Clock, Gauge, Terminal } from 'lucide-react';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -274,6 +274,73 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     ))}
                 </div>
                 
+                {(plugin.commands?.length > 0 || plugin.eventGraphs?.length > 0) && (
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                        {plugin.commands?.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Terminal className="h-3 w-3 text-blue-500" />
+                                <span className="text-xs text-muted-foreground">
+                                    Команды: {plugin.commands.length}
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                    {plugin.commands.slice(0, 3).map(cmd => (
+                                        <Badge key={cmd.id} variant="outline" className="text-xs">
+                                            {cmd.name}
+                                        </Badge>
+                                    ))}
+                                    {plugin.commands.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                            +{plugin.commands.length - 3}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {plugin.commands?.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Terminal className="h-3 w-3 text-blue-500" />
+                                <span className="text-xs text-muted-foreground">
+                                    Команды: {plugin.commands.length}
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                    {plugin.commands.slice(0, 3).map(command => (
+                                        <Badge key={command.id} variant="outline" className="text-xs">
+                                            {command.name}
+                                        </Badge>
+                                    ))}
+                                    {plugin.commands.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                            +{plugin.commands.length - 3}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {plugin.eventGraphs?.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-3 w-3 text-green-500" />
+                                <span className="text-xs text-muted-foreground">
+                                    Графы событий: {plugin.eventGraphs.length}
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                    {plugin.eventGraphs.slice(0, 3).map(graph => (
+                                        <Badge key={graph.id} variant="outline" className="text-xs">
+                                            {graph.name}
+                                        </Badge>
+                                    ))}
+                                    {plugin.eventGraphs.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                            +{plugin.eventGraphs.length - 3}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
                 {lastUpdated && (
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -372,13 +439,19 @@ export default function InstalledPluginsView({
         const enabled = installedPlugins.filter(p => p.isEnabled).length;
         const local = installedPlugins.filter(p => p.sourceType === 'LOCAL' || p.sourceType === 'LOCAL_IDE').length;
         const github = installedPlugins.filter(p => p.sourceType === 'GITHUB').length;
+        
+        const totalCommands = installedPlugins.reduce((sum, p) => sum + (p.commands?.length || 0), 0);
+        const totalGraphs = installedPlugins.reduce((sum, p) => sum + (p.eventGraphs?.length || 0), 0);
+        
         return {
             total: installedPlugins.length,
             enabled: enabled,
             disabled: installedPlugins.length - enabled,
             updates: Object.keys(updates).length,
             local,
-            github
+            github,
+            commands: totalCommands,
+            graphs: totalGraphs
         };
     }, [installedPlugins, updates]);
 
@@ -460,6 +533,24 @@ export default function InstalledPluginsView({
                             <div>
                                 <p className="text-2xl font-bold text-orange-500">{stats.github}</p>
                                 <p className="text-xs text-muted-foreground">GitHub</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <Terminal className="h-5 w-5 text-blue-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-blue-500">{stats.commands}</p>
+                                <p className="text-xs text-muted-foreground">Команды</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <Activity className="h-5 w-5 text-green-500" />
+                            <div>
+                                <p className="text-2xl font-bold text-green-500">{stats.graphs}</p>
+                                <p className="text-xs text-muted-foreground">Графы</p>
                             </div>
                         </div>
                     </Card>
