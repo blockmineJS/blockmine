@@ -122,12 +122,7 @@ export default function Layout() {
         return JSON.parse(localStorage.getItem('sidebar-collapsed')) || false;
     });
 
-    useEffect(() => {
-        const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
-        if (savedTheme !== theme) {
-            setTheme(savedTheme);
-        }
-    }, []);
+
 
     useEffect(() => {
         if (location.state?.openCreateBotModal) {

@@ -29,6 +29,12 @@ import PluginUIPage from "./pages/Bot/PluginUIPage";
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
   const initializeAuth = useAppStore(state => state.initializeAuth);
+  const setTheme = useAppStore(state => state.setTheme);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
+    setTheme(savedTheme);
+  }, [setTheme]);
 
   useEffect(() => {
     if (!authInitialized) {
