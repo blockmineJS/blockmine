@@ -266,6 +266,41 @@ class GraphExecutionEngine {
               await this.traverse(node, 'exec');
               break;
           }
+          case 'array:get_random_element': {
+              await this.traverse(node, 'element');
+              break;
+          }
+          case 'array:add_element':
+          case 'array:remove_by_index':
+          case 'array:get_by_index':
+          case 'array:find_index':
+          case 'array:contains': {
+              await this.traverse(node, 'result');
+              break;
+          }
+          case 'data:array_literal':
+          case 'data:make_object':
+          case 'data:get_variable':
+          case 'data:get_argument':
+          case 'data:length':
+          case 'data:get_entity_field':
+          case 'data:cast':
+          case 'data:string_literal':
+          case 'data:get_user_field':
+          case 'data:get_server_players':
+          case 'data:get_bot_look':
+          case 'math:operation':
+          case 'math:random_number':
+          case 'logic:operation':
+          case 'string:concat':
+          case 'object:create':
+          case 'object:get':
+          case 'object:set':
+          case 'object:delete':
+          case 'object:has_key': {
+              await this.traverse(node, 'value');
+              break;
+          }
       }
   }
 
@@ -535,7 +570,10 @@ class GraphExecutionEngine {
             const numPins = node.data?.pinCount || 0;
             const items = [];
             for (let i = 0; i < numPins; i++) {
-                items.push(await this.resolvePinValue(node, `pin_${i}`));
+                const value = await this.resolvePinValue(node, `pin_${i}`) || 
+                             node.data?.[`item_${i}`] || 
+                             node.data?.[`value_${i}`];
+                items.push(value);
             }
             result = items;
             break;

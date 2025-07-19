@@ -58,22 +58,34 @@ router.post('/',
     }
 
     const { botId } = req.params;
-    const { name } = req.body;
+    const { name, graphJson, variables, isEnabled = true } = req.body;
 
-    const initialGraph = {
+    let graphJsonString;
+    if (graphJson) {
+      if (typeof graphJson === 'string') {
+        graphJsonString = graphJson;
+      } else {
+        graphJsonString = JSON.stringify(graphJson);
+      }
+    } else {
+      graphJsonString = JSON.stringify({
         nodes: [],
         connections: []
-    };
+      });
+    }
 
     try {
         const newGraph = await prisma.eventGraph.create({
             data: {
                 botId: parseInt(botId),
-                name,
-                graphJson: JSON.stringify(initialGraph),
+                name: name.trim(),
+                isEnabled: isEnabled,
+                graphJson: graphJsonString,
+                variables: variables || '[]',
                 pluginOwnerId: req.body.pluginOwnerId || null
             }
         });
+        
         res.status(201).json(newGraph);
     } catch (error) {
         if (error.code === 'P2002') {
