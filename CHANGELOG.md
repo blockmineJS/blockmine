@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.15.1](https://github.com/blockmineJS/blockmine/compare/v1.15.0...v1.15.1) (2025-07-19)
+
+
+### 🐛 Исправления
+
+* фикс. создание триггеров при установке из стора графа ([7980413](https://github.com/blockmineJS/blockmine/commit/79804133a6ff5d6f41769e7db2b6c4f1027e33f6))
+
 ## [1.15.0](https://github.com/blockmineJS/blockmine/compare/v1.14.1...v1.15.0) (2025-07-19)
 
 
