@@ -357,7 +357,7 @@ class PluginManager {
                             data: {
                                 botId,
                                 name: graphName,
-                                command: graphData.command,
+                                description: graphData.command || `Команда ${graphName}`,
                                 graphJson: JSON.stringify(graphData),
                                 isEnabled: true,
                                 pluginOwnerId: pluginId,
