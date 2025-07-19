@@ -1492,23 +1492,27 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
         
         botIdMap.set(botData.id, newBot.id);
 
-        const commandsEntry = zipEntries.find(e => e.entryName === 'commands.json');
-        if (commandsEntry) {
-            const commands = JSON.parse(commandsEntry.getData().toString('utf8'));
-            for (let command of commands) {
-                delete command.id;
-                command.botId = newBot.id;
-                await prisma.command.create({ data: command });
-            }
-        }
-
         const permissionsEntry = zipEntries.find(e => e.entryName === 'permissions.json');
+        let pMap = new Map();
+        
         if (permissionsEntry) {
             const { users, groups, permissions } = JSON.parse(permissionsEntry.getData().toString('utf8'));
             
             await setupDefaultPermissionsForBot(newBot.id, prisma);
             
-            const pMap = new Map();
+            for(let p of permissions.filter(p=>p.owner === 'system')) {
+                const existingPermission = await prisma.permission.findFirst({
+                    where: { 
+                        botId: newBot.id, 
+                        name: p.name,
+                        owner: 'system'
+                    }
+                });
+                if (existingPermission) {
+                    pMap.set(p.id, existingPermission.id);
+                }
+            }
+            
             for(let p of permissions.filter(p=>p.owner !== 'system')) {
                 const newP = await prisma.permission.create({ data: { ...p, id: undefined, botId: newBot.id }});
                 pMap.set(p.id, newP.id);
@@ -1528,6 +1532,28 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
                 }}});
             }
         }
+
+        const commandsEntry = zipEntries.find(e => e.entryName === 'commands.json');
+        if (commandsEntry) {
+            const commands = JSON.parse(commandsEntry.getData().toString('utf8'));
+            for (let command of commands) {
+                delete command.id;
+                command.botId = newBot.id;
+                
+                if (command.permissionId && pMap.has(command.permissionId)) {
+                    command.permissionId = pMap.get(command.permissionId);
+                } else {
+                    command.permissionId = null;
+                }
+                
+                command.pluginOwnerId = null;
+                try {
+                    await prisma.command.create({ data: command });
+                } catch (error) {
+                    console.warn(`[Import] Пропущена команда ${command.name}: ${error.message}`);
+                }
+            }
+        }
         
         const eventGraphsEntry = zipEntries.find(e => e.entryName === 'event_graphs.json');
         if (eventGraphsEntry) {
@@ -1535,7 +1561,12 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
             for (let graph of eventGraphs) {
                 delete graph.id;
                 graph.botId = newBot.id;
-                await prisma.eventGraph.create({ data: graph });
+                graph.pluginOwnerId = null;
+                try {
+                    await prisma.eventGraph.create({ data: graph });
+                } catch (error) {
+                    console.warn(`[Import] Пропущен граф ${graph.name}: ${error.message}`);
+                }
             }
         }
 
