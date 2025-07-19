@@ -754,7 +754,13 @@ process.on('message', async (message) => {
 process.on('unhandledRejection', (reason, promise) => {
     const errorMsg = `[FATAL] Необработанная ошибка процесса: ${reason?.stack || reason}`;
     sendLog(errorMsg);
-    process.exit(1);
+    setTimeout(() => process.exit(1), 100);
+});
+
+process.on('uncaughtException', (error) => {
+    const errorMsg = `[FATAL] Необработанное исключение: ${error.stack || error.message}`;
+    sendLog(errorMsg);
+    setTimeout(() => process.exit(1), 100);
 });
 
 process.on('SIGTERM', () => {
@@ -766,13 +772,25 @@ process.on('SIGTERM', () => {
             sendLog(`[System] Ошибка при корректном завершении бота: ${error.message}`);
         }
     }
-    process.exit(0);
+    setTimeout(() => process.exit(0), 100);
 });
 
-process.on('SIGKILL', () => {
-    sendLog('[System] Получен сигнал SIGKILL. Принудительное завершение...');
-    process.exit(0);
+process.on('SIGINT', () => {
+    sendLog('[System] Получен сигнал SIGINT. Завершение работы...');
+    if (bot) {
+        try {
+            bot.quit();
+        } catch (error) {
+            sendLog(`[System] Ошибка при корректном завершении бота: ${error.message}`);
+        }
+    }
+    setTimeout(() => process.exit(0), 100);
 });
+
+// process.on('SIGKILL', () => {
+//     sendLog('[System] Получен сигнал SIGKILL. Принудительное завершение...');
+//     process.exit(0);
+// });
 
 function serializeEntity(entity) {
     if (!entity) return null;
