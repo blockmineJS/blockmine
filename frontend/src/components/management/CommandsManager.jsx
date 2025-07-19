@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,11 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const [commandToDelete, setCommandToDelete] = useState(null);
     const [commandToShare, setCommandToShare] = useState(null);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [localCommands, setLocalCommands] = useState(commands);
+
+    useEffect(() => {
+        setLocalCommands(commands);
+    }, [commands]);
 
     const handleOpenModal = (command) => {
         if (command.isVisual) {
@@ -73,13 +78,15 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
         setCommandToDelete(null);
     };
 
-    const updateCommand = async (commandId, data) => {
+    const updateCommand = async (commandId, data, skipDataChange = false) => {
         try {
             await apiHelper(`/api/bots/${botId}/commands/${commandId}`, {
                 method: 'PUT',
                 body: JSON.stringify(data),
             });
-            onDataChange();
+            if (!skipDataChange) {
+                onDataChange();
+            }
             return true;
         } catch (error) {
             return false;
@@ -87,9 +94,22 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     };
 
     const handleToggle = async (command, isEnabled) => {
-        const success = await updateCommand(command.id, { isEnabled });
+        setLocalCommands(prevCommands => 
+            prevCommands.map(cmd => 
+                cmd.id === command.id ? { ...cmd, isEnabled } : cmd
+            )
+        );
+
+        const success = await updateCommand(command.id, { isEnabled }, true);
         if (success) {
             toast({ title: "Успех!", description: `Команда "${command.name}" была ${isEnabled ? 'включена' : 'выключена'}.` });
+        } else {
+            setLocalCommands(prevCommands => 
+                prevCommands.map(cmd => 
+                    cmd.id === command.id ? { ...cmd, isEnabled: !isEnabled } : cmd
+                )
+            );
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось изменить статус команды.' });
         }
     };
 
@@ -149,7 +169,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                         {isLoading ? (
                             <TableRow><TableCell colSpan={8} className="text-center">Загрузка...</TableCell></TableRow>
                         ) : (
-                            commands.map(command => (
+                            localCommands.map(command => (
                                 <TableRow key={command.id} onClick={() => handleOpenModal(command)} className="cursor-pointer transition-colors hover:bg-muted/50">
                                     <TableCell onClick={e => e.stopPropagation()}>
                                         <Switch checked={command.isEnabled} onCheckedChange={checked => handleToggle(command, checked)} />
