@@ -1,6 +1,8 @@
 # История версий
 
 
+### [1.14.1](https://github.com/blockmineJS/blockmine/compare/v1.14.0...v1.14.1) (2025-07-19)
+
 ## [1.14.0](https://github.com/blockmineJS/blockmine/compare/v1.13.1...v1.14.0) (2025-07-19)
 
 
