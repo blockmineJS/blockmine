@@ -20,6 +20,7 @@ export default function ConfigurationPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [changes, setChanges] = useState({});
+    const [formErrors, setFormErrors] = useState({});
     const { toast } = useToast();
 
     const fetchAllSettings = useCallback(async () => {
@@ -84,6 +85,7 @@ export default function ConfigurationPage() {
 
             toast({ title: "Успех!", description: "Все изменения сохранены." });
             setChanges({});
+            setFormErrors({});
             
             if (updatedBotData) {
                 setAllSettings(prev => ({...prev, bot: updatedBotData}));
@@ -93,7 +95,17 @@ export default function ConfigurationPage() {
             await refreshBotList();
 
         } catch (error) {
-            toast({ variant: "destructive", title: "Ошибка сохранения", description: error.message });
+            console.error('Error saving bot settings:', error);
+            
+            if (error.message.includes('уже существует')) {
+                setFormErrors({ username: error.message });
+            } else {
+                toast({ 
+                    variant: "destructive", 
+                    title: "Ошибка сохранения", 
+                    description: error.message || 'Произошла неизвестная ошибка при сохранении' 
+                });
+            }
         }
         setIsSaving(false);
     };
@@ -155,6 +167,7 @@ export default function ConfigurationPage() {
                             servers={servers}
                             onFormChange={handleBotFormChange}
                             showFooter={false}
+                            errors={formErrors}
                         />
                     </div>
                 </TabsContent>

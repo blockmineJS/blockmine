@@ -426,6 +426,10 @@ const ALL_PERMISSIONS = [
     { id: 'panel:role:delete', label: 'Удаление ролей панели' },
     { id: 'panel:settings:view', label: 'Просмотр глобальных настроек' },
     { id: 'panel:settings:edit', label: 'Редактирование глобальных настроек' },
+    { id: 'graph:read', label: 'Просмотр магазина графов' },
+    { id: 'graph:download', label: 'Скачивание графов из магазина' },
+    { id: 'graph:like', label: 'Лайки графов в магазине' },
+    { id: 'graph:publish', label: 'Публикация графов в магазин' },
 ];
 
 /**

@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from '@/components/ui/separator';
 import DynamicInputList from './management/DynamicInputList';
 
-export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCreation = false, isSaving = false }) {
+export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCreation = false, isSaving = false, errors = {} }) {
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -21,7 +21,14 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
         proxyUsername: '',
         proxyPassword: ''
     });
+    const [usernameError, setUsernameError] = useState('');
     const isInitialized = React.useRef(false);
+
+    useEffect(() => {
+        if (errors.username) {
+            setUsernameError(errors.username);
+        }
+    }, [errors.username]);
 
     useEffect(() => {
         if (bot) {
@@ -54,6 +61,10 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        
+        if (name === 'username') {
+            setUsernameError('');
+        }
     };
 
     const handleSelectChange = (value) => {
@@ -92,7 +103,17 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                 <CardContent className="space-y-4 px-6 pb-6">
                     <div className="space-y-2">
                         <Label htmlFor="username">Имя бота</Label>
-                        <Input id="username" name="username" value={formData.username} onChange={handleChange} required />
+                        <Input 
+                            id="username" 
+                            name="username" 
+                            value={formData.username} 
+                            onChange={handleChange} 
+                            required 
+                            className={usernameError ? 'border-red-500' : ''}
+                        />
+                        {usernameError && (
+                            <p className="text-sm text-red-500">{usernameError}</p>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="note">Короткая заметка</Label>

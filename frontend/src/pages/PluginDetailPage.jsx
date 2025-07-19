@@ -43,7 +43,6 @@ export default function PluginDetailPage() {
                 if (!response.ok) throw new Error('Плагин не найден');
                 const data = await response.json();
                 
-                // Загружаем актуальную статистику скачиваний
                 try {
                     const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
                     if (statsResponse.ok) {
@@ -59,7 +58,6 @@ export default function PluginDetailPage() {
                 
                 setPlugin(data);
                 
-                // Загружаем описание последнего релиза из GitHub
                 try {
                     const urlParts = new URL(data.repoUrl);
                     const pathParts = urlParts.pathname.split('/').filter(p => p);
@@ -68,7 +66,6 @@ export default function PluginDetailPage() {
                         const owner = pathParts[0];
                         const repo = pathParts[1].replace('.git', '');
                         
-                        // Получаем последний релиз через GitHub API
                         const releasesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
                         if (releasesResponse.ok) {
                             const releaseData = await releasesResponse.json();
@@ -97,7 +94,13 @@ export default function PluginDetailPage() {
 
     const isInstalled = useMemo(() => {
         if (!plugin) return false;
-        return installedPluginsForBot.some(p => p.sourceUri === plugin.repoUrl);
+        if (installedPluginsForBot.some(p => p.sourceUri === plugin.repoUrl)) {
+            return true;
+        }
+        if (installedPluginsForBot.some(p => p.name === plugin.name)) {
+            return true;
+        }
+        return false;
     }, [installedPluginsForBot, plugin]);
 
     const handleInstall = async () => {
