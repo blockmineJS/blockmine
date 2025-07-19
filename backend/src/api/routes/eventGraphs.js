@@ -75,6 +75,17 @@ router.post('/',
     }
 
     try {
+        let eventTypes = [];
+        try {
+            const parsedGraph = JSON.parse(graphJsonString);
+            if (parsedGraph.nodes && Array.isArray(parsedGraph.nodes)) {
+                const eventNodes = parsedGraph.nodes.filter(node => node.type && node.type.startsWith('event:'));
+                eventTypes = [...new Set(eventNodes.map(node => node.type.split(':')[1]))];
+            }
+        } catch (error) {
+            console.warn('[API] Не удалось извлечь типы событий из графа:', error.message);
+        }
+
         const newGraph = await prisma.eventGraph.create({
             data: {
                 botId: parseInt(botId),
@@ -82,8 +93,12 @@ router.post('/',
                 isEnabled: isEnabled,
                 graphJson: graphJsonString,
                 variables: variables || '[]',
-                pluginOwnerId: req.body.pluginOwnerId || null
-            }
+                pluginOwnerId: req.body.pluginOwnerId || null,
+                triggers: {
+                    create: eventTypes.map(eventType => ({ eventType }))
+                }
+            },
+            include: { triggers: true }
         });
         
         res.status(201).json(newGraph);
