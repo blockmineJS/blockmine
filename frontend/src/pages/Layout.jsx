@@ -123,8 +123,11 @@ export default function Layout() {
     });
 
     useEffect(() => {
-        setTheme(theme);
-    }, [theme, setTheme]);
+        const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
+        if (savedTheme !== theme) {
+            setTheme(savedTheme);
+        }
+    }, []);
 
     useEffect(() => {
         if (location.state?.openCreateBotModal) {
