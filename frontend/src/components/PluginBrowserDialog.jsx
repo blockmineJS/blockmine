@@ -50,6 +50,17 @@ export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess
     };
 
     const installedPluginNames = new Set(installedPlugins.map(p => p.name));
+    const installedPluginUrls = new Set(installedPlugins.map(p => p.sourceUri));
+
+    const isPluginInstalled = (plugin) => {
+        if (installedPluginUrls.has(plugin.repoUrl)) {
+            return true;
+        }
+        if (installedPluginNames.has(plugin.name)) {
+            return true;
+        }
+        return false;
+    };
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
@@ -66,7 +77,7 @@ export default function PluginBrowserDialog({ installedPlugins, onInstallSuccess
                             <PluginStoreCard
                                 key={plugin.id}
                                 plugin={plugin}
-                                isInstalled={installedPluginNames.has(plugin.name)}
+                                isInstalled={isPluginInstalled(plugin)}
                                 isInstalling={installingPluginId === plugin.id}
                                 onInstall={(repoUrl) => handleInstall(repoUrl, plugin.id)}
                             />

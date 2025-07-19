@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     };
 
     const installedPluginUrls = useMemo(() => new Set(installedPlugins.map(p => p.sourceUri)), [installedPlugins]);
+    const installedPluginNames = useMemo(() => new Set(installedPlugins.map(p => p.name)), [installedPlugins]);
     
     const filteredAndSortedCatalog = useMemo(() => {
         let filtered = catalog.filter(plugin => {
@@ -146,6 +147,16 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
 
         return filtered;
     }, [catalog, searchQuery, selectedCategory, sortBy]);
+
+    const isPluginInstalled = useCallback((plugin) => {
+        if (installedPluginUrls.has(plugin.repoUrl)) {
+            return true;
+        }
+        if (installedPluginNames.has(plugin.name)) {
+            return true;
+        }
+        return false;
+    }, [installedPluginUrls, installedPluginNames]);
 
     return (
         <div className="flex h-full">
@@ -250,7 +261,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                                         <PluginStoreCard
                                             plugin={plugin}
                                             botId={botId}
-                                            isInstalled={installedPluginUrls.has(plugin.repoUrl)}
+                                            isInstalled={isPluginInstalled(plugin)}
                                             isInstalling={installingPlugins.has(plugin.id)}
                                             onInstall={handleInstall}
                                             allPlugins={catalog}
@@ -265,7 +276,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                                         key={plugin.id}
                                         plugin={plugin}
                                         botId={botId}
-                                        isInstalled={installedPluginUrls.has(plugin.repoUrl)}
+                                        isInstalled={isPluginInstalled(plugin)}
                                         isInstalling={installingPlugins.has(plugin.id)}
                                         onInstall={handleInstall}
                                         allPlugins={catalog}

@@ -25,6 +25,7 @@ import TasksPage from "./pages/TasksPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from '@/components/ProtectedRoute';
 import PluginUIPage from "./pages/Bot/PluginUIPage";
+import GraphStorePage from "./pages/GraphStorePage";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -125,6 +126,7 @@ const router = createBrowserRouter([
             { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },
             { path: "tasks", element: <ProtectedRoute requiredPermission="task:list"><TasksPage /></ProtectedRoute> },
             { path: "admin", element: <ProtectedRoute requiredPermission="panel:user:list"><AdminPage /></ProtectedRoute> },
+            { path: "graph-store", element: <GraphStorePage /> },
         ]
       }
     ]

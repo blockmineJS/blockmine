@@ -37,7 +37,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     }, [commands]);
 
     const handleOpenModal = (command) => {
-        if (command.isVisual) {
+        if (command.isVisual || (command.graphJson && command.graphJson !== 'null')) {
             navigate(`/bots/${botId}/commands/visual/${command.id}`);
             return;
         }
@@ -197,12 +197,24 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                            {command.aliases.map(alias => <Badge key={alias} variant="secondary">{alias}</Badge>)}
+                                            {Array.isArray(command.aliases) 
+                                                ? command.aliases.map(alias => <Badge key={alias} variant="secondary">{alias}</Badge>)
+                                                : (typeof command.aliases === 'string' 
+                                                    ? JSON.parse(command.aliases || '[]').map(alias => <Badge key={alias} variant="secondary">{alias}</Badge>)
+                                                    : <span className="text-muted-foreground">-</span>
+                                                )
+                                            }
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                            {command.allowedChatTypes.map(type => <Badge key={type} variant="outline">{type}</Badge>)}
+                                            {Array.isArray(command.allowedChatTypes) 
+                                                ? command.allowedChatTypes.map(type => <Badge key={type} variant="outline">{type}</Badge>)
+                                                : (typeof command.allowedChatTypes === 'string' 
+                                                    ? JSON.parse(command.allowedChatTypes || '[]').map(type => <Badge key={type} variant="outline">{type}</Badge>)
+                                                    : <span className="text-muted-foreground">-</span>
+                                                )
+                                            }
                                         </div>
                                     </TableCell>
                                     <TableCell className="font-mono text-xs">
@@ -212,7 +224,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                         {command.cooldown} сек.
                                     </TableCell>
                                     <TableCell>
-                                        {command.isVisual ? (
+                                        {(command.isVisual || (command.graphJson && command.graphJson !== 'null')) ? (
                                             <div className="flex items-center gap-2">
                                                 <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }} className="transition-colors hover:bg-accent">
                                                     <FilePenLine className="h-4 w-4 mr-1" />

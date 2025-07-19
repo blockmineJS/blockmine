@@ -2,6 +2,9 @@
 import { useAppStore } from '@/stores/appStore';
 import { toast } from '@/hooks/use-toast';
 
+const API_BASE = '/api';
+const STATS_SERVER_URL = 'http://185.65.200.184:3000';
+
 export const apiHelper = async (url, options = {}, successMessage) => {
     const token = useAppStore.getState().token;
     const finalOptions = { ...options };
@@ -48,9 +51,9 @@ export const apiHelper = async (url, options = {}, successMessage) => {
                     const { logout } = useAppStore.getState();
                     logout();
                 }
-                throw new Error(data.error || 'Ошибка авторизации');
+                throw new Error(data.error || data.message || 'Ошибка авторизации');
             }
-            throw new Error(data.error || 'Произошла неизвестная ошибка на сервере');
+            throw new Error(data.error || data.message || 'Произошла неизвестная ошибка на сервере');
         }
 
         if (successMessage) toast({ title: "Успех!", description: successMessage });

@@ -4,7 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { PlusCircle, Server, LayoutDashboard, Upload, Github, Clock, LogOut, ShieldCheck, Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { 
+    LayoutDashboard, 
+    Clock, 
+    Github, 
+    PlusCircle, 
+    Upload, 
+    LogOut, 
+    Menu, 
+    ChevronsLeft, 
+    ChevronsRight, 
+    Server, 
+    ShieldCheck,
+    Store
+} from 'lucide-react';
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
 import BotForm from "@/components/BotForm";
@@ -43,6 +56,10 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                     {iconAndText(<Clock className="h-4 w-4 flex-shrink-0" />, "Планировщик")}
                 </NavLink>
             )}
+
+            <NavLink to="/graph-store" onClick={onLinkClick} className={navLinkClasses}>
+                {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, "Магазин графов")}
+            </NavLink>
 
             <Button 
                 variant="ghost"

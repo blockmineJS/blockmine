@@ -16,6 +16,15 @@ import CustomNode from '@/components/visual-editor/CustomNode';
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import CommandMenu from "@/components/ui/CommandMenu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, Share2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
 const nodeTypes = {
     custom: CustomNode,
@@ -47,6 +56,13 @@ function BotVisualEditorPage() {
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);
+    const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+    const [publishForm, setPublishForm] = useState({
+        name: '',
+        author: '',
+        description: ''
+    });
+    const [categories, setCategories] = useState([]);
 
     const editorType = location.pathname.includes('/commands/') ? 'command' : 'event';
     const entityId = editorType === 'command' ? commandId : eventId;
@@ -56,6 +72,76 @@ function BotVisualEditorPage() {
             init(botId, entityId, editorType);
         }
     }, [botId, entityId, editorType, init]);
+
+    useEffect(() => {
+        loadCategories();
+    }, []);
+
+    const loadCategories = async () => {
+        try {
+            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/categories`);
+            const data = await response.json();
+            setCategories(data);
+        } catch (error) {
+            console.error('Ошибка загрузки категорий:', error);
+        }
+    };
+
+    const handlePublish = async () => {
+        try {
+            if (!publishForm.name || !publishForm.author || !publishForm.description) {
+                toast.error('Все поля обязательны');
+                return;
+            }
+
+            if (publishForm.description.length < 10) {
+                toast.error('Описание должно содержать минимум 10 символов');
+                return;
+            }
+
+            const graphData = {
+                nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+                connections: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
+                    id,
+                    sourceNodeId: source,
+                    targetNodeId: target,
+                    sourcePinId: sourceHandle,
+                    targetPinId: targetHandle,
+                })),
+                variables: command.variables || []
+            };
+
+            const graphType = editorType === 'command' ? 'COMMAND' : 'EVENT';
+            const categoryId = graphType === 'COMMAND' ? 1 : 2;
+
+            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/publish`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...publishForm,
+                    graphData,
+                    graphType,
+                    categoryId
+                })
+            });
+
+            if (response.ok) {
+                toast.success('Граф опубликован и ожидает модерации!');
+                setPublishDialogOpen(false);
+                setPublishForm({
+                    name: '',
+                    author: '',
+                    description: ''
+                });
+            } else {
+                const error = await response.json();
+                toast.error(error.error || 'Ошибка при публикации');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            toast.error('Ошибка при публикации графа');
+        }
+    };
     
     const generatedNodeTypes = useMemo(() => {
         if (!availableNodes || Object.keys(availableNodes).length === 0) {
@@ -140,9 +226,62 @@ function BotVisualEditorPage() {
             <div className="h-full w-full flex flex-col">
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">Редактор: {command?.name}</h1>
-                    <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? 'Сохранение...' : 'Сохранить'}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Share2 className="w-4 h-4 mr-2" />
+                                    Опубликовать
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Опубликовать граф в магазин</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="name">Название</Label>
+                                        <Input
+                                            id="name"
+                                            value={publishForm.name}
+                                            onChange={(e) => setPublishForm(prev => ({ ...prev, name: e.target.value }))}
+                                            placeholder="Название графа"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="author">Автор</Label>
+                                        <Input
+                                            id="author"
+                                            value={publishForm.author}
+                                            onChange={(e) => setPublishForm(prev => ({ ...prev, author: e.target.value }))}
+                                            placeholder="Ваше имя"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="description">Описание</Label>
+                                        <Textarea
+                                            id="description"
+                                            value={publishForm.description}
+                                            onChange={(e) => setPublishForm(prev => ({ ...prev, description: e.target.value }))}
+                                            placeholder="Описание графа (минимум 10 символов)"
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button onClick={handlePublish} className="flex-1">
+                                            Опубликовать
+                                        </Button>
+                                        <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
+                                            Отмена
+                                        </Button>
+                                    </div>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                        <Button onClick={handleSave} disabled={isSaving}>
+                            {isSaving ? 'Сохранение...' : 'Сохранить'}
+                        </Button>
+                    </div>
                 </header>
                 <ResizablePanelGroup direction="horizontal" className="flex-grow">
                     <ResizablePanel defaultSize={15}>
