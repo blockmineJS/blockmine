@@ -1533,43 +1533,6 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
             }
         }
 
-        const commandsEntry = zipEntries.find(e => e.entryName === 'commands.json');
-        if (commandsEntry) {
-            const commands = JSON.parse(commandsEntry.getData().toString('utf8'));
-            for (let command of commands) {
-                delete command.id;
-                command.botId = newBot.id;
-                
-                if (command.permissionId && pMap.has(command.permissionId)) {
-                    command.permissionId = pMap.get(command.permissionId);
-                } else {
-                    command.permissionId = null;
-                }
-                
-                command.pluginOwnerId = null;
-                try {
-                    await prisma.command.create({ data: command });
-                } catch (error) {
-                    console.warn(`[Import] Пропущена команда ${command.name}: ${error.message}`);
-                }
-            }
-        }
-        
-        const eventGraphsEntry = zipEntries.find(e => e.entryName === 'event_graphs.json');
-        if (eventGraphsEntry) {
-            const eventGraphs = JSON.parse(eventGraphsEntry.getData().toString('utf8'));
-            for (let graph of eventGraphs) {
-                delete graph.id;
-                graph.botId = newBot.id;
-                graph.pluginOwnerId = null;
-                try {
-                    await prisma.eventGraph.create({ data: graph });
-                } catch (error) {
-                    console.warn(`[Import] Пропущен граф ${graph.name}: ${error.message}`);
-                }
-            }
-        }
-
         const pluginDataStoreEntry = zipEntries.find(e => e.entryName === 'plugin_data_store.json');
         if (pluginDataStoreEntry) {
             console.log(`[Import] Импорт PluginDataStore для бота ${newBot.id}`);
@@ -1585,6 +1548,8 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
         }
 
         const pluginsEntry = zipEntries.find(e => e.entryName === 'plugins.json');
+        let pluginMap = new Map();
+        
         if (pluginsEntry) {
             const plugins = JSON.parse(pluginsEntry.getData().toString('utf8'));
             const pluginsDir = path.join(os.homedir(), '.blockmine', 'storage', 'plugins');
@@ -1596,6 +1561,7 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
                 const pluginName = pluginData.name;
                 const newPluginPath = path.join(botPluginsDir, pluginName);
 
+                const oldPluginId = pluginData.id;
                 delete pluginData.id;
                 pluginData.botId = newBot.id;
                 pluginData.path = path.resolve(newPluginPath);
@@ -1615,7 +1581,56 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
                     }
                 }
                 
-                await prisma.installedPlugin.create({ data: pluginData });
+                const newPlugin = await prisma.installedPlugin.create({ data: pluginData });
+                pluginMap.set(oldPluginId, newPlugin.id);
+            }
+        }
+
+        const commandsEntry = zipEntries.find(e => e.entryName === 'commands.json');
+        if (commandsEntry) {
+            const commands = JSON.parse(commandsEntry.getData().toString('utf8'));
+            for (let command of commands) {
+                delete command.id;
+                command.botId = newBot.id;
+                
+                if (command.permissionId && pMap.has(command.permissionId)) {
+                    command.permissionId = pMap.get(command.permissionId);
+                } else {
+                    command.permissionId = null;
+                }
+                
+                if (command.pluginOwnerId && pluginMap.has(command.pluginOwnerId)) {
+                    command.pluginOwnerId = pluginMap.get(command.pluginOwnerId);
+                } else {
+                    command.pluginOwnerId = null;
+                }
+                
+                try {
+                    await prisma.command.create({ data: command });
+                } catch (error) {
+                    console.warn(`[Import] Пропущена команда ${command.name}: ${error.message}`);
+                }
+            }
+        }
+        
+        const eventGraphsEntry = zipEntries.find(e => e.entryName === 'event_graphs.json');
+        if (eventGraphsEntry) {
+            const eventGraphs = JSON.parse(eventGraphsEntry.getData().toString('utf8'));
+            for (let graph of eventGraphs) {
+                delete graph.id;
+                graph.botId = newBot.id;
+                
+                if (graph.pluginOwnerId && pluginMap.has(graph.pluginOwnerId)) {
+                    graph.pluginOwnerId = pluginMap.get(graph.pluginOwnerId);
+                } else {
+                    graph.pluginOwnerId = null;
+                }
+                
+                try {
+                    await prisma.eventGraph.create({ data: graph });
+                } catch (error) {
+                    console.warn(`[Import] Пропущен граф ${graph.name}: ${error.message}`);
+                }
             }
         }
         
