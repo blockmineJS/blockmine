@@ -70,7 +70,17 @@ router.get('/:id/info', authenticate, authorize('plugin:list'), async (req, res)
         
         const plugin = await prisma.installedPlugin.findUnique({
             where: { id: pluginId },
-            include: {
+            select: {
+                id: true,
+                name: true,
+                version: true,
+                description: true,
+                sourceType: true,
+                sourceUri: true,
+                isEnabled: true,
+                manifest: true,
+                settings: true,
+                createdAt: true,
                 commands: {
                     select: {
                         id: true,
@@ -116,7 +126,11 @@ router.get('/bot/:botId', authenticate, authorize('plugin:list'), async (req, re
                 version: true,
                 description: true,
                 sourceType: true,
+                sourceUri: true,
                 isEnabled: true,
+                manifest: true,
+                settings: true,
+                createdAt: true,
                 commands: {
                     select: {
                         id: true,

@@ -32,6 +32,15 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(false);
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
+    
+    if (plugin.name === 'auth-keksik-servers') {
+        console.log(`[Debug] ${plugin.name}:`, {
+            hasSettings,
+            manifest: plugin.manifest,
+            settings: plugin.manifest?.settings,
+            settingsKeys: plugin.manifest?.settings ? Object.keys(plugin.manifest.settings) : []
+        });
+    }
     const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
     const isEditable = plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE';
     const isForkable = plugin.sourceType === 'GITHUB';
