@@ -176,6 +176,10 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
         const botManager = req.app.get('botManager');
         botManager.reloadBotConfigInRealTime(botId);
 
+        if (dataToUpdate.owners !== undefined) {
+            botManager.invalidateAllUserCache(botId);
+        }
+
         res.json(updatedBot);
     } catch (error) {
         console.error('Error updating bot:', error);

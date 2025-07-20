@@ -765,6 +765,16 @@ class BotManager {
         return { success: true };
     }
 
+    invalidateAllUserCache(botId) {
+        for (const [cacheKey, user] of UserService.cache.entries()) {
+            if (cacheKey.startsWith(`${botId}:`)) {
+                UserService.cache.delete(cacheKey);
+            }
+        }
+        console.log(`[BotManager] Кэш пользователей очищен для бота ${botId}`);
+        return { success: true };
+    }
+
     async getPlayerList(botId) {
         const PLAYER_LIST_CACHE_TTL = 2000;
 
