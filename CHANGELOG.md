@@ -1,6 +1,18 @@
 # История версий
 
 
+### [1.16.2](https://github.com/blockmineJS/blockmine/compare/v1.16.1...v1.16.2) (2025-07-20)
+
+
+### 🐛 Исправления
+
+* обновление плагинов починено ([6b3c536](https://github.com/blockmineJS/blockmine/commit/6b3c5360c490dda43b0fd8cbf5b77a6c4d329543))
+
+
+### 🛠 Рефакторинг
+
+* удалены отладочные сообщения и неиспользуемый код из компонента InstalledPluginsView ([1b41026](https://github.com/blockmineJS/blockmine/commit/1b410264d1e844c76404c047c4547e86199bbb27))
+
 ### [1.16.1](https://github.com/blockmineJS/blockmine/compare/v1.16.0...v1.16.1) (2025-07-20)
 
 
