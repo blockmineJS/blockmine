@@ -165,6 +165,21 @@ const SettingsPanel = () => {
           </Select>
         </div>
 
+          <div>
+            <Label htmlFor="command-cooldown">Кулдаун (секунды)</Label>
+            <Input
+              id="command-cooldown"
+              type="number"
+              min="0"
+              value={command.cooldown || 0}
+              onChange={(e) => updateCommand({ cooldown: parseInt(e.target.value) || 0 })}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Время в секундах, которое должно пройти между использованиями команды
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label>Типы чатов (через запятую)</Label>
             <Input
