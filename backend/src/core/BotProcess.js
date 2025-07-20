@@ -699,6 +699,15 @@ process.on('message', async (message) => {
         if (message.username && bot && bot.config) {
             UserService.clearCache(message.username, bot.config.id);
         }
+    } else if (message.type === 'invalidate_all_user_cache') {
+        if (bot && bot.config) {
+            for (const [cacheKey, user] of UserService.cache.entries()) {
+                if (cacheKey.startsWith(`${bot.config.id}:`)) {
+                    UserService.cache.delete(cacheKey);
+                }
+            }
+            sendLog(`[BotProcess] Кэш пользователей очищен для бота ${bot.config.id}`);
+        }
     } else if (message.type === 'handle_permission_error') {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
@@ -787,10 +796,6 @@ process.on('SIGINT', () => {
     setTimeout(() => process.exit(0), 100);
 });
 
-// process.on('SIGKILL', () => {
-//     sendLog('[System] Получен сигнал SIGKILL. Принудительное завершение...');
-//     process.exit(0);
-// });
 
 function serializeEntity(entity) {
     if (!entity) return null;

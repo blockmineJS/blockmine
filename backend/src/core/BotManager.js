@@ -772,6 +772,13 @@ class BotManager {
             }
         }
         console.log(`[BotManager] Кэш пользователей очищен для бота ${botId}`);
+        
+        const child = this.bots.get(botId);
+        if (child && !child.killed) {
+            child.send({ type: 'invalidate_all_user_cache' });
+            console.log(`[BotManager] Отправлено сообщение об очистке кэша в процесс бота ${botId}`);
+        }
+        
         return { success: true };
     }
 
