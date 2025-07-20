@@ -1,6 +1,14 @@
 # История версий
 
 
+## [1.16.0](https://github.com/blockmineJS/blockmine/compare/v1.15.2...v1.16.0) (2025-07-20)
+
+
+### ✨ Новые возможности
+
+* добавлен новый узел 'flow:switch' с динамическими case'ами ([81886db](https://github.com/blockmineJS/blockmine/commit/81886db75da6792d499cdc2c277494f9e39136c3))
+* добавлена кнопка перезапуска бота ([db13070](https://github.com/blockmineJS/blockmine/commit/db130707637a8a5e93e8c783463ca38f0ab2bf85))
+
 ### [1.15.2](https://github.com/blockmineJS/blockmine/compare/v1.15.1...v1.15.2) (2025-07-19)
 
 ### [1.15.1](https://github.com/blockmineJS/blockmine/compare/v1.15.0...v1.15.1) (2025-07-19)
