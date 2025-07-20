@@ -63,6 +63,7 @@ export const createPluginSlice = (set, get) => {
                 
                 let statsMap = new Map();
                 try {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
                     if (statsResponse.ok) {
                         const statsData = await statsResponse.json();

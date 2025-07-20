@@ -837,6 +837,7 @@ class BotManager {
         if (child && !child.killed) {
             child.send({ type: 'plugins:reload' });
             console.log(`[BotManager] Sent plugins:reload to bot process ${botId}`);
+            const { getIO } = require('../real-time/socketHandler');
             getIO().emit('bot:plugins_reloaded', { botId });
             return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };
         }

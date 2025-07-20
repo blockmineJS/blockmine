@@ -38,7 +38,9 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             hasSettings,
             manifest: plugin.manifest,
             settings: plugin.manifest?.settings,
-            settingsKeys: plugin.manifest?.settings ? Object.keys(plugin.manifest.settings) : []
+            settingsKeys: plugin.manifest?.settings ? Object.keys(plugin.manifest.settings) : [],
+            manifestType: typeof plugin.manifest,
+            settingsType: typeof plugin.manifest?.settings
         });
     }
     const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
