@@ -33,16 +33,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
     const [isHovered, setIsHovered] = useState(false);
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
     
-    if (plugin.name === 'auth-keksik-servers') {
-        console.log(`[Debug] ${plugin.name}:`, {
-            hasSettings,
-            manifest: plugin.manifest,
-            settings: plugin.manifest?.settings,
-            settingsKeys: plugin.manifest?.settings ? Object.keys(plugin.manifest.settings) : [],
-            manifestType: typeof plugin.manifest,
-            settingsType: typeof plugin.manifest?.settings
-        });
-    }
     const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
     const isEditable = plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE';
     const isForkable = plugin.sourceType === 'GITHUB';
@@ -297,27 +287,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                     {plugin.commands.slice(0, 3).map(cmd => (
                                         <Badge key={cmd.id} variant="outline" className="text-xs">
                                             {cmd.name}
-                                        </Badge>
-                                    ))}
-                                    {plugin.commands.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{plugin.commands.length - 3}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        
-                        {plugin.commands?.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <Terminal className="h-3 w-3 text-blue-500" />
-                                <span className="text-xs text-muted-foreground">
-                                    Команды: {plugin.commands.length}
-                                </span>
-                                <div className="flex flex-wrap gap-1">
-                                    {plugin.commands.slice(0, 3).map(command => (
-                                        <Badge key={command.id} variant="outline" className="text-xs">
-                                            {command.name}
                                         </Badge>
                                     ))}
                                     {plugin.commands.length > 3 && (
