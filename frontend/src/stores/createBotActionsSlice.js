@@ -22,6 +22,10 @@ export const createBotActionsSlice = (set, get) => ({
     stopBot: async (botId) => {
         await apiHelper(`/api/bots/${botId}/stop`, { method: 'POST' });
     },
+
+    restartBot: async (botId) => {
+        await apiHelper(`/api/bots/${botId}/restart`, { method: 'POST' });
+    },
     
     deleteBot: async (botId) => {
         await apiHelper(`/api/bots/${botId}`, { method: 'DELETE' }, "Бот успешно удален.");

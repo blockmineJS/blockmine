@@ -10,8 +10,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import StopCircleIcon from '@mui/icons-material/StopCircle';
+import ReplayIcon from '@mui/icons-material/Replay';
 
-export default function BotCard({ bot, status, logs, onStart, onStop, onEdit, onDelete }) {
+export default function BotCard({ bot, status, logs, onStart, onStop, onRestart, onEdit, onDelete }) {
     const isRunning = status === 'running';
     const statusColor = isRunning ? 'success' : 'error';
 
@@ -50,7 +51,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onEdit, on
                     disabled={isRunning}
                     variant="contained"
                     color="primary"
-                    sx={{ width: '50%' }}
+                    sx={{ width: '33.33%' }}
                 >
                     Запустить
                 </Button>
@@ -60,9 +61,18 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onEdit, on
                     disabled={!isRunning}
                     variant="contained"
                     color="error"
-                    sx={{ width: '50%' }}
+                    sx={{ width: '33.33%' }}
                 >
                     Остановить
+                </Button>
+                <Button
+                    startIcon={<ReplayIcon />}
+                    onClick={() => onRestart(bot.id)}
+                    disabled={!isRunning}
+                    variant="contained"
+                    sx={{ width: '33.33%' }}
+                >
+                    Перезапустить
                 </Button>
             </CardActions>
         </Card>

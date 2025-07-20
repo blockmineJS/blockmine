@@ -230,6 +230,24 @@ router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
     }
 });
 
+router.post('/:id/restart', authorize('bot:start_stop'), async (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        botManager.stopBot(botId);
+        setTimeout(async () => {
+            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+            if (!botConfig) {
+                return res.status(404).json({ success: false, message: 'Бот не найден' });
+            }
+            botManager.startBot(botConfig);
+            res.status(202).json({ success: true, message: 'Команда на перезапуск отправлена.' });
+        }, 1000);
+    } catch (error) {
+        console.error(`[API] Ошибка перезапуска бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при перезапуске бота: ' + error.message });
+    }
+});
+
 router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);

@@ -26,6 +26,7 @@ export default function BotView() {
     const botStatuses = useAppStore(state => state.botStatuses);
     const startBot = useAppStore(state => state.startBot);
     const stopBot = useAppStore(state => state.stopBot);
+    const restartBot = useAppStore(state => state.restartBot);
     const deleteBot = useAppStore(state => state.deleteBot);
     const hasPermission = useAppStore(state => state.hasPermission);
     const fetchUIExtensions = useAppStore(state => state.fetchUIExtensions);
@@ -213,13 +214,23 @@ export default function BotView() {
                                         <Square className="h-4 w-4 mr-1" /> 
                                         Остановить
                                     </Button>
+                                    <Button
+                                       variant="outline"
+                                       size="sm"
+                                       onClick={() => restartBot(bot.id)}
+                                       disabled={!isRunning}
+                                       className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
+                                    >
+                                       <Sparkles className="h-4 w-4 mr-1" />
+                                       Перезапустить
+                                    </Button>
                                 </>
                             )}
                             {hasPermission('bot:export') && (
                                  <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
                                     <DialogTrigger asChild>
-                                        <Button 
-                                            variant="outline" 
+                                        <Button
+                                            variant="outline"
                                             size="icon" 
                                             title="Экспортировать бота"
                                             className="bg-blue-500/10 border-blue-500/20 text-blue-600 hover:bg-blue-500/20 hover:text-blue-700"
