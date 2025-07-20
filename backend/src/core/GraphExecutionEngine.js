@@ -254,6 +254,41 @@ class GraphExecutionEngine {
               }
               break;
           }
+          case 'flow:switch': {
+              const value = await this.resolvePinValue(node, 'value');
+              const caseCount = node.data?.caseCount || 0;
+              let matched = false;
+              
+              for (let i = 0; i < caseCount; i++) {
+                  const caseValue = node.data?.[`case_${i}`];
+                  if (caseValue !== undefined) {
+                      let isMatch = false;
+                      
+                      if (Array.isArray(value) && Array.isArray(caseValue)) {
+                          isMatch = JSON.stringify(value) === JSON.stringify(caseValue);
+                      } else if (typeof value === 'object' && typeof caseValue === 'object' && value !== null && caseValue !== null) {
+                          isMatch = JSON.stringify(value) === JSON.stringify(caseValue);
+                      } else if (typeof value === 'number' && typeof caseValue === 'number') {
+                          isMatch = value === caseValue;
+                      } else if (typeof value === 'boolean' && typeof caseValue === 'boolean') {
+                          isMatch = value === caseValue;
+                      } else {
+                          isMatch = String(value) === String(caseValue);
+                      }
+                      
+                      if (isMatch) {
+                          await this.traverse(node, `case_${i}`);
+                          matched = true;
+                          break;
+                      }
+                  }
+              }
+              
+              if (!matched) {
+                  await this.traverse(node, 'default');
+              }
+              break;
+          }
           case 'debug:log': {
               const value = await this.resolvePinValue(node, 'value');
               console.log('[Graph Debug]', value);

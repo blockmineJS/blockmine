@@ -1064,6 +1064,24 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'flow:switch',
+      label: '🔄 Switch (свитч)',
+      category: 'Поток',
+      description: 'Выполняет разные действия в зависимости от значения. Автоматически определяет тип сравнения.',
+      graphType: all,
+      dynamicPins: true,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+          { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'default', name: 'Default', type: 'Exec' }
+        ]
+      }
+    });
+
     console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
   }
 

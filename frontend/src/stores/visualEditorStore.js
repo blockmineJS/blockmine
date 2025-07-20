@@ -206,6 +206,9 @@ export const useVisualEditorStore = create(
       if (type === 'data:array_literal' || type === 'data:make_object') {
           defaultData.pinCount = 0;
       }
+      if (type === 'flow:switch') {
+          defaultData.caseCount = 0;
+      }
 
       const newNode = {
         id: `${type}-${randomUUID()}`,
