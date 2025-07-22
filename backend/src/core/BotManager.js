@@ -335,6 +335,10 @@ class BotManager {
         getIO().emit('bot:log', { botId, log: logEntry });
     }
 
+    getBotLogs(botId) {
+        return this.logCache.get(botId) || [];
+    }
+
     async startBot(botConfig) {
         if (this.bots.has(botConfig.id) && !this.bots.get(botConfig.id).killed) {
             this.appendLog(botConfig.id, `[SYSTEM-ERROR] Попытка повторного запуска. Запуск отменен.`);

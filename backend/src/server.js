@@ -20,6 +20,7 @@ const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
 const changelogRoutes = require('./api/routes/changelog');
+const logsRoutes = require('./api/routes/logs');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +62,7 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 app.use('/api/changelog', changelogRoutes);
+app.use('/api/logs', logsRoutes);
 
 app.use(express.static(frontendPath));
 

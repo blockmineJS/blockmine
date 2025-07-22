@@ -14,6 +14,11 @@ if (!fs.existsSync(DATA_DIR)) {
 
 process.env.DATABASE_URL = `file:${path.join(DATA_DIR, 'blockmine.db')}`;
 
+if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev') || process.argv.includes('--debug')) {
+    process.env.DEBUG = 'true';
+    console.log('[Dev] Режим отладки включен (DEBUG=true)');
+}
+
 function runCommand(command) {
     try {
         console.log(`> ${command}`);

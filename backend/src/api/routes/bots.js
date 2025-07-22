@@ -22,6 +22,155 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
+const conditionalRestartAuth = (req, res, next) => {
+    if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+        console.log('[Debug] Роут перезапуска бота доступен без проверки прав');
+        return next();
+    }
+    
+    return authenticate(req, res, (err) => {
+        if (err) return next(err);
+        return authorize('bot:start_stop')(req, res, next);
+    });
+};
+
+const conditionalChatAuth = (req, res, next) => {
+    if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+        console.log('[Debug] Роут отправки сообщения боту доступен без проверки прав');
+        return next();
+    }
+    
+    return authenticate(req, res, (err) => {
+        if (err) return next(err);
+        return authorize('bot:interact')(req, res, next);
+    });
+};
+
+const conditionalStartStopAuth = (req, res, next) => {
+    if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+        console.log('[Debug] Роут запуска/остановки бота доступен без проверки прав');
+        return next();
+    }
+    
+    return authenticate(req, res, (err) => {
+        if (err) return next(err);
+        return authorize('bot:start_stop')(req, res, next);
+    });
+};
+
+const conditionalListAuth = (req, res, next) => {
+    if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+        console.log('[Debug] Роут списка ботов/состояния доступен без проверки прав');
+        return next();
+    }
+    
+    return authenticate(req, res, (err) => {
+        if (err) return next(err);
+        return authorize('bot:list')(req, res, next);
+    });
+};
+
+router.post('/:id/restart', conditionalRestartAuth, async (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        botManager.stopBot(botId);
+        setTimeout(async () => {
+            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+            if (!botConfig) {
+                return res.status(404).json({ success: false, message: 'Бот не найден' });
+            }
+            botManager.startBot(botConfig);
+            res.status(202).json({ success: true, message: 'Команда на перезапуск отправлена.' });
+        }, 1000);
+    } catch (error) {
+        console.error(`[API] Ошибка перезапуска бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при перезапуске бота: ' + error.message });
+    }
+});
+
+router.post('/:id/chat', conditionalChatAuth, (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+        const result = botManager.sendMessageToBot(botId, message);
+        if (result.success) res.json({ success: true });
+        else res.status(404).json(result);
+    } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
+});
+
+router.post('/:id/start', conditionalStartStopAuth, async (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+        if (!botConfig) {
+            return res.status(404).json({ success: false, message: 'Бот не найден' });
+        }
+        botManager.startBot(botConfig);
+        res.status(202).json({ success: true, message: 'Команда на запуск отправлена.' });
+    } catch (error) {
+        console.error(`[API] Ошибка запуска бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при запуске бота: ' + error.message });
+    }
+});
+
+router.post('/:id/stop', conditionalStartStopAuth, (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        botManager.stopBot(botId);
+        res.status(202).json({ success: true, message: 'Команда на остановку отправлена.' });
+    } catch (error) {
+        console.error(`[API] Ошибка остановки бота ${req.params.id}:`, error);
+        res.status(500).json({ success: false, message: 'Ошибка при остановке бота: ' + error.message });
+    }
+});
+
+router.get('/', conditionalListAuth, async (req, res) => {
+    try {
+        const bots = await prisma.bot.findMany({ include: { server: true }, orderBy: { createdAt: 'asc' } });
+        res.json(bots);
+    } catch (error) { 
+        console.error("[API /api/bots] Ошибка получения списка ботов:", error);
+        res.status(500).json({ error: 'Не удалось получить список ботов' }); 
+    }
+});
+
+router.get('/state', conditionalListAuth, (req, res) => {
+    try {
+        const state = botManager.getFullState();
+        res.json(state);
+    } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
+});
+
+router.get('/:id/logs', conditionalListAuth, (req, res) => {
+    try {
+        const botId = parseInt(req.params.id, 10);
+        const { limit = 100, offset = 0 } = req.query;
+        
+        const logs = botManager.getBotLogs(botId);
+        
+        const startIndex = parseInt(offset);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedLogs = logs.slice(startIndex, endIndex);
+        
+        res.json({
+            success: true,
+            data: {
+                logs: paginatedLogs,
+                pagination: {
+                    total: logs.length,
+                    limit: parseInt(limit),
+                    offset: startIndex,
+                    hasMore: endIndex < logs.length
+                }
+            }
+        });
+    } catch (error) { 
+        console.error(`[API] Ошибка получения логов бота ${req.params.id}:`, error);
+        res.status(500).json({ error: 'Не удалось получить логи бота' }); 
+    }
+});
+
 router.use(authenticate);
 router.use('/:botId/event-graphs', eventGraphsRouter);
 router.use('/:botId/plugins/ide', pluginIdeRouter);
@@ -62,22 +211,7 @@ async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     console.log(`[Setup] Для бота ID ${botId} созданы группы и права по умолчанию.`);
 }
 
-router.get('/', authorize('bot:list'), async (req, res) => {
-    try {
-        const bots = await prisma.bot.findMany({ include: { server: true }, orderBy: { createdAt: 'asc' } });
-        res.json(bots);
-    } catch (error) { 
-        console.error("[API /api/bots] Ошибка получения списка ботов:", error);
-        res.status(500).json({ error: 'Не удалось получить список ботов' }); 
-    }
-});
 
-router.get('/state', authorize('bot:list'), (req, res) => {
-    try {
-        const state = botManager.getFullState();
-        res.json(state);
-    } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
-});
 
 router.post('/', authorize('bot:create'), async (req, res) => {
     try {
@@ -207,62 +341,6 @@ router.delete('/:id', authorize('bot:delete'), async (req, res) => {
         res.status(204).send();
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить бота' }); }
 });
-
-router.post('/:id/start', authorize('bot:start_stop'), async (req, res) => {
-    try {
-        const botId = parseInt(req.params.id, 10);
-        const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
-        if (!botConfig) {
-            return res.status(404).json({ success: false, message: 'Бот не найден' });
-        }
-        botManager.startBot(botConfig);
-        res.status(202).json({ success: true, message: 'Команда на запуск отправлена.' });
-    } catch (error) { 
-        console.error(`[API] Ошибка запуска бота ${req.params.id}:`, error);
-        res.status(500).json({ success: false, message: 'Ошибка при запуске бота: ' + error.message }); 
-    }
-});
-
-router.post('/:id/stop', authorize('bot:start_stop'), (req, res) => {
-    try {
-        const botId = parseInt(req.params.id, 10);
-        botManager.stopBot(botId);
-        res.status(202).json({ success: true, message: 'Команда на остановку отправлена.' });
-    } catch (error) {
-        console.error(`[API] Ошибка остановки бота ${req.params.id}:`, error);
-        res.status(500).json({ success: false, message: 'Ошибка при остановке бота: ' + error.message });
-    }
-});
-
-router.post('/:id/restart', authorize('bot:start_stop'), async (req, res) => {
-    try {
-        const botId = parseInt(req.params.id, 10);
-        botManager.stopBot(botId);
-        setTimeout(async () => {
-            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
-            if (!botConfig) {
-                return res.status(404).json({ success: false, message: 'Бот не найден' });
-            }
-            botManager.startBot(botConfig);
-            res.status(202).json({ success: true, message: 'Команда на перезапуск отправлена.' });
-        }, 1000);
-    } catch (error) {
-        console.error(`[API] Ошибка перезапуска бота ${req.params.id}:`, error);
-        res.status(500).json({ success: false, message: 'Ошибка при перезапуске бота: ' + error.message });
-    }
-});
-
-router.post('/:id/chat', authorize('bot:interact'), (req, res) => {
-    try {
-        const botId = parseInt(req.params.id, 10);
-        const { message } = req.body;
-        if (!message) return res.status(400).json({ error: 'Сообщение не может быть пустым' });
-        const result = botManager.sendMessageToBot(botId, message);
-        if (result.success) res.json({ success: true });
-        else res.status(404).json(result);
-    } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
-});
-
 
 router.get('/servers', authorize('bot:list'), async (req, res) => {
     try {

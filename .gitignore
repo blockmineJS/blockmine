@@ -53,3 +53,5 @@ plug.md
 
 stats-server/
 blockmine-proxy/
+/mptest
+/stats-server
