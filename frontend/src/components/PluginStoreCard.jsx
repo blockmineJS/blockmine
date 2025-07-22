@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles } from 'lucide-react';
+import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles, Server, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId }) {
@@ -105,6 +105,36 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                             <Download className="h-3 w-3" />
                             <span>v{plugin.latestTag.replace('v','')}</span>
                         </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1">
+                        {!plugin.supportedHosts || plugin.supportedHosts.length === 0 ? (
+                            <Badge variant="outline" className="text-xs">
+                                <Globe className="h-3 w-3 mr-1" />
+                                Любой сервер
+                            </Badge>
+                        ) : (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-xs cursor-help">
+                                        <Server className="h-3 w-3 mr-1" />
+                                        {plugin.supportedHosts.length <= 2 ? (
+                                            plugin.supportedHosts.map(host => (
+                                                <span key={host} className="font-mono">{host}</span>
+                                            ))
+                                        ) : (
+                                            `${plugin.supportedHosts.length} серверов`
+                                        )}
+                                    </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p className="font-semibold mb-1">Протестировано на:</p>
+                                    <ul className="list-disc list-inside text-sm">
+                                        {plugin.supportedHosts.map(host => <li key={host}>{host}</li>)}
+                                    </ul>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
                     </div>
                 </CardContent>
                 

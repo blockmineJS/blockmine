@@ -162,7 +162,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </Tooltip>
                         )}
                         
-                        {!hasSupportedHosts ? (
+                        {!hasSupportedHosts || plugin.supportedHosts.length === 0 ? (
                             <Badge variant="outline" className="text-xs">
                                 <GlobeIcon className="h-3 w-3 mr-1" />
                                 Любой
