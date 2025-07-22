@@ -19,6 +19,26 @@ class DevCommand extends Command {
         });
     }
 
+    // Переопределяем метод для кастомного сообщения при отсутствии прав
+    onInsufficientPermissions(bot, typeChat, user) {
+        bot.api.sendMessage(typeChat, `${user.username}, у вас нет прав для этой команды.`, user.username);
+    }
+
+    // Переопределяем метод для неправильного типа чата
+    onWrongChatType(bot, typeChat, user) {
+        bot.api.sendMessage('private', `${user.username}, команду dev нельзя использовать в чате типа "${typeChat}"`, user.username);
+    }
+
+    // Переопределяем метод для кулдауна
+    onCooldown(bot, typeChat, user, timeLeft) {
+        bot.api.sendMessage(typeChat, `${user.username}, подождите еще ${timeLeft} секунд перед повторным использованием команды.`, user.username);
+    }
+
+    // Переопределяем метод для черного списка (по умолчанию ничего не отправляется)
+    onBlacklisted(bot, typeChat, user) {
+        bot.api.sendMessage(typeChat, `${user.username}, вы находитесь в черном списке.`, user.username);
+    }
+
     async handler(bot, typeChat, user) {
         if (!appVersion) {
             try {

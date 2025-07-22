@@ -712,25 +712,39 @@ process.on('message', async (message) => {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
-            commandInstance.onInsufficientPermissions(bot, typeChat, { username });
+            if (commandInstance.onInsufficientPermissions !== Command.prototype.onInsufficientPermissions) {
+                commandInstance.onInsufficientPermissions(bot, typeChat, { username });
+            } else {
+                bot.api.sendMessage(typeChat, `У вас нет прав для выполнения команды ${commandName}.`, username);
+            }
         }
     } else if (message.type === 'handle_wrong_chat') {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
-            commandInstance.onWrongChatType(bot, typeChat, { username });
+            if (commandInstance.onWrongChatType !== Command.prototype.onWrongChatType) {
+                commandInstance.onWrongChatType(bot, typeChat, { username });
+            } else {
+                bot.api.sendMessage('private', `Команду ${commandName} нельзя использовать в этом типе чата - ${typeChat}.`, username);
+            }
         }
     } else if (message.type === 'handle_cooldown') {
         const { commandName, username, typeChat, timeLeft } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
-            commandInstance.onCooldown(bot, typeChat, { username }, timeLeft);
+            if (commandInstance.onCooldown !== Command.prototype.onCooldown) {
+                commandInstance.onCooldown(bot, typeChat, { username }, timeLeft);
+            } else {
+                bot.api.sendMessage(typeChat, `Команду ${commandName} можно будет использовать через ${timeLeft} сек.`, username);
+            }
         }
     } else if (message.type === 'handle_blacklist') {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
-            commandInstance.onBlacklisted(bot, typeChat, { username });
+            if (commandInstance.onBlacklisted !== Command.prototype.onBlacklisted) {
+                commandInstance.onBlacklisted(bot, typeChat, { username });
+            }
         }
     } else if (message.type === 'action') {
         if (message.name === 'lookAt' && bot && message.payload.position) {

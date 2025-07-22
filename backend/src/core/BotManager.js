@@ -545,7 +545,12 @@ class BotManager {
             if (!child) return;
 
             if (user.isBlacklisted) {
-                this.sendMessageToBot(botId, 'Вы находитесь в черном списке и не можете использовать команды.', 'private', username);
+                child.send({ 
+                    type: 'handle_blacklist', 
+                    commandName: commandName, 
+                    username, 
+                    typeChat 
+                });
                 return;
             }
 
@@ -559,13 +564,23 @@ class BotManager {
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
                 if (typeChat === 'global') return;
-                this.sendMessageToBot(botId, 'Эту команду нельзя использовать в этом чате.', 'private', username);
+                child.send({ 
+                    type: 'handle_wrong_chat', 
+                    commandName: dbCommand.name, 
+                    username, 
+                    typeChat 
+                });
                 return;
             }
 
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
             if (permission && !user.hasPermission(permission.name)) {
-                this.sendMessageToBot(botId, 'У вас нет прав на использование этой команды.', 'private', username);
+                child.send({ 
+                    type: 'handle_permission_error', 
+                    commandName: dbCommand.name, 
+                    username, 
+                    typeChat 
+                });
                 return;
             }
             
@@ -579,7 +594,13 @@ class BotManager {
 
                 if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
                     const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    this.sendMessageToBot(botId, `Подождите еще ${timeLeft} сек. перед использованием команды.`, 'private', username);
+                    child.send({ 
+                        type: 'handle_cooldown', 
+                        commandName: dbCommand.name, 
+                        username, 
+                        typeChat, 
+                        timeLeft 
+                    });
                     return;
                 }
                 cooldowns.set(cooldownKey, now);
