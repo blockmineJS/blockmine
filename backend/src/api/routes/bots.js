@@ -1654,6 +1654,25 @@ router.get('/:botId/export', authorize('bot:export'), async (req, res) => {
             const installedPlugins = await prisma.installedPlugin.findMany({ where: { botId } });
             archive.append(JSON.stringify(installedPlugins, null, 2), { name: 'plugins.json' });
 
+            try {
+                const installedPlugins = await prisma.installedPlugin.findMany({ where: { botId } });
+                const pluginSettings = installedPlugins
+                    .filter(plugin => plugin.settings && plugin.settings !== '{}')
+                    .map(plugin => ({
+                        pluginName: plugin.name,
+                        settings: plugin.settings
+                    }));
+                
+                if (pluginSettings.length > 0) {
+                    console.log(`[Export] Экспорт настроек плагинов для бота ${botId}: ${pluginSettings.length} настроек`);
+                    archive.append(JSON.stringify(pluginSettings, null, 2), { name: 'settings.json' });
+                } else {
+                    console.log(`[Export] Нет настроек плагинов для экспорта`);
+                }
+            } catch (error) {
+                console.warn(`[Export] Ошибка при экспорте настроек плагинов:`, error.message);
+            }
+
             if (includePluginFiles === 'true') {
                 for (const plugin of installedPlugins) {
                     const pluginPath = plugin.path;
@@ -1681,7 +1700,9 @@ router.get('/:botId/export', authorize('bot:export'), async (req, res) => {
 
     } catch (error) {
         console.error('Failed to export bot:', error);
-        res.status(500).json({ error: `Failed to export bot: ${error.message}` });
+        if (!res.headersSent) {
+            res.status(500).json({ error: `Failed to export bot: ${error.message}` });
+        }
     }
 });
 
@@ -1875,6 +1896,223 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
     } catch (error) {
         console.error('Failed to import bot:', error);
         res.status(500).json({ error: `Failed to import bot: ${error.message}` });
+    }
+});
+
+router.post('/import/preview', authorize('bot:create'), upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Файл не загружен' });
+        }
+
+        const tempDir = path.join(os.tmpdir(), `import-${Date.now()}`);
+        await fse.ensureDir(tempDir);
+
+        try {
+            const zip = new AdmZip(req.file.buffer);
+            zip.extractAllTo(tempDir, true);
+
+            console.log('[Import] Файлы в архиве:', zip.getEntries().map(entry => entry.entryName));
+
+            const importData = {
+                plugins: [],
+                commands: [],
+                eventGraphs: [],
+                settings: null,
+                bot: null
+            };
+
+            const botConfigPath = path.join(tempDir, 'bot.json');
+            if (await fse.pathExists(botConfigPath)) {
+                console.log('[Import] Найден bot.json');
+                const botConfig = JSON.parse(await fse.readFile(botConfigPath, 'utf8'));
+                delete botConfig.password;
+                delete botConfig.proxyPassword;
+                delete botConfig.id;
+                delete botConfig.createdAt;
+                delete botConfig.updatedAt;
+                importData.bot = botConfig;
+            } else {
+                console.log('[Import] bot.json не найден');
+            }
+
+            const pluginsPath = path.join(tempDir, 'plugins.json');
+            if (await fse.pathExists(pluginsPath)) {
+                console.log('[Import] Найден plugins.json');
+                importData.plugins = JSON.parse(await fse.readFile(pluginsPath, 'utf8'));
+                console.log('[Import] Плагинов:', importData.plugins.length);
+            } else {
+                console.log('[Import] plugins.json не найден');
+            }
+
+            const commandsPath = path.join(tempDir, 'commands.json');
+            if (await fse.pathExists(commandsPath)) {
+                console.log('[Import] Найден commands.json');
+                importData.commands = JSON.parse(await fse.readFile(commandsPath, 'utf8'));
+                console.log('[Import] Команд:', importData.commands.length);
+            } else {
+                console.log('[Import] commands.json не найден');
+            }
+
+            const eventGraphsPath = path.join(tempDir, 'event_graphs.json');
+            if (await fse.pathExists(eventGraphsPath)) {
+                console.log('[Import] Найден event_graphs.json');
+                importData.eventGraphs = JSON.parse(await fse.readFile(eventGraphsPath, 'utf8'));
+                console.log('[Import] Графов событий:', importData.eventGraphs.length);
+            } else {
+                console.log('[Import] event_graphs.json не найден');
+                const eventGraphsPathAlt = path.join(tempDir, 'event-graphs.json');
+                if (await fse.pathExists(eventGraphsPathAlt)) {
+                    console.log('[Import] Найден event-graphs.json');
+                    importData.eventGraphs = JSON.parse(await fse.readFile(eventGraphsPathAlt, 'utf8'));
+                    console.log('[Import] Графов событий:', importData.eventGraphs.length);
+                } else {
+                    console.log('[Import] event-graphs.json тоже не найден');
+                }
+            }
+
+            const settingsPath = path.join(tempDir, 'settings.json');
+            if (await fse.pathExists(settingsPath)) {
+                console.log('[Import] Найден settings.json');
+                importData.settings = JSON.parse(await fse.readFile(settingsPath, 'utf8'));
+            } else {
+                console.log('[Import] settings.json не найден');
+            }
+
+            console.log('[Import] Итоговые данные:', {
+                plugins: importData.plugins.length,
+                commands: importData.commands.length,
+                eventGraphs: importData.eventGraphs.length,
+                hasSettings: !!importData.settings,
+                hasBot: !!importData.bot
+            });
+
+            res.json(importData);
+
+        } finally {
+            await fse.remove(tempDir);
+        }
+
+    } catch (error) {
+        console.error('[API Error] /bots/import/preview:', error);
+        res.status(500).json({ error: 'Не удалось обработать архив импорта' });
+    }
+});
+
+router.post('/import/create', authorize('bot:create'), async (req, res) => {
+    try {
+        const { username, password, prefix, serverId, note, owners, proxyHost, proxyPort, proxyUsername, proxyPassword, importData } = req.body;
+        
+        if (!username || !serverId) {
+            return res.status(400).json({ error: 'Имя и сервер обязательны' });
+        }
+
+        const botData = { 
+            username, 
+            prefix, 
+            note, 
+            serverId: parseInt(serverId, 10),
+            password: password ? encrypt(password) : null,
+            owners: owners || '',
+            proxyHost: proxyHost || null,
+            proxyPort: proxyPort ? parseInt(proxyPort, 10) : null,
+            proxyUsername: proxyUsername || null,
+            proxyPassword: proxyPassword ? encrypt(proxyPassword) : null
+        };
+
+        const newBot = await prisma.bot.create({
+            data: botData,
+            include: { server: true }
+        });
+
+        await setupDefaultPermissionsForBot(newBot.id);
+
+        if (importData) {
+            try {
+                if (importData.plugins && Array.isArray(importData.plugins)) {
+                    for (const plugin of importData.plugins) {
+                        try {
+                            await prisma.installedPlugin.create({
+                                data: {
+                                    ...plugin,
+                                    botId: newBot.id,
+                                    id: undefined
+                                }
+                            });
+                            console.log(`[Import] Импортирован плагин ${plugin.name}`);
+                        } catch (error) {
+                            console.warn(`[Import] Не удалось импортировать плагин ${plugin.name}:`, error.message);
+                        }
+                    }
+                }
+
+                if (importData.commands && Array.isArray(importData.commands)) {
+                    for (const command of importData.commands) {
+                        try {
+                            await prisma.command.create({
+                                data: {
+                                    ...command,
+                                    botId: newBot.id,
+                                    id: undefined
+                                }
+                            });
+                        } catch (error) {
+                            console.warn(`[Import] Не удалось импортировать команду ${command.name}:`, error.message);
+                        }
+                    }
+                }
+
+                if (importData.eventGraphs && Array.isArray(importData.eventGraphs)) {
+                    for (const graph of importData.eventGraphs) {
+                        try {
+                            await prisma.eventGraph.create({
+                                data: {
+                                    ...graph,
+                                    botId: newBot.id,
+                                    id: undefined
+                                }
+                            });
+                        } catch (error) {
+                            console.warn(`[Import] Не удалось импортировать граф событий ${graph.name}:`, error.message);
+                        }
+                    }
+                }
+
+                if (importData.settings && Array.isArray(importData.settings)) {
+                    for (const setting of importData.settings) {
+                        try {
+                            const updated = await prisma.installedPlugin.updateMany({
+                                where: {
+                                    botId: newBot.id,
+                                    name: setting.pluginName
+                                },
+                                data: {
+                                    settings: setting.settings
+                                }
+                            });
+                            if (updated.count > 0) {
+                                console.log(`[Import] Импортированы настройки плагина ${setting.pluginName}`);
+                            } else {
+                                console.warn(`[Import] Плагин ${setting.pluginName} не найден для применения настроек`);
+                            }
+                        } catch (error) {
+                            console.warn(`[Import] Не удалось импортировать настройки плагина ${setting.pluginName}:`, error.message);
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error('[Import] Ошибка при импорте данных:', error);
+            }
+        }
+
+        res.status(201).json(newBot);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: 'Бот с таким именем уже существует' });
+        }
+        console.error("[API Error] /bots/import/create:", error);
+        res.status(500).json({ error: 'Не удалось создать бота с импортированными данными' });
     }
 });
 

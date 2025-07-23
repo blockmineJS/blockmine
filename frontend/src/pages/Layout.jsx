@@ -406,9 +406,10 @@ export default function Layout() {
     const handleImportSuccess = (newBot) => {
         setIsImportModalOpen(false);
         setIsSheetOpen(false);
-        fetchInitialData();
-        toast({ title: "Успех!", description: `Бот "${newBot.username}" успешно импортирован.` });
-        navigate(`/bots/${newBot.id}`);
+        fetchInitialData().then(() => {
+            toast({ title: "Успех!", description: `Бот "${newBot.username}" успешно импортирован.` });
+            navigate(`/bots/${newBot.id}`);
+        });
     };
 
     const handleLogout = () => {
@@ -533,7 +534,11 @@ export default function Layout() {
                                     {!isCollapsed && "Импорт бота"}
                                 </Button>
                             </DialogTrigger>
-                            <ImportBotDialog onImportSuccess={handleImportSuccess} onCancel={() => setIsImportModalOpen(false)} />
+                            <ImportBotDialog 
+                                onImportSuccess={handleImportSuccess} 
+                                onCancel={() => setIsImportModalOpen(false)} 
+                                servers={servers}
+                            />
                         </Dialog>
                     )}
                 </div>
