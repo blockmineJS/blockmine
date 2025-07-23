@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -26,14 +26,170 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
 import ChangelogDialog from '@/components/ChangelogDialog';
+import { apiHelper } from '@/lib/api';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDragging: globalIsDragging }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: bot.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const handleClick = (e) => {
+        if (isDragging || globalIsDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        onLinkClick(e);
+    };
+
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            {...attributes} 
+            {...listeners}
+            onMouseDown={(e) => {
+                if (isDragging || globalIsDragging) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }}
+        >
+            <NavLink 
+                to={`/bots/${bot.id}`} 
+                onClick={handleClick} 
+                data-bot-id={bot.id} 
+                className={({ isActive }) => cn(
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 ease-in-out cursor-move",
+                    isActive 
+                        ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600 shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:shadow-sm",
+                    isCollapsed && "justify-center"
+                )}
+            >
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className={cn(
+                        "w-1.5 h-1.5 rounded-full transition-all duration-200",
+                        botStatuses[bot.id] === 'running' 
+                            ? 'bg-green-500 animate-pulse' 
+                            : 'bg-gray-500'
+                    )} />
+                    {isCollapsed && (
+                        <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center shadow-sm">
+                            <span className="text-xs font-bold text-white">
+                                {bot.username.charAt(0).toUpperCase()}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                <div className={cn("flex flex-col overflow-hidden", isCollapsed && "hidden")}>
+                    <span className="font-medium truncate text-xs">{bot.username}</span>
+                    <span className="text-xs text-muted-foreground truncate leading-tight">{bot.note || `${bot.server.host}:${bot.server.port}`}</span>
+                </div>
+            </NavLink>
+        </div>
+    );
+};
 
 const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const hasPermission = useAppStore(state => state.hasPermission);
+    const updateBotOrder = useAppStore(state => state.updateBotOrder);
     const location = useLocation();
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const [isDragging, setIsDragging] = useState(false);
 
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
+
+    const handleNavClick = (e, botId) => {
+        if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        onLinkClick(e);
+    };
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragStart = useCallback((event) => {
+        setIsDragging(true);
+    }, []);
+
+    const handleDragEnd = useCallback(async (event) => {
+        const { active, over } = event;
+
+        setTimeout(() => setIsDragging(false), 100);
+
+        if (active.id !== over.id) {
+            const oldIndex = bots.findIndex(bot => bot.id === active.id);
+            const newIndex = bots.findIndex(bot => bot.id === over.id);
+            
+            
+            const oldBots = [...bots];
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                const newBots = arrayMove(bots, oldIndex, newIndex);
+                updateBotOrder(newBots);
+
+                const result = await apiHelper(`/api/bots/${active.id}/sort-order`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ newPosition: newIndex + 1 }),
+                });
+
+            } catch (error) {
+                console.error('[Drag] Ошибка:', error);
+                updateBotOrder(oldBots);
+                toast({
+                    title: "Ошибка",
+                    description: "Не удалось обновить порядок ботов",
+                    variant: "destructive",
+                });
+            }
+        }
+    }, [bots, updateBotOrder, toast]);
 
     useEffect(() => {
         if (activeBotId) {
@@ -60,6 +216,43 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
             }
         }
     }, [activeBotId, bots]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        };
+
+        const handleClick = (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        };
+
+        const handleMouseDown = (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        };
+
+        if (isDragging) {
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            document.addEventListener('click', handleClick, true);
+            document.addEventListener('mousedown', handleMouseDown, true);
+            return () => {
+                window.removeEventListener('beforeunload', handleBeforeUnload);
+                document.removeEventListener('click', handleClick, true);
+                document.removeEventListener('mousedown', handleMouseDown, true);
+            };
+        }
+    }, [isDragging]);
 
     const navLinkClasses = ({ isActive }) => cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
@@ -117,37 +310,37 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                 maxHeight: bots.length >= 6 ? '35vh' : 'auto',
                 minHeight: bots.length > 0 ? '120px' : 'auto'
             }}>
-                <div className="space-y-0.5">
-                    {bots.map((bot) => (
-                        <NavLink key={bot.id} to={`/bots/${bot.id}`} onClick={onLinkClick} data-bot-id={bot.id} className={({ isActive }) => cn(
-                            "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 ease-in-out",
-                            isActive 
-                                ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600 shadow-sm" 
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:shadow-sm",
-                            isCollapsed && "justify-center"
-                        )}>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                                <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full transition-all duration-200",
-                                    botStatuses[bot.id] === 'running' 
-                                        ? 'bg-green-500 animate-pulse' 
-                                        : 'bg-gray-500'
-                                )} />
-                                {isCollapsed && (
-                                    <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center shadow-sm">
-                                        <span className="text-xs font-bold text-white">
-                                            {bot.username.charAt(0).toUpperCase()}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className={cn("flex flex-col overflow-hidden", isCollapsed && "hidden")}>
-                                <span className="font-medium truncate text-xs">{bot.username}</span>
-                                <span className="text-xs text-muted-foreground truncate leading-tight">{bot.note || `${bot.server.host}:${bot.server.port}`}</span>
-                            </div>
-                        </NavLink>
-                    ))}
-                </div>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={bots.map(bot => bot.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div 
+                            className="space-y-0.5"
+                            onMouseDown={(e) => {
+                                if (isDragging) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }
+                            }}
+                            onClick={(e) => {
+                                if (isDragging) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }
+                            }}
+                        >
+                            {bots.map((bot) => (
+                                <SortableBotItem key={bot.id} bot={bot} isCollapsed={isCollapsed} botStatuses={botStatuses} onLinkClick={onLinkClick} isDragging={isDragging} />
+                            ))}
+                        </div>
+                    </SortableContext>
+                </DndContext>
                 <div className="pb-1"></div>
             </div>
         </nav>

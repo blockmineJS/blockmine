@@ -177,6 +177,12 @@ export const createCoreSlice = (set, get) => ({
         });
     },
 
+    updateBotOrder: (newBotsOrder) => {
+        set(state => {
+            state.bots = newBotsOrder;
+        });
+    },
+
     fetchChangelog: async () => {
         try {
             const response = await fetch('/api/changelog');

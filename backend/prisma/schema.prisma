@@ -23,6 +23,7 @@ model Bot {
   prefix   String? @default("@")
   note     String?
   owners   String? @default("")
+  sortOrder Int?
 
   server   Server @relation(fields: [serverId], references: [id])
   serverId Int

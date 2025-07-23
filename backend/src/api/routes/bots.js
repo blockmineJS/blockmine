@@ -127,7 +127,25 @@ router.post('/:id/stop', conditionalStartStopAuth, (req, res) => {
 
 router.get('/', conditionalListAuth, async (req, res) => {
     try {
-        const bots = await prisma.bot.findMany({ include: { server: true }, orderBy: { createdAt: 'asc' } });
+        const botsWithoutSortOrder = await prisma.bot.findMany({
+            where: { sortOrder: null },
+            select: { id: true }
+        });
+        
+        if (botsWithoutSortOrder.length > 0) {
+            console.log(`[API] Обновляем sortOrder для ${botsWithoutSortOrder.length} ботов`);
+            for (const bot of botsWithoutSortOrder) {
+                await prisma.bot.update({
+                    where: { id: bot.id },
+                    data: { sortOrder: bot.id }
+                });
+            }
+        }
+        
+        const bots = await prisma.bot.findMany({ 
+            include: { server: true }, 
+            orderBy: { sortOrder: 'asc' } 
+        });
         res.json(bots);
     } catch (error) { 
         console.error("[API /api/bots] Ошибка получения списка ботов:", error);
@@ -218,12 +236,18 @@ router.post('/', authorize('bot:create'), async (req, res) => {
         const { username, password, prefix, serverId, note } = req.body;
         if (!username || !serverId) return res.status(400).json({ error: 'Имя и сервер обязательны' });
         
+        const maxSortOrder = await prisma.bot.aggregate({
+            _max: { sortOrder: true }
+        });
+        const nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1;
+        
         const data = { 
             username, 
             prefix, 
             note, 
             serverId: parseInt(serverId, 10),
-            password: password ? encrypt(password) : null 
+            password: password ? encrypt(password) : null,
+            sortOrder: nextSortOrder
         };
 
         const newBot = await prisma.bot.create({
@@ -302,34 +326,90 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
         const updatedBot = await prisma.bot.update({
             where: { id: botId },
             data: dataToUpdate,
-            include: {
-                server: true
-            }
+            include: { server: true }
         });
-
-        const botManager = req.app.get('botManager');
-        botManager.reloadBotConfigInRealTime(botId);
-
-        if (dataToUpdate.owners !== undefined) {
-            botManager.invalidateAllUserCache(botId);
-        }
 
         res.json(updatedBot);
     } catch (error) {
-        console.error('Error updating bot:', error);
-        console.error('Error details:', {
-            code: error.code,
-            meta: error.meta,
-            message: error.message
-        });
+        console.error("[API Error] /bots PUT:", error);
+        res.status(500).json({ error: 'Не удалось обновить бота' });
+    }
+});
+
+router.put('/:id/sort-order', authorize('bot:update'), async (req, res) => {
+    try {
+        const { newPosition } = req.body;
+        const botId = parseInt(req.params.id, 10);
         
-        if (error.code === 'P2002' && error.meta?.target?.includes('username')) {
-            return res.status(400).json({ 
-                message: 'Бот с таким именем уже существует. Выберите другое имя.' 
-            });
+        console.log(`[API] Запрос на изменение порядка бота ${botId} на позицию ${newPosition}`);
+        
+        if (isNaN(botId) || typeof newPosition !== 'number') {
+            console.log(`[API] Неверные параметры: botId=${botId}, newPosition=${newPosition}`);
+            return res.status(400).json({ error: 'Неверные параметры' });
         }
+
+        const currentBot = await prisma.bot.findUnique({
+            where: { id: botId },
+            select: { sortOrder: true }
+        });
+
+        if (!currentBot) {
+            console.log(`[API] Бот ${botId} не найден`);
+            return res.status(404).json({ error: 'Бот не найден' });
+        }
+
+        const currentPosition = currentBot.sortOrder;
+        console.log(`[API] Текущая позиция бота ${botId}: ${currentPosition}, новая позиция: ${newPosition}`);
         
-        res.status(500).json({ message: `Не удалось обновить бота: ${error.message}` });
+        if (newPosition === currentPosition) {
+            console.log(`[API] Позиция не изменилась для бота ${botId}`);
+            return res.json({ success: true, message: 'Позиция не изменилась' });
+        }
+
+        if (newPosition > currentPosition) {
+            console.log(`[API] Перемещаем бота ${botId} вниз с позиции ${currentPosition} на ${newPosition}`);
+            const updateResult = await prisma.bot.updateMany({
+                where: {
+                    sortOrder: {
+                        gt: currentPosition,
+                        lte: newPosition
+                    }
+                },
+                data: {
+                    sortOrder: {
+                        decrement: 1
+                    }
+                }
+            });
+            console.log(`[API] Обновлено ${updateResult.count} ботов при перемещении вниз`);
+        } else {
+            console.log(`[API] Перемещаем бота ${botId} вверх с позиции ${currentPosition} на ${newPosition}`);
+            const updateResult = await prisma.bot.updateMany({
+                where: {
+                    sortOrder: {
+                        gte: newPosition,
+                        lt: currentPosition
+                    }
+                },
+                data: {
+                    sortOrder: {
+                        increment: 1
+                    }
+                }
+            });
+            console.log(`[API] Обновлено ${updateResult.count} ботов при перемещении вверх`);
+        }
+
+        await prisma.bot.update({
+            where: { id: botId },
+            data: { sortOrder: newPosition }
+        });
+
+        console.log(`[API] Успешно обновлен порядок бота ${botId} на позицию ${newPosition}`);
+        res.json({ success: true, message: 'Порядок ботов обновлен' });
+    } catch (error) {
+        console.error("[API Error] /bots sort-order PUT:", error);
+        res.status(500).json({ error: 'Не удалось обновить порядок ботов' });
     }
 });
 
