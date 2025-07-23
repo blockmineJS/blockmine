@@ -175,14 +175,19 @@ process.on('message', async (message) => {
 
             if (config.proxyHost && config.proxyPort) {
                 sendLog(`[System] Используется прокси: ${config.proxyHost}:${config.proxyPort}`);
+                
+                // Очищаем пароль от лишних символов
+                const cleanProxyPassword = config.proxyPassword ? config.proxyPassword.trim() : null;
+                const cleanProxyUsername = config.proxyUsername ? config.proxyUsername.trim() : null;
+                
                 botOptions.connect = (client) => {
                    SocksClient.createConnection({
                        proxy: {
                            host: config.proxyHost,
                            port: config.proxyPort,
                            type: 5,
-                           userId: config.proxyUsername,
-                           password: config.proxyPassword
+                           userId: cleanProxyUsername,
+                           password: cleanProxyPassword
                        },
                        command: 'connect',
                        destination: {
@@ -194,6 +199,7 @@ process.on('message', async (message) => {
                        client.emit('connect');
                    }).catch(err => {
                        sendLog(`[Proxy Error] ${err.message}`);
+                       sendLog(`[Debug] Full proxy error: ${JSON.stringify(err)}`);
                        client.emit('error', err);
                    });
                 }

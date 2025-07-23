@@ -380,6 +380,10 @@ class BotManager {
         if (decryptedConfig.password) decryptedConfig.password = decrypt(decryptedConfig.password);
         if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
 
+        // Очищаем данные прокси от лишних символов
+        if (decryptedConfig.proxyUsername) decryptedConfig.proxyUsername = decryptedConfig.proxyUsername.trim();
+        if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decryptedConfig.proxyPassword.trim();
+
         const fullBotConfig = { ...decryptedConfig, plugins: sortedPlugins };
         const botProcessPath = path.resolve(__dirname, 'BotProcess.js');
         const child = fork(botProcessPath, [], { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
