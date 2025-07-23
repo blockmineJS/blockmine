@@ -38,12 +38,24 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     useEffect(() => {
         if (activeBotId) {
             const activeBotElement = document.querySelector(`[data-bot-id="${activeBotId}"]`);
-            if (activeBotElement) {
+            const scrollContainer = activeBotElement?.closest('.custom-scrollbar');
+            
+            if (activeBotElement && scrollContainer) {
                 setTimeout(() => {
-                    activeBotElement.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'nearest'
-                    });
+                    const containerRect = scrollContainer.getBoundingClientRect();
+                    const elementRect = activeBotElement.getBoundingClientRect();
+                    
+                    const isVisible = (
+                        elementRect.top >= containerRect.top &&
+                        elementRect.bottom <= containerRect.bottom
+                    );
+                    
+                    if (!isVisible) {
+                        activeBotElement.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'nearest'
+                        });
+                    }
                 }, 100);
             }
         }
@@ -101,7 +113,10 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                 </div>
             )}
             
-            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200" style={{ maxHeight: '280px' }}>
+            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200" style={{ 
+                maxHeight: bots.length >= 6 ? '35vh' : 'auto',
+                minHeight: bots.length > 0 ? '120px' : 'auto'
+            }}>
                 <div className="space-y-0.5">
                     {bots.map((bot) => (
                         <NavLink key={bot.id} to={`/bots/${bot.id}`} onClick={onLinkClick} data-bot-id={bot.id} className={({ isActive }) => cn(
