@@ -479,24 +479,49 @@ router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view
         if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
         const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
-        let defaultSettings = {};
+        const defaultSettings = {};
         const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+        const manifestSettings = manifest.settings || {};
 
-        if (manifest.settings) {
-            for (const key in manifest.settings) {
-                const config = manifest.settings[key];
-                if (config.type === 'json_file' && config.defaultPath) {
-                    const configFilePath = path.join(plugin.path, config.defaultPath);
-                    try {
-                        const fileContent = await fs.readFile(configFilePath, 'utf-8');
-                        defaultSettings[key] = JSON.parse(fileContent);
-                    } catch (e) { defaultSettings[key] = {}; }
-                } else {
-                    try { defaultSettings[key] = JSON.parse(config.default || 'null'); } 
-                    catch { defaultSettings[key] = config.default; }
+
+        const firstSettingValue = Object.values(manifestSettings)[0];
+        const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+
+        const processSetting = async (settingKey, config) => {
+            if (!config || !config.type) return;
+
+            if (config.type === 'json_file' && config.defaultPath) {
+                const configFilePath = path.join(plugin.path, config.defaultPath);
+                try {
+                    const fileContent = await fs.readFile(configFilePath, 'utf-8');
+                    defaultSettings[settingKey] = JSON.parse(fileContent);
+                } catch (e) {
+                    console.error(`[API Settings] Не удалось прочитать defaultPath ${config.defaultPath} для плагина ${plugin.name}: ${e.message}`);
+                    defaultSettings[settingKey] = {};
+                }
+            } else if (config.default !== undefined) {
+                try {
+                    defaultSettings[settingKey] = JSON.parse(config.default);
+                } catch {
+                    defaultSettings[settingKey] = config.default;
                 }
             }
+        };
+
+        if (isGrouped) {
+            for (const categoryKey in manifestSettings) {
+                const categoryConfig = manifestSettings[categoryKey];
+                for (const settingKey in categoryConfig) {
+                    if (settingKey === 'label') continue;
+                    await processSetting(settingKey, categoryConfig[settingKey]);
+                }
+            }
+        } else {
+            for (const settingKey in manifestSettings) {
+                await processSetting(settingKey, manifestSettings[settingKey]);
+            }
         }
+
         const finalSettings = { ...defaultSettings, ...savedSettings };
         res.json(finalSettings);
     } catch (error) {

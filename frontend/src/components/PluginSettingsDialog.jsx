@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { Edit, Save, Code, Trash2, Loader2, Settings, Info } from 'lucide-react';
 import Editor from '@monaco-editor/react';
@@ -33,22 +34,11 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
         }
     };
     
-    const handleFormatCode = () => {
-        try {
-            const parsed = JSON.parse(jsonString);
-            const formatted = JSON.stringify(parsed, null, 2);
-            setJsonString(formatted);
-        } catch (e) {
-        }
-    }
-
     return (
         <DialogContent className="max-w-3xl">
             <DialogHeader>
                 <DialogTitle>Редактор конфигурации JSON</DialogTitle>
-                <DialogDescription>
-                    Внесите изменения и сохраните. Редактор подсветит синтаксические ошибки.
-                </DialogDescription>
+                <DialogDescription>Внесите изменения и сохраните.</DialogDescription>
             </DialogHeader>
             <div className="py-4 relative">
                 <Editor
@@ -57,20 +47,12 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
                     value={jsonString}
                     onChange={(value) => setJsonString(value || '')}
                     theme="vs-dark"
-                    options={{
-                        minimap: { enabled: false },
-                        fontSize: 14,
-                        wordWrap: 'on',
-                        automaticLayout: true,
-                    }}
+                    options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on' }}
                 />
             </div>
-            <DialogFooter className="justify-between sm:justify-between">
-                <Button variant="outline" onClick={handleFormatCode}><Code className="mr-2"/>Форматировать</Button>
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={onCancel}>Отмена</Button>
-                    <Button onClick={handleSave}><Save className="mr-2"/>Применить и сохранить</Button>
-                </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button onClick={handleSave}><Save className="mr-2"/>Применить</Button>
             </DialogFooter>
         </DialogContent>
     );
@@ -80,13 +62,17 @@ function SettingField({ settingKey, config, value, onChange }) {
     const id = `${settingKey}-input`;
     const [isJsonEditorOpen, setIsJsonEditorOpen] = useState(false);
 
+    if (!config || !config.type) {
+        return null;
+    }
+
     switch (config.type) {
         case 'string':
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
                     <Input id={id} value={value || ''} onChange={(e) => onChange(settingKey, e.target.value)} />
-                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                    {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
         case 'string[]':
@@ -94,7 +80,7 @@ function SettingField({ settingKey, config, value, onChange }) {
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
                     <Textarea id={id} value={Array.isArray(value) ? value.join('\n') : ''} onChange={(e) => onChange(settingKey, e.target.value.split('\n'))} />
-                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
         case 'boolean':
@@ -102,7 +88,7 @@ function SettingField({ settingKey, config, value, onChange }) {
                 <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                     <div className="space-y-0.5">
                         <Label htmlFor={id} className="cursor-pointer">{config.label}</Label>
-                        <p className="text-sm text-muted-foreground">{config.description}</p>
+                        {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                     </div>
                     <Switch id={id} checked={!!value} onCheckedChange={(checked) => onChange(settingKey, checked)} />
                 </div>
@@ -112,16 +98,15 @@ function SettingField({ settingKey, config, value, onChange }) {
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
                     <Input id={id} type="number" value={value ?? ''} onChange={(e) => onChange(settingKey, e.target.value === '' ? null : e.target.valueAsNumber)} />
-                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                    {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
-        case 'json':
         case 'json_file':
             return (
                 <div className="space-y-2">
                     <Label>{config.label}</Label>
                     <div className="flex items-center justify-between rounded-lg border p-3">
-                        <p className="text-sm text-muted-foreground">{config.description}</p>
+                        {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                         <Dialog open={isJsonEditorOpen} onOpenChange={setIsJsonEditorOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Редактировать</Button>
@@ -140,13 +125,18 @@ function SettingField({ settingKey, config, value, onChange }) {
     }
 }
 
-
 export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSaveSuccess }) {
     const [settings, setSettings] = useState(null);
     const [isClearing, setIsClearing] = useState(false);
     const { toast } = useToast();
     const manifestSettings = plugin.manifest?.settings || {};
 
+    const isGrouped = useMemo(() => {
+        if (Object.keys(manifestSettings).length === 0) return false;
+        const firstSettingValue = Object.values(manifestSettings)[0];
+        return firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+    }, [manifestSettings]);
+    
     useEffect(() => {
         const fetchSettings = async () => {
             setSettings(null);
@@ -174,20 +164,60 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             
             onSaveSuccess();
             onOpenChange(false);
-        } catch (error) {
-        }
+        } catch (error) { }
     };
-
+    
     const handleClearData = async () => {
         if (confirm(`Вы уверены, что хотите удалить все данные плагина "${plugin.name}"? Это действие необратимо.`)) {
             setIsClearing(true);
             try {
                 await apiHelper(`/api/plugins/${plugin.id}/clear-data`, { method: 'POST' }, 'Данные плагина успешно очищены.');
-            } catch (error) {
-            } finally {
+            } catch (error) { } finally {
                 setIsClearing(false);
             }
         }
+    };
+
+    const renderSettings = () => {
+        if (settings === null) return <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>;
+        if (Object.keys(manifestSettings).length === 0) return <p className="text-muted-foreground p-4 text-center">У этого плагина нет настроек.</p>;
+
+        if (isGrouped) {
+            return (
+                 <Accordion type="multiple" className="w-full space-y-2" defaultValue={Object.keys(manifestSettings)}>
+                    {Object.entries(manifestSettings).map(([categoryKey, categoryConfig]) => (
+                        <AccordionItem key={categoryKey} value={categoryKey} className="border rounded-lg bg-muted/20 px-4">
+                            <AccordionTrigger className="text-base font-semibold hover:no-underline">{categoryConfig.label}</AccordionTrigger>
+                            <AccordionContent className="pt-4 border-t space-y-4">
+                                {Object.entries(categoryConfig).filter(([key]) => key !== 'label').map(([key, config]) => (
+                                     <SettingField
+                                        key={key}
+                                        settingKey={key}
+                                        config={config}
+                                        value={settings[key]}
+                                        onChange={handleSettingChange}
+                                    />
+                                ))}
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            );
+        }
+
+        return (
+            <div className="space-y-4">
+                {Object.entries(manifestSettings).map(([key, config]) => (
+                    <SettingField
+                        key={key}
+                        settingKey={key}
+                        config={config}
+                        value={settings[key]}
+                        onChange={handleSettingChange}
+                    />
+                ))}
+            </div>
+        );
     };
 
     return (
@@ -199,46 +229,17 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             
             <Tabs defaultValue="settings" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="settings" className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Настройки
-                    </TabsTrigger>
-                    <TabsTrigger value="info" className="flex items-center gap-2">
-                        <Info className="h-4 w-4" />
-                        Информация
-                    </TabsTrigger>
+                    <TabsTrigger value="settings" className="flex items-center gap-2"><Settings className="h-4 w-4" />Настройки</TabsTrigger>
+                    <TabsTrigger value="info" className="flex items-center gap-2"><Info className="h-4 w-4" />Информация</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="settings" className="space-y-4">
-                    <div className="max-h-[50vh] overflow-y-auto pr-2">
-                        {settings === null ? <p>Загрузка настроек...</p> : (
-                            Object.keys(manifestSettings).length > 0 ? (
-                                Object.entries(manifestSettings).map(([key, config]) => (
-                                    <SettingField
-                                        key={key}
-                                        settingKey={key}
-                                        config={config}
-                                        value={settings[key]}
-                                        onChange={handleSettingChange}
-                                    />
-                                ))
-                            ) : (
-                                <p className="text-muted-foreground">У этого плагина нет настроек.</p>
-                            )
-                        )}
+                <TabsContent value="settings">
+                    <div className="max-h-[50vh] overflow-y-auto pr-2 py-4">
+                        {renderSettings()}
                     </div>
-                    
-                    <DialogFooter className="justify-between sm:justify-between">
-                        <Button 
-                            variant="destructive"
-                            onClick={handleClearData}
-                            disabled={isClearing}
-                        >
-                            {isClearing ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <Trash2 className="mr-2 h-4 w-4" />
-                            )}
+                    <DialogFooter className="justify-between sm:justify-between pt-4 border-t">
+                        <Button variant="destructive" onClick={handleClearData} disabled={isClearing}>
+                            {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Очистить данные
                         </Button>
                         <div className="flex gap-2">
@@ -251,7 +252,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                     </DialogFooter>
                 </TabsContent>
 
-                <TabsContent value="info" className="max-h-[50vh] overflow-y-auto">
+                <TabsContent value="info" className="max-h-[60vh] overflow-y-auto py-4">
                     <PluginDetailInfo plugin={plugin} botId={bot.id} />
                 </TabsContent>
             </Tabs>
