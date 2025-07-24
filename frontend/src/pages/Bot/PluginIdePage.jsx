@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Save } from 'lucide-react';
+import { Save, Download, Copy } from 'lucide-react';
 import Editor from "@monaco-editor/react";
 import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Github } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
@@ -31,6 +32,8 @@ export default function PluginIdePage() {
         originalRepo: '' 
     });
     const [isPrLoading, setIsPrLoading] = useState(false);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+    const [exportedCode, setExportedCode] = useState('');
 
     const [openTabs, setOpenTabs] = useState([]);
     const [activeTab, setActiveTab] = useState(null);
@@ -327,6 +330,148 @@ export default function PluginIdePage() {
             setIsPrLoading(false);
         }
     };
+
+    const handleExportPlugin = async () => {
+        try {
+            console.log('Начинаем экспорт плагина:', pluginName);
+            
+            const shouldIgnore = (filePath) => {
+                const ignoreList = [
+                    'node_modules/',
+                    'package-lock.json',
+                    '.git/',
+                    '.vscode/',
+                    '.idea/',
+                    '*.log',
+                    '*.sql',
+                    '*.db',
+                    'sqlite.db',
+                    'local_modules',
+                    'miniapp',
+                    'drizzle',
+                    'dist/',
+                    '.env',
+                    '.gemini_histroy',
+                    '.gemini_tool_history_js',
+                    'com.txt',
+                    'image',
+                    'logo.png',
+                    'public/',
+                    'storage'
+                ];
+                
+                return ignoreList.some(pattern => {
+                    if (pattern.endsWith('/')) {
+                        const dirPattern = pattern.slice(0, -1);
+                        return filePath.includes(dirPattern) || filePath.startsWith(pattern);
+                    }
+                    if (pattern.startsWith('*.')) {
+                        const extension = pattern.substring(1);
+                        return filePath.endsWith(extension);
+                    }
+                    return filePath === pattern || filePath.includes(pattern);
+                });
+            };
+            
+            const structureData = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/structure`);
+            console.log('Структура получена:', structureData);
+            
+            const allFiles = [];
+            const collectFiles = (items, basePath = '') => {
+                items.forEach(item => {
+                    const fullPath = basePath ? `${basePath}/${item.name}` : item.name;
+                    
+                    if (shouldIgnore(fullPath)) {
+                        return;
+                    }
+                    
+                    if (item.type === 'file') {
+                        allFiles.push(fullPath);
+                    } else if (item.type === 'folder' && item.children) {
+                        collectFiles(item.children, fullPath);
+                    }
+                });
+            };
+            
+            collectFiles(structureData);
+            console.log('Найдено файлов:', allFiles);
+            
+            const fileContents = [];
+            for (const filePath of allFiles) {
+                try {
+                    const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/file?path=${encodeURIComponent(filePath)}`, {
+                        headers: {
+                            'Authorization': `Bearer ${useAppStore.getState().token}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const content = await response.text();
+                        fileContents.push({
+                            path: filePath,
+                            content: content
+                        });
+                        console.log(`Загружен файл: ${filePath}`);
+                    } else {
+                        console.error(`Ошибка HTTP ${response.status} для файла ${filePath}`);
+                    }
+                } catch (error) {
+                    console.error(`Ошибка загрузки файла ${filePath}:`, error);
+                }
+            }
+            
+            let combinedCode = `// Весь код плагина: ${pluginName}\n\n`;
+            
+            combinedCode += `// Структура файлов:\n`;
+            const addTreeStructure = (items, indent = '', basePath = '') => {
+                items.forEach(item => {
+                    const fullPath = basePath ? `${basePath}/${item.name}` : item.name;
+                    
+                    if (shouldIgnore(fullPath)) {
+                        return;
+                    }
+                    
+                    const prefix = item.type === 'folder' ? '📁' : '📄';
+                    combinedCode += `${indent}${prefix} ${item.name}\n`;
+                    if (item.type === 'folder' && item.children) {
+                        addTreeStructure(item.children, indent + '  ', fullPath);
+                    }
+                });
+            };
+            addTreeStructure(structureData);
+            combinedCode += '\n';
+            
+            combinedCode += `// Содержимое файлов:\n`;
+            combinedCode += `// ========================================\n\n`;
+            
+            fileContents.forEach((file, index) => {
+                combinedCode += `// Файл ${index + 1}: ${file.path}\n`;
+                combinedCode += `// ========================================\n`;
+                combinedCode += file.content;
+                combinedCode += `\n\n`;
+            });
+            
+            console.log('Код сформирован, размер:', combinedCode.length);
+            setExportedCode(combinedCode);
+            setIsExportDialogOpen(true);
+            
+        } catch (error) {
+            console.error('Ошибка экспорта плагина:', error);
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось экспортировать плагин' });
+        }
+    };
+
+    const handleCopyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(exportedCode);
+            toast({ title: 'Успех', description: 'Код скопирован в буфер обмена' });
+        } catch (error) {
+            console.error('Ошибка копирования:', error);
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось скопировать код' });
+        }
+    };
+
+
     
     return (
         <div className="h-full w-full flex flex-col p-4 gap-4">
@@ -336,6 +481,10 @@ export default function PluginIdePage() {
                     <p className="text-muted-foreground">Редактирование для бота #{botId}</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button onClick={handleExportPlugin} variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Полный код
+                    </Button>
                     <Button onClick={handleOpenPrDialog}>
                         <Github className="h-4 w-4 mr-2" />
                         Создать PR
@@ -460,6 +609,38 @@ export default function PluginIdePage() {
                         <Button onClick={handleCreatePr} disabled={isPrLoading || !prForm.branch || !prForm.originalRepo}>
                             {isPrLoading ? 'Создание...' : 'Создать и открыть PR'}
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogContent className="max-w-4xl max-h-[80vh]">
+                    <DialogHeader>
+                        <DialogTitle>Весь код плагина: {pluginName}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Весь код плагина</Label>
+                            <div className="relative">
+                                <Textarea
+                                    value={exportedCode}
+                                    readOnly
+                                    className="min-h-[400px] font-mono text-sm"
+                                    placeholder="Код плагина будет загружен..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex justify-between">
+                        <div className="text-sm text-muted-foreground">
+                            Размер: {Math.round(exportedCode.length / 1024)} KB
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={handleCopyToClipboard} variant="outline">
+                                <Copy className="h-4 w-4 mr-2" />
+                                Копировать
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
