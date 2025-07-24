@@ -121,7 +121,7 @@ export const createCoreSlice = (set, get) => ({
 
                     const uniqueLogs = Array.from(new Map(combinedLogs.map(log => [log.id, log])).values());
 
-                    newBotLogs[botId] = uniqueLogs.slice(-1000);
+                    newBotLogs[botId] = uniqueLogs.slice(-200);
                 }
 
                 return {
@@ -171,7 +171,7 @@ export const createCoreSlice = (set, get) => ({
             }
 
             const newLogs = [...currentLogs, newLog];
-            const limitedLogs = newLogs.length > 2000 ? newLogs.slice(-2000) : newLogs;
+            const limitedLogs = newLogs.length > 500 ? newLogs.slice(-500) : newLogs;
 
             state.botLogs[botId] = limitedLogs;
         });

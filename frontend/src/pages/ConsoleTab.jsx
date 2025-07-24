@@ -37,7 +37,7 @@ export default function ConsoleTab() {
     
     const logs = useMemo(() => {
         const allLogs = botLogs[botId] || [];
-        const maxLogs = allLogs.length > 5000 ? 500 : allLogs.length > 2000 ? 1000 : 2000;
+        const maxLogs = allLogs.length > 1000 ? 200 : allLogs.length > 500 ? 300 : 500;
         return allLogs.slice(-maxLogs);
     }, [botLogs, botId]);
     
@@ -100,7 +100,7 @@ export default function ConsoleTab() {
         lastLogCount.current = logs.length;
 
         const allLogsForBot = botLogs[botId] || [];
-        if (allLogsForBot.length > 4000) {
+        if (allLogsForBot.length > 800) {
             setShowPerformanceWarning(true);
         } else {
             setShowPerformanceWarning(false);
