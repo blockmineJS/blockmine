@@ -22,6 +22,17 @@ const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
 let connectionTimeout = null;
 
+const originalJSONParse = JSON.parse
+JSON.parse = function(text, reviver) {
+  if (typeof text !== 'string') return originalJSONParse(text, reviver)
+  try {
+    return originalJSONParse(text, reviver)
+  } catch (e) {
+    const fixed = text.replace(/([{,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
+    return originalJSONParse(fixed, reviver)
+  }
+}
+
 function sendLog(content) {
     if (process.send) {
         process.send({ type: 'log', content });
