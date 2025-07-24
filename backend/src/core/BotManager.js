@@ -55,6 +55,7 @@ class BotManager {
 
         getInstanceId();
         setInterval(() => this.updateAllResourceUsage(), 5000);
+        setInterval(() => this.syncBotStatuses(), 10000);
         if (config.telemetry?.enabled) {
             setInterval(() => this.sendHeartbeat(), 5 * 60 * 1000);
         }
@@ -322,6 +323,14 @@ class BotManager {
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
         getIO().emit('bot:status', { botId, status, message });
     }
+
+    syncBotStatuses() {
+        for (const [botId, child] of this.bots.entries()) {
+            const actualStatus = child.killed ? 'stopped' : 'running';
+            const { getIO } = require('../real-time/socketHandler');
+            getIO().emit('bot:status', { botId, status: actualStatus });
+        }
+    }
     
     appendLog(botId, logContent) {
         const { getIO } = require('../real-time/socketHandler');
@@ -330,7 +339,7 @@ class BotManager {
             content: logContent,
         };
         const currentLogs = this.logCache.get(botId) || [];
-        const newLogs = [...currentLogs.slice(-499), logEntry];
+        const newLogs = [...currentLogs.slice(-199), logEntry];
         this.logCache.set(botId, newLogs);
         getIO().emit('bot:log', { botId, log: logEntry });
     }
@@ -380,7 +389,6 @@ class BotManager {
         if (decryptedConfig.password) decryptedConfig.password = decrypt(decryptedConfig.password);
         if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
 
-        // Очищаем данные прокси от лишних символов
         if (decryptedConfig.proxyUsername) decryptedConfig.proxyUsername = decryptedConfig.proxyUsername.trim();
         if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decryptedConfig.proxyPassword.trim();
 
@@ -430,6 +438,9 @@ class BotManager {
                         break;
                     case 'status':
                         this.emitStatusUpdate(botId, message.status);
+                        break;
+                    case 'bot_ready':
+                        this.emitStatusUpdate(botId, 'running', 'Бот успешно подключился к серверу.');
                         break;
                     case 'validate_and_run_command':
                         await this.handleCommandValidation(botConfig, message);
