@@ -1,6 +1,16 @@
 # История версий
 
 
+### [1.17.1](https://github.com/blockmineJS/blockmine/compare/v1.17.0...v1.17.1) (2025-07-24)
+
+
+### 🐛 Исправления
+
+* добавлена синхронизация статусов ботов каждые 10 секунд и обработка события 'bot_ready' ([c9e8bcc](https://github.com/blockmineJS/blockmine/commit/c9e8bcc5f1b31a122aa05b2bb65f3b4127dfb79a))
+* исправление ошибок со скинами. вроде ([459d65b](https://github.com/blockmineJS/blockmine/commit/459d65ba40ec18da5d9a7402992c2cd6aa73a7d2))
+* исправление ошибок со скинами. by сахарок ([433e5c6](https://github.com/blockmineJS/blockmine/commit/433e5c6222e385cfd0ba656c78eecd67f094b0ef))
+* уменьшены лимиты логов для ботов. так много явно не надо ([d690dcd](https://github.com/blockmineJS/blockmine/commit/d690dcd5701603d455d105a2032f9262923cf5f0))
+
 ## [1.17.0](https://github.com/blockmineJS/blockmine/compare/v1.16.3...v1.17.0) (2025-07-24)
 
 
