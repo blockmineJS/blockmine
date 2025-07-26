@@ -4,33 +4,11 @@ const fs = require('fs/promises');
 const { execSync } = require('child_process');
 const fssync = require('fs');
 const PluginStore = require('../plugins/PluginStore');
+const { deepMergeSettings } = require('./utils/settingsMerger');
 
 const projectRoot = path.resolve(__dirname, '..');
 
-async function ensurePluginDependencies(pluginPath, pluginName) {
-    const packageJsonPath = path.join(pluginPath, 'package.json');
-    try {
-        if (fssync.existsSync(packageJsonPath)) {
-            const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
-            if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0) {
-                console.log(`[PluginLoader] У плагина ${pluginName} есть зависимости, устанавливаем их...`);
-                const shell = process.platform === 'win32' ? process.env.ComSpec : '/bin/sh';
-                try {
-                    execSync('npm install', {
-                        cwd: pluginPath,
-                        stdio: 'pipe',
-                        shell: shell
-                    });
-                    console.log(`[PluginLoader] Зависимости для плагина ${pluginName} установлены`);
-                } catch (installError) {
-                    console.error(`[PluginLoader] Ошибка установки зависимостей для ${pluginName}:`, installError.message);
-                }
-            }
-        }
-    } catch (error) {
-        console.error(`[PluginLoader] Ошибка чтения package.json для ${pluginName}:`, error.message);
-    }
-}
+
 
 async function initializePlugins(bot, installedPlugins = [], prisma) {
     if (!installedPlugins || installedPlugins.length === 0) return;
@@ -41,8 +19,6 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
     for (const plugin of installedPlugins) {
         if (plugin && plugin.path) {
             try {
-                await ensurePluginDependencies(plugin.path, plugin.name);
-
                 const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
                 const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
                 const defaultSettings = {};
@@ -69,7 +45,7 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                     }
                 }
                 
-                const finalSettings = { ...defaultSettings, ...savedSettings };
+                const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
                 const store = new PluginStore(prisma, bot.config.id, plugin.name);
                 
                 const mainFile = manifest.main || 'index.js';
@@ -89,37 +65,16 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                         sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
                     }
                 } catch (error) {
+                    // Зависимости должны быть установлены заранее в PluginManager
+                    // Если модуль не найден, это означает, что установка зависимостей не была выполнена корректно
                     if (error.message.includes('Cannot find module')) {
                         const moduleMatch = error.message.match(/Cannot find module '([^']+)'/);
                         if (moduleMatch) {
                             const missingModule = moduleMatch[1];
-                            sendLog(`[PluginLoader] Попытка установки недостающего модуля ${missingModule} в папку плагина ${plugin.name}`);
-                            const shell = process.platform === 'win32' ? process.env.ComSpec : '/bin/sh';
-                            try {
-                                execSync(`npm install ${missingModule}`, {
-                                    cwd: plugin.path,
-                                    stdio: 'pipe',
-                                    shell: shell
-                                });
-                                sendLog(`[PluginLoader] Модуль ${missingModule} успешно установлен в папку плагина ${plugin.name}, повторная попытка загрузки`);
-                                
-                                // Повторная попытка загрузки
-                                const pluginModule = require(normalizedPath);
-                                if (typeof pluginModule === 'function') {
-                                    pluginModule(bot, { settings: finalSettings, store });
-                                } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-                                    pluginModule.onLoad(bot, { settings: finalSettings, store });
-                                }
-                            } catch (installError) {
-                                sendLog(`[PluginLoader] Не удалось установить модуль ${missingModule} в папку плагина ${plugin.name}: ${installError.message}`);
-                                throw error; // Пробрасываем оригинальную ошибку
-                            }
-                        } else {
-                            throw error;
+                            sendLog(`[PluginLoader] [ERROR] Модуль ${missingModule} не найден для плагина ${plugin.name}. Зависимости должны быть установлены заранее.`);
                         }
-                    } else {
-                        throw error;
                     }
+                    throw error;
                 }
 
             } catch (error) {

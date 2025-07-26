@@ -1,6 +1,7 @@
 const path = require('path');
 const fse = require('fs-extra');
 const os = require('os');
+const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
 const AdmZip = require('adm-zip');
 const semver = require('semver');
@@ -46,6 +47,27 @@ class PluginManager {
         await fse.mkdir(PLUGINS_BASE_DIR, { recursive: true }).catch(console.error);
     }
 
+    async _installDependencies(pluginPath) {
+        const packageJsonPath = path.join(pluginPath, 'package.json');
+        try {
+            if (await fse.pathExists(packageJsonPath)) {
+                const packageJson = await fse.readJson(packageJsonPath);
+                if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0) {
+                    console.log(`[PluginManager] Установка зависимостей для плагина в ${pluginPath}...`);
+                    // Используем --omit=dev чтобы не ставить dev-зависимости
+                    execSync('npm install --omit=dev', {
+                        cwd: pluginPath,
+                        stdio: 'inherit'
+                    });
+                    console.log(`[PluginManager] Зависимости успешно установлены.`);
+                }
+            }
+        } catch (error) {
+            console.error(`[PluginManager] Ошибка при установке зависимостей в ${pluginPath}:`, error);
+            throw new Error('Не удалось установить зависимости плагина.');
+        }
+    }
+
     async installFromLocalPath(botId, directoryPath) {
         const newPlugin = await this.registerPlugin(botId, directoryPath, 'LOCAL', directoryPath);
         try {
@@ -55,6 +77,7 @@ class PluginManager {
             console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
         }
 
+        await this._installDependencies(directoryPath);
         await this.loadPluginGraphs(botId, newPlugin.id, directoryPath);
         
         if (this.botManager) {
@@ -109,6 +132,8 @@ class PluginManager {
             zip.extractAllTo(botPluginsDir, true);
             
             await fse.move(tempExtractPath, localPath, { overwrite: true });
+
+            await this._installDependencies(localPath);
 
             const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
             

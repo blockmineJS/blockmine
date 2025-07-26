@@ -12,6 +12,7 @@ const { encrypt } = require('../../core/utils/crypto');
 const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
 const pluginIdeRouter = require('./pluginIde');
+const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -522,7 +523,7 @@ router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view
             }
         }
 
-        const finalSettings = { ...defaultSettings, ...savedSettings };
+        const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
         res.json(finalSettings);
     } catch (error) {
         console.error("[API Error] /settings GET:", error);
@@ -969,7 +970,7 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
                 description: plugin.description,
                 isEnabled: plugin.isEnabled,
                 manifest: manifest,
-                settings: { ...defaultSettings, ...savedSettings }
+                settings: deepMergeSettings(defaultSettings, savedSettings)
             };
         });
 
