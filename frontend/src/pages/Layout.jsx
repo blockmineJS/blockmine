@@ -16,7 +16,9 @@ import {
     ChevronsRight, 
     Server, 
     ShieldCheck,
-    Store
+    Store,
+    Lightbulb,
+    MessageSquarePlus
 } from 'lucide-react';
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
@@ -45,6 +47,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import ContributeDialog from '@/components/ContributeDialog';
 
 const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDragging: globalIsDragging }) => {
     const {
@@ -129,6 +132,19 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [isDragging, setIsDragging] = useState(false);
+    const [randomFeature, setRandomFeature] = useState({ text: 'Улучшить BlockMine', icon: <Lightbulb className="h-4 w-4 flex-shrink-0" /> });
+    const [isContributeModalOpen, setIsContributeModalOpen] = useState(false);
+
+    useEffect(() => {
+        const texts = ["Предложить улучшение", "Предложить изменение", "Задать вопрос", "Улучшить BlockMine"];
+        const icons = [
+            <Lightbulb key="lightbulb" className="h-4 w-4 flex-shrink-0" />,
+            <MessageSquarePlus key="msg" className="h-4 w-4 flex-shrink-0" />
+        ];
+        const randomText = texts[Math.floor(Math.random() * texts.length)];
+        const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+        setRandomFeature({ text: randomText, icon: randomIcon });
+    }, []);
 
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
 
@@ -283,6 +299,25 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                 {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, "Магазин графов")}
             </NavLink>
 
+            <Dialog open={isContributeModalOpen} onOpenChange={setIsContributeModalOpen}>
+                <DialogTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        className={cn(
+                            "w-full justify-start flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                            isCollapsed && "justify-center"
+                        )}
+                        onClick={() => {
+                            setIsContributeModalOpen(true);
+                            if (typeof onLinkClick === 'function') onLinkClick();
+                        }}
+                    >
+                        {iconAndText(randomFeature.icon, randomFeature.text)}
+                    </Button>
+                </DialogTrigger>
+                <ContributeDialog onClose={() => setIsContributeModalOpen(false)} />
+            </Dialog>
+            
             <Button 
                 variant="ghost"
                 className={cn(
