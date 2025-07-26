@@ -1,6 +1,14 @@
 # История версий
 
 
+## [1.18.0](https://github.com/blockmineJS/blockmine/compare/v1.17.1...v1.18.0) (2025-07-26)
+
+
+### ✨ Новые возможности
+
+* добавлена новая кнопка - "Предложить улучшение". Поможет адептам составить свой запрос ([d741881](https://github.com/blockmineJS/blockmine/commit/d7418813e53d15fcd16c0517cea033d019ed355b))
+* добавлено глубокое объединение настроек для плагинов и улучшена установка зависимостей ([452af4b](https://github.com/blockmineJS/blockmine/commit/452af4b67325f3faebe12c136a40f77515e805c0))
+
 ### [1.17.1](https://github.com/blockmineJS/blockmine/compare/v1.17.0...v1.17.1) (2025-07-24)
 
 
