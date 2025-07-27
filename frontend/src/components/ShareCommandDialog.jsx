@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Copy, Loader2 } from 'lucide-react';
 import { apiHelper } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
+import { copyToClipboard } from '@/lib/clipboard';
 
 export default function ShareCommandDialog({ botId, commandId, onCancel }) {
     const [commandData, setCommandData] = useState(null);
@@ -37,13 +38,21 @@ export default function ShareCommandDialog({ botId, commandId, onCancel }) {
         }
     }, [botId, commandId, onCancel, toast]);
 
-    const handleCopy = () => {
+    const handleCopy = async () => {
         if (commandData) {
-            navigator.clipboard.writeText(commandData);
-            toast({
-                title: 'Скопировано!',
-                description: 'Код для импорта скопирован в буфер обмена.',
-            });
+            const success = await copyToClipboard(commandData);
+            if (success) {
+                toast({
+                    title: 'Скопировано!',
+                    description: 'Код для импорта скопирован в буфер обмена.',
+                });
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Ошибка',
+                    description: 'Не удалось скопировать код. Попробуйте выделить и скопировать вручную.',
+                });
+            }
         }
     };
 

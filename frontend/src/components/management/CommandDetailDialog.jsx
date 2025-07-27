@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DynamicInputList from './DynamicInputList';
 import { Save, Loader2, Terminal, Settings as SettingsIcon, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 
 const OWNER_TYPES = {
   SYSTEM: 'system'
@@ -28,10 +29,12 @@ function CommandOverviewTab({ command }) {
     const ownerName = command.owner ? command.owner.replace('plugin:', '') : '';
     const [copied, setCopied] = useState(false);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(usageString);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
+    const handleCopy = async () => {
+        const success = await copyToClipboard(usageString);
+        if (success) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+        }
     };
 
     return (

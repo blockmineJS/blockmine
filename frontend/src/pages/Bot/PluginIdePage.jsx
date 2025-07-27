@@ -18,6 +18,7 @@ import { Github } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { copyToClipboard } from '@/lib/clipboard';
 
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
@@ -462,12 +463,11 @@ export default function PluginIdePage() {
     };
 
     const handleCopyToClipboard = async () => {
-        try {
-            await navigator.clipboard.writeText(exportedCode);
+        const success = await copyToClipboard(exportedCode);
+        if (success) {
             toast({ title: 'Успех', description: 'Код скопирован в буфер обмена' });
-        } catch (error) {
-            console.error('Ошибка копирования:', error);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось скопировать код' });
+        } else {
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось скопировать код. Попробуйте выделить и скопировать вручную.' });
         }
     };
 
