@@ -28,18 +28,19 @@ const generateCron = (simpleConfig) => {
     const [hour, minute] = time.split(':').map(Number);
 
     if (intervalType === 'minutes') {
-        const minutePattern = intervalValue === 1 ? '*' : `*/${intervalValue}`;
-        if (intervalValue > 0 && intervalValue < 60) return `${minutePattern} * * * *`;
+        if (intervalValue === 1) return '* * * * *';
+        if (intervalValue === 60) return `${minute} * * * *`; // каждые 60 минут = каждый час
+        if (intervalValue > 0 && intervalValue < 60) return `*/${intervalValue} * * * *`;
         return '* * * * *';
     }
     if (intervalType === 'hours') {
-        const hourPattern = intervalValue === 1 ? '*' : `*/${intervalValue}`;
-        if (intervalValue > 0 && intervalValue < 24) return `${minute} ${hourPattern} * * *`;
+        if (intervalValue === 1) return `${minute} * * * *`;
+        if (intervalValue > 0 && intervalValue < 24) return `${minute} */${intervalValue} * * *`;
         return `${minute} * * * *`;
     }
     if (intervalType === 'days') {
-        const dayPattern = intervalValue === 1 ? '*' : `*/${intervalValue}`;
-        if (intervalValue > 0 && intervalValue < 32) return `${minute} ${hour} ${dayPattern} * *`;
+        if (intervalValue === 1) return `${minute} ${hour} * * *`;
+        if (intervalValue > 0 && intervalValue < 32) return `${minute} ${hour} */${intervalValue} * *`;
         return `${minute} ${hour} * * *`;
     }
     return '* * * * *';

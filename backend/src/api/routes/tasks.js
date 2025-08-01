@@ -12,7 +12,8 @@ router.use(authenticate);
 
 const normalizeCronPattern = (pattern) => {
     if (typeof pattern !== 'string') return '* * * * *';
-    return pattern.replace(/\*\/1/g, '*').trim();
+    // Убираем лишние пробелы и нормализуем паттерн
+    return pattern.replace(/\*\/1/g, '*').replace(/\s+/g, ' ').trim();
 };
 
 router.get('/', authorize('task:list'), async (req, res) => {
