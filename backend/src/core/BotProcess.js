@@ -627,8 +627,11 @@ process.on('message', async (message) => {
                     clearTimeout(connectionTimeout);
                     connectionTimeout = null;
                 }
+                const restartableReasons = ['socketClosed', 'keepAliveError'];
+                const exitCode = restartableReasons.includes(reason) ? 1 : 0;
+
                 sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
-                process.exit(0);
+                process.exit(exitCode);
             });
 
             bot.on('playerJoined', (player) => {

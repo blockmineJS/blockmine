@@ -528,8 +528,18 @@ class BotManager {
             this.bots.delete(botId);
             this.resourceUsage.delete(botId);
             this.botConfigs.delete(botId);
+            
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
+
+            if (code === 1) {
+                console.log(`[BotManager] Обнаружена ошибка с кодом 1 для бота ${botId}. Попытка перезапуска через 5 секунд...`);
+                this.appendLog(botId, `[SYSTEM] Обнаружена критическая ошибка, перезапуск через 5 секунд...`);
+                setTimeout(() => {
+                    console.log(`[BotManager] Перезапуск бота ${botId}...`);
+                    this.startBot(botConfig);
+                }, 5000);
+            }
         });
 
         this.bots.set(botConfig.id, child);
