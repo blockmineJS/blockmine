@@ -47,20 +47,23 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                 proxyPassword: ''
             });
         } else if (importedData && isCreation) {
+            const importedServerName = importedData.bot?.server?.name;
+            const matchingServer = servers?.find(s => s.name === importedServerName);
+
             setFormData({
                 username: '',
                 password: '',
                 prefix: importedData.bot?.prefix || '@',
                 note: importedData.bot?.note || '',
-                serverId: '',
-                owners: [],
+                serverId: matchingServer ? matchingServer.id.toString() : '',
+                owners: importedData.bot?.owners ? importedData.bot.owners.split(',').map(s => s.trim()).filter(Boolean) : [], // Авто-заполнение владельцев
                 proxyHost: importedData.bot?.proxyHost || '',
                 proxyPort: importedData.bot?.proxyPort || '',
                 proxyUsername: importedData.bot?.proxyUsername || '',
                 proxyPassword: ''
             });
         }
-    }, [bot, importedData, isCreation]);
+    }, [bot, importedData, isCreation, servers]);
 
     useEffect(() => {
         if (onFormChange) {
@@ -105,7 +108,7 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
     const showFooter = !!onFormSubmit;
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <form id="bot-form" onSubmit={handleSubmit} className="flex flex-col h-full">
             {!disableScrollArea && (
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
