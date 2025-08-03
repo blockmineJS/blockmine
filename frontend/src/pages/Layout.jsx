@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { 
@@ -48,6 +48,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ContributeDialog from '@/components/ContributeDialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDragging: globalIsDragging }) => {
     const {
@@ -550,6 +551,12 @@ export default function Layout() {
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="h-[90vh] flex flex-col">
+                                <VisuallyHidden>
+                                    <DialogTitle>Создание нового бота</DialogTitle>
+                                    <DialogDescription>
+                                        Заполните информацию ниже, чтобы добавить нового бота в панель.
+                                    </DialogDescription>
+                                </VisuallyHidden>
                                 <BotForm servers={servers} onFormSubmit={handleCreateBot} isSaving={isSaving} isCreation={true} />
                             </DialogContent>
                         </Dialog>
