@@ -33,7 +33,8 @@ app.set('pluginManager', pluginManager);
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 const rootPath = path.resolve(__dirname, '..', '..');
