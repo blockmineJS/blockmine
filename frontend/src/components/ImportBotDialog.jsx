@@ -62,18 +62,31 @@ export default function ImportBotDialog({ onImportSuccess, onCancel, servers }) 
     const handleFormSubmit = async (formData) => {
         setIsImporting(true);
         try {
-            const data = await apiHelper('/api/bots/import/create', {
-                method: 'POST',
-                body: JSON.stringify({
+
+            let body;
+            try {
+                body = JSON.stringify({
                     ...formData,
                     importData: importedData
-                }),
+                });
+                console.log('[Import Create] JSON.stringify successful. Body length:', body.length);
+            } catch (e) {
+                console.error('[Import Create] Error during JSON.stringify:', e);
+                toast({ variant: 'destructive', title: 'Ошибка клиента', description: 'Не удалось подготовить данные для отправки. ' + e.message });
+                setIsImporting(false);
+                return;
+            }
+
+            const data = await apiHelper('/api/bots/import/create', {
+                method: 'POST',
+                body: body,
             });
             
             onImportSuccess(data);
             toast({ title: 'Успешно', description: 'Бот создан с импортированными настройками.' });
 
         } catch (error) {
+            console.error('[Import Create] API Error:', error);
             toast({ variant: 'destructive', title: 'Ошибка', description: error.message || 'Не удалось создать бота.' });
         } finally {
             setIsImporting(false);
@@ -128,12 +141,8 @@ export default function ImportBotDialog({ onImportSuccess, onCancel, servers }) 
                         Назад
                     </Button>
                     <Button 
-                        onClick={() => {
-                            const form = document.querySelector('form');
-                            if (form) {
-                                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                            }
-                        }}
+                        type="submit"
+                        form="bot-form"
                         disabled={isImporting}
                     >
                         {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
