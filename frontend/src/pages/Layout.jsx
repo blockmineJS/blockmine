@@ -124,7 +124,44 @@ const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDraggin
     );
 };
 
-const SidebarNav = ({ onLinkClick, isCollapsed }) => {
+const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
+    return (
+        <NavLink 
+            to={`/bots/${bot.id}`} 
+            onClick={onLinkClick} 
+            data-bot-id={bot.id} 
+            className={({ isActive }) => cn(
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 ease-in-out cursor-pointer",
+                isActive 
+                    ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600 shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:shadow-sm",
+                isCollapsed && "justify-center"
+            )}
+        >
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-all duration-200",
+                    botStatuses[bot.id] === 'running' 
+                        ? 'bg-green-500 animate-pulse' 
+                        : 'bg-gray-500'
+                )} />
+                {isCollapsed && (
+                    <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center shadow-sm">
+                        <span className="text-xs font-bold text-white">
+                            {bot.username.charAt(0).toUpperCase()}
+                        </span>
+                    </div>
+                )}
+            </div>
+            <div className={cn("flex flex-col overflow-hidden", isCollapsed && "hidden")}> 
+                <span className="font-medium truncate text-xs">{bot.username}</span>
+                <span className="text-xs text-muted-foreground truncate leading-tight">{bot.note || `${bot.server.host}:${bot.server.port}`}</span>
+            </div>
+        </NavLink>
+    );
+};
+
+const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const hasPermission = useAppStore(state => state.hasPermission);
@@ -161,7 +198,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 8,
+                distance: 12,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -170,8 +207,11 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     );
 
     const handleDragStart = useCallback((event) => {
+        if (isSheetOpen) return;
         setIsDragging(true);
-    }, []);
+    }, [
+        isSheetOpen
+    ]);
 
     const handleDragEnd = useCallback(async (event) => {
         const { active, over } = event;
@@ -209,6 +249,12 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     }, [bots, updateBotOrder, toast]);
 
     useEffect(() => {
+        if (isSheetOpen) {
+            setIsDragging(false);
+        }
+    }, [isSheetOpen]);
+
+    useEffect(() => {
         if (activeBotId) {
             const activeBotElement = document.querySelector(`[data-bot-id="${activeBotId}"]`);
             const scrollContainer = activeBotElement?.closest('.custom-scrollbar');
@@ -236,7 +282,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
 
     useEffect(() => {
         const handleBeforeUnload = (e) => {
-            if (isDragging) {
+            if (isDragging && !isSheetOpen) {
                 e.preventDefault();
                 e.returnValue = '';
                 return '';
@@ -244,7 +290,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
         };
 
         const handleClick = (e) => {
-            if (isDragging) {
+            if (isDragging && !isSheetOpen) {
                 e.preventDefault();
                 e.stopPropagation();
                 return false;
@@ -252,14 +298,14 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
         };
 
         const handleMouseDown = (e) => {
-            if (isDragging) {
+            if (isDragging && !isSheetOpen) {
                 e.preventDefault();
                 e.stopPropagation();
                 return false;
             }
         };
 
-        if (isDragging) {
+        if (isDragging && !isSheetOpen) {
             window.addEventListener('beforeunload', handleBeforeUnload);
             document.addEventListener('click', handleClick, true);
             document.addEventListener('mousedown', handleMouseDown, true);
@@ -269,7 +315,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                 document.removeEventListener('mousedown', handleMouseDown, true);
             };
         }
-    }, [isDragging]);
+    }, [isDragging, isSheetOpen]);
 
     const navLinkClasses = ({ isActive }) => cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
@@ -285,7 +331,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     );
 
     return (
-        <nav className="flex-1 flex flex-col gap-1 p-4 min-h-0">
+        <nav className="flex-1 flex flex-col gap-1 p-4 min-h-0 overflow-y-auto md:overflow-visible pb-20 md:pb-0 overscroll-contain">
             <NavLink to="/" end onClick={onLinkClick} className={navLinkClasses}>
                 {iconAndText(<LayoutDashboard className="h-4 w-4 flex-shrink-0" />, "Дашборд")}
             </NavLink>
@@ -344,42 +390,50 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
             
             <div
                 className={cn(
-                    "flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200",
-                    bots.length > 0 && "min-h-[120px]",
+                    "flex-1 min-h-0 custom-scrollbar transition-all duration-200 md:overflow-y-auto",
+                    bots.length > 0 && "min-h-[96px]",
                     bots.length >= 6 && "md:max-h-[35vh]"
                 )}
             >
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext
-                        items={bots.map(bot => bot.id)}
-                        strategy={verticalListSortingStrategy}
+                {isSheetOpen ? (
+                    <div className="space-y-0.5">
+                        {bots.map((bot) => (
+                            <BotItem key={bot.id} bot={bot} isCollapsed={isCollapsed} botStatuses={botStatuses} onLinkClick={onLinkClick} />
+                        ))}
+                    </div>
+                ) : (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
                     >
-                        <div 
-                            className="space-y-0.5"
-                            onMouseDown={(e) => {
-                                if (isDragging) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }
-                            }}
-                            onClick={(e) => {
-                                if (isDragging) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }
-                            }}
+                        <SortableContext
+                            items={bots.map(bot => bot.id)}
+                            strategy={verticalListSortingStrategy}
                         >
-                            {bots.map((bot) => (
-                                <SortableBotItem key={bot.id} bot={bot} isCollapsed={isCollapsed} botStatuses={botStatuses} onLinkClick={onLinkClick} isDragging={isDragging} />
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                            <div 
+                                className="space-y-0.5"
+                                onMouseDown={(e) => {
+                                    if (isDragging) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                }}
+                                onClick={(e) => {
+                                    if (isDragging) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                }}
+                            >
+                                {bots.map((bot) => (
+                                    <SortableBotItem key={bot.id} bot={bot} isCollapsed={isCollapsed} botStatuses={botStatuses} onLinkClick={onLinkClick} isDragging={isDragging} />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                )}
                 <div className="pb-1"></div>
             </div>
         </nav>
@@ -501,15 +555,15 @@ export default function Layout() {
                 )}
             </div>
 
-            <SidebarNav onLinkClick={() => setIsSheetOpen(false)} isCollapsed={isCollapsed} />
+            <SidebarNav onLinkClick={() => setIsSheetOpen(false)} isCollapsed={isCollapsed} isSheetOpen={isSheetOpen} />
             
-            <div className="mt-auto p-4 border-t border-border/50 space-y-3">
+            <div className="mt-auto p-3 sm:p-4 border-t border-border/50 space-y-2.5">
                 {hasPermission('panel:user:list') && (
                     <NavLink 
                         to="/admin" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                             isActive 
                                 ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-purple-600" 
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -525,7 +579,7 @@ export default function Layout() {
                         to="/servers" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                             isActive 
                                 ? "bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 text-blue-600" 
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -537,7 +591,7 @@ export default function Layout() {
                     </NavLink>
                 )}
                 
-                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-3")}>
+                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-2.5")}> 
                     {hasPermission('bot:create') && (
                         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                             <DialogTrigger asChild>
@@ -545,7 +599,7 @@ export default function Layout() {
                                     variant="outline" 
                                     className={cn(
                                         "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
+                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
                                     )}
                                     size={isCollapsed ? "icon" : "default"}
                                 >
@@ -571,7 +625,7 @@ export default function Layout() {
                                     variant="outline" 
                                     className={cn(
                                         "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
+                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
                                     )}
                                     size={isCollapsed ? "icon" : "default"}
                                 >
@@ -596,7 +650,7 @@ export default function Layout() {
                     variant="ghost" 
                     className={cn(
                         "w-full transition-all",
-                        isCollapsed ? "h-9 w-9 p-0 justify-center" : "justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        isCollapsed ? "h-9 w-9 p-0 justify-center" : "h-9 justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )} 
                     onClick={handleLogout}
                 >
