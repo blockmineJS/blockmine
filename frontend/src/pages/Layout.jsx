@@ -285,7 +285,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
     );
 
     return (
-        <nav className="flex-1 flex flex-col gap-1 p-4 min-h-0">
+        <nav className="flex-1 flex flex-col gap-1 p-4 min-h-0 overflow-y-auto md:overflow-visible pb-20 md:pb-0 overscroll-contain">
             <NavLink to="/" end onClick={onLinkClick} className={navLinkClasses}>
                 {iconAndText(<LayoutDashboard className="h-4 w-4 flex-shrink-0" />, "Дашборд")}
             </NavLink>
@@ -344,8 +344,8 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
             
             <div
                 className={cn(
-                    "flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200",
-                    bots.length > 0 && "min-h-[120px]",
+                    "flex-1 min-h-0 custom-scrollbar transition-all duration-200 md:overflow-y-auto",
+                    bots.length > 0 && "min-h-[96px]",
                     bots.length >= 6 && "md:max-h-[35vh]"
                 )}
             >
@@ -503,13 +503,13 @@ export default function Layout() {
 
             <SidebarNav onLinkClick={() => setIsSheetOpen(false)} isCollapsed={isCollapsed} />
             
-            <div className="mt-auto p-4 border-t border-border/50 space-y-3">
+            <div className="mt-auto p-3 sm:p-4 border-t border-border/50 space-y-2.5">
                 {hasPermission('panel:user:list') && (
                     <NavLink 
                         to="/admin" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                             isActive 
                                 ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-purple-600" 
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -525,7 +525,7 @@ export default function Layout() {
                         to="/servers" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                             isActive 
                                 ? "bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 text-blue-600" 
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -537,7 +537,7 @@ export default function Layout() {
                     </NavLink>
                 )}
                 
-                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-3")}>
+                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-2.5")}> 
                     {hasPermission('bot:create') && (
                         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                             <DialogTrigger asChild>
@@ -545,7 +545,7 @@ export default function Layout() {
                                     variant="outline" 
                                     className={cn(
                                         "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
+                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
                                     )}
                                     size={isCollapsed ? "icon" : "default"}
                                 >
@@ -571,7 +571,7 @@ export default function Layout() {
                                     variant="outline" 
                                     className={cn(
                                         "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
+                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
                                     )}
                                     size={isCollapsed ? "icon" : "default"}
                                 >
@@ -596,7 +596,7 @@ export default function Layout() {
                     variant="ghost" 
                     className={cn(
                         "w-full transition-all",
-                        isCollapsed ? "h-9 w-9 p-0 justify-center" : "justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        isCollapsed ? "h-9 w-9 p-0 justify-center" : "h-9 justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )} 
                     onClick={handleLogout}
                 >
