@@ -51,21 +51,21 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="flex flex-col h-full w-full p-6 gap-6 overflow-y-auto">
-            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 rounded-xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5 border border-blue-500/10">
+        <div className="flex flex-col h-full w-full p-4 sm:p-6 gap-4 sm:gap-6 overflow-y-auto">
+            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 sm:p-6 rounded-xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5 border border-blue-500/10">
                 <div className="flex items-center gap-4">
                     <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 shadow-lg">
                         <LayoutDashboard className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                             Дашборд
                         </h1>
                         <p className="text-muted-foreground mt-1">Общая сводка по вашей системе BlockMineJS</p>
                     </div>
                 </div>
                 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                     {hasPermission('bot:import') && (
                         <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                             <DialogTrigger asChild>
@@ -85,7 +85,7 @@ export default function DashboardPage() {
                                 className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                             >
                                 <Play className="mr-2 h-4 w-4" />
-                                Запустить всех
+                                <span className="hidden sm:inline">Запустить всех</span>
                             </Button>
                             <Button 
                                 variant="destructive" 
@@ -93,15 +93,15 @@ export default function DashboardPage() {
                                 className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-200"
                             >
                                 <Square className="mr-2 h-4 w-4" />
-                                Остановить всех
+                                <span className="hidden sm:inline">Остановить всех</span>
                             </Button>
                         </>
                     )}
                 </div>
             </header>
             
-            <main className="grid gap-6 lg:grid-cols-3 flex-grow">
-                <div className="lg:col-span-1 space-y-4">
+            <main className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 flex-grow">
+                <div className="md:col-span-1 space-y-4">
                     <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 border border-blue-500/10">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Activity className="h-5 w-5 text-blue-500" />
@@ -130,7 +130,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 
-                <div className="lg:col-span-1 min-h-[500px]">
+                <div className="md:col-span-1 min-h-[420px] sm:min-h-[500px]">
                     <div className="h-full p-4 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 border border-purple-500/10">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Zap className="h-5 w-5 text-purple-500" />
@@ -140,7 +140,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                <div className="lg:col-span-1 min-h-[500px]">
+                <div className="md:col-span-1 min-h-[420px] sm:min-h-[500px]">
                     <div className="h-full p-4 rounded-xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 border border-emerald-500/10">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Activity className="h-5 w-5 text-emerald-500" />

@@ -68,7 +68,7 @@ export default function BotView() {
         <>
             <div className="flex flex-col h-full w-full overflow-hidden">
                 <header className="shrink-0 p-6 bg-gradient-to-br from-background via-muted/20 to-background border-b">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
                         <div className="relative">
                             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg blur-sm opacity-20" />
                             <div className="relative bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg">
@@ -91,7 +91,7 @@ export default function BotView() {
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 ml-auto mt-2 sm:mt-0">
                             <div className={cn(
                                 "flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-medium transition-all",
                                 isRunning 
@@ -109,12 +109,12 @@ export default function BotView() {
                         </div>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                        <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1 overflow-x-auto whitespace-nowrap -mx-2 px-2 md:mx-0 md:px-1">
                             <NavLink 
                                 to="console" 
                                 className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -126,7 +126,7 @@ export default function BotView() {
                             <NavLink 
                                 to="plugins" 
                                 className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -142,7 +142,7 @@ export default function BotView() {
                                         key={ext.id}
                                         to={`plugins/ui/${ext.pluginName}/${ext.path}`}
                                         className={({isActive}) => cn(
-                                            "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                            "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                             isActive 
                                                 ? "bg-background text-foreground shadow-sm" 
                                                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -156,7 +156,7 @@ export default function BotView() {
                             <NavLink 
                                 to="settings" 
                                 className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -168,7 +168,7 @@ export default function BotView() {
                             <NavLink 
                                 to="events" 
                                 className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -180,7 +180,7 @@ export default function BotView() {
                             <NavLink 
                                 to="management" 
                                 className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -191,7 +191,7 @@ export default function BotView() {
                             </NavLink>
                         </nav>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
                             {hasPermission('bot:start_stop') && (
                                 <>
                                     <Button 
@@ -201,8 +201,8 @@ export default function BotView() {
                                         disabled={isRunning}
                                         className="bg-green-500/10 border-green-500/20 text-green-600 hover:bg-green-500/20 hover:text-green-700"
                                     >
-                                        <Play className="h-4 w-4 mr-1" /> 
-                                        Запустить
+                                        <Play className="h-4 w-4 mr-1" />
+                                        <span className="hidden sm:inline">Запустить</span>
                                     </Button>
                                     <Button 
                                         variant="outline" 
@@ -211,8 +211,8 @@ export default function BotView() {
                                         disabled={!isRunning}
                                         className="bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 hover:text-red-700"
                                     >
-                                        <Square className="h-4 w-4 mr-1" /> 
-                                        Остановить
+                                        <Square className="h-4 w-4 mr-1" />
+                                        <span className="hidden sm:inline">Остановить</span>
                                     </Button>
                                     <Button
                                        variant="outline"
@@ -222,7 +222,7 @@ export default function BotView() {
                                        className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
                                     >
                                        <Sparkles className="h-4 w-4 mr-1" />
-                                       Перезапустить
+                                       <span className="hidden sm:inline">Перезапустить</span>
                                     </Button>
                                 </>
                             )}

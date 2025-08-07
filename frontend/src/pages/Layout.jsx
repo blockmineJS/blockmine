@@ -342,10 +342,13 @@ const SidebarNav = ({ onLinkClick, isCollapsed }) => {
                 </div>
             )}
             
-            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200" style={{ 
-                maxHeight: bots.length >= 6 ? '35vh' : 'auto',
-                minHeight: bots.length > 0 ? '120px' : 'auto'
-            }}>
+            <div
+                className={cn(
+                    "flex-1 overflow-y-auto min-h-0 custom-scrollbar transition-all duration-200",
+                    bots.length > 0 && "min-h-[120px]",
+                    bots.length >= 6 && "md:max-h-[35vh]"
+                )}
+            >
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -629,23 +632,27 @@ export default function Layout() {
 
     return (
         <div className={cn(
-            "grid h-screen transition-[grid-template-columns] duration-300 ease-in-out",
+            "grid h-[100dvh] md:h-screen transition-[grid-template-columns] duration-300 ease-in-out",
             isSidebarCollapsed ? "md:grid-cols-[80px_1fr]" : "md:grid-cols-[280px_1fr]"
         )}>
             <GlobalSearch />
-            <header className="md:hidden flex items-center justify-between p-2 border-b">
-                <h2 className="text-lg font-semibold tracking-tight ml-2">BlockMine</h2>
+            <div className="md:hidden fixed z-50 top-[max(0.5rem,env(safe-area-inset-top))] left-[max(0.5rem,env(safe-area-inset-left))]">
                 <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <Menu className="h-6 w-6" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-background/80 backdrop-blur border"
+                            aria-label="Открыть меню"
+                        >
+                            <Menu className="h-4 w-4" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-full max-w-xs flex">
+                    <SheetContent side="left" className="p-0 w-full max-w-[85vw] sm:max-w-xs h-[100dvh] flex">
                         {sidebarContent(false)}
                     </SheetContent>
                 </Sheet>
-            </header>
+            </div>
 
             <aside className="hidden md:block border-r">
                 {sidebarContent(isSidebarCollapsed)}
