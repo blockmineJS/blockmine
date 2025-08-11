@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Download, Heart, Upload, Search, Filter, Settings } from 'lucide-react';
+import { Heart, Upload, Search, Settings, ShoppingBag } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
@@ -288,31 +288,22 @@ export default function GraphStorePage() {
     }, [selectedCategory, selectedType, searchQuery]);
 
     return (
-        <div className="container mx-auto p-6">
-            {!serverAvailable && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                        </div>
-                        <div className="ml-3">
-                            <h3 className="text-sm font-medium text-yellow-800">
-                                Сервер магазина графов недоступен
-                            </h3>
-                            <div className="mt-2 text-sm text-yellow-700">
-                                <p>Данные не могут быть загружены. Попробуйте обновить страницу позже.</p>
-                            </div>
-                        </div>
+        <div className="flex flex-col h-full w-full p-4 sm:p-6 gap-4 sm:gap-6 overflow-y-auto">
+            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 sm:p-6 rounded-xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5 border border-blue-500/10">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 shadow-lg">
+                        <ShoppingBag className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            Магазин графов
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Публикуйте и устанавливайте визуальные графы для ваших ботов</p>
                     </div>
                 </div>
-            )}
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Магазин графов</h1>
                 <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button disabled={!serverAvailable}>
+                        <Button disabled={!serverAvailable} className="border-blue-500/20 hover:bg-blue-500/5 hover:border-blue-500/40">
                             <Upload className="w-4 h-4 mr-2" />
                             Опубликовать граф
                         </Button>
@@ -370,49 +361,73 @@ export default function GraphStorePage() {
                         </div>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </header>
 
-            <div className="flex gap-4 mb-6">
-                <div className="flex-1">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <Input
-                            placeholder="Поиск графов..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
-                        />
+            {!serverAvailable && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800">
+                                Сервер магазина графов недоступен
+                            </h3>
+                            <div className="mt-2 text-sm text-yellow-700">
+                                <p>Данные не могут быть загружены. Попробуйте обновить страницу позже.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={!serverAvailable}>
-                    <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Все категории" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Все категории</SelectItem>
-                        {categories.map(category => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                                {category.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Select value={selectedType} onValueChange={setSelectedType} disabled={!serverAvailable}>
-                    <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Все типы" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Все типы</SelectItem>
-                        <SelectItem value="COMMAND">Команды</SelectItem>
-                        <SelectItem value="EVENT">События</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+            )}
+
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                <Input
+                                    placeholder="Поиск графов..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10"
+                                />
+                            </div>
+                        </div>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={!serverAvailable}>
+                            <SelectTrigger className="w-full md:w-48">
+                                <SelectValue placeholder="Все категории" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Все категории</SelectItem>
+                                {categories.map(category => (
+                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                        {category.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedType} onValueChange={setSelectedType} disabled={!serverAvailable}>
+                            <SelectTrigger className="w-full md:w-48">
+                                <SelectValue placeholder="Все типы" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Все типы</SelectItem>
+                                <SelectItem value="COMMAND">Команды</SelectItem>
+                                <SelectItem value="EVENT">События</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
 
             {loading ? (
-                <div className="text-center py-8">Загрузка...</div>
+                <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
             ) : graphs.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">Графы не найдены</div>
+                <div className="text-center py-8 text-muted-foreground">Графы не найдены</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {graphs.map(graph => (
@@ -424,15 +439,15 @@ export default function GraphStorePage() {
                                         {graph.graphType === 'COMMAND' ? 'Команда' : 'Событие'}
                                     </Badge>
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                     Автор: {graph.author} | {graph.category.name}
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+                                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                                     {graph.description}
                                 </p>
-                                <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
+                                <div className="flex justify-between items-center text-sm text-muted-foreground mb-4">
                                     <span>📥 {graph.downloads} скачиваний</span>
                                     <span>❤️ {graph.likes} лайков</span>
                                 </div>
@@ -468,10 +483,10 @@ export default function GraphStorePage() {
                     </DialogHeader>
                     <div className="space-y-4">
                         {selectedGraph && (
-                            <div className="p-3 bg-gray-50 rounded-md">
+                            <div className="p-3 bg-muted rounded-md">
                                 <h4 className="font-medium">{selectedGraph.name}</h4>
-                                <p className="text-sm text-gray-600">{selectedGraph.description}</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-sm text-muted-foreground">{selectedGraph.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
                                     Автор: {selectedGraph.author} | Тип: {selectedGraph.graphType === 'COMMAND' ? 'Команда' : 'Событие'}
                                 </p>
                             </div>
