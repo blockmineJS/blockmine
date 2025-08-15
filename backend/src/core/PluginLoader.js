@@ -67,14 +67,53 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                 } catch (error) {
                     // Зависимости должны быть установлены заранее в PluginManager
                     // Если модуль не найден, это означает, что установка зависимостей не была выполнена корректно
+                    let handled = false;
                     if (error.message.includes('Cannot find module')) {
                         const moduleMatch = error.message.match(/Cannot find module '([^']+)'/);
-                        if (moduleMatch) {
-                            const missingModule = moduleMatch[1];
-                            sendLog(`[PluginLoader] [ERROR] Модуль ${missingModule} не найден для плагина ${plugin.name}. Зависимости должны быть установлены заранее.`);
+                        const missingModule = moduleMatch ? moduleMatch[1] : null;
+                        if (missingModule) {
+                            sendLog(`[PluginLoader] [WARN] Модуль ${missingModule} не найден для плагина ${plugin.name}. Пытаюсь установить автоматически...`);
+                            try {
+                                execSync('npm install --omit=dev', { cwd: plugin.path, stdio: 'inherit' });
+                                sendLog(`[PluginLoader] [INFO] Зависимости установлены. Повторная загрузка плагина ${plugin.name}...`);
+                                const retriedModule = require(normalizedPath);
+                                if (typeof retriedModule === 'function') {
+                                    retriedModule(bot, { settings: finalSettings, store });
+                                } else if (retriedModule && typeof retriedModule.onLoad === 'function') {
+                                    retriedModule.onLoad(bot, { settings: finalSettings, store });
+                                } else {
+                                    sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
+                                }
+                                handled = true;
+                            } catch (retryErr) {
+                                if (retryErr.message && retryErr.message.includes('Cannot find module') && missingModule) {
+                                    try {
+                                        sendLog(`[PluginLoader] [WARN] Повторная попытка: устанавливаю ${missingModule} адресно...`);
+                                        execSync(`npm install ${missingModule} --omit=dev`, { cwd: plugin.path, stdio: 'inherit' });
+                                        sendLog(`[PluginLoader] [INFO] Модуль ${missingModule} установлен. Повторная загрузка ${plugin.name}...`);
+                                        const retriedSpecific = require(normalizedPath);
+                                        if (typeof retriedSpecific === 'function') {
+                                            retriedSpecific(bot, { settings: finalSettings, store });
+                                        } else if (retriedSpecific && typeof retriedSpecific.onLoad === 'function') {
+                                            retriedSpecific.onLoad(bot, { settings: finalSettings, store });
+                                        } else {
+                                            sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
+                                        }
+                                        handled = true;
+                                    } catch (installErr) {
+                                        sendLog(`[PluginLoader] [ERROR] Автоустановка модуля ${missingModule} для ${plugin.name} не удалась: ${installErr.message}`);
+                                    }
+                                } else {
+                                    sendLog(`[PluginLoader] [ERROR] Не удалось автоматически установить зависимости для ${plugin.name}: ${retryErr.message}`);
+                                }
+                            }
+                        } else {
+                            sendLog(`[PluginLoader] [ERROR] Не удалось определить отсутствующий модуль для плагина ${plugin.name}.`);
                         }
                     }
-                    throw error;
+                    if (!handled) {
+                        throw error;
+                    }
                 }
 
             } catch (error) {
