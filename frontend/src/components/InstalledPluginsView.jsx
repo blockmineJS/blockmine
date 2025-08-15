@@ -12,6 +12,7 @@ import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 const cardStyles = {
     card: "relative overflow-hidden transition-all duration-300 group h-full flex flex-col",
@@ -414,6 +415,7 @@ export default function InstalledPluginsView({
         return saved || 'grid';
     });
     const [pluginToDelete, setPluginToDelete] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const stats = useMemo(() => {
         const enabled = installedPlugins.filter(p => p.isEnabled).length;
@@ -437,22 +439,30 @@ export default function InstalledPluginsView({
 
     const sortedAndFilteredPlugins = useMemo(() => {
         const sorted = [...installedPlugins].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        
-        switch (filter) {
-            case 'enabled':
-                return sorted.filter(p => p.isEnabled);
-            case 'disabled':
-                return sorted.filter(p => !p.isEnabled);
-            case 'updates':
-                return sorted.filter(p => updates[p.sourceUri]);
-            case 'local':
-                return sorted.filter(p => p.sourceType === 'LOCAL' || p.sourceType === 'LOCAL_IDE');
-            case 'github':
-                return sorted.filter(p => p.sourceType === 'GITHUB');
-            default:
-                return sorted;
-        }
-    }, [installedPlugins, filter, updates]);
+        const byFilter = (() => {
+            switch (filter) {
+                case 'enabled':
+                    return sorted.filter(p => p.isEnabled);
+                case 'disabled':
+                    return sorted.filter(p => !p.isEnabled);
+                case 'updates':
+                    return sorted.filter(p => updates[p.sourceUri]);
+                case 'local':
+                    return sorted.filter(p => p.sourceType === 'LOCAL' || p.sourceType === 'LOCAL_IDE');
+                case 'github':
+                    return sorted.filter(p => p.sourceType === 'GITHUB');
+                default:
+                    return sorted;
+            }
+        })();
+        if (!searchQuery) return byFilter;
+        const q = searchQuery.toLowerCase();
+        return byFilter.filter(p => (
+            p.name?.toLowerCase().includes(q) ||
+            p.description?.toLowerCase().includes(q) ||
+            p.author?.toLowerCase().includes(q)
+        ));
+    }, [installedPlugins, filter, updates, searchQuery]);
 
     useEffect(() => {
         localStorage.setItem('installed-plugins-view-mode', viewMode);
@@ -461,7 +471,7 @@ export default function InstalledPluginsView({
     return (
         <TooltipProvider delayDuration={100}>
             <div className="flex flex-col h-full">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-muted/30 border-b">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-background/50 backdrop-blur border-b">
                     <Card className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                             <Package className="h-5 w-5 text-primary" />
@@ -516,27 +526,9 @@ export default function InstalledPluginsView({
                             </div>
                         </div>
                     </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <Terminal className="h-5 w-5 text-blue-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-blue-500">{stats.commands}</p>
-                                <p className="text-xs text-muted-foreground">Команды</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <Activity className="h-5 w-5 text-green-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-green-500">{stats.graphs}</p>
-                                <p className="text-xs text-muted-foreground">Графы</p>
-                            </div>
-                        </div>
-                    </Card>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 p-4 border-b">
+                <div className="flex items-center justify-between gap-4 p-4 border-b bg-background/30">
                     <div className="flex items-center gap-2">
                         <Button 
                             variant={filter === 'all' ? 'secondary' : 'ghost'} 
@@ -597,18 +589,29 @@ export default function InstalledPluginsView({
                         </Button>
                     </div>
                     
-                    <Tabs value={viewMode} onValueChange={setViewMode}>
-                        <TabsList>
-                            <TabsTrigger value="grid" className="flex items-center gap-2">
-                                <LayoutGrid className="h-4 w-4" />
-                                Сетка
-                            </TabsTrigger>
-                            <TabsTrigger value="list" className="flex items-center gap-2">
-                                <List className="h-4 w-4" />
-                                Список
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
+                    <div className="flex items-center gap-2">
+                        <div className="relative w-64">
+                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Поиск установленных..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+                        <Tabs value={viewMode} onValueChange={setViewMode}>
+                            <TabsList>
+                                <TabsTrigger value="grid" className="flex items-center gap-2">
+                                    <LayoutGrid className="h-4 w-4" />
+                                    Сетка
+                                </TabsTrigger>
+                                <TabsTrigger value="list" className="flex items-center gap-2">
+                                    <List className="h-4 w-4" />
+                                    Список
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4">

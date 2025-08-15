@@ -159,153 +159,133 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     }, [installedPluginUrls, installedPluginNames]);
 
     return (
-        <div className="flex h-full">
-            <aside className="w-64 border-r p-4 flex flex-col gap-4 shrink-0 bg-muted/30">
-                <div className="space-y-4">
-                    <Input
-                        placeholder="Поиск плагинов..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full"
-                        prefix={<Icons.Search className="h-4 w-4 text-muted-foreground" />}
-                    />
-                    
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(SORT_OPTIONS).map(([key, { label, icon: Icon }]) => (
-                                <SelectItem key={key} value={key}>
-                                    <div className="flex items-center gap-2">
-                                        <Icon className="h-4 w-4" />
-                                        {label}
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+        <div className="flex h-full flex-col">
+            <div className="border-b bg-background/50 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="p-4 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="relative w-full max-w-xl">
+                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Поиск плагинов..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
 
-                <div className="flex-1 overflow-y-auto">
-                    <nav className="flex flex-col gap-1">
-                        {Object.entries(CATEGORIES).map(([name, { icon: Icon, color }]) => (
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="w-[160px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(SORT_OPTIONS).map(([key, { label, icon: Icon }]) => (
+                                    <SelectItem key={key} value={key}>
+                                        <div className="flex items-center gap-2">
+                                            <Icon className="h-4 w-4" />
+                                            {label}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <div className="ml-auto flex items-center gap-1">
+                            <Button
+                                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                                size="icon"
+                                onClick={() => setViewMode('grid')}
+                                aria-label="Сетка"
+                            >
+                                <Icons.LayoutGrid className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                                size="icon"
+                                onClick={() => setViewMode('list')}
+                                aria-label="Список"
+                            >
+                                <Icons.List className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                        {Object.entries(CATEGORIES).map(([name, { icon: Icon }]) => (
                             <Button
                                 key={name}
-                                variant={selectedCategory === name ? "secondary" : "ghost"}
-                                className={cn(
-                                    "justify-start category-button transition-all",
-                                    selectedCategory === name && "bg-gradient-to-r text-white hover:text-white",
-                                    selectedCategory === name && color
-                                )}
+                                variant={selectedCategory === name ? 'default' : 'outline'}
+                                className="h-8 px-3 whitespace-nowrap"
                                 onClick={() => setSelectedCategory(name)}
                             >
-                                <Icon className="mr-2 h-4 w-4 category-icon" />
+                                <Icon className="mr-2 h-4 w-4" />
                                 {name}
                             </Button>
                         ))}
-                    </nav>
-                </div>
-
-                <div className="border-t pt-4">
-                    <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="grid" className="flex items-center gap-2">
-                                <Icons.LayoutGrid className="h-4 w-4" />
-                                Сетка
-                            </TabsTrigger>
-                            <TabsTrigger value="list" className="flex items-center gap-2">
-                                <Icons.List className="h-4 w-4" />
-                                Список
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
-            </aside>
-
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-6 shrink-0 bg-gradient-to-r from-background to-muted/20">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-3xl font-bold tracking-tight gradient-text">
-                                {selectedCategory}
-                            </h2>
-                            <p className="text-muted-foreground mt-1">
-                                Найдено: <span className="font-semibold">{filteredAndSortedCatalog.length}</span> плагинов
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="px-3 py-1">
-                                <Icons.Package className="h-4 w-4 mr-2" />
-                                Всего: {catalog.length}
-                            </Badge>
-                        </div>
+                        <Badge variant="outline" className="ml-auto px-3 py-1 shrink-0">
+                            <Icons.Package className="h-4 w-4 mr-2" />
+                            Всего: {catalog.length}
+                        </Badge>
                     </div>
                 </div>
+            </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
-                    {isLoading ? (
-                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                            <Icons.Loader2 className="h-12 w-12 animate-spin mb-4" />
-                            <p className="text-lg">Загрузка каталога плагинов...</p>
+            <div className="flex-1 overflow-y-auto p-6">
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                        <Icons.Loader2 className="h-12 w-12 animate-spin mb-4" />
+                        <p className="text-lg">Загрузка каталога плагинов...</p>
+                    </div>
+                ) : filteredAndSortedCatalog.length > 0 ? (
+                    viewMode === 'grid' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {filteredAndSortedCatalog.map((plugin) => (
+                                <PluginStoreCard
+                                    key={plugin.id}
+                                    plugin={plugin}
+                                    botId={botId}
+                                    isInstalled={isPluginInstalled(plugin)}
+                                    isInstalling={installingPlugins.has(plugin.id)}
+                                    onInstall={handleInstall}
+                                    allPlugins={catalog}
+                                />
+                            ))}
                         </div>
-                    ) : filteredAndSortedCatalog.length > 0 ? (
-                        viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in slide-in-from-bottom duration-500">
-                                {filteredAndSortedCatalog.map((plugin, index) => (
-                                    <div
-                                        key={plugin.id}
-                                        className="animate-in slide-in-from-bottom duration-300"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                    >
-                                        <PluginStoreCard
-                                            plugin={plugin}
-                                            botId={botId}
-                                            isInstalled={isPluginInstalled(plugin)}
-                                            isInstalling={installingPlugins.has(plugin.id)}
-                                            onInstall={handleInstall}
-                                            allPlugins={catalog}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {filteredAndSortedCatalog.map(plugin => (
-                                    <PluginListItem 
-                                        key={plugin.id}
-                                        plugin={plugin}
-                                        botId={botId}
-                                        isInstalled={isPluginInstalled(plugin)}
-                                        isInstalling={installingPlugins.has(plugin.id)}
-                                        onInstall={handleInstall}
-                                        allPlugins={catalog}
-                                    />
-                                ))}
-                            </div>
-                        )
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                            <Icons.PackageX className="h-16 w-16 mb-4 opacity-50" />
-                            <h3 className="text-xl font-semibold">Плагины не найдены</h3>
-                            <p className="text-sm mt-2 max-w-md">
-                                В категории "{selectedCategory}" нет плагинов, соответствующих вашему запросу "{searchQuery}".
-                            </p>
-                            <Button 
-                                variant="outline" 
-                                className="mt-4"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setSelectedCategory('Все плагины');
-                                }}
-                            >
-                                <Icons.RotateCcw className="h-4 w-4 mr-2" />
-                                Сбросить фильтры
-                            </Button>
+                        <div className="space-y-2">
+                            {filteredAndSortedCatalog.map(plugin => (
+                                <PluginListItem 
+                                    key={plugin.id}
+                                    plugin={plugin}
+                                    botId={botId}
+                                    isInstalled={isPluginInstalled(plugin)}
+                                    isInstalling={installingPlugins.has(plugin.id)}
+                                    onInstall={handleInstall}
+                                    allPlugins={catalog}
+                                />
+                            ))}
                         </div>
-                    )}
-                </div>
-            </main>
+                    )
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+                        <Icons.PackageX className="h-16 w-16 mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold">Плагины не найдены</h3>
+                        <p className="text-sm mt-2 max-w-md">
+                            В категории "{selectedCategory}" нет плагинов, соответствующих вашему запросу "{searchQuery}".
+                        </p>
+                        <Button 
+                            variant="outline" 
+                            className="mt-4"
+                            onClick={() => {
+                                setSearchQuery('');
+                                setSelectedCategory('Все плагины');
+                            }}
+                        >
+                            <Icons.RotateCcw className="h-4 w-4 mr-2" />
+                            Сбросить фильтры
+                        </Button>
+                    </div>
+                )}
+            </div>
 
             <Dialog 
                 open={dependencyDialogState.isOpen} 
