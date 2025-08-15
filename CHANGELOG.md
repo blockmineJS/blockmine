@@ -1,6 +1,16 @@
 # История версий
 
 
+### [1.18.4](https://github.com/blockmineJS/blockmine/compare/v1.18.3...v1.18.4) (2025-08-15)
+
+
+### 🐛 Исправления
+
+* в диалог настроек плагина добавлена новая вкладка - данные. данные из бд плагина ([b532993](https://github.com/blockmineJS/blockmine/commit/b53299383132684e37a8426643ab1346bcf60d86))
+* граф стор. чуть изменен дизайн ([c51abcd](https://github.com/blockmineJS/blockmine/commit/c51abcd9e6fe025f8a7b6c85d0b9eb71eb68546a))
+* любимая переделка страницы плагинов ([d2f2b59](https://github.com/blockmineJS/blockmine/commit/d2f2b59b3c649e7f5c0eb5f5242d9908311c2c02))
+* страница история версий изменена. теперь можно смотреть прошлые ([c5fc95e](https://github.com/blockmineJS/blockmine/commit/c5fc95eb92c9fc0759d76bbd9ec2b46cd7b7f825))
+
 ### [1.18.3](https://github.com/blockmineJS/blockmine/compare/v1.18.2...v1.18.3) (2025-08-07)
 
 ### [1.18.2](https://github.com/blockmineJS/blockmine/compare/v1.18.1...v1.18.2) (2025-08-07)
