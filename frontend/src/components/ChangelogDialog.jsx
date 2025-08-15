@@ -22,8 +22,8 @@ function parseChangelog(markdownText) {
             current.hasBreaking = /breaking change|breaking|⚠️|!:|\*\*breaking\*\*/i.test(current.body);
             releases.push(current);
         }
-        const m = headerLine.match(/^##\s*\[?v?([^\]\s]+)\]?\s*(?:[-(]\s*([^\n)]+)\)?)?\s*$/i);
-        const version = m?.[1] || headerLine.replace(/^##\s*/, '').trim();
+        const m = headerLine.match(/^#{2,3}\s*\[?v?([0-9]+(?:\.[0-9]+){1,2}(?:-[0-9A-Za-z.-]+)?)\]?\s*(?:[-(]\s*([^\n)]+)\)?)?\s*$/i);
+        const version = m?.[1] || headerLine.replace(/^#{2,3}\s*/, '').trim();
         const date = m?.[2]?.trim() || '';
         current = { version, date, bodyLines: [] };
     };
@@ -31,6 +31,14 @@ function parseChangelog(markdownText) {
     for (const line of lines) {
         if (line.startsWith('## ')) {
             startNew(line);
+        } else if (line.startsWith('### ')) {
+            const isSemverHeader = /^#{3}\s*\[?v?\d+(?:\.[0-9]+){1,2}(?:-[0-9A-Za-z.-]+)?\]?/.test(line);
+            if (isSemverHeader) {
+                startNew(line);
+            } else {
+                if (!current) continue;
+                current.bodyLines.push(line);
+            }
         } else {
             if (!current) continue;
             current.bodyLines.push(line);
@@ -57,9 +65,31 @@ export default function ChangelogDialog() {
     const [selectedVersion, setSelectedVersion] = useState('');
 
     useEffect(() => {
-        const initial = releases.slice(0, 2).map(r => r.version);
-        setExpanded(initial);
-        setSelectedVersion(releases[0]?.version || '');
+        const lastShown = localStorage.getItem('lastShownVersion') || '';
+        if (releases.length === 0) {
+            setExpanded([]);
+            setSelectedVersion('');
+            return;
+        }
+
+        if (!lastShown) {
+            const initial = releases.slice(0, 2).map(r => r.version);
+            setExpanded(initial);
+            setSelectedVersion(releases[0]?.version || '');
+            return;
+        }
+
+        const idx = releases.findIndex(r => r.version === lastShown);
+        const versionsToExpand = idx === -1
+            ? releases.map(r => r.version)
+            : releases.slice(0, Math.max(0, idx)).map(r => r.version);
+
+        if (versionsToExpand.length > 0) {
+            setExpanded(versionsToExpand);
+        } else {
+            setExpanded([releases[0].version]);
+        }
+        setSelectedVersion(releases[0].version);
     }, [releases]);
 
     const handleAccordionChange = (value) => {

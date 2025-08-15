@@ -106,7 +106,6 @@ export const createCoreSlice = (set, get) => ({
                 if (currentVersion && currentVersion !== lastShownVersion) {
                     await get().fetchChangelog();
                     set({ showChangelogDialog: true });
-                    localStorage.setItem('lastShownVersion', currentVersion);
                 }
 
             set(state => {
@@ -198,6 +197,10 @@ export const createCoreSlice = (set, get) => ({
     },
 
     closeChangelogDialog: () => {
+        const currentVersion = get().appVersion;
+        if (currentVersion) {
+            localStorage.setItem('lastShownVersion', currentVersion);
+        }
         set({ showChangelogDialog: false });
     },
 });
