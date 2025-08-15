@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.18.5](https://github.com/blockmineJS/blockmine/compare/v1.18.4...v1.18.5) (2025-08-15)
+
+
+### 🐛 Исправления
+
+* теперь чейнджлог показывает не только минорные версии ([1a8a1d4](https://github.com/blockmineJS/blockmine/commit/1a8a1d405d02b34df37d8e9f19dcd3989f197b41))
+
 ### [1.18.4](https://github.com/blockmineJS/blockmine/compare/v1.18.3...v1.18.4) (2025-08-15)
 
 
