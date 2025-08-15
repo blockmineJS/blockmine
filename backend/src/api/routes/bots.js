@@ -474,74 +474,174 @@ router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (re
 });
 
 router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view'), async (req, res) => {
-    try {
-        const pluginId = parseInt(req.params.pluginId);
-        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-        if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
-        const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
-        const defaultSettings = {};
-        const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
-        const manifestSettings = manifest.settings || {};
+		const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
+		const defaultSettings = {};
+		const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+		const manifestSettings = manifest.settings || {};
 
 
-        const firstSettingValue = Object.values(manifestSettings)[0];
-        const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+		const firstSettingValue = Object.values(manifestSettings)[0];
+		const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
 
-        const processSetting = async (settingKey, config) => {
-            if (!config || !config.type) return;
+		const processSetting = async (settingKey, config) => {
+			if (!config || !config.type) return;
 
-            if (config.type === 'json_file' && config.defaultPath) {
-                const configFilePath = path.join(plugin.path, config.defaultPath);
-                try {
-                    const fileContent = await fs.readFile(configFilePath, 'utf-8');
-                    defaultSettings[settingKey] = JSON.parse(fileContent);
-                } catch (e) {
-                    console.error(`[API Settings] Не удалось прочитать defaultPath ${config.defaultPath} для плагина ${plugin.name}: ${e.message}`);
-                    defaultSettings[settingKey] = {};
-                }
-            } else if (config.default !== undefined) {
-                try {
-                    defaultSettings[settingKey] = JSON.parse(config.default);
-                } catch {
-                    defaultSettings[settingKey] = config.default;
-                }
-            }
-        };
+			if (config.type === 'json_file' && config.defaultPath) {
+				const configFilePath = path.join(plugin.path, config.defaultPath);
+				try {
+					const fileContent = await fs.readFile(configFilePath, 'utf-8');
+					defaultSettings[settingKey] = JSON.parse(fileContent);
+				} catch (e) {
+					console.error(`[API Settings] Не удалось прочитать defaultPath ${config.defaultPath} для плагина ${plugin.name}: ${e.message}`);
+					defaultSettings[settingKey] = {};
+				}
+			} else if (config.default !== undefined) {
+				try {
+					defaultSettings[settingKey] = JSON.parse(config.default);
+				} catch {
+					defaultSettings[settingKey] = config.default;
+				}
+			}
+		};
 
-        if (isGrouped) {
-            for (const categoryKey in manifestSettings) {
-                const categoryConfig = manifestSettings[categoryKey];
-                for (const settingKey in categoryConfig) {
-                    if (settingKey === 'label') continue;
-                    await processSetting(settingKey, categoryConfig[settingKey]);
-                }
-            }
-        } else {
-            for (const settingKey in manifestSettings) {
-                await processSetting(settingKey, manifestSettings[settingKey]);
-            }
-        }
+		if (isGrouped) {
+			for (const categoryKey in manifestSettings) {
+				const categoryConfig = manifestSettings[categoryKey];
+				for (const settingKey in categoryConfig) {
+					if (settingKey === 'label') continue;
+					await processSetting(settingKey, categoryConfig[settingKey]);
+				}
+			}
+		} else {
+			for (const settingKey in manifestSettings) {
+				await processSetting(settingKey, manifestSettings[settingKey]);
+			}
+		}
 
-        const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
-        res.json(finalSettings);
-    } catch (error) {
-        console.error("[API Error] /settings GET:", error);
-        res.status(500).json({ error: 'Не удалось получить настройки плагина' });
-    }
+		const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
+		res.json(finalSettings);
+	} catch (error) {
+		console.error("[API Error] /settings GET:", error);
+		res.status(500).json({ error: 'Не удалось получить настройки плагина' });
+	}
+});
+
+// Вкладка Данные плагина (PluginDataStore)
+router.get('/:botId/plugins/:pluginId/data', authorize('plugin:settings:view'), async (req, res) => {
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+
+		const rows = await prisma.pluginDataStore.findMany({
+			where: { botId: plugin.botId, pluginName: plugin.name },
+			orderBy: { updatedAt: 'desc' }
+		});
+
+		const result = rows.map(r => {
+			let value;
+			try { value = JSON.parse(r.value); } catch { value = r.value; }
+			return { key: r.key, value, createdAt: r.createdAt, updatedAt: r.updatedAt };
+		});
+		res.json(result);
+	} catch (error) {
+		console.error('[API Error] GET plugin data:', error);
+		res.status(500).json({ error: 'Не удалось получить данные плагина' });
+	}
+});
+
+router.get('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:view'), async (req, res) => {
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const { key } = req.params;
+		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+
+		const row = await prisma.pluginDataStore.findUnique({
+			where: {
+				pluginName_botId_key: {
+					pluginName: plugin.name,
+					botId: plugin.botId,
+					key
+				}
+			}
+		});
+		if (!row) return res.status(404).json({ error: 'Ключ не найден' });
+		let value; try { value = JSON.parse(row.value); } catch { value = row.value; }
+		res.json({ key: row.key, value, createdAt: row.createdAt, updatedAt: row.updatedAt });
+	} catch (error) {
+		console.error('[API Error] GET plugin data by key:', error);
+		res.status(500).json({ error: 'Не удалось получить значение по ключу' });
+	}
+});
+
+router.put('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:edit'), async (req, res) => {
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const { key } = req.params;
+		const { value } = req.body;
+		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+
+		const jsonValue = JSON.stringify(value ?? null);
+		const upserted = await prisma.pluginDataStore.upsert({
+			where: {
+				pluginName_botId_key: {
+					pluginName: plugin.name,
+					botId: plugin.botId,
+					key
+				}
+			},
+			update: { value: jsonValue },
+			create: { pluginName: plugin.name, botId: plugin.botId, key, value: jsonValue }
+		});
+		let parsed; try { parsed = JSON.parse(upserted.value); } catch { parsed = upserted.value; }
+		res.json({ key: upserted.key, value: parsed, createdAt: upserted.createdAt, updatedAt: upserted.updatedAt });
+	} catch (error) {
+		console.error('[API Error] PUT plugin data by key:', error);
+		res.status(500).json({ error: 'Не удалось сохранить значение' });
+	}
+});
+
+router.delete('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:edit'), async (req, res) => {
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const { key } = req.params;
+		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+
+		await prisma.pluginDataStore.delete({
+			where: {
+				pluginName_botId_key: {
+					pluginName: plugin.name,
+					botId: plugin.botId,
+					key
+				}
+			}
+		});
+		res.status(204).send();
+	} catch (error) {
+		console.error('[API Error] DELETE plugin data by key:', error);
+		res.status(500).json({ error: 'Не удалось удалить значение' });
+	}
 });
 
 router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async (req, res) => {
-    try {
-        const pluginId = parseInt(req.params.pluginId);
-        const { isEnabled, settings } = req.body;
-        const dataToUpdate = {};
-        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        if (settings) dataToUpdate.settings = JSON.stringify(settings);
-        if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
-        const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
-        res.json(updated);
-    } catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
+	try {
+		const pluginId = parseInt(req.params.pluginId);
+		const { isEnabled, settings } = req.body;
+		const dataToUpdate = {};
+		if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
+		if (settings) dataToUpdate.settings = JSON.stringify(settings);
+		if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
+		const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
+		res.json(updated);
+	} catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
 });
 
 router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {

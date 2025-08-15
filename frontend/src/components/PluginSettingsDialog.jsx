@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Save, Code, Trash2, Loader2, Settings, Info } from 'lucide-react';
+import { Edit, Save, Code, Trash2, Loader2, Settings, Info, Plus, RefreshCw, Search } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
@@ -131,6 +131,14 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     const { toast } = useToast();
     const manifestSettings = plugin.manifest?.settings || {};
 
+    const [dataItems, setDataItems] = useState(null);
+    const [isSavingKey, setIsSavingKey] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isDataDialogOpen, setIsDataDialogOpen] = useState(false);
+    const [dataFormKey, setDataFormKey] = useState('');
+    const [dataFormValue, setDataFormValue] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false);
+
     const isGrouped = useMemo(() => {
         if (Object.keys(manifestSettings).length === 0) return false;
         const firstSettingValue = Object.values(manifestSettings)[0];
@@ -151,6 +159,19 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         fetchSettings();
     }, [bot.id, plugin.id, toast]);
 
+    useEffect(() => {
+        const fetchDataItems = async () => {
+            setDataItems(null);
+            try {
+                const list = await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data`);
+                setDataItems(list);
+            } catch (error) {
+                setDataItems([]);
+            }
+        };
+        fetchDataItems();
+    }, [bot.id, plugin.id]);
+
     const handleSettingChange = (key, value) => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
@@ -161,7 +182,6 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                 method: 'PUT',
                 body: JSON.stringify({ settings }),
             }, 'Настройки плагина сохранены.');
-            
             onSaveSuccess();
             onOpenChange(false);
         } catch (error) { }
@@ -172,9 +192,62 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             setIsClearing(true);
             try {
                 await apiHelper(`/api/plugins/${plugin.id}/clear-data`, { method: 'POST' }, 'Данные плагина успешно очищены.');
+                // локально очистим вкладку Данные
+                setDataItems([]);
             } catch (error) { } finally {
                 setIsClearing(false);
             }
+        }
+    };
+
+    const handleDeleteKey = async (key) => {
+        if (!confirm(`Удалить ключ "${key}"?`)) return;
+        try {
+            await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(key)}`, { method: 'DELETE' }, 'Запись удалена');
+            setDataItems(prev => (prev || []).filter(i => i.key !== key));
+        } catch {}
+    };
+
+    const openCreateDialog = () => {
+        setIsEditMode(false);
+        setDataFormKey('');
+        setDataFormValue('{\n  "foo": "bar"\n}');
+        setIsDataDialogOpen(true);
+    };
+
+    const openEditDialog = async (item) => {
+        setIsEditMode(true);
+        try {
+            const full = await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(item.key)}`);
+            setDataFormKey(full.key);
+            setDataFormValue(JSON.stringify(full.value, null, 2));
+        } catch {
+            setDataFormKey(item.key);
+            setDataFormValue(JSON.stringify(item.value, null, 2));
+        }
+        setIsDataDialogOpen(true);
+    };
+
+    const handleSaveData = async () => {
+        if (!dataFormKey) return toast({ variant: 'destructive', title: 'Ошибка', description: 'Ключ не может быть пустым' });
+        setIsSavingKey(dataFormKey);
+        let parsed;
+        try {
+            parsed = dataFormValue ? JSON.parse(dataFormValue) : null;
+        } catch {
+            setIsSavingKey(null);
+            return toast({ variant: 'destructive', title: 'Ошибка', description: 'Значение должно быть валидным JSON' });
+        }
+        try {
+            await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(dataFormKey)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ value: parsed })
+            }, 'Запись сохранена');
+            const updatedList = await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data`);
+            setDataItems(updatedList);
+            setIsDataDialogOpen(false);
+        } finally {
+            setIsSavingKey(null);
         }
     };
 
@@ -220,6 +293,87 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         );
     };
 
+    const renderData = () => {
+        if (dataItems === null) return <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>;
+        const filtered = (dataItems || []).filter(i => i.key.toLowerCase().includes(searchTerm.toLowerCase()));
+        return (
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input className="pl-8" placeholder="Поиск по ключу" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+                    <Button variant="outline" onClick={async () => setDataItems(await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data`))}>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Обновить
+                    </Button>
+                    <Button onClick={openCreateDialog}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Добавить запись
+                    </Button>
+                </div>
+
+                <div className="rounded-lg border overflow-hidden">
+                    <div className="grid grid-cols-[1fr,160px,180px] gap-0 bg-muted/40 px-3 py-2 text-xs font-semibold">
+                        <div>Ключ</div>
+                        <div>Обновлено</div>
+                        <div className="text-right pr-1">Действия</div>
+                    </div>
+                    <div className="max-h-[44vh] overflow-y-auto divide-y">
+                        {filtered.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground">Нет данных</div>
+                        ) : filtered.map(item => (
+                            <div key={item.key} className="grid grid-cols-[1fr,160px,180px] items-start gap-0 px-3 py-2">
+                                <div className="font-mono text-xs break-all pr-3">
+                                    {item.key}
+                                    <pre className="mt-2 bg-muted/30 rounded p-2 text-[11px] overflow-auto max-h-36">{JSON.stringify(item.value, null, 2)}</pre>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground pt-1">{new Date(item.updatedAt).toLocaleString()}</div>
+                                <div className="flex justify-end gap-2 pt-1">
+                                    <Button variant="outline" onClick={() => openEditDialog(item)}>Редактировать</Button>
+                                    <Button variant="destructive" onClick={() => handleDeleteKey(item.key)}>Удалить</Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <Dialog open={isDataDialogOpen} onOpenChange={setIsDataDialogOpen}>
+                    <DialogContent className="max-w-3xl">
+                        <DialogHeader>
+                            <DialogTitle>{isEditMode ? 'Редактировать запись' : 'Новая запись'}</DialogTitle>
+                            <DialogDescription>{isEditMode ? 'Измените JSON значение и сохраните.' : 'Укажите ключ и JSON значение.'}</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <Label className="w-24">Ключ</Label>
+                                <Input value={dataFormKey} onChange={(e) => setDataFormKey(e.target.value)} disabled={isEditMode} placeholder="Например, state" />
+                            </div>
+                            <div>
+                                <Label className="mb-1 block">JSON значение</Label>
+                                <Editor
+                                    height="50vh"
+                                    language="json"
+                                    value={dataFormValue}
+                                    onChange={(value) => setDataFormValue(value || '')}
+                                    theme="vs-dark"
+                                    options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on' }}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setIsDataDialogOpen(false)}>Отмена</Button>
+                            <Button onClick={handleSaveData} disabled={!!isSavingKey}>
+                                {isSavingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                Сохранить
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        );
+    };
+
     return (
         <DialogContent className="max-w-4xl max-h-[80vh]">
             <DialogHeader>
@@ -228,8 +382,9 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             </DialogHeader>
             
             <Tabs defaultValue="settings" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="settings" className="flex items-center gap-2"><Settings className="h-4 w-4" />Настройки</TabsTrigger>
+                    <TabsTrigger value="data" className="flex items-center gap-2"><Code className="h-4 w-4" />Данные</TabsTrigger>
                     <TabsTrigger value="info" className="flex items-center gap-2"><Info className="h-4 w-4" />Информация</TabsTrigger>
                 </TabsList>
 
@@ -250,6 +405,10 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                             </Button>
                         </div>
                     </DialogFooter>
+                </TabsContent>
+
+                <TabsContent value="data" className="max-h-[60vh] overflow-y-auto py-4">
+                    {renderData()}
                 </TabsContent>
 
                 <TabsContent value="info" className="max-h-[60vh] overflow-y-auto py-4">
