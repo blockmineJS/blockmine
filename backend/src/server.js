@@ -14,7 +14,7 @@ const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
 const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
-const { router: authRoutes, ALL_PERMISSIONS } = require('./api/routes/auth');
+const { router: authRoutes, ALL_PERMISSIONS, VIEWER_PERMISSIONS } = require('./api/routes/auth');
 const searchRoutes = require('./api/routes/search');
 const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
@@ -96,6 +96,13 @@ async function runStartupMigrations() {
                 });
             }
         }
+
+        // Создаем/обновляем роль Viewer
+        const viewerRole = await prisma.panelRole.upsert({
+            where: { name: 'Viewer' },
+            update: { permissions: JSON.stringify(VIEWER_PERMISSIONS) },
+            create: { name: 'Viewer', permissions: JSON.stringify(VIEWER_PERMISSIONS) }
+        });
 
         const rootUser = await prisma.panelUser.findUnique({ where: { id: 1 }, include: { role: true } });
         if (rootUser && rootUser.role) {

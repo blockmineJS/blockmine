@@ -11,6 +11,7 @@ import LocalInstallDialog from '@/components/LocalInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function PluginsTab() {
     const { botId } = useParams();
@@ -19,6 +20,7 @@ export default function PluginsTab() {
     const allBots = useAppStore(state => state.bots);
     const allInstalledPlugins = useAppStore(state => state.installedPlugins);
     const allPluginUpdates = useAppStore(state => state.pluginUpdates);
+    const hasPermission = useAppStore(state => state.hasPermission);
 
     const bot = useMemo(() => allBots.find(b => b.id === intBotId), [allBots, intBotId]);
     const installedPlugins = useMemo(() => allInstalledPlugins[intBotId] || [], [allInstalledPlugins, intBotId]);
@@ -120,6 +122,11 @@ export default function PluginsTab() {
 
     if (!bot) return null;
 
+    const canInstall = hasPermission('plugin:install');
+    const canDelete = hasPermission('plugin:delete');
+    const canUpdate = hasPermission('plugin:update');
+    const canDevelop = hasPermission('plugin:develop');
+
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col">
             <div className="shrink-0 p-6 bg-gradient-to-br from-background via-muted/20 to-background border-b">
@@ -162,30 +169,57 @@ export default function PluginsTab() {
                             <Package className="h-4 w-4" />
                             Установленные ({installedPlugins.length})
                         </TabsTrigger>
-                        <TabsTrigger value="browser" className="flex items-center gap-2">
+                        <TabsTrigger value="browser" className="flex items-center gap-2" disabled={!canInstall}>
                             <Puzzle className="h-4 w-4" />
                             Обзор
                         </TabsTrigger>
                     </TabsList>
                     
                     <div className="flex items-center gap-2">
-                        <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates} size="sm">
+                        <TooltipProvider>
+                        <Tooltip>
+                        <TooltipTrigger asChild>
+                        <span>
+                        <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates || !canUpdate} size="sm">
                             <RefreshCw className={`mr-2 h-4 w-4 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
                             Проверить обновления
                         </Button>
+                        </span>
+                        </TooltipTrigger>
+                        {!canUpdate && <TooltipContent>Недостаточно прав для обновления плагинов</TooltipContent>}
+                        </Tooltip>
+                        </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <TooltipProvider>
+                                <Tooltip>
+                                <TooltipTrigger asChild>
+                                <span>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
                                     <FolderPlus className="mr-2 h-4 w-4" />
                                     Установить локально
                                 </Button>
+                                </span>
+                                </TooltipTrigger>
+                                {!canInstall && <TooltipContent>Недостаточно прав для установки плагинов</TooltipContent>}
+                                </Tooltip>
+                                </TooltipProvider>
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
-                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+                        <TooltipProvider>
+                        <Tooltip>
+                        <TooltipTrigger asChild>
+                        <span>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="mr-2 h-4 w-4" />
                             Создать плагин
                         </Button>
+                        </span>
+                        </TooltipTrigger>
+                        {!canDevelop && <TooltipContent>Недостаточно прав для разработки плагинов</TooltipContent>}
+                        </Tooltip>
+                        </TooltipProvider>
                     </div>
                 </div>
             </div>
@@ -198,11 +232,11 @@ export default function PluginsTab() {
                         isLoading={isLoading}
                         updates={updates}
                         isUpdating={isUpdating}
-                        onTogglePlugin={(plugin, isEnabled) => togglePlugin(intBotId, plugin.id, isEnabled)} 
-                        onDeletePlugin={(plugin) => deletePlugin(intBotId, plugin.id, plugin.name)}
-                        onUpdatePlugin={handleUpdatePlugin}
+                        onTogglePlugin={canUpdate ? ((plugin, isEnabled) => togglePlugin(intBotId, plugin.id, isEnabled)) : null}
+                        onDeletePlugin={canDelete ? ((plugin) => deletePlugin(intBotId, plugin.id, plugin.name)) : null}
+                        onUpdatePlugin={canUpdate ? ((pluginId) => handleUpdatePlugin(pluginId)) : null}
                         onSaveSettings={handlePluginOperationSuccess}
-                        onForkPlugin={handleForkPlugin}
+                        onForkPlugin={canDevelop ? ((plugin) => handleForkPlugin(plugin)) : null}
                     />
                 </div>
             </TabsContent>

@@ -6,6 +6,7 @@ import { Send, ArrowDown, Trash2, AlertTriangle } from 'lucide-react';
 import AnsiToHtml from 'ansi-to-html';
 import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const ansiConverter = new AnsiToHtml({
     fg: 'var(--ansi-fg, #e5e7eb)',
@@ -32,6 +33,7 @@ export default function ConsoleTab() {
     const bots = useAppStore(state => state.bots);
     const botLogs = useAppStore(state => state.botLogs);
     const botStatuses = useAppStore(state => state.botStatuses);
+    const hasPermission = useAppStore(state => state.hasPermission);
 
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
     
@@ -42,6 +44,7 @@ export default function ConsoleTab() {
     }, [botLogs, botId]);
     
     const status = bot ? botStatuses[bot.id] || 'stopped' : 'stopped';
+    const canInteract = hasPermission('bot:interact');
 
     const [command, setCommand] = useState('');
     const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -65,7 +68,7 @@ export default function ConsoleTab() {
 
     const handleSendCommand = async (e) => {
         e.preventDefault();
-        if (!command.trim() || !bot || status !== 'running') return;
+        if (!canInteract || !command.trim() || !bot || status !== 'running') return;
 
         try {
             await apiHelper(`/api/bots/${bot.id}/chat`, {
@@ -160,22 +163,38 @@ export default function ConsoleTab() {
                 </Button>
             </div>
 
-            <form onSubmit={handleSendCommand} className="flex-shrink-0 flex items-center gap-2 p-2 bg-muted/50 border-t border-border">
+            <form onSubmit={handleSendCommand} className="flex-shrink-0 flex flex-col gap-2 p-2 bg-muted/50 border-t border-border">
+                {!canInteract && (
+                    <div className="text-xs text-muted-foreground px-1">Режим просмотра: отправка команд недоступна</div>
+                )}
+                <div className="flex items-center gap-2">
                 <Input
                     type="text"
                     placeholder={status === 'running' ? `Отправить как ${bot?.username}...` : 'Запустите бота, чтобы отправлять сообщения'}
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
-                    disabled={status !== 'running'}
+                    disabled={status !== 'running' || !canInteract}
                     className="flex-1"
                 />
-                <Button
-                    type="submit"
-                    disabled={!command.trim() || status !== 'running'}
-                    size="sm"
-                >
-                    <Send className="h-4 w-4" />
-                </Button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>
+                                <Button
+                                    type="submit"
+                                    disabled={!command.trim() || status !== 'running' || !canInteract}
+                                    size="sm"
+                                >
+                                    <Send className="h-4 w-4" />
+                                </Button>
+                            </span>
+                        </TooltipTrigger>
+                        {!canInteract && (
+                            <TooltipContent>Недостаточно прав для отправки команд</TooltipContent>
+                        )}
+                    </Tooltip>
+                </TooltipProvider>
+                </div>
             </form>
         </div>
     );

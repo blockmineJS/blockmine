@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const config = require('../config');
 
 const { botManager } = require('../core/services');
+const presence = require('./presence');
 
 let io;
 
@@ -18,6 +19,7 @@ function initializeSocket(httpServer) {
     });
 
     io.on('connection', (socket) => {
+        presence.handleConnection(io, socket);
         
         socket.on('disconnect', () => {
             botManager.handleSocketDisconnect(socket);

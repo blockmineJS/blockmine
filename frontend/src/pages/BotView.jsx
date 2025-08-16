@@ -38,6 +38,12 @@ export default function BotView() {
     }, [bots, botId]);
 
     useEffect(() => {
+        if (Array.isArray(bots) && bots.length > 0 && !bot) {
+            navigate('/', { replace: true });
+        }
+    }, [bots, bot, navigate]);
+
+    useEffect(() => {
         if (botId) {
             fetchUIExtensions(parseInt(botId, 10));
         }

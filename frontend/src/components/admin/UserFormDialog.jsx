@@ -5,25 +5,46 @@ import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFoot
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { apiHelper } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 
 export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSaving }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [roleId, setRoleId] = useState('');
+    const [allBots, setAllBots] = useState(true);
+    const [bots, setBots] = useState([]);
+    const [selectedBotIds, setSelectedBotIds] = useState([]);
     const { toast } = useToast();
 
     const isEditMode = !!user;
+    const isOwner = isEditMode && user?.id === 1;
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const list = await apiHelper('/api/bots');
+                setBots(list);
+            } catch (e) {
+            }
+        })();
+    }, []);
 
     useEffect(() => {
         if (isEditMode) {
             setUsername(user.username);
             setRoleId(user.roleId.toString());
             setPassword('');
+            setAllBots(user.allBots ?? true);
+            const accessIds = Array.isArray(user.botAccess) ? user.botAccess.map(a => a.botId) : [];
+            setSelectedBotIds(accessIds);
         } else {
             setUsername('');
             setPassword('');
             setRoleId(roles.length > 0 ? roles[0].id.toString() : '');
+            setAllBots(true);
+            setSelectedBotIds([]);
         }
     }, [user, roles, isEditMode]);
 
@@ -42,7 +63,7 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
             return;
         }
 
-        const dataToSubmit = { username, roleId: parseInt(roleId, 10) };
+        const dataToSubmit = { username, roleId: parseInt(roleId, 10), allBots, botIds: allBots ? [] : selectedBotIds };
         if (password) {
             dataToSubmit.password = password;
         }
@@ -77,6 +98,31 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
                             ))}
                         </SelectContent>
                     </Select>
+                </div>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <Checkbox id="allBots" checked={allBots} onCheckedChange={(v) => setAllBots(!!v)} disabled={isOwner} />
+                        <Label htmlFor="allBots">Доступ ко всем ботам {isOwner ? '(владелец, всегда включено)' : ''}</Label>
+                    </div>
+                    {!allBots && !isOwner && (
+                        <div className="max-h-48 overflow-auto border rounded p-2 space-y-1">
+                            {bots.map(b => {
+                                const checked = selectedBotIds.includes(b.id);
+                                return (
+                                    <label key={b.id} className="flex items-center gap-2 text-sm">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={checked} 
+                                            onChange={(e) => {
+                                                setSelectedBotIds(prev => e.target.checked ? [...prev, b.id] : prev.filter(id => id !== b.id))
+                                            }}
+                                        />
+                                        <span>{b.username}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </form>
             <DialogFooter>

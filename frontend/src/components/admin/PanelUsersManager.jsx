@@ -53,22 +53,30 @@ export default function PanelUsersManager() {
         setEditingUser(null);
     };
 
-    const handleSubmit = async (userData, userId) => {
+    const handleSubmit = async (formData, userId) => {
         setIsSaving(true);
-        const isEdit = !!userId;
-        const url = isEdit ? `/api/auth/users/${userId}` : '/api/auth/users';
-        const method = isEdit ? 'PUT' : 'POST';
-
         try {
-            await apiHelper(url, {
-                method,
-                body: JSON.stringify(userData),
-            }, `Пользователь успешно ${isEdit ? 'обновлен' : 'создан'}.`);
-            handleCloseModal();
-            fetchData();
-        } catch(err) {
+            if (userId) {
+                const updated = await apiHelper(`/api/auth/users/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(formData)
+                });
+                setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+                toast({ title: 'Успешно', description: 'Пользователь обновлен.' });
+            } else {
+                const created = await apiHelper('/api/auth/users', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+                setUsers(prev => [...prev, created]);
+                toast({ title: 'Успешно', description: 'Пользователь создан.' });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить пользователя.' });
         } finally {
             setIsSaving(false);
+            handleCloseModal();
         }
     };
     
@@ -97,15 +105,16 @@ export default function PanelUsersManager() {
                 </CardHeader>
                 <CardContent className="flex-grow overflow-y-auto">
                     <Table>
-                        <TableHeader><TableRow><TableHead>Имя</TableHead><TableHead>Роль</TableHead><TableHead>Дата создания</TableHead><TableHead className="text-right">Действия</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Имя</TableHead><TableHead>Роль</TableHead><TableHead>Доступ к ботам</TableHead><TableHead>Дата создания</TableHead><TableHead className="text-right">Действия</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
                             ) : (
                                 users.map(user => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">{user.username}</TableCell>
                                         <TableCell>{user.role.name}</TableCell>
+                                        <TableCell>{user.allBots ? 'Все боты' : `Выбрано: ${user.botAccess?.length || 0}`}</TableCell>
                                         <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenModal(user)}><Edit className="h-4 w-4" /></Button>

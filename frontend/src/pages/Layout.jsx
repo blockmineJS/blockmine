@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
 import ChangelogDialog from '@/components/ChangelogDialog';
+import PresenceButton from '@/components/PresenceButton';
 import { apiHelper } from '@/lib/api';
 import {
     DndContext,
@@ -689,7 +690,10 @@ export default function Layout() {
             "grid h-[100dvh] md:h-screen transition-[grid-template-columns] duration-300 ease-in-out",
             isSidebarCollapsed ? "md:grid-cols-[80px_1fr]" : "md:grid-cols-[280px_1fr]"
         )}>
-            <GlobalSearch />
+            <div className="fixed z-40 flex items-center gap-2" style={{ top: 'max(8px, env(safe-area-inset-top))', right: 'max(8px, env(safe-area-inset-right))' }}>
+                <GlobalSearch />
+                <PresenceButton />
+            </div>
             <div className="md:hidden fixed z-50 top-[max(0.5rem,env(safe-area-inset-top))] left-[max(0.5rem,env(safe-area-inset-left))]">
                 <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>

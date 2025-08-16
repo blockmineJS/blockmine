@@ -15,6 +15,7 @@ export default function ConfigurationPage() {
     
     const servers = useAppStore((state) => state.servers);
     const refreshBotList = useAppStore((state) => state.fetchInitialData);
+    const hasPermission = useAppStore(state => state.hasPermission);
     
     const [allSettings, setAllSettings] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -22,6 +23,8 @@ export default function ConfigurationPage() {
     const [changes, setChanges] = useState({});
     const [formErrors, setFormErrors] = useState({});
     const { toast } = useToast();
+    const canEditBot = hasPermission('bot:update');
+    const canEditPlugin = hasPermission('plugin:settings:edit');
 
     const fetchAllSettings = useCallback(async () => {
         setIsLoading(true);
@@ -58,7 +61,7 @@ export default function ConfigurationPage() {
         setIsSaving(true);
         let updatedBotData = null;
         try {
-            if (changes.bot) {
+            if (changes.bot && canEditBot) {
                 const dataToSend = { ...allSettings.bot, ...changes.bot };
                 if (Array.isArray(dataToSend.owners)) {
                     dataToSend.owners = dataToSend.owners.join(',');
@@ -72,7 +75,7 @@ export default function ConfigurationPage() {
                 });
             }
             
-            if (changes.plugins) {
+            if (changes.plugins && canEditPlugin) {
                  await Promise.all(
                     Object.entries(changes.plugins).map(([pluginId, settings]) => 
                         apiHelper(`/api/bots/${botId}/plugins/${pluginId}`, {
@@ -139,7 +142,7 @@ export default function ConfigurationPage() {
                 </div>
                 <Button 
                     onClick={handleSaveAll} 
-                    disabled={!hasChanges || isSaving}
+                    disabled={!hasChanges || isSaving || (!canEditBot && !canEditPlugin)}
                     className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:from-green-600 hover:to-emerald-600 transition-all"
                     size="lg"
                 >
@@ -168,6 +171,7 @@ export default function ConfigurationPage() {
                             onFormChange={handleBotFormChange}
                             showFooter={false}
                             errors={formErrors}
+                            readOnly={!canEditBot}
                         />
                     </div>
                 </TabsContent>
@@ -190,6 +194,7 @@ export default function ConfigurationPage() {
                                         <PluginSettingsForm
                                             plugin={plugin}
                                             onSettingsChange={handlePluginSettingsChange}
+                                            readOnly={!canEditPlugin}
                                         />
                                     </AccordionContent>
                                 </AccordionItem>

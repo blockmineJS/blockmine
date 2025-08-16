@@ -327,10 +327,13 @@ router.get('/me', authenticate, async (req, res) => {
 router.get('/users', authenticate, authorize('panel:user:list'), async (req, res) => {
     try {
         const users = await prisma.panelUser.findMany({
-            include: { role: true },
+            include: { role: true, botAccess: { include: { bot: { select: { id: true, username: true } } } } },
             orderBy: { username: 'asc' }
         });
-        res.json(users);
+        res.json(users.map(u => ({
+            ...u,
+            botAccess: u.botAccess.map(a => ({ botId: a.botId, bot: a.bot }))
+        })));
     } catch (error) {
         res.status(500).json({ error: 'Не удалось получить пользователей' });
     }
@@ -342,7 +345,7 @@ router.get('/users', authenticate, authorize('panel:user:list'), async (req, res
  * @access  Private (Admin only)
  */
 router.post('/users', authenticate, authorize('panel:user:create'), async (req, res) => {
-    const { username, password, roleId } = req.body;
+    const { username, password, roleId, allBots = true, botIds = [] } = req.body;
     if (!username || !password || !roleId) {
         return res.status(400).json({ error: 'Имя, пароль и роль обязательны' });
     }
@@ -356,9 +359,13 @@ router.post('/users', authenticate, authorize('panel:user:create'), async (req, 
             data: {
                 username,
                 passwordHash: hashedPassword,
-                roleId: parseInt(roleId, 10)
+                roleId: parseInt(roleId, 10),
+                allBots: !!allBots,
+                botAccess: allBots ? undefined : {
+                    create: (Array.isArray(botIds) ? botIds : []).map(id => ({ bot: { connect: { id: Number(id) } } }))
+                }
             },
-            include: { role: true }
+            include: { role: true, botAccess: true }
         });
         const { passwordHash, ...userToReturn } = newUser;
         res.status(201).json(userToReturn);
@@ -432,6 +439,16 @@ const ALL_PERMISSIONS = [
     { id: 'graph:publish', label: 'Публикация графов в магазин' },
 ];
 
+const VIEWER_PERMISSIONS = [
+    'bot:list',
+    'plugin:list',
+    'plugin:settings:view',
+    'management:view',
+    'server:list',
+    'task:list',
+    'graph:read',
+];
+
 /**
  * @route   GET /api/auth/permissions
  * @desc    Получить список всех возможных прав в системе
@@ -449,9 +466,12 @@ router.get('/permissions', authenticate, (req, res) => {
  */
 router.put('/users/:id', authenticate, authorize('panel:user:edit'), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
-    const { password, roleId } = req.body;
+    const { password, roleId, allBots, botIds } = req.body;
 
     try {
+        const owner = await prisma.panelUser.findFirst({ orderBy: { id: 'asc' } });
+        const isOwner = owner && owner.id === userId;
+
         const updateData = {};
         if (password) {
             if (password.length < 4) return res.status(400).json({ error: 'Пароль должен быть не менее 4 символов' });
@@ -460,9 +480,8 @@ router.put('/users/:id', authenticate, authorize('panel:user:edit'), async (req,
         if (roleId) {
             updateData.roleId = parseInt(roleId, 10);
         }
-
-        if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({ error: 'Нет данных для обновления' });
+        if (!isOwner && typeof allBots === 'boolean') {
+            updateData.allBots = allBots;
         }
 
         const updatedUser = await prisma.panelUser.update({
@@ -470,6 +489,15 @@ router.put('/users/:id', authenticate, authorize('panel:user:edit'), async (req,
             data: updateData,
             include: { role: true }
         });
+
+        if (Array.isArray(botIds)) {
+            await prisma.panelUserBotAccess.deleteMany({ where: { userId } });
+            if (!isOwner && !updatedUser.allBots && botIds.length > 0) {
+                await prisma.panelUserBotAccess.createMany({
+                    data: botIds.map(id => ({ userId, botId: Number(id) }))
+                });
+            }
+        }
 
         const { passwordHash, ...userToReturn } = updatedUser;
         res.json(userToReturn);
@@ -492,6 +520,10 @@ router.delete('/users/:id', authenticate, authorize('panel:user:delete'), async 
     }
 
     try {
+        const owner = await prisma.panelUser.findFirst({ orderBy: { id: 'asc' } });
+        if (owner && owner.id === userId) {
+            return res.status(403).json({ error: 'Нельзя удалить владельца системы.' });
+        }
         await prisma.panelUser.delete({ where: { id: userId } });
         res.status(204).send();
     } catch (error) {
@@ -593,4 +625,5 @@ router.delete('/roles/:id', authenticate, authorize('panel:role:delete'), async 
 module.exports = {
     router,
     ALL_PERMISSIONS,
+    VIEWER_PERMISSIONS,
 };

@@ -12,6 +12,7 @@ import { Edit, Save, Code, Trash2, Loader2, Settings, Info, Plus, RefreshCw, Sea
 import Editor from '@monaco-editor/react';
 import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -58,7 +59,7 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     );
 }
 
-function SettingField({ settingKey, config, value, onChange }) {
+function SettingField({ settingKey, config, value, onChange, readOnly }) {
     const id = `${settingKey}-input`;
     const [isJsonEditorOpen, setIsJsonEditorOpen] = useState(false);
 
@@ -71,7 +72,7 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Input id={id} value={value || ''} onChange={(e) => onChange(settingKey, e.target.value)} />
+                    <Input id={id} value={value || ''} onChange={(e) => onChange(settingKey, e.target.value)} disabled={readOnly} />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
@@ -79,7 +80,7 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Textarea id={id} value={Array.isArray(value) ? value.join('\n') : ''} onChange={(e) => onChange(settingKey, e.target.value.split('\n'))} />
+                    <Textarea id={id} value={Array.isArray(value) ? value.join('\n') : ''} onChange={(e) => onChange(settingKey, e.target.value.split('\n'))} disabled={readOnly} />
                      {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
@@ -90,14 +91,14 @@ function SettingField({ settingKey, config, value, onChange }) {
                         <Label htmlFor={id} className="cursor-pointer">{config.label}</Label>
                         {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                     </div>
-                    <Switch id={id} checked={!!value} onCheckedChange={(checked) => onChange(settingKey, checked)} />
+                    <Switch id={id} checked={!!value} onCheckedChange={readOnly ? undefined : ((checked) => onChange(settingKey, checked))} disabled={readOnly} />
                 </div>
             );
         case 'number':
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Input id={id} type="number" value={value ?? ''} onChange={(e) => onChange(settingKey, e.target.value === '' ? null : e.target.valueAsNumber)} />
+                    <Input id={id} type="number" value={value ?? ''} onChange={(e) => onChange(settingKey, e.target.value === '' ? null : e.target.valueAsNumber)} disabled={readOnly} />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
@@ -109,13 +110,17 @@ function SettingField({ settingKey, config, value, onChange }) {
                         {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                         <Dialog open={isJsonEditorOpen} onOpenChange={setIsJsonEditorOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Редактировать</Button>
+                                <span>
+                                <Button variant="outline" disabled={readOnly}><Edit className="mr-2 h-4 w-4" /> Редактировать</Button>
+                                </span>
                             </DialogTrigger>
-                            <JsonEditorDialog 
-                                initialValue={value}
-                                onSave={(newValue) => { onChange(settingKey, newValue); setIsJsonEditorOpen(false); }}
-                                onCancel={() => setIsJsonEditorOpen(false)}
-                            />
+                            {!readOnly && (
+                                <JsonEditorDialog 
+                                    initialValue={value}
+                                    onSave={(newValue) => { onChange(settingKey, newValue); setIsJsonEditorOpen(false); }}
+                                    onCancel={() => setIsJsonEditorOpen(false)}
+                                />
+                            )}
                         </Dialog>
                     </div>
                 </div>
@@ -125,7 +130,7 @@ function SettingField({ settingKey, config, value, onChange }) {
     }
 }
 
-export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSaveSuccess }) {
+export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSaveSuccess, readOnly }) {
     const [settings, setSettings] = useState(null);
     const [isClearing, setIsClearing] = useState(false);
     const { toast } = useToast();
@@ -178,6 +183,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
 
     const handleSave = async () => {
         try {
+            if (readOnly) return;
             await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}`, {
                 method: 'PUT',
                 body: JSON.stringify({ settings }),
@@ -192,7 +198,6 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             setIsClearing(true);
             try {
                 await apiHelper(`/api/plugins/${plugin.id}/clear-data`, { method: 'POST' }, 'Данные плагина успешно очищены.');
-                // локально очистим вкладку Данные
                 setDataItems([]);
             } catch (error) { } finally {
                 setIsClearing(false);
@@ -203,12 +208,14 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     const handleDeleteKey = async (key) => {
         if (!confirm(`Удалить ключ "${key}"?`)) return;
         try {
+            if (readOnly) return;
             await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(key)}`, { method: 'DELETE' }, 'Запись удалена');
             setDataItems(prev => (prev || []).filter(i => i.key !== key));
         } catch {}
     };
 
     const openCreateDialog = () => {
+        if (readOnly) return;
         setIsEditMode(false);
         setDataFormKey('');
         setDataFormValue('{\n  "foo": "bar"\n}');
@@ -216,6 +223,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     };
 
     const openEditDialog = async (item) => {
+        if (readOnly) return;
         setIsEditMode(true);
         try {
             const full = await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(item.key)}`);
@@ -229,6 +237,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     };
 
     const handleSaveData = async () => {
+        if (readOnly) return;
         if (!dataFormKey) return toast({ variant: 'destructive', title: 'Ошибка', description: 'Ключ не может быть пустым' });
         setIsSavingKey(dataFormKey);
         let parsed;
@@ -269,6 +278,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                                         config={config}
                                         value={settings[key]}
                                         onChange={handleSettingChange}
+                                        readOnly={readOnly}
                                     />
                                 ))}
                             </AccordionContent>
@@ -287,6 +297,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                         config={config}
                         value={settings[key]}
                         onChange={handleSettingChange}
+                        readOnly={readOnly}
                     />
                 ))}
             </div>
@@ -307,10 +318,19 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Обновить
                     </Button>
-                    <Button onClick={openCreateDialog}>
+                    <TooltipProvider>
+                    <Tooltip>
+                    <TooltipTrigger asChild>
+                    <span>
+                    <Button onClick={openCreateDialog} disabled={readOnly}>
                         <Plus className="mr-2 h-4 w-4" />
                         Добавить запись
                     </Button>
+                    </span>
+                    </TooltipTrigger>
+                    {readOnly && <TooltipContent>Недостаточно прав для добавления записей</TooltipContent>}
+                    </Tooltip>
+                    </TooltipProvider>
                 </div>
 
                 <div className="rounded-lg border overflow-hidden">
@@ -330,8 +350,12 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                                 </div>
                                 <div className="text-[11px] text-muted-foreground pt-1">{new Date(item.updatedAt).toLocaleString()}</div>
                                 <div className="flex justify-end gap-2 pt-1">
-                                    <Button variant="outline" onClick={() => openEditDialog(item)}>Редактировать</Button>
-                                    <Button variant="destructive" onClick={() => handleDeleteKey(item.key)}>Удалить</Button>
+                                    <TooltipProvider><Tooltip><TooltipTrigger asChild><span>
+                                    <Button variant="outline" onClick={() => openEditDialog(item)} disabled={readOnly}>Редактировать</Button>
+                                    </span></TooltipTrigger>{readOnly && <TooltipContent>Недостаточно прав</TooltipContent>}</Tooltip></TooltipProvider>
+                                    <TooltipProvider><Tooltip><TooltipTrigger asChild><span>
+                                    <Button variant="destructive" onClick={() => handleDeleteKey(item.key)} disabled={readOnly}>Удалить</Button>
+                                    </span></TooltipTrigger>{readOnly && <TooltipContent>Недостаточно прав</TooltipContent>}</Tooltip></TooltipProvider>
                                 </div>
                             </div>
                         ))}
@@ -393,16 +417,34 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                         {renderSettings()}
                     </div>
                     <DialogFooter className="justify-between sm:justify-between pt-4 border-t">
-                        <Button variant="destructive" onClick={handleClearData} disabled={isClearing}>
+                        <TooltipProvider>
+                        <Tooltip>
+                        <TooltipTrigger asChild>
+                        <span>
+                        <Button variant="destructive" onClick={handleClearData} disabled={isClearing || readOnly}>
                             {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Очистить данные
                         </Button>
+                        </span>
+                        </TooltipTrigger>
+                        {readOnly && <TooltipContent>Недостаточно прав для изменения данных</TooltipContent>}
+                        </Tooltip>
+                        </TooltipProvider>
                         <div className="flex gap-2">
                             <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
-                            <Button onClick={handleSave} disabled={settings === null}>
+                            <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger asChild>
+                            <span>
+                            <Button onClick={handleSave} disabled={settings === null || readOnly}>
                                 <Save className="mr-2 h-4 w-4" />
                                 Сохранить
                             </Button>
+                            </span>
+                            </TooltipTrigger>
+                            {readOnly && <TooltipContent>Недостаточно прав для сохранения настроек</TooltipContent>}
+                            </Tooltip>
+                            </TooltipProvider>
                         </div>
                     </DialogFooter>
                 </TabsContent>

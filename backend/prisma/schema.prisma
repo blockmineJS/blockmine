@@ -41,6 +41,8 @@ model Bot {
   eventGraphs      EventGraph[]
   pluginData       PluginDataStore[]
 
+  panelUserAccess  PanelUserBotAccess[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -201,6 +203,10 @@ model PanelUser {
   role         PanelRole @relation(fields: [roleId], references: [id])
   roleId       Int
   createdAt    DateTime @default(now())
+
+  allBots      Boolean  @default(true)
+
+  botAccess    PanelUserBotAccess[]
 }
 
 // Роли пользователей (Admin, Moderator, Viewer)
@@ -212,6 +218,15 @@ model PanelRole {
   // Пример: '[\"bot:create\", \"bot:delete\", \"user:manage\"]'
   permissions String   @default("[]") 
   users       PanelUser[]
+}
+
+model PanelUserBotAccess {
+  user   PanelUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  bot    Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  botId  Int
+
+  @@id([userId, botId])
 }
 
 model PluginDataStore {

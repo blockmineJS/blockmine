@@ -13,6 +13,7 @@ const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
 const pluginIdeRouter = require('./pluginIde');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
+const { checkBotAccess } = require('../middleware/botAccess');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -22,6 +23,8 @@ const os = require('os');
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
+
+router.use('/:botId/*', authenticate, (req, res, next) => checkBotAccess(req, res, next));
 
 const conditionalRestartAuth = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
@@ -60,18 +63,16 @@ const conditionalStartStopAuth = (req, res, next) => {
 };
 
 const conditionalListAuth = (req, res, next) => {
-    if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
-        console.log('[Debug] Роут списка ботов/состояния доступен без проверки прав');
-        return next();
-    }
-    
     return authenticate(req, res, (err) => {
         if (err) return next(err);
+        if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+            return next();
+        }
         return authorize('bot:list')(req, res, next);
     });
 };
 
-router.post('/:id/restart', conditionalRestartAuth, async (req, res) => {
+router.post('/:id/restart', conditionalRestartAuth, authenticate, checkBotAccess, async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         botManager.stopBot(botId);
@@ -89,7 +90,7 @@ router.post('/:id/restart', conditionalRestartAuth, async (req, res) => {
     }
 });
 
-router.post('/:id/chat', conditionalChatAuth, (req, res) => {
+router.post('/:id/chat', conditionalChatAuth, authenticate, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const { message } = req.body;
@@ -100,7 +101,7 @@ router.post('/:id/chat', conditionalChatAuth, (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
-router.post('/:id/start', conditionalStartStopAuth, async (req, res) => {
+router.post('/:id/start', conditionalStartStopAuth, authenticate, checkBotAccess, async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
@@ -115,7 +116,7 @@ router.post('/:id/start', conditionalStartStopAuth, async (req, res) => {
     }
 });
 
-router.post('/:id/stop', conditionalStartStopAuth, (req, res) => {
+router.post('/:id/stop', conditionalStartStopAuth, authenticate, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         botManager.stopBot(botId);
@@ -142,8 +143,21 @@ router.get('/', conditionalListAuth, async (req, res) => {
                 });
             }
         }
+
+        let whereFilter = {};
+        if (req.user && typeof req.user.userId === 'number') {
+            const panelUser = await prisma.panelUser.findUnique({
+                where: { id: req.user.userId },
+                select: { allBots: true, botAccess: { select: { botId: true } } }
+            });
+            if (panelUser && !panelUser.allBots) {
+                const allowedIds = panelUser.botAccess.map(a => a.botId);
+                whereFilter = { id: { in: allowedIds.length ? allowedIds : [-1] } };
+            }
+        }
         
         const bots = await prisma.bot.findMany({ 
+            where: whereFilter,
             include: { server: true }, 
             orderBy: { sortOrder: 'asc' } 
         });
@@ -161,7 +175,7 @@ router.get('/state', conditionalListAuth, (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
 });
 
-router.get('/:id/logs', conditionalListAuth, (req, res) => {
+router.get('/:id/logs', conditionalListAuth, authenticate, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const { limit = 50, offset = 0 } = req.query;
@@ -264,7 +278,7 @@ router.post('/', authorize('bot:create'), async (req, res) => {
     }
 });
 
-router.put('/:id', authorize('bot:update'), async (req, res) => {
+router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
         const { 
             username, password, prefix, serverId, note, owners,
@@ -337,7 +351,7 @@ router.put('/:id', authorize('bot:update'), async (req, res) => {
     }
 });
 
-router.put('/:id/sort-order', authorize('bot:update'), async (req, res) => {
+router.put('/:id/sort-order', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
         const { newPosition } = req.body;
         const botId = parseInt(req.params.id, 10);
@@ -414,7 +428,7 @@ router.put('/:id/sort-order', authorize('bot:update'), async (req, res) => {
     }
 });
 
-router.delete('/:id', authorize('bot:delete'), async (req, res) => {
+router.delete('/:id', authenticate, checkBotAccess, authorize('bot:delete'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         if (botManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
@@ -433,7 +447,7 @@ router.get('/servers', authorize('bot:list'), async (req, res) => {
     }
 });
 
-router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
+router.get('/:botId/plugins', authenticate, checkBotAccess, authorize('plugin:list'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const plugins = await prisma.installedPlugin.findMany({ where: { botId } });
@@ -441,7 +455,7 @@ router.get('/:botId/plugins', authorize('plugin:list'), async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
-router.post('/:botId/plugins/install/github', authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/github', authenticate, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { repoUrl } = req.body;
     try {
@@ -452,7 +466,7 @@ router.post('/:botId/plugins/install/github', authorize('plugin:install'), async
     }
 });
 
-router.post('/:botId/plugins/install/local', authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/local', authenticate, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { path } = req.body;
     try {
@@ -463,7 +477,7 @@ router.post('/:botId/plugins/install/local', authorize('plugin:install'), async 
     }
 });
 
-router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (req, res) => {
+router.delete('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize('plugin:delete'), async (req, res) => {
     const { pluginId } = req.params;
     try {
         await pluginManager.deletePlugin(parseInt(pluginId));
@@ -473,7 +487,7 @@ router.delete('/:botId/plugins/:pluginId', authorize('plugin:delete'), async (re
     }
 });
 
-router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view'), async (req, res) => {
+router.get('/:botId/plugins/:pluginId/settings', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
 	try {
 		const pluginId = parseInt(req.params.pluginId);
 		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
@@ -531,120 +545,107 @@ router.get('/:botId/plugins/:pluginId/settings', authorize('plugin:settings:view
 	}
 });
 
-// Вкладка Данные плагина (PluginDataStore)
-router.get('/:botId/plugins/:pluginId/data', authorize('plugin:settings:view'), async (req, res) => {
-	try {
-		const pluginId = parseInt(req.params.pluginId);
-		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+router.get('/:botId/plugins/:pluginId/data', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.pluginId);
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
-		const rows = await prisma.pluginDataStore.findMany({
-			where: { botId: plugin.botId, pluginName: plugin.name },
-			orderBy: { updatedAt: 'desc' }
-		});
+        const rows = await prisma.pluginDataStore.findMany({
+            where: { botId: plugin.botId, pluginName: plugin.name },
+            orderBy: { updatedAt: 'desc' }
+        });
 
-		const result = rows.map(r => {
-			let value;
-			try { value = JSON.parse(r.value); } catch { value = r.value; }
-			return { key: r.key, value, createdAt: r.createdAt, updatedAt: r.updatedAt };
-		});
-		res.json(result);
-	} catch (error) {
-		console.error('[API Error] GET plugin data:', error);
-		res.status(500).json({ error: 'Не удалось получить данные плагина' });
-	}
+        const result = rows.map(r => {
+            let value;
+            try { value = JSON.parse(r.value); } catch { value = r.value; }
+            return { key: r.key, value, createdAt: r.createdAt, updatedAt: r.updatedAt };
+        });
+        res.json(result);
+    } catch (error) { res.status(500).json({ error: 'Не удалось получить данные плагина' }); }
 });
 
-router.get('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:view'), async (req, res) => {
-	try {
-		const pluginId = parseInt(req.params.pluginId);
-		const { key } = req.params;
-		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+router.get('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.pluginId);
+        const { key } = req.params;
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
-		const row = await prisma.pluginDataStore.findUnique({
-			where: {
-				pluginName_botId_key: {
-					pluginName: plugin.name,
-					botId: plugin.botId,
-					key
-				}
-			}
-		});
-		if (!row) return res.status(404).json({ error: 'Ключ не найден' });
-		let value; try { value = JSON.parse(row.value); } catch { value = row.value; }
-		res.json({ key: row.key, value, createdAt: row.createdAt, updatedAt: row.updatedAt });
-	} catch (error) {
-		console.error('[API Error] GET plugin data by key:', error);
-		res.status(500).json({ error: 'Не удалось получить значение по ключу' });
-	}
+        const row = await prisma.pluginDataStore.findUnique({
+            where: {
+                pluginName_botId_key: {
+                    pluginName: plugin.name,
+                    botId: plugin.botId,
+                    key
+                }
+            }
+        });
+        if (!row) return res.status(404).json({ error: 'Ключ не найден' });
+        let value; try { value = JSON.parse(row.value); } catch { value = row.value; }
+        res.json({ key: row.key, value, createdAt: row.createdAt, updatedAt: row.updatedAt });
+    } catch (error) { res.status(500).json({ error: 'Не удалось получить значение по ключу' }); }
 });
 
-router.put('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:edit'), async (req, res) => {
-	try {
-		const pluginId = parseInt(req.params.pluginId);
-		const { key } = req.params;
-		const { value } = req.body;
-		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+router.put('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.pluginId);
+        const { key } = req.params;
+        const { value } = req.body;
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
-		const jsonValue = JSON.stringify(value ?? null);
-		const upserted = await prisma.pluginDataStore.upsert({
-			where: {
-				pluginName_botId_key: {
-					pluginName: plugin.name,
-					botId: plugin.botId,
-					key
-				}
-			},
-			update: { value: jsonValue },
-			create: { pluginName: plugin.name, botId: plugin.botId, key, value: jsonValue }
-		});
-		let parsed; try { parsed = JSON.parse(upserted.value); } catch { parsed = upserted.value; }
-		res.json({ key: upserted.key, value: parsed, createdAt: upserted.createdAt, updatedAt: upserted.updatedAt });
-	} catch (error) {
-		console.error('[API Error] PUT plugin data by key:', error);
-		res.status(500).json({ error: 'Не удалось сохранить значение' });
-	}
+        const jsonValue = JSON.stringify(value ?? null);
+        const upserted = await prisma.pluginDataStore.upsert({
+            where: {
+                pluginName_botId_key: {
+                    pluginName: plugin.name,
+                    botId: plugin.botId,
+                    key
+                }
+            },
+            update: { value: jsonValue },
+            create: { pluginName: plugin.name, botId: plugin.botId, key, value: jsonValue }
+        });
+        let parsed; try { parsed = JSON.parse(upserted.value); } catch { parsed = upserted.value; }
+        res.json({ key: upserted.key, value: parsed, createdAt: upserted.createdAt, updatedAt: upserted.updatedAt });
+    } catch (error) { res.status(500).json({ error: 'Не удалось сохранить значение' }); }
 });
 
-router.delete('/:botId/plugins/:pluginId/data/:key', authorize('plugin:settings:edit'), async (req, res) => {
-	try {
-		const pluginId = parseInt(req.params.pluginId);
-		const { key } = req.params;
-		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-		if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
+router.delete('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.pluginId);
+        const { key } = req.params;
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) return res.status(404).json({ error: 'Установленный плагин не найден' });
 
-		await prisma.pluginDataStore.delete({
-			where: {
-				pluginName_botId_key: {
-					pluginName: plugin.name,
-					botId: plugin.botId,
-					key
-				}
-			}
-		});
-		res.status(204).send();
-	} catch (error) {
-		console.error('[API Error] DELETE plugin data by key:', error);
-		res.status(500).json({ error: 'Не удалось удалить значение' });
-	}
+        await prisma.pluginDataStore.delete({
+            where: {
+                pluginName_botId_key: {
+                    pluginName: plugin.name,
+                    botId: plugin.botId,
+                    key
+                }
+            }
+        });
+        res.status(204).send();
+    } catch (error) { res.status(500).json({ error: 'Не удалось удалить значение' }); }
 });
 
-router.put('/:botId/plugins/:pluginId', authorize('plugin:settings:edit'), async (req, res) => {
-	try {
-		const pluginId = parseInt(req.params.pluginId);
-		const { isEnabled, settings } = req.body;
-		const dataToUpdate = {};
-		if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-		if (settings) dataToUpdate.settings = JSON.stringify(settings);
-		if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
-		const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
-		res.json(updated);
-	} catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
+router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+    try {
+        const pluginId = parseInt(req.params.pluginId);
+        const { isEnabled, settings } = req.body;
+        const dataToUpdate = {};
+        if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
+        if (settings) dataToUpdate.settings = JSON.stringify(settings);
+        if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
+        const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
+        res.json(updated);
+    } catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
 });
 
-router.get('/:botId/management-data', authorize('management:view'), async (req, res) => {
+router.get('/:botId/management-data', authenticate, checkBotAccess, authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         if (isNaN(botId)) return res.status(400).json({ error: 'Неверный ID бота' });
@@ -1007,7 +1008,7 @@ router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
     }
 });
 
-router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
+router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
 
@@ -1086,7 +1087,7 @@ router.get('/:id/settings/all', authorize('bot:update'), async (req, res) => {
 
 const nodeRegistry = require('../../core/NodeRegistry'); 
 
-router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, res) => {
+router.get('/:botId/visual-editor/nodes', authenticate, checkBotAccess, authorize('management:view'), (req, res) => {
     try {
         const { graphType } = req.query;
         const nodesByCategory = nodeRegistry.getNodesByCategory(graphType);
@@ -1097,7 +1098,7 @@ router.get('/:botId/visual-editor/nodes', authorize('management:view'), (req, re
     }
 });
 
-router.get('/:botId/visual-editor/node-config', authorize('management:view'), (req, res) => {
+router.get('/:botId/visual-editor/node-config', authenticate, checkBotAccess, authorize('management:view'), (req, res) => {
     try {
         const { types } = req.query;
         if (!types) {
@@ -1112,7 +1113,7 @@ router.get('/:botId/visual-editor/node-config', authorize('management:view'), (r
     }
 });
 
-router.get('/:botId/visual-editor/permissions', authorize('management:view'), async (req, res) => {
+router.get('/:botId/visual-editor/permissions', authenticate, checkBotAccess, authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const permissions = await prisma.permission.findMany({ 
@@ -1733,7 +1734,7 @@ router.post('/:botId/plugins/:pluginName/action', authorize('plugin:list'), asyn
 });
 
 
-router.get('/:botId/export', authorize('bot:export'), async (req, res) => {
+router.get('/:botId/export', authenticate, checkBotAccess, authorize('bot:export'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const {

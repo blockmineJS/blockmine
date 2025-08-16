@@ -81,13 +81,10 @@ export const createCoreSlice = (set, get) => ({
 
         set({ socket: newSocket });
     },
-
     disconnectSocket: () => {
-        const socket = get().socket;
-        if (socket) {
-            socket.disconnect();
-            set({ socket: null });
-        }
+        const s = get().socket;
+        try { s?.disconnect(); } catch (e) {}
+        set({ socket: null });
     },
 
     fetchInitialData: async () => {

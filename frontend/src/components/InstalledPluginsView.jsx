@@ -34,7 +34,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
     const [isHovered, setIsHovered] = useState(false);
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
     
-    const isUpdatingThisPlugin = onUpdate.isUpdating === plugin.id;
+    const isUpdatingThisPlugin = onUpdate && onUpdate.isUpdating === plugin.id;
     const isEditable = plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE';
     const isForkable = plugin.sourceType === 'GITHUB';
 
@@ -127,7 +127,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 ml-4">
-                    {updateInfo && (
+                    {updateInfo && onUpdate && (
                         <Button 
                             size="sm" 
                             className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
@@ -145,7 +145,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         </Button>
                     )}
                     <div className="flex gap-1">
-                        {isEditable && (
+                        {isEditable && onFork && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
@@ -155,7 +155,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                 <TooltipContent>Редактировать код</TooltipContent>
                             </Tooltip>
                         )}
-                        {isForkable && (
+                        {isForkable && onFork && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFork(plugin)}>
@@ -165,7 +165,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                 <TooltipContent>Создать локальную копию</TooltipContent>
                             </Tooltip>
                         )}
-                        {hasSettings && (
+                        {hasSettings && onOpenSettings && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
@@ -175,18 +175,21 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                 <TooltipContent>Настройки</TooltipContent>
                             </Tooltip>
                         )}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
-                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Удалить</TooltipContent>
-                        </Tooltip>
+                        {onDelete && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Удалить</TooltipContent>
+                            </Tooltip>
+                        )}
                     </div>
                     <Switch
                         checked={plugin.isEnabled}
-                        onCheckedChange={(checked) => onToggle(plugin, checked)}
+                        onCheckedChange={onToggle ? ((checked) => onToggle(plugin, checked)) : undefined}
+                        disabled={!onToggle}
                         className="ml-2"
                     />
                 </div>
@@ -252,7 +255,8 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     </div>
                     <Switch
                         checked={plugin.isEnabled}
-                        onCheckedChange={(checked) => onToggle(plugin, checked)}
+                        onCheckedChange={onToggle ? ((checked) => onToggle(plugin, checked)) : undefined}
+                        disabled={!onToggle}
                         className="shrink-0"
                     />
                 </div>
@@ -331,7 +335,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             </CardContent>
             
             <CardFooter className={cardStyles.footer}>
-                {updateInfo && (
+                {updateInfo && onUpdate && (
                     <Button 
                         className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
                         size="sm"
@@ -353,7 +357,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 )}
                 
                 <div className="grid grid-cols-2 gap-2 w-full">
-                    {isEditable && (
+                    {isEditable && onFork && (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
@@ -363,7 +367,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <TooltipContent>Редактировать код</TooltipContent>
                         </Tooltip>
                     )}
-                    {isForkable && (
+                    {isForkable && onFork && (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => onFork(plugin)}>
@@ -373,7 +377,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <TooltipContent>Создать копию</TooltipContent>
                         </Tooltip>
                     )}
-                    {hasSettings && (
+                    {hasSettings && onOpenSettings && (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="outline" size="sm" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
@@ -383,14 +387,16 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <TooltipContent>Настройки</TooltipContent>
                         </Tooltip>
                     )}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Удалить</TooltipContent>
-                    </Tooltip>
+                    {onDelete && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Удалить</TooltipContent>
+                        </Tooltip>
+                    )}
                 </div>
             </CardFooter>
         </Card>
@@ -680,7 +686,7 @@ export default function InstalledPluginsView({
             </div>
             
             <Dialog open={!!selectedPlugin} onOpenChange={(isOpen) => !isOpen && setSelectedPlugin(null)}>
-                {selectedPlugin && <PluginSettingsDialog bot={bot} plugin={selectedPlugin} onOpenChange={(isOpen) => !isOpen && setSelectedPlugin(null)} onSaveSuccess={onSaveSettings} />}
+                {selectedPlugin && <PluginSettingsDialog bot={bot} plugin={selectedPlugin} onOpenChange={(isOpen) => !isOpen && setSelectedPlugin(null)} onSaveSuccess={onSaveSettings} readOnly={!onUpdatePlugin} />}
             </Dialog>
 
             {pluginToDelete && (
