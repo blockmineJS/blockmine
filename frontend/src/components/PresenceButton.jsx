@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 const routeTitles = (path) => {
 	if (path === '/') return 'Дашборд';
@@ -29,17 +30,54 @@ function sinceText(ts) {
 
 export default function PresenceButton() {
 	const socket = useAppStore((s) => s.socket);
+	const currentUser = useAppStore((s) => s.user);
+	const { toast } = useToast();
 	const [list, setList] = useState([]);
 	const [tick, setTick] = useState(0);
 	const location = useLocation();
 	const navigate = useNavigate();
 
+	const prevIdsRef = useRef(new Set());
+	const lastLeftAtRef = useRef(() => {
+		try {
+			const raw = sessionStorage.getItem('presence:lastLeftAt');
+			return raw ? new Map(Object.entries(JSON.parse(raw)).map(([k,v]) => [Number(k), Number(v)])) : new Map();
+		} catch { return new Map(); }
+	});
+	if (typeof lastLeftAtRef.current === 'function') {
+		lastLeftAtRef.current = lastLeftAtRef.current();
+	}
+
 	useEffect(() => {
 		if (!socket) return;
-		const handler = (payload) => setList(payload || []);
+		const handler = (payload) => {
+			setList(payload || []);
+			const currentIds = new Set((payload || []).map(u => u.userId));
+			const prevIds = prevIdsRef.current;
+			const now = Date.now();
+			for (const uid of prevIds) {
+				if (!currentIds.has(uid)) {
+					lastLeftAtRef.current.set(uid, now);
+				}
+			}
+			try {
+				sessionStorage.setItem('presence:lastLeftAt', JSON.stringify(Object.fromEntries(lastLeftAtRef.current)));
+			} catch {}
+			for (const user of payload || []) {
+				if (!prevIds.has(user.userId)) {
+					if (!currentUser || user.userId !== currentUser.id) {
+						const lastLeft = lastLeftAtRef.current.get(user.userId);
+						if (!lastLeft || now - lastLeft >= 5 * 60 * 1000) {
+							toast({ title: `${user.username} зашел в панель`, description: routeTitles(user.path) });
+						}
+					}
+				}
+			}
+			prevIdsRef.current = currentIds;
+		};
 		socket.on('presence:list', handler);
 		return () => socket.off('presence:list', handler);
-	}, [socket]);
+	}, [socket, toast, currentUser]);
 
 	useEffect(() => {
 		if (!socket) return;
