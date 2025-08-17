@@ -33,6 +33,8 @@ async function main() {
     console.log('Запуск панели управления BlockMine...');
 
     const dbPath = path.join(DATA_DIR, 'blockmine.db');
+    runCommand(`npx prisma generate`);
+
     if (!fs.existsSync(dbPath)) {
         console.log('База данных не найдена. Создаем и применяем все миграции...');
         runCommand(`npx prisma migrate deploy`);

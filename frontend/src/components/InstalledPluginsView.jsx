@@ -176,14 +176,14 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             </Tooltip>
                         )}
                         {onDelete && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
-                                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Удалить</TooltipContent>
-                            </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Удалить</TooltipContent>
+                        </Tooltip>
                         )}
                     </div>
                     <Switch
@@ -388,14 +388,14 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         </Tooltip>
                     )}
                     {onDelete && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Удалить</TooltipContent>
-                        </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Удалить</TooltipContent>
+                    </Tooltip>
                     )}
                 </div>
             </CardFooter>

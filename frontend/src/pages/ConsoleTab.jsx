@@ -180,13 +180,13 @@ export default function ConsoleTab() {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <span>
-                                <Button
-                                    type="submit"
+                <Button
+                    type="submit"
                                     disabled={!command.trim() || status !== 'running' || !canInteract}
-                                    size="sm"
-                                >
-                                    <Send className="h-4 w-4" />
-                                </Button>
+                    size="sm"
+                >
+                    <Send className="h-4 w-4" />
+                </Button>
                             </span>
                         </TooltipTrigger>
                         {!canInteract && (
