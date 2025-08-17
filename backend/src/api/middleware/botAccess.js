@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 /**
  * Проверяет доступ текущего panelUser (из req.user.userId) к botId из params
- * Если у пользователя allBots=true, доступ разрешен.
+ * Если у пользователя allBots=true (или поля нет), доступ разрешен.
  * Иначе проверяется наличие записи в PanelUserBotAccess.
  */
 async function checkBotAccess(req, res, next) {
@@ -17,11 +17,12 @@ async function checkBotAccess(req, res, next) {
 
 		const user = await prisma.panelUser.findUnique({
 			where: { id: userId },
-			select: { id: true, allBots: true, botAccess: { select: { botId: true } } }
+			include: { botAccess: { select: { botId: true } } }
 		});
 		if (!user) return res.status(401).json({ error: 'Пользователь не найден' });
 
-		if (user.allBots) return next();
+		// Если поле allBots отсутствует (старый клиент) — считаем true
+		if (user.allBots !== false) return next();
 		const allowed = user.botAccess.some((a) => a.botId === botId);
 		if (!allowed) return res.status(403).json({ error: 'Доступ к боту запрещен' });
 		return next();

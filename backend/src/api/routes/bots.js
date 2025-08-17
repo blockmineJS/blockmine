@@ -148,9 +148,9 @@ router.get('/', conditionalListAuth, async (req, res) => {
         if (req.user && typeof req.user.userId === 'number') {
             const panelUser = await prisma.panelUser.findUnique({
                 where: { id: req.user.userId },
-                select: { allBots: true, botAccess: { select: { botId: true } } }
+                include: { botAccess: { select: { botId: true } } }
             });
-            if (panelUser && !panelUser.allBots) {
+            if (panelUser && panelUser.allBots === false) {
                 const allowedIds = panelUser.botAccess.map(a => a.botId);
                 whereFilter = { id: { in: allowedIds.length ? allowedIds : [-1] } };
             }
