@@ -190,21 +190,19 @@ export default function PluginsTab() {
                         </Tooltip>
                         </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
-                            <DialogTrigger asChild>
-                                <TooltipProvider>
-                                <Tooltip>
-                                <TooltipTrigger asChild>
-                                <span>
-                                <Button variant="outline" size="sm" disabled={!canInstall}>
-                                    <FolderPlus className="mr-2 h-4 w-4" />
-                                    Установить локально
-                                </Button>
-                                </span>
-                                </TooltipTrigger>
-                                {!canInstall && <TooltipContent>Недостаточно прав для установки плагинов</TooltipContent>}
-                                </Tooltip>
-                                </TooltipProvider>
-                            </DialogTrigger>
+                            <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm" disabled={!canInstall}>
+                                        <FolderPlus className="mr-2 h-4 w-4" />
+                                        Установить локально
+                                    </Button>
+                                </DialogTrigger>
+                            </TooltipTrigger>
+                            {!canInstall && <TooltipContent>Недостаточно прав для установки плагинов</TooltipContent>}
+                            </Tooltip>
+                            </TooltipProvider>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
                         <TooltipProvider>
