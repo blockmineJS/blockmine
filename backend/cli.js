@@ -5,7 +5,6 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const config = require('./src/config.js'); 
-const { startServer } = require('./src/server.js');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 if (!fs.existsSync(DATA_DIR)) {
@@ -47,6 +46,7 @@ async function main() {
         console.log('База данных в актуальном состоянии.');
     }
 
+    const { startServer } = require('./src/server.js');
     await startServer();
 }
 
