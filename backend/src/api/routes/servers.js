@@ -32,6 +32,33 @@ router.post('/', authorize('server:create'), async (req, res) => {
     }
 });
 
+router.put('/:id', authorize('server:create'), async (req, res) => {
+    try {
+        const serverId = parseInt(req.params.id, 10);
+        if (isNaN(serverId)) return res.status(400).json({ error: 'Некорректный ID сервера' });
+
+        const { name, host, port, version } = req.body;
+        const dataToUpdate = {};
+        if (name !== undefined) dataToUpdate.name = name;
+        if (host !== undefined) dataToUpdate.host = host;
+        if (port !== undefined && port !== '') dataToUpdate.port = parseInt(port, 10);
+        if (version !== undefined) dataToUpdate.version = version;
+
+        Object.keys(dataToUpdate).forEach(k => { if (dataToUpdate[k] === undefined) delete dataToUpdate[k]; });
+
+        if (dataToUpdate.name) {
+            const existing = await prisma.server.findFirst({ where: { name: dataToUpdate.name, id: { not: serverId } } });
+            if (existing) return res.status(409).json({ error: 'Сервер с таким именем уже существует' });
+        }
+
+        const updated = await prisma.server.update({ where: { id: serverId }, data: dataToUpdate });
+        res.json(updated);
+    } catch (error) {
+        console.error('[API /api/servers] Ошибка обновления сервера:', error);
+        res.status(500).json({ error: 'Не удалось обновить сервер' });
+    }
+});
+
 router.delete('/:id', authorize('server:delete'), async (req, res) => {
     try {
         const serverId = parseInt(req.params.id, 10);
