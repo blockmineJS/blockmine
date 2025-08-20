@@ -52,15 +52,53 @@ class PluginManager {
         try {
             if (await fse.pathExists(packageJsonPath)) {
                 const packageJson = await fse.readJson(packageJsonPath);
-                if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0) {
-                    console.log(`[PluginManager] Установка зависимостей для плагина в ${pluginPath}...`);
-                    // Используем --omit=dev чтобы не ставить dev-зависимости
-                    execSync('npm install --omit=dev', {
-                        cwd: pluginPath,
-                        stdio: 'inherit'
-                    });
-                    console.log(`[PluginManager] Зависимости успешно установлены.`);
+                const hasDeps = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
+                if (!hasDeps) return;
+
+                console.log(`[PluginManager] Установка зависимостей для плагина в ${pluginPath}...`);
+
+                const tryExec = (cmd) => {
+                    try {
+                        execSync(cmd, { cwd: pluginPath, stdio: 'inherit' });
+                        return true;
+                    } catch (e) {
+                        return false;
+                    }
+                };
+
+                const packageManagerField = typeof packageJson.packageManager === 'string' ? packageJson.packageManager : '';
+                const prefersPnpm = /pnpm/i.test(packageManagerField);
+                const prefersYarn = /yarn/i.test(packageManagerField);
+                const hasPackageLock = await fse.pathExists(path.join(pluginPath, 'package-lock.json'));
+                const hasPnpmLock = await fse.pathExists(path.join(pluginPath, 'pnpm-lock.yaml'));
+                const hasYarnLock = await fse.pathExists(path.join(pluginPath, 'yarn.lock'));
+
+                let installed = false;
+
+                if (!installed && (prefersPnpm || hasPnpmLock)) {
+                    installed = tryExec('pnpm install --prod --no-frozen-lockfile');
                 }
+                if (!installed && (prefersYarn || hasYarnLock)) {
+                    installed = tryExec('yarn install --production --no-immutable');
+                }
+
+                if (!installed) {
+                    if (hasPackageLock) {
+                        installed = tryExec('npm ci --omit=dev --no-audit --no-fund');
+                    }
+                    if (!installed) {
+                        installed = tryExec('npm install --omit=dev --no-audit --no-fund');
+                    }
+                    if (!installed) {
+                        installed = tryExec('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund');
+                    }
+                }
+
+                if (!installed) {
+                    throw new Error('Не удалось установить зависимости плагина стандартными способами.');
+                }
+
+                console.log(`[PluginManager] Зависимости успешно установлены.`);
             }
         } catch (error) {
             console.error(`[PluginManager] Ошибка при установке зависимостей в ${pluginPath}:`, error);
