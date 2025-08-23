@@ -2077,7 +2077,18 @@ router.post('/import', authorize('bot:create'), upload.single('file'), async (re
                     }
                 }
                 
-                const newPlugin = await prisma.installedPlugin.create({ data: pluginData });
+                try {
+                    await pluginManager._installDependencies(newPluginPath);
+                } catch (e) {
+                    console.warn(`[Import] Не удалось установить зависимости для плагина ${pluginName}: ${e.message}`);
+                }
+                
+                let newPlugin;
+                try {
+                    newPlugin = await pluginManager.registerPlugin(newBot.id, newPluginPath, 'LOCAL', newPluginPath);
+                } catch (e) {
+                    newPlugin = await prisma.installedPlugin.create({ data: pluginData });
+                }
                 pluginMap.set(oldPluginId, newPlugin.id);
             }
         }

@@ -16,6 +16,11 @@ const JWT_EXPIRES_IN = '7d';
 
 const activeResetTokens = new Map();
 
+function ownerOnly(req, res, next) {
+    if (req.user && req.user.userId === 1) return next();
+    return res.status(403).json({ error: 'Только владелец может изменять права пользователей и роли.' });
+}
+
 /**
  * @route   GET /api/auth/status
  * @desc    Проверяет, была ли произведена первоначальная настройка (создан админ)
@@ -344,7 +349,7 @@ router.get('/users', authenticate, authorize('panel:user:list'), async (req, res
  * @desc    Создать нового пользователя
  * @access  Private (Admin only)
  */
-router.post('/users', authenticate, authorize('panel:user:create'), async (req, res) => {
+router.post('/users', authenticate, ownerOnly, authorize('panel:user:create'), async (req, res) => {
     const { username, password, roleId, allBots = true, botIds = [] } = req.body;
     if (!username || !password || !roleId) {
         return res.status(400).json({ error: 'Имя, пароль и роль обязательны' });
@@ -464,7 +469,7 @@ router.get('/permissions', authenticate, (req, res) => {
  * @desc    Обновить пользователя (роль, пароль)
  * @access  Private (Admin only)
  */
-router.put('/users/:id', authenticate, authorize('panel:user:edit'), async (req, res) => {
+router.put('/users/:id', authenticate, ownerOnly, authorize('panel:user:edit'), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     const { password, roleId, allBots, botIds } = req.body;
 
@@ -512,7 +517,7 @@ router.put('/users/:id', authenticate, authorize('panel:user:edit'), async (req,
  * @desc    Удалить пользователя
  * @access  Private (Admin only)
  */
-router.delete('/users/:id', authenticate, authorize('panel:user:delete'), async (req, res) => {
+router.delete('/users/:id', authenticate, ownerOnly, authorize('panel:user:delete'), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     
     if (req.user.userId === userId) {
@@ -539,7 +544,7 @@ router.delete('/users/:id', authenticate, authorize('panel:user:delete'), async 
  * @desc    Создать новую роль
  * @access  Private (Admin only)
  */
-router.post('/roles', authenticate, authorize('panel:role:create'), async (req, res) => {
+router.post('/roles', authenticate, ownerOnly, authorize('panel:role:create'), async (req, res) => {
     const { name, permissions } = req.body;
     if (!name || !Array.isArray(permissions)) {
         return res.status(400).json({ error: 'Имя и массив прав обязательны' });
@@ -568,7 +573,7 @@ router.post('/roles', authenticate, authorize('panel:role:create'), async (req, 
  * @desc    Обновить роль (имя и права)
  * @access  Private (Admin only)
  */
-router.put('/roles/:id', authenticate, authorize('panel:role:edit'), async (req, res) => {
+router.put('/roles/:id', authenticate, ownerOnly, authorize('panel:role:edit'), async (req, res) => {
     const roleId = parseInt(req.params.id, 10);
     const { name, permissions } = req.body;
     if (!name || !Array.isArray(permissions)) {
@@ -604,7 +609,7 @@ router.put('/roles/:id', authenticate, authorize('panel:role:edit'), async (req,
  * @desc    Удалить роль
  * @access  Private (Admin only)
  */
-router.delete('/roles/:id', authenticate, authorize('panel:role:delete'), async (req, res) => {
+router.delete('/roles/:id', authenticate, ownerOnly, authorize('panel:role:delete'), async (req, res) => {
     const roleId = parseInt(req.params.id, 10);
     try {
         const role = await prisma.panelRole.findUnique({ where: { id: roleId }, include: { users: true } });
