@@ -187,9 +187,8 @@ process.on('message', async (message) => {
             if (config.proxyHost && config.proxyPort) {
                 sendLog(`[System] Используется прокси: ${config.proxyHost}:${config.proxyPort}`);
                 
-                // Очищаем пароль от лишних символов
-                const cleanProxyPassword = config.proxyPassword ? config.proxyPassword.trim() : null;
                 const cleanProxyUsername = config.proxyUsername ? config.proxyUsername.trim() : null;
+                const cleanProxyPassword = config.proxyPassword || null;
                 
                 botOptions.connect = (client) => {
                    SocksClient.createConnection({

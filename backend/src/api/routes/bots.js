@@ -236,7 +236,7 @@ router.put('/bulk-proxy-update', authenticate, authorize('bot:update'), async (r
         const encryptedSettings = {
             proxyHost: proxySettings.proxyHost.trim(),
             proxyPort: parseInt(proxySettings.proxyPort),
-            proxyUsername: proxySettings.proxyUsername ? encrypt(proxySettings.proxyUsername.trim()) : null,
+            proxyUsername: proxySettings.proxyUsername ? proxySettings.proxyUsername.trim() : null,
             proxyPassword: proxySettings.proxyPassword ? encrypt(proxySettings.proxyPassword) : null
         };
         
