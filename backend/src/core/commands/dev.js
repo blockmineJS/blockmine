@@ -52,7 +52,12 @@ class DevCommand extends Command {
         }
 
         const enabledPluginsCount = bot.config.plugins.length;
-        const totalCommandsCount = bot.commands.size;
+        
+        const uniqueCommands = new Set();
+        for (const command of bot.commands.values()) {
+            uniqueCommands.add(command.name);
+        }
+        const totalCommandsCount = uniqueCommands.size;
 
         bot.api.sendMessage(typeChat, `Бот создан с помощью - BlockMine. Версия: v${appVersion}. Активных плагинов: ${enabledPluginsCount}. Всего команд: ${totalCommandsCount}`, user.username);
     }
