@@ -18,7 +18,8 @@ import {
     ShieldCheck,
     Store,
     Lightbulb,
-    MessageSquarePlus
+    MessageSquarePlus,
+    Globe
 } from 'lucide-react';
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
@@ -346,6 +347,12 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
             <NavLink to="/graph-store" onClick={onLinkClick} className={navLinkClasses}>
                 {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, "Магазин графов")}
             </NavLink>
+
+            {hasPermission('bot:update') && (
+                <NavLink to="/proxy-config" onClick={onLinkClick} className={navLinkClasses}>
+                    {iconAndText(<Globe className="h-4 w-4 flex-shrink-0" />, "Прокси")}
+                </NavLink>
+            )}
 
             <Dialog open={isContributeModalOpen} onOpenChange={setIsContributeModalOpen}>
                 <DialogTrigger asChild>

@@ -39,4 +39,26 @@ export const createBotActionsSlice = (set, get) => ({
     stopAllBots: async () => {
         await apiHelper('/api/bots/stop-all', { method: 'POST' }, 'Команда на остановку всех ботов отправлена.');
     },
+
+    applyProxyToBots: async (botIds, proxySettings) => {
+        try {
+            const result = await apiHelper('/api/bots/bulk-proxy-update', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    botIds,
+                    proxySettings
+                })
+            }, `Настройки прокси применены к ${botIds.length} бот(ам)`);
+            
+            if (result.success) {
+                await get().fetchInitialData();
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('Failed to apply proxy settings:', error);
+            throw error;
+        }
+    },
 });

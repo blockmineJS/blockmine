@@ -175,6 +175,118 @@ router.get('/state', conditionalListAuth, (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
 });
 
+router.put('/bulk-proxy-update', authenticate, authorize('bot:update'), async (req, res) => {
+    try {
+        const { botIds, proxySettings } = req.body;
+        
+        if (!Array.isArray(botIds) || botIds.length === 0) {
+            return res.status(400).json({ error: 'Bot IDs array is required and cannot be empty' });
+        }
+        
+        if (!proxySettings || !proxySettings.proxyHost || !proxySettings.proxyPort) {
+            return res.status(400).json({ error: 'Proxy host and port are required' });
+        }
+        
+        if (proxySettings.proxyPort < 1 || proxySettings.proxyPort > 65535) {
+            return res.status(400).json({ error: 'Proxy port must be between 1 and 65535' });
+        }
+        
+        const accessibleBots = [];
+        const inaccessibleBots = [];
+        
+        for (const botId of botIds) {
+            try {
+                const userId = req.user?.userId;
+                if (!userId) {
+                    inaccessibleBots.push(botId);
+                    continue;
+                }
+
+                const botIdInt = parseInt(botId, 10);
+                if (isNaN(botIdInt)) {
+                    inaccessibleBots.push(botId);
+                    continue;
+                }
+
+                const user = await prisma.panelUser.findUnique({
+                    where: { id: userId },
+                    include: { botAccess: { select: { botId: true } } }
+                });
+                
+                if (!user) {
+                    inaccessibleBots.push(botId);
+                    continue;
+                }
+
+                if (user.allBots !== false || user.botAccess.some((a) => a.botId === botIdInt)) {
+                    accessibleBots.push(botIdInt);
+                } else {
+                    inaccessibleBots.push(botId);
+                }
+            } catch (error) {
+                console.error(`Error checking access for bot ${botId}:`, error);
+                inaccessibleBots.push(botId);
+            }
+        }
+        
+        if (accessibleBots.length === 0) {
+            return res.status(403).json({ error: 'No accessible bots in the provided list' });
+        }
+        
+        const encryptedSettings = {
+            proxyHost: proxySettings.proxyHost.trim(),
+            proxyPort: parseInt(proxySettings.proxyPort),
+            proxyUsername: proxySettings.proxyUsername ? encrypt(proxySettings.proxyUsername.trim()) : null,
+            proxyPassword: proxySettings.proxyPassword ? encrypt(proxySettings.proxyPassword) : null
+        };
+        
+        const updatedBots = await prisma.$transaction(
+            accessibleBots.map(botId => 
+                prisma.bot.update({
+                    where: { id: parseInt(botId) },
+                    data: encryptedSettings,
+                    include: {
+                        server: {
+                            select: {
+                                id: true,
+                                name: true,
+                                host: true,
+                                port: true,
+                                version: true
+                            }
+                        }
+                    }
+                })
+            )
+        );
+        
+        if (req.io) {
+            req.io.emit('bots-updated', updatedBots);
+        }
+        
+        res.json({
+            success: true,
+            message: `Proxy settings updated for ${updatedBots.length} bot(s)`,
+            updatedBots: updatedBots.map(bot => ({
+                id: bot.id,
+                username: bot.username,
+                proxyHost: bot.proxyHost,
+                proxyPort: bot.proxyPort,
+                server: bot.server
+            })),
+            inaccessibleBots: inaccessibleBots,
+            errors: inaccessibleBots.length > 0 ? [`Access denied to ${inaccessibleBots.length} bot(s)`] : []
+        });
+        
+    } catch (error) {
+        console.error('Bulk proxy update error:', error);
+        res.status(500).json({ 
+            error: 'Failed to update proxy settings',
+            details: error.message 
+        });
+    }
+});
+
 router.get('/:id/logs', conditionalListAuth, authenticate, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
