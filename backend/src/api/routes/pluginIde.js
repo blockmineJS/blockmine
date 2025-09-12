@@ -675,10 +675,10 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
 
 
             if (branchExists) {
-                cp.execSync(`git push origin ${branch} --force`);
+                cp.execFileSync('git', ['push', 'origin', branch, '--force']);
                 console.log(`[Plugin IDE] Ветка ${branch} обновлена`);
             } else {
-                cp.execSync(`git push -u origin ${branch}`);
+                cp.execFileSync('git', ['push', '-u', 'origin', branch]);
                 console.log(`[Plugin IDE] Новая ветка ${branch} создана`);
             }
 
