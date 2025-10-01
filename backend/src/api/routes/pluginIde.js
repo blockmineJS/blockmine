@@ -588,6 +588,10 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
     if (!branch) {
         return res.status(400).json({ error: 'Название ветки обязательно.' });
     }
+    // Validate branch name: only allow letters, numbers, dashes, underscores, dots, slashes
+    if (!branch.match(/^[\w\-.\/]+$/)) {
+        return res.status(400).json({ error: 'Некорректное имя ветки.' });
+    }
 
     try {
         cp.execSync('git --version');
@@ -675,10 +679,10 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
 
 
             if (branchExists) {
-                cp.execSync(`git push origin ${branch} --force`);
+                cp.execFileSync('git', ['push', 'origin', branch, '--force']);
                 console.log(`[Plugin IDE] Ветка ${branch} обновлена`);
             } else {
-                cp.execSync(`git push -u origin ${branch}`);
+                cp.execFileSync('git', ['push', '-u', 'origin', branch]);
                 console.log(`[Plugin IDE] Новая ветка ${branch} создана`);
             }
 
