@@ -136,11 +136,20 @@ router.get('/', conditionalListAuth, async (req, res) => {
         
         if (botsWithoutSortOrder.length > 0) {
             console.log(`[API] Обновляем sortOrder для ${botsWithoutSortOrder.length} ботов`);
+            
+            const maxSortOrder = await prisma.bot.aggregate({
+                _max: { sortOrder: true }
+            });
+            
+            let nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1;
+            
             for (const bot of botsWithoutSortOrder) {
                 await prisma.bot.update({
                     where: { id: bot.id },
-                    data: { sortOrder: bot.id }
+                    data: { sortOrder: nextSortOrder }
                 });
+                console.log(`[API] Установлен sortOrder ${nextSortOrder} для бота ${bot.id}`);
+                nextSortOrder++;
             }
         }
 
@@ -465,74 +474,56 @@ router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async 
 
 router.put('/:id/sort-order', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
-        const { newPosition } = req.body;
+        const { newPosition, oldIndex, newIndex } = req.body;
         const botId = parseInt(req.params.id, 10);
         
-        console.log(`[API] Запрос на изменение порядка бота ${botId} на позицию ${newPosition}`);
+        console.log(`[API] Запрос на изменение порядка бота ${botId}: oldIndex=${oldIndex}, newIndex=${newIndex}, newPosition=${newPosition}`);
         
-        if (isNaN(botId) || typeof newPosition !== 'number') {
-            console.log(`[API] Неверные параметры: botId=${botId}, newPosition=${newPosition}`);
-            return res.status(400).json({ error: 'Неверные параметры' });
+        if (isNaN(botId)) {
+            console.log(`[API] Неверный botId: ${botId}`);
+            return res.status(400).json({ error: 'Неверный ID бота' });
         }
 
-        const currentBot = await prisma.bot.findUnique({
-            where: { id: botId },
-            select: { sortOrder: true }
+        const allBots = await prisma.bot.findMany({
+            orderBy: { sortOrder: 'asc' },
+            select: { id: true, sortOrder: true }
         });
 
-        if (!currentBot) {
+        console.log(`[API] Всего ботов: ${allBots.length}`);
+        const currentBotIndex = allBots.findIndex(bot => bot.id === botId);
+        if (currentBotIndex === -1) {
             console.log(`[API] Бот ${botId} не найден`);
             return res.status(404).json({ error: 'Бот не найден' });
         }
 
-        const currentPosition = currentBot.sortOrder;
-        console.log(`[API] Текущая позиция бота ${botId}: ${currentPosition}, новая позиция: ${newPosition}`);
-        
-        if (newPosition === currentPosition) {
+        if (newIndex < 0 || newIndex >= allBots.length) {
+            console.log(`[API] Неверная новая позиция: ${newIndex}`);
+            return res.status(400).json({ error: 'Неверная позиция' });
+        }
+
+        if (currentBotIndex === newIndex) {
             console.log(`[API] Позиция не изменилась для бота ${botId}`);
             return res.json({ success: true, message: 'Позиция не изменилась' });
         }
+        const reorderedBots = [...allBots];
+        const [movedBot] = reorderedBots.splice(currentBotIndex, 1);
+        reorderedBots.splice(newIndex, 0, movedBot);
 
-        if (newPosition > currentPosition) {
-            console.log(`[API] Перемещаем бота ${botId} вниз с позиции ${currentPosition} на ${newPosition}`);
-            const updateResult = await prisma.bot.updateMany({
-                where: {
-                    sortOrder: {
-                        gt: currentPosition,
-                        lte: newPosition
-                    }
-                },
-                data: {
-                    sortOrder: {
-                        decrement: 1
-                    }
-                }
-            });
-            console.log(`[API] Обновлено ${updateResult.count} ботов при перемещении вниз`);
-        } else {
-            console.log(`[API] Перемещаем бота ${botId} вверх с позиции ${currentPosition} на ${newPosition}`);
-            const updateResult = await prisma.bot.updateMany({
-                where: {
-                    sortOrder: {
-                        gte: newPosition,
-                        lt: currentPosition
-                    }
-                },
-                data: {
-                    sortOrder: {
-                        increment: 1
-                    }
-                }
-            });
-            console.log(`[API] Обновлено ${updateResult.count} ботов при перемещении вверх`);
+        console.log(`[API] Обновляем порядок для всех ботов`);
+        for (let i = 0; i < reorderedBots.length; i++) {
+            const bot = reorderedBots[i];
+            const newSortOrder = i + 1; // 1-based позиции
+            
+            if (bot.sortOrder !== newSortOrder) {
+                await prisma.bot.update({
+                    where: { id: bot.id },
+                    data: { sortOrder: newSortOrder }
+                });
+                console.log(`[API] Обновлен бот ${bot.id}: sortOrder ${bot.sortOrder} -> ${newSortOrder}`);
+            }
         }
 
-        await prisma.bot.update({
-            where: { id: botId },
-            data: { sortOrder: newPosition }
-        });
-
-        console.log(`[API] Успешно обновлен порядок бота ${botId} на позицию ${newPosition}`);
+        console.log(`[API] Успешно обновлен порядок бота ${botId}`);
         res.json({ success: true, message: 'Порядок ботов обновлен' });
     } catch (error) {
         console.error("[API Error] /bots sort-order PUT:", error);

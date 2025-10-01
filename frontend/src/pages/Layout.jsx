@@ -233,9 +233,16 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                 const newBots = arrayMove(bots, oldIndex, newIndex);
                 updateBotOrder(newBots);
 
+                const targetBot = bots[newIndex];
+                const newSortOrder = targetBot.sortOrder;
+
                 const result = await apiHelper(`/api/bots/${active.id}/sort-order`, {
                     method: 'PUT',
-                    body: JSON.stringify({ newPosition: newIndex + 1 }),
+                    body: JSON.stringify({ 
+                        newPosition: newSortOrder,
+                        oldIndex: oldIndex,
+                        newIndex: newIndex 
+                    }),
                 });
 
             } catch (error) {
