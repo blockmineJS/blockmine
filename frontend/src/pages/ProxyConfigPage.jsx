@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
-import { Globe, Search, CheckAll, X, Loader2, TestTube, Check } from 'lucide-react';
+import { Globe, Search, X, Loader2, TestTube, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
