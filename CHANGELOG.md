@@ -1,6 +1,14 @@
 # История версий
 
 
+### [1.19.1](https://github.com/blockmineJS/blockmine/compare/v1.19.0...v1.19.1) (2025-10-01)
+
+
+### 🐛 Исправления
+
+* изменение порядка ботов теперь корректное ([9663737](https://github.com/blockmineJS/blockmine/commit/9663737505201468dd2233bf5658be5b2442f583))
+* фиксим новой вкладки прокси ([7ebdb7d](https://github.com/blockmineJS/blockmine/commit/7ebdb7d0df6c4e5cd6a9b15576cc1907ab7fcd74))
+
 ## [1.19.0](https://github.com/blockmineJS/blockmine/compare/v1.18.5...v1.19.0) (2025-08-23)
 
 
