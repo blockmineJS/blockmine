@@ -393,7 +393,13 @@ class BotManager {
 
         const fullBotConfig = { ...decryptedConfig, plugins: sortedPlugins };
         const botProcessPath = path.resolve(__dirname, 'BotProcess.js');
-        const child = fork(botProcessPath, [], { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
+        const child = fork(botProcessPath, [], {
+            stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+            env: {
+                ...process.env,
+                NODE_PATH: path.resolve(__dirname, '../../../node_modules')
+            }
+        });
 
         child.botConfig = botConfig;
 
