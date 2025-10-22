@@ -33,7 +33,26 @@ function CustomNode({ data, type, id: nodeId }) {
 
   const inputs = useMemo(() => {
     let baseInputs = nodeConfig?.pins?.inputs ? [...nodeConfig.pins.inputs] : [];
-    
+
+    // Динамические входы для action:send_message на основе переменных в тексте
+    if (type === 'action:send_message') {
+      const message = data.message || '';
+      const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+      const matches = [...message.matchAll(variablePattern)];
+      const uniqueVars = [...new Set(matches.map(m => m[1]))];
+
+      // Добавляем динамические входы для каждой уникальной переменной
+      uniqueVars.forEach(varName => {
+        if (!baseInputs.find(input => input.id === `var_${varName}`)) {
+          baseInputs.push({
+            id: `var_${varName}`,
+            name: varName,
+            type: 'String',
+          });
+        }
+      });
+    }
+
     if (type === 'data:array_literal') {
       for (let i = 0; i < (data.pinCount || 0); i++) {
         baseInputs.push({
@@ -110,7 +129,7 @@ function CustomNode({ data, type, id: nodeId }) {
         return baseInputs.filter(p => p.id === 'condition' || p.type === 'Exec');
     }
     return baseInputs;
-  }, [nodeConfig, data, type]);
+  }, [nodeConfig, data, type, data?.message]);
 
   const outputs = useMemo(() => {
     if (type === 'flow:sequence') {

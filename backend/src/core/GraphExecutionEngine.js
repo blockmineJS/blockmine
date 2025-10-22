@@ -129,9 +129,20 @@ class GraphExecutionEngine {
               break;
           }
           case 'action:send_message': {
-              const message = String(await this.resolvePinValue(node, 'message', ''));
+              let message = String(await this.resolvePinValue(node, 'message', ''));
               const chatType = await this.resolvePinValue(node, 'chat_type', this.context.typeChat);
               const recipient = await this.resolvePinValue(node, 'recipient', this.context.user?.username);
+
+              // Парсим и заменяем переменные в формате {varName}
+              const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+              const matches = [...message.matchAll(variablePattern)];
+
+              for (const match of matches) {
+                  const varName = match[1];
+                  const varValue = await this.resolvePinValue(node, `var_${varName}`, '');
+                  message = message.replace(match[0], String(varValue));
+              }
+
               this.context.bot.sendMessage(chatType, message, recipient);
               await this.traverse(node, 'exec');
               break;

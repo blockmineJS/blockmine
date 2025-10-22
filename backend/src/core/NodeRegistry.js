@@ -299,8 +299,9 @@ class NodeRegistry {
       type: 'action:send_message',
       label: '🗣️ Отправить сообщение',
       category: 'Действия',
-      description: 'Отправляет сообщение в чат',
+      description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
       graphType: all,
+      dynamicPins: true,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
