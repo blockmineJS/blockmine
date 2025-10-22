@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
