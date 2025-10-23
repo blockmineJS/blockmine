@@ -556,8 +556,8 @@ class BotManager {
 
                 if (counter.count >= MAX_RESTART_ATTEMPTS) {
                     console.log(`[BotManager] Бот ${botId} упал ${counter.count} раз подряд. Автоперезапуск остановлен.`);
-                    this.appendLog(botId, `[SYSTEM] ❌ Обнаружено ${counter.count} критических ошибок подряд.`);
-                    this.appendLog(botId, `[SYSTEM] 💡 Исправьте проблему и запустите бота вручную.`);
+                    this.appendLog(botId, `[SYSTEM] Обнаружено ${counter.count} критических ошибок подряд.`);
+                    this.appendLog(botId, `[SYSTEM] Исправьте проблему и запустите бота вручную.`);
                     this.crashCounters.delete(botId);
                     return;
                 }
