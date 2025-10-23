@@ -52,6 +52,7 @@ class BotManager {
         this.playerListCache = new Map();
         this.eventGraphManager = null;
         this.uiSubscriptions = new Map();
+        this.crashCounters = new Map();
 
         getInstanceId();
         setInterval(() => this.updateAllResourceUsage(), 5000);
@@ -446,6 +447,7 @@ class BotManager {
                         break;
                     case 'bot_ready':
                         this.emitStatusUpdate(botId, 'running', 'Бот успешно подключился к серверу.');
+                        this.crashCounters.delete(botId);
                         break;
                     case 'validate_and_run_command':
                         await this.handleCommandValidation(botConfig, message);
@@ -533,13 +535,35 @@ class BotManager {
             this.bots.delete(botId);
             this.resourceUsage.delete(botId);
             this.botConfigs.delete(botId);
-            
+
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
 
             if (code === 1) {
-                console.log(`[BotManager] Обнаружена ошибка с кодом 1 для бота ${botId}. Попытка перезапуска через 5 секунд...`);
-                this.appendLog(botId, `[SYSTEM] Обнаружена критическая ошибка, перезапуск через 5 секунд...`);
+                const MAX_RESTART_ATTEMPTS = 5;
+                const RESTART_COOLDOWN = 60000;
+
+                const counter = this.crashCounters.get(botId) || { count: 0, firstCrash: Date.now() };
+                const timeSinceFirstCrash = Date.now() - counter.firstCrash;
+
+                if (timeSinceFirstCrash > RESTART_COOLDOWN) {
+                    counter.count = 0;
+                    counter.firstCrash = Date.now();
+                }
+
+                counter.count++;
+                this.crashCounters.set(botId, counter);
+
+                if (counter.count >= MAX_RESTART_ATTEMPTS) {
+                    console.log(`[BotManager] Бот ${botId} упал ${counter.count} раз подряд. Автоперезапуск остановлен.`);
+                    this.appendLog(botId, `[SYSTEM] ❌ Обнаружено ${counter.count} критических ошибок подряд.`);
+                    this.appendLog(botId, `[SYSTEM] 💡 Исправьте проблему и запустите бота вручную.`);
+                    this.crashCounters.delete(botId);
+                    return;
+                }
+
+                console.log(`[BotManager] Обнаружена ошибка с кодом 1 для бота ${botId}. Попытка ${counter.count}/${MAX_RESTART_ATTEMPTS}. Перезапуск через 5 секунд...`);
+                this.appendLog(botId, `[SYSTEM] Обнаружена критическая ошибка, перезапуск через 5 секунд... (попытка ${counter.count}/${MAX_RESTART_ATTEMPTS})`);
                 setTimeout(() => {
                     console.log(`[BotManager] Перезапуск бота ${botId}...`);
                     this.startBot(botConfig);
