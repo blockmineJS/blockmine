@@ -1,6 +1,14 @@
 # История версий
 
 
+## [1.20.0](https://github.com/blockmineJS/blockmine/compare/v1.19.1...v1.20.0) (2025-10-23)
+
+
+### ✨ Новые возможности
+
+* если бот падает 5 раз с критической ошибкой, то перезапуск отменяется ([2ba022f](https://github.com/blockmineJS/blockmine/commit/2ba022fff038cc83bb1edfa04d3edf97fc76c255))
+* action:send_message to support dynamic variables. example. Сообщение: привет, {username} ([457639d](https://github.com/blockmineJS/blockmine/commit/457639d70e7a8933f0508d93196a2be6951f1a0a))
+
 ### [1.19.1](https://github.com/blockmineJS/blockmine/compare/v1.19.0...v1.19.1) (2025-10-01)
 
 
