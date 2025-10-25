@@ -38,6 +38,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "@reactflow/node-toolbar": "^1.2.1",
+    "@tanstack/react-virtual": "^3.13.12",
     "ansi-to-html": "^0.7.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

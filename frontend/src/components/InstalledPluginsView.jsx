@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,8 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { FixedSizeList, FixedSizeGrid } from 'react-window';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const cardStyles = {
     card: "relative overflow-hidden transition-all duration-300 group h-full flex flex-col",
@@ -61,7 +63,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
         return (
             <div 
                 className={cn(
-                    "relative flex items-start gap-4 p-4 border rounded-lg transition-all duration-300",
+                    "relative flex items-start gap-4 p-4 border rounded-lg transition-all duration-300 h-full",
                     "hover:border-primary/50 hover:bg-muted/50",
                     plugin.isEnabled ? "border-green-600/30 bg-green-950/5" : "opacity-80"
                 )}
@@ -422,6 +424,8 @@ export default function InstalledPluginsView({
     });
     const [pluginToDelete, setPluginToDelete] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const containerRef = useRef(null);
+    const [size, setSize] = useState({ width: 0, height: 0 });
 
     const stats = useMemo(() => {
         const enabled = installedPlugins.filter(p => p.isEnabled).length;
@@ -470,9 +474,77 @@ export default function InstalledPluginsView({
         ));
     }, [installedPlugins, filter, updates, searchQuery]);
 
+    const isXl = useMediaQuery("(min-width: 1280px)");
+    const isLg = useMediaQuery("(min-width: 1024px)");
+    const isMd = useMediaQuery("(min-width: 768px)");
+
+    const columnCount = useMemo(() => (isXl ? 4 : isLg ? 3 : isMd ? 2 : 1), [isXl, isLg, isMd]);
+    const rowCount = Math.ceil(sortedAndFilteredPlugins.length / columnCount);
+    const columnWidth = size.width > 0 ? size.width / columnCount : 0;
+    const rowHeight = 420; 
+
     useEffect(() => {
         localStorage.setItem('installed-plugins-view-mode', viewMode);
     }, [viewMode]);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+                setSize({
+                    width: container.offsetWidth,
+                    height: container.offsetHeight,
+                });
+            }
+        });
+
+        resizeObserver.observe(container);
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    const Row = ({ index, style }) => {
+        const plugin = sortedAndFilteredPlugins[index];
+        return (
+            <div style={style} className="py-1.5 px-4">
+                <InstalledPluginCard
+                    plugin={plugin}
+                    botId={bot.id}
+                    updateInfo={updates[plugin.sourceUri]}
+                    onToggle={onTogglePlugin}
+                    onDelete={() => setPluginToDelete(plugin)}
+                    onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
+                    onOpenSettings={setSelectedPlugin}
+                    onFork={onForkPlugin}
+                    viewMode="list"
+                />
+            </div>
+        );
+    };
+
+    const Cell = ({ columnIndex, rowIndex, style }) => {
+        const index = rowIndex * columnCount + columnIndex;
+        if (index >= sortedAndFilteredPlugins.length) {
+            return null;
+        }
+        const plugin = sortedAndFilteredPlugins[index];
+        return (
+            <div style={style} className="p-3">
+                <InstalledPluginCard
+                    plugin={plugin}
+                    botId={bot.id}
+                    updateInfo={updates[plugin.sourceUri]}
+                    onToggle={onTogglePlugin}
+                    onDelete={() => setPluginToDelete(plugin)}
+                    onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
+                    onOpenSettings={setSelectedPlugin}
+                    onFork={onForkPlugin}
+                    viewMode="grid"
+                />
+            </div>
+        );
+    };
 
     return (
         <TooltipProvider delayDuration={100}>
@@ -528,8 +600,7 @@ export default function InstalledPluginsView({
                             <GitBranch className="h-5 w-5 text-orange-500" />
                             <div>
                                 <p className="text-2xl font-bold text-orange-500">{stats.github}</p>
-                                <p className="text-xs text-muted-foreground">GitHub</p>
-                            </div>
+                                <p className="text-xs text-muted-foreground">GitHub</p>                            </div>
                         </div>
                     </Card>
                 </div>
@@ -568,7 +639,7 @@ export default function InstalledPluginsView({
                                 onClick={() => setFilter('updates')} 
                                 className={cn(
                                     "animate-pulse",
-                                    filter === 'updates' && "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:text-white"
+                                    filter === 'updates' && "bg-gradientto-r from-blue-500 to-cyan-500 text-white hover:text-white"
                                 )}
                             >
                                 <ArrowUpCircle className="mr-1 h-4 w-4"/>
@@ -620,47 +691,30 @@ export default function InstalledPluginsView({
                     </div>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4">
-                    {sortedAndFilteredPlugins.length > 0 ? (
+                <div className="flex-1 overflow-hidden" ref={containerRef}>
+                    {sortedAndFilteredPlugins.length > 0 && size.width > 0 ? (
                         viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {sortedAndFilteredPlugins.map((plugin, index) => (
-                                    <div
-                                        key={plugin.id}
-                                        className="animate-in slide-in-from-bottom duration-300"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                    >
-                                        <InstalledPluginCard
-                                            plugin={plugin}
-                                            botId={bot.id}
-                                            updateInfo={updates[plugin.sourceUri]}
-                                            onToggle={onTogglePlugin}
-                                            onDelete={() => setPluginToDelete(plugin)}
-                                            onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
-                                            onOpenSettings={setSelectedPlugin}
-                                            onFork={onForkPlugin}
-                                            viewMode={viewMode}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
+                            <FixedSizeGrid
+                                height={size.height}
+                                width={size.width}
+                                columnCount={columnCount}
+                                columnWidth={columnWidth}
+                                rowCount={rowCount}
+                                rowHeight={rowHeight}
+                                overscanCount={1}
+                            >
+                                {Cell}
+                            </FixedSizeGrid>
                         ) : (
-                            <div className="space-y-3">
-                                {sortedAndFilteredPlugins.map((plugin) => (
-                                    <InstalledPluginCard
-                                        key={plugin.id}
-                                        plugin={plugin}
-                                        botId={bot.id}
-                                        updateInfo={updates[plugin.sourceUri]}
-                                        onToggle={onTogglePlugin}
-                                        onDelete={() => setPluginToDelete(plugin)}
-                                        onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
-                                        onOpenSettings={setSelectedPlugin}
-                                        onFork={onForkPlugin}
-                                        viewMode={viewMode}
-                                    />
-                                ))}
-                            </div>
+                            <FixedSizeList
+                                height={size.height}
+                                width={size.width}
+                                itemCount={sortedAndFilteredPlugins.length}
+                                itemSize={195}
+                                overscanCount={5}
+                            >
+                                {Row}
+                            </FixedSizeList>
                         )
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center p-10">

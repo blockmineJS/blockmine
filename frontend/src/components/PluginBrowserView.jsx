@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import PluginStoreCard from '@/components/PluginStoreCard';
 import PluginListItem from '@/components/PluginListItem';
 import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FixedSizeList, FixedSizeGrid } from 'react-window';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const CATEGORIES = {
     "Все плагины": { icon: Icons.LayoutGrid, color: "from-blue-500 to-purple-500" },
@@ -49,6 +51,9 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
         isOpen: false, mainPlugin: null, dependencies: [],
     });
 
+    const containerRef = useRef(null);
+    const [size, setSize] = useState({ width: 0, height: 0 });
+
     useEffect(() => {
         fetchPluginCatalog();
     }, [fetchPluginCatalog]);
@@ -56,6 +61,18 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     useEffect(() => {
         localStorage.setItem('plugin-browser-view-mode', viewMode);
     }, [viewMode]);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const resizeObserver = new ResizeObserver(() => {
+            if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+                setSize({ width: container.offsetWidth, height: container.offsetHeight });
+            }
+        });
+        resizeObserver.observe(container);
+        return () => resizeObserver.disconnect();
+    }, []);
 
     const installSinglePlugin = async (pluginToInstall) => {
         if (!pluginToInstall) return;
@@ -158,6 +175,53 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
         return false;
     }, [installedPluginUrls, installedPluginNames]);
 
+    const isXl = useMediaQuery("(min-width: 1280px)");
+    const isLg = useMediaQuery("(min-width: 1024px)");
+    const isMd = useMediaQuery("(min-width: 768px)");
+
+    const columnCount = useMemo(() => (isXl ? 4 : isLg ? 3 : isMd ? 2 : 1), [isXl, isLg, isMd]);
+    const gridRowCount = Math.ceil(filteredAndSortedCatalog.length / columnCount);
+    const columnWidth = size.width > 0 ? size.width / columnCount : 0;
+    const gridRowHeight = 420;
+
+    const Row = ({ index, style }) => {
+        const plugin = filteredAndSortedCatalog[index];
+        return (
+            <div style={style} className="py-1 px-4">
+                <PluginListItem 
+                    key={plugin.id}
+                    plugin={plugin}
+                    botId={botId}
+                    isInstalled={isPluginInstalled(plugin)}
+                    isInstalling={installingPlugins.has(plugin.id)}
+                    onInstall={handleInstall}
+                    allPlugins={catalog}
+                />
+            </div>
+        );
+    };
+
+    const Cell = ({ columnIndex, rowIndex, style }) => {
+        const index = rowIndex * columnCount + columnIndex;
+        if (index >= filteredAndSortedCatalog.length) {
+            return null;
+        }
+        const plugin = filteredAndSortedCatalog[index];
+        return (
+            <div style={style} className="p-2">
+                <PluginStoreCard
+                    key={plugin.id}
+                    plugin={plugin}
+                    botId={botId}
+                    isInstalled={isPluginInstalled(plugin)}
+                    isInstalling={installingPlugins.has(plugin.id)}
+                    onInstall={handleInstall}
+                    allPlugins={catalog}
+                />
+            </div>
+        );
+    };
+
     return (
         <div className="flex h-full flex-col">
             <div className="border-b bg-background/50 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -229,41 +293,35 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-hidden" ref={containerRef}>
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <Icons.Loader2 className="h-12 w-12 animate-spin mb-4" />
                         <p className="text-lg">Загрузка каталога плагинов...</p>
                     </div>
-                ) : filteredAndSortedCatalog.length > 0 ? (
+                ) : filteredAndSortedCatalog.length > 0 && size.width > 0 ? (
                     viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {filteredAndSortedCatalog.map((plugin) => (
-                                <PluginStoreCard
-                                    key={plugin.id}
-                                    plugin={plugin}
-                                    botId={botId}
-                                    isInstalled={isPluginInstalled(plugin)}
-                                    isInstalling={installingPlugins.has(plugin.id)}
-                                    onInstall={handleInstall}
-                                    allPlugins={catalog}
-                                />
-                            ))}
-                        </div>
+                        <FixedSizeGrid
+                            height={size.height}
+                            width={size.width}
+                            columnCount={columnCount}
+                            columnWidth={columnWidth}
+                            rowCount={gridRowCount}
+                            rowHeight={gridRowHeight}
+                            overscanCount={1}
+                        >
+                            {Cell}
+                        </FixedSizeGrid>
                     ) : (
-                        <div className="space-y-2">
-                            {filteredAndSortedCatalog.map(plugin => (
-                                <PluginListItem 
-                                    key={plugin.id}
-                                    plugin={plugin}
-                                    botId={botId}
-                                    isInstalled={isPluginInstalled(plugin)}
-                                    isInstalling={installingPlugins.has(plugin.id)}
-                                    onInstall={handleInstall}
-                                    allPlugins={catalog}
-                                />
-                            ))}
-                        </div>
+                        <FixedSizeList
+                            height={size.height}
+                            width={size.width}
+                            itemCount={filteredAndSortedCatalog.length}
+                            itemSize={170}
+                            overscanCount={5}
+                        >
+                            {Row}
+                        </FixedSizeList>
                     )
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
