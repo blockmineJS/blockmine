@@ -34,7 +34,6 @@ const VisualEditorCanvas = () => {
   const addNode = useVisualEditorStore(state => state.addNode);
   const connectingPin = useVisualEditorStore(state => state.connectingPin);
   const command = useVisualEditorStore(state => state.command);
-  // Используем state.variables напрямую из корня store для реактивности
   const variables = useVisualEditorStore(state => state.variables);
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
 
@@ -198,7 +197,6 @@ const VisualEditorCanvas = () => {
               <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
 
-                  {/* Динамические пункты для переменных */}
                   {variables && variables.length > 0 && (
                     <CommandGroup heading="📦 Переменные">
                       {variables.map(variable => (
@@ -220,7 +218,6 @@ const VisualEditorCanvas = () => {
                     </CommandGroup>
                   )}
 
-                  {/* Динамические пункты для аргументов */}
                   {commandArguments && commandArguments.length > 0 && (
                     <CommandGroup heading="🎯 Аргументы">
                       {commandArguments.map(arg => (
