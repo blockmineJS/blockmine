@@ -173,6 +173,11 @@ class EventGraphManager {
             case 'botDied':
                 context.user = args.user;
                 break;
+            case 'health':
+                context.health = args.health;
+                context.food = args.food;
+                context.saturation = args.saturation;
+                break;
             case 'tick':
                 break;
             case 'entitySpawn':

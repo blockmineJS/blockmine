@@ -53,6 +53,24 @@ function CustomNode({ data, type, id: nodeId }) {
       });
     }
 
+    // Динамические входы для data:string_literal с переменными
+    if (type === 'data:string_literal') {
+      const text = data.value || '';
+      const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+      const matches = [...text.matchAll(variablePattern)];
+      const uniqueVars = [...new Set(matches.map(m => m[1]))];
+
+      uniqueVars.forEach(varName => {
+        if (!baseInputs.find(input => input.id === `var_${varName}`)) {
+          baseInputs.push({
+            id: `var_${varName}`,
+            name: varName,
+            type: 'Wildcard',
+          });
+        }
+      });
+    }
+
     if (type === 'data:array_literal') {
       for (let i = 0; i < (data.pinCount || 0); i++) {
         baseInputs.push({
@@ -127,9 +145,14 @@ function CustomNode({ data, type, id: nodeId }) {
             baseInputs.push({ id: 'condition', name: 'Condition', type: 'Boolean', required: true });
         }
         return baseInputs.filter(p => p.id === 'condition' || p.type === 'Exec');
+    } else if (type === 'action:http_request') {
+        const method = data.method || 'GET';
+        if (method === 'GET' || method === 'DELETE') {
+            return baseInputs.filter(p => p.id !== 'body');
+        }
     }
     return baseInputs;
-  }, [nodeConfig, data, type, data?.message]);
+  }, [nodeConfig, data, type, data?.message, data?.method, data?.value]);
 
   const outputs = useMemo(() => {
     if (type === 'flow:sequence') {
@@ -281,7 +304,21 @@ function CustomNode({ data, type, id: nodeId }) {
               return (
                 <div key={pin.id} className="relative p-2 flex items-center w-full">
                   {renderPin(pin, true)}
-                  {!hasConnection && pin.type !== 'Boolean' && pin.id !== 'persist' && (
+                  {!hasConnection && type === 'action:http_request' && pin.id === 'method' && (
+                    <Select value={data.method || 'GET'} onValueChange={(value) => updateNodeData(nodeId, { method: value })}>
+                        <SelectTrigger className="w-[120px] bg-slate-900 border-slate-500">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="GET">GET</SelectItem>
+                            <SelectItem value="POST">POST</SelectItem>
+                            <SelectItem value="PUT">PUT</SelectItem>
+                            <SelectItem value="DELETE">DELETE</SelectItem>
+                            <SelectItem value="PATCH">PATCH</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  )}
+                  {!hasConnection && pin.type !== 'Boolean' && pin.id !== 'persist' && !(type === 'action:http_request' && pin.id === 'method') && (
                     <AutosizeInput
                       className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
                       value={data[pin.id] || ''}
@@ -308,6 +345,7 @@ function CustomNode({ data, type, id: nodeId }) {
                   className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden w-full"
                   value={data.value || ''}
                   onChange={(e) => updateNodeData(nodeId, { value: e.target.value })}
+                  placeholder="Привет, {username}!"
                 />
               </div>
             )}
@@ -524,7 +562,7 @@ function CustomNode({ data, type, id: nodeId }) {
           </Select>
         </div>
       )}
-      
+
       {type === 'flow:switch' && (
         <div className="p-2 border-t border-slate-700">
           <div className="space-y-2">

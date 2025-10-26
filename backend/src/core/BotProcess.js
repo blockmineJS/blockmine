@@ -606,6 +606,14 @@ process.on('message', async (message) => {
                 sendEvent('botDied', { user: { username: bot.username } });
             });
 
+            bot.on('health', () => {
+                sendEvent('health', {
+                    health: bot.health,
+                    food: bot.food,
+                    saturation: bot.foodSaturation
+                });
+            });
+
             bot.on('kicked', (reason) => {
                 let reasonText;
                 try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }

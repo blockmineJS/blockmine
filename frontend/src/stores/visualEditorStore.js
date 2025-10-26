@@ -8,6 +8,7 @@ import {
 import { apiHelper } from '@/lib/api';
 import { toast } from "@/hooks/use-toast";
 import { randomUUID } from '@/lib/uuid';
+import { getConversionChain, createConverterNode } from '@/lib/typeConversionHelper';
 
 export const useVisualEditorStore = create(
   immer((set, get) => ({
@@ -191,11 +192,104 @@ export const useVisualEditorStore = create(
       });
     },
 
-    onConnect: (connection) => {
-      set(state => {
-        state.edges = addEdge(connection, state.edges);
-        state.connectingPin = null;
-      });
+    onConnect: async (connection) => {
+      const { nodes, edges, command } = get();
+      const botId = command.botId;
+
+      try {
+        // Получаем конфигурации source и target нод
+        const sourceNode = nodes.find(n => n.id === connection.source);
+        const targetNode = nodes.find(n => n.id === connection.target);
+
+        if (!sourceNode || !targetNode) {
+          set(state => {
+            state.edges = addEdge(connection, state.edges);
+            state.connectingPin = null;
+          });
+          return;
+        }
+
+        const nodeConfigs = await apiHelper(`/api/bots/${botId}/visual-editor/node-config?types[]=${sourceNode.type}&types[]=${targetNode.type}`);
+        const sourceNodeConfig = nodeConfigs.find(n => n.type === sourceNode.type);
+        const targetNodeConfig = nodeConfigs.find(n => n.type === targetNode.type);
+
+        if (!sourceNodeConfig || !targetNodeConfig) {
+          set(state => {
+            state.edges = addEdge(connection, state.edges);
+            state.connectingPin = null;
+          });
+          return;
+        }
+
+        const sourcePin = (sourceNodeConfig.pins?.outputs || sourceNodeConfig.outputs || []).find(p => p.id === connection.sourceHandle);
+        const targetPin = (targetNodeConfig.pins?.inputs || targetNodeConfig.inputs || []).find(p => p.id === connection.targetHandle);
+
+        if (!sourcePin || !targetPin) {
+          set(state => {
+            state.edges = addEdge(connection, state.edges);
+            state.connectingPin = null;
+          });
+          return;
+        }
+
+        // Проверяем совместимость типов
+        const typesMatch = sourcePin.type === targetPin.type ||
+                          sourcePin.type === 'Wildcard' ||
+                          targetPin.type === 'Wildcard';
+
+        if (typesMatch) {
+          // Типы совместимы, обычное подключение
+          set(state => {
+            state.edges = addEdge(connection, state.edges);
+            state.connectingPin = null;
+          });
+          return;
+        }
+
+        // Типы несовместимы, пытаемся найти цепочку конвертации
+        const conversionChain = getConversionChain(sourcePin.type, targetPin.type, sourceNode);
+
+        if (conversionChain) {
+          // Создаем конвертер и подключения
+          const result = createConverterNode(
+            connection,
+            conversionChain,
+            sourceNode,
+            targetNode,
+            get().addNode,
+            addEdge,
+            nodes,
+            edges
+          );
+
+          set(state => {
+            // Добавляем новые ноды
+            result.additionalNodes.forEach(node => {
+              state.nodes.push(node);
+            });
+
+            // Добавляем новые edges
+            result.newEdges.forEach(edge => {
+              state.edges = addEdge(edge, state.edges);
+            });
+
+            state.connectingPin = null;
+          });
+        } else {
+          // Нет известной цепочки конвертации, делаем обычное подключение
+          set(state => {
+            state.edges = addEdge(connection, state.edges);
+            state.connectingPin = null;
+          });
+        }
+      } catch (error) {
+        console.error("Ошибка при создании подключения:", error);
+        // В случае ошибки делаем обычное подключение
+        set(state => {
+          state.edges = addEdge(connection, state.edges);
+          state.connectingPin = null;
+        });
+      }
     },
 
     addNode: (type, position, shouldUpdateState = true) => {
@@ -409,8 +503,8 @@ export const useVisualEditorStore = create(
           throw new Error('Не удалось получить конфигурацию узлов.');
         }
 
-        const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.pinId);
-        const targetPin = targetNodeConfig.inputs.find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
+        const sourcePin = (sourceNodeConfig.pins?.outputs || sourceNodeConfig.outputs || []).find(p => p.id === connectingPin.pinId);
+        const targetPin = (targetNodeConfig.pins?.inputs || targetNodeConfig.inputs || []).find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
 
         const newNode = addNode(nodeType, position, false);
 

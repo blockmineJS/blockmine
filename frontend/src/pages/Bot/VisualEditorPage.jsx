@@ -158,20 +158,73 @@ function BotVisualEditorPage() {
         return types;
     }, [availableNodes]);
     
+    const variables = useVisualEditorStore(state => state.variables);
+    const commandArguments = useVisualEditorStore(state => state.commandArguments);
+
     const menuItems = useMemo(() => {
         if (!availableNodes) return [];
-        return Object.entries(availableNodes).map(([category, nodes]) => ({
+
+        const dynamicGroups = [];
+
+        // Добавляем группу переменных
+        if (variables && variables.length > 0) {
+            const variableItems = [];
+            variables.forEach(variable => {
+                variableItems.push({
+                    label: `📤 Получить переменную ${variable.name}`,
+                    type: 'data:get_variable',
+                    data: { variableName: variable.name }
+                });
+                variableItems.push({
+                    label: `📥 Задать переменную ${variable.name}`,
+                    type: 'action:bot_set_variable',
+                    data: { variableName: variable.name }
+                });
+            });
+            dynamicGroups.push({
+                label: '📦 Переменные',
+                children: variableItems
+            });
+        }
+
+        // Добавляем группу аргументов
+        if (commandArguments && commandArguments.length > 0) {
+            const argumentItems = commandArguments.map(arg => ({
+                label: `📤 Получить аргумент ${arg.name}`,
+                type: 'data:get_argument',
+                data: { argumentName: arg.name }
+            }));
+            dynamicGroups.push({
+                label: '🎯 Аргументы',
+                children: argumentItems
+            });
+        }
+
+        const staticGroups = Object.entries(availableNodes).map(([category, nodes]) => ({
             label: category,
             children: nodes.map(node => ({
                 label: node.label,
                 type: node.type,
             }))
         }));
-    }, [availableNodes]);
+
+        return [...dynamicGroups, ...staticGroups];
+    }, [availableNodes, variables, commandArguments]);
 
     const handleMenuItemSelect = (item) => {
         const { menuPosition, addNode, closeMenu } = useVisualEditorStore.getState();
-        addNode(item.type, menuPosition.flowPosition);
+        const newNode = addNode(item.type, menuPosition.flowPosition, false);
+
+        // Если есть дополнительные данные (для переменных/аргументов), применяем их
+        if (item.data && Object.keys(item.data).length > 0) {
+            newNode.data = { ...newNode.data, ...item.data };
+        }
+
+        // Добавляем ноду в state
+        useVisualEditorStore.setState(state => {
+            state.nodes.push(newNode);
+        });
+
         closeMenu();
     };
 
@@ -181,11 +234,10 @@ function BotVisualEditorPage() {
     
     const handlePaneInteraction = (event, handler) => {
         if (!reactFlowInstance) return;
-        
-        const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-        const position = reactFlowInstance.project({
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
+
+        const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
         });
 
         handler(event.clientY, event.clientX, position);
@@ -208,11 +260,10 @@ function BotVisualEditorPage() {
     const onDrop = (event) => {
         event.preventDefault();
         if (!reactFlowInstance) return;
-        const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
         const type = event.dataTransfer.getData('application/reactflow');
-        const position = reactFlowInstance.project({
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
+        const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
         });
         addNode(type, position);
     };

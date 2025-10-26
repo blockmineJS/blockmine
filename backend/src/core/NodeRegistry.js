@@ -232,6 +232,7 @@ class NodeRegistry {
       category: 'Поток',
       description: 'if/else логика',
       graphType: all,
+      executor: require('./nodes/flow_branch').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -250,6 +251,7 @@ class NodeRegistry {
       category: 'Поток',
       description: 'Выполняет действия по очереди',
       graphType: all,
+      executor: require('./nodes/flow_sequence').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true }
@@ -267,6 +269,7 @@ class NodeRegistry {
       category: 'Поток',
       description: 'Выполняет "Тело цикла" для каждого элемента в "Массиве".',
       graphType: all,
+      executor: require('./nodes/flow_for_each').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -282,11 +285,33 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'flow:while',
+      label: '🔁 Цикл While',
+      category: 'Поток',
+      description: 'Выполняет "Тело цикла" пока условие истинно.',
+      graphType: all,
+      executor: require('./nodes/flow_while').execute,
+      evaluator: require('./nodes/flow_while').evaluate,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+          { id: 'condition', name: 'Условие', type: 'Boolean', required: true }
+        ],
+        outputs: [
+          { id: 'loop_body', name: 'Тело цикла', type: 'Exec' },
+          { id: 'iteration', name: 'Итерация', type: 'Number' },
+          { id: 'completed', name: 'Завершено', type: 'Exec' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'flow:break',
       label: '🛑 Выйти из цикла',
       category: 'Поток',
       description: 'Немедленно прерывает выполнение цикла (For Each Loop) и передает управление на его выход Completed.',
       graphType: all,
+      executor: require('./nodes/flow_break').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true }
@@ -302,6 +327,7 @@ class NodeRegistry {
       description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
       graphType: all,
       dynamicPins: true,
+      executor: require('./nodes/action_send_message').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -321,6 +347,7 @@ class NodeRegistry {
         category: 'Действия',
         description: 'Отправляет сообщение в консоль на странице бота.',
         graphType: all,
+        executor: require('./nodes/action_send_log').execute,
         pins: {
             inputs: [
                 { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -338,6 +365,7 @@ class NodeRegistry {
       category: 'Действия',
       description: 'Поворачивает голову бота в сторону координат или сущности.',
       graphType: all,
+      executor: require('./nodes/action_bot_look_at').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -356,6 +384,7 @@ class NodeRegistry {
       category: 'Действия',
       description: 'Сохраняет значение в переменную графа.',
       graphType: all,
+      executor: require('./nodes/action_bot_set_variable').execute,
       pins: {
           inputs: [
               { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -370,11 +399,40 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'action:http_request',
+      label: '🌐 HTTP-запрос',
+      category: 'Действия',
+      description: 'Выполняет HTTP-запрос (GET, POST, PUT, DELETE и т.д.) и возвращает ответ.',
+      graphType: all,
+      executor: require('./nodes/action_http_request').execute,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+          { id: 'url', name: 'URL', type: 'String', required: true },
+          { id: 'method', name: 'Метод', type: 'String', required: false },
+          { id: 'headers', name: 'Заголовки (JSON)', type: 'String', required: false },
+          { id: 'body', name: 'Тело (JSON)', type: 'Wildcard', required: false },
+          { id: 'timeout', name: 'Таймаут (мс)', type: 'Number', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Успех', type: 'Exec' },
+          { id: 'exec_error', name: 'Ошибка', type: 'Exec' },
+          { id: 'status', name: 'Статус', type: 'Number' },
+          { id: 'response', name: 'Ответ', type: 'Wildcard' },
+          { id: 'response_headers', name: 'Заголовки ответа', type: 'Object' },
+          { id: 'success', name: 'Успешно', type: 'Boolean' },
+          { id: 'error', name: 'Ошибка', type: 'String' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'data:get_argument',
       label: '📥 Получить аргумент',
       category: 'Данные',
       description: 'Получает значение аргумента команды по его имени.',
       graphType: command,
+      evaluator: require('./nodes/data_get_argument').evaluate,
       data: {
         argumentName: {
           type: 'argument',
@@ -396,6 +454,7 @@ class NodeRegistry {
         category: 'Данные',
         description: 'Получает значение переменной графа.',
         graphType: all,
+        evaluator: require('./nodes/data_get_variable').evaluate,
         pins: {
             inputs: [],
             outputs: [
@@ -410,6 +469,7 @@ class NodeRegistry {
       category: 'Данные',
       description: 'Получает определенное поле из объекта сущности (например, "position.x", "username").',
       graphType: all,
+      evaluator: require('./nodes/data_get_entity_field').evaluate,
       pins: {
         inputs: [
           { id: 'entity', name: 'Сущность', type: 'Object', required: true },
@@ -427,8 +487,10 @@ class NodeRegistry {
       type: 'data:string_literal',
       label: '📜 Строка',
       category: 'Данные',
-      description: 'Простое текстовое значение.',
+      description: 'Текстовое значение с поддержкой переменных. Используйте {имя} для вставки значений.',
       graphType: all,
+      dynamicPins: true,
+      evaluator: require('./nodes/data_string_literal').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -443,6 +505,7 @@ class NodeRegistry {
       category: 'Данные',
       description: 'Простое числовое значение.',
       graphType: all,
+      evaluator: require('./nodes/data_number_literal').evaluate,
       pins: {
         inputs: [
           { id: 'value', name: 'Значение', type: 'Number', required: true }
@@ -459,6 +522,7 @@ class NodeRegistry {
       category: 'Данные',
       description: 'Значение Истина/Ложь.',
       graphType: all,
+      evaluator: require('./nodes/data_boolean_literal').evaluate,
       pins: {
         inputs: [
           { id: 'value', name: 'Значение', type: 'Boolean', required: true }
@@ -476,6 +540,7 @@ class NodeRegistry {
       description: 'Создает массив из элементов.',
       graphType: all,
       dynamicPins: true,
+      evaluator: require('./nodes/data_array_literal').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -491,6 +556,7 @@ class NodeRegistry {
       description: 'Создает JSON-объект из пар ключ-значение.',
       graphType: all,
       dynamicPins: true,
+      evaluator: require('./nodes/data_make_object').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -505,6 +571,7 @@ class NodeRegistry {
       category: 'Данные',
       description: 'Приводит входящее значение к указанному целевому типу.',
       graphType: all,
+      evaluator: require('./nodes/data_cast').evaluate,
       pins: {
         inputs: [
           { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
@@ -521,6 +588,7 @@ class NodeRegistry {
       category: 'Массив',
       graphType: 'all',
       description: 'Возвращает количество элементов в массиве или длину строки.',
+      evaluator: require('./nodes/data_length').evaluate,
       pins: {
         inputs: [
           { id: 'data', name: 'Массив или Строка', type: 'Any', required: true }
@@ -537,6 +605,8 @@ class NodeRegistry {
       category: 'Строки',
       description: 'Проверяет, содержит ли одна строка другую.',
       graphType: all,
+      executor: require('./nodes/string_contains').execute,
+      evaluator: require('./nodes/string_contains').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -552,11 +622,34 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'string:matches',
+      label: '🔎 Строка: Совпадает с RegEx',
+      category: 'Строки',
+      description: 'Проверяет, совпадает ли строка с регулярным выражением.',
+      graphType: all,
+      executor: require('./nodes/string_matches').execute,
+      evaluator: require('./nodes/string_matches').evaluate,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
+          { id: 'string', name: 'Строка', type: 'String', required: true },
+          { id: 'regex', name: 'RegEx', type: 'String', required: true }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Exec', type: 'Exec' },
+          { id: 'result', name: 'Результат', type: 'Boolean' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'string:equals',
       label: 'Строка: Равно',
       category: 'Строки',
       description: 'Проверяет, равны ли строки (с учетом/без учета регистра).',
       graphType: all,
+      executor: require('./nodes/string_equals').execute,
+      evaluator: require('./nodes/string_equals').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -577,6 +670,8 @@ class NodeRegistry {
       category: 'Строки',
       description: 'Проверяет, начинается ли строка с указанной подстроки.',
       graphType: all,
+      executor: require('./nodes/string_starts_with').execute,
+      evaluator: require('./nodes/string_starts_with').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -597,6 +692,8 @@ class NodeRegistry {
       category: 'Строки',
       description: 'Проверяет, заканчивается ли строка указанной подстрокой.',
       graphType: all,
+      executor: require('./nodes/string_ends_with').execute,
+      evaluator: require('./nodes/string_ends_with').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -617,6 +714,8 @@ class NodeRegistry {
       category: 'Строки',
       description: 'Возвращает количество символов в строке.',
       graphType: all,
+      executor: require('./nodes/string_length').execute,
+      evaluator: require('./nodes/string_length').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -635,6 +734,8 @@ class NodeRegistry {
       category: 'Строки',
       description: 'Разделяет строку на массив подстрок по разделителю.',
       graphType: all,
+      executor: require('./nodes/string_split').execute,
+      evaluator: require('./nodes/string_split').evaluate,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec', required: true },
@@ -655,6 +756,7 @@ class NodeRegistry {
       description: 'Объединяет две или более строки в одну.',
       graphType: all,
       dynamicPins: true,
+      evaluator: require('./nodes/string_concat').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -669,6 +771,7 @@ class NodeRegistry {
       category: 'Математика',
       description: 'Выполняет математическую операцию над двумя числами.',
       graphType: all,
+      evaluator: require('./nodes/math_operation').evaluate,
       pins: {
         inputs: [
           { id: 'a', name: 'A', type: 'Number', required: true },
@@ -687,6 +790,7 @@ class NodeRegistry {
       description: 'Выполняет логическую операцию. Для НЕ (NOT) используется только вход А.',
       graphType: all,
       dynamicPins: true,
+      evaluator: require('./nodes/logic_operation').evaluate,
       pins: {
         inputs: [
           { id: 'a', name: 'A', type: 'Boolean', required: true },
@@ -704,6 +808,7 @@ class NodeRegistry {
       category: 'Отладка',
       description: 'Выводит значение в консоль терминала, где запущен бот.',
       graphType: all,
+      executor: require('./nodes/debug_log').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Exec', type: 'Exec' },
@@ -721,6 +826,7 @@ class NodeRegistry {
       category: 'Математика',
       graphType: 'all',
       description: 'Генерирует случайное число в заданном диапазоне.',
+      evaluator: require('./nodes/math_random_number').evaluate,
       pins: {
         inputs: [
           { id: 'min', name: 'Мин', type: 'Number' },
@@ -736,6 +842,7 @@ class NodeRegistry {
       category: 'Массив',
       graphType: 'all',
       description: 'Возвращает случайный элемент из массива и его индекс.',
+      evaluator: require('./nodes/array_get_random_element').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true }
@@ -753,6 +860,7 @@ class NodeRegistry {
       category: 'Массив',
       description: 'Проверяет, содержит ли массив указанный элемент и возвращает его индекс.',
       graphType: all,
+      evaluator: require('./nodes/array_contains').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true },
@@ -771,6 +879,7 @@ class NodeRegistry {
       category: 'Массив',
       description: 'Получает элемент массива по его индексу.',
       graphType: all,
+      evaluator: require('./nodes/array_get_by_index').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true },
@@ -788,6 +897,7 @@ class NodeRegistry {
       category: 'Массив',
       description: 'Добавляет элемент в конец массива.',
       graphType: all,
+      evaluator: require('./nodes/array_add_element').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true },
@@ -805,6 +915,7 @@ class NodeRegistry {
       category: 'Массив',
       description: 'Удаляет элемент из массива по его индексу.',
       graphType: all,
+      evaluator: require('./nodes/array_remove_by_index').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true },
@@ -822,6 +933,7 @@ class NodeRegistry {
       category: 'Массив',
       description: 'Находит индекс элемента в массиве (или -1 если не найден).',
       graphType: all,
+      evaluator: require('./nodes/array_find_index').evaluate,
       pins: {
         inputs: [
           { id: 'array', name: 'Массив', type: 'Array', required: true },
@@ -840,6 +952,7 @@ class NodeRegistry {
       description: 'Создает объект из пар ключ-значение.',
       graphType: all,
       dynamicPins: true,
+      evaluator: require('./nodes/object_create').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -854,6 +967,7 @@ class NodeRegistry {
       category: 'Объект',
       description: 'Получает значение по ключу из объекта.',
       graphType: all,
+      evaluator: require('./nodes/object_get').evaluate,
       pins: {
         inputs: [
           { id: 'object', name: 'Объект', type: 'Object', required: true },
@@ -871,6 +985,7 @@ class NodeRegistry {
       category: 'Объект',
       description: 'Добавляет или изменяет значение по ключу в объекте.',
       graphType: all,
+      evaluator: require('./nodes/object_set').evaluate,
       pins: {
         inputs: [
           { id: 'object', name: 'Объект', type: 'Object', required: true },
@@ -889,6 +1004,7 @@ class NodeRegistry {
       category: 'Объект',
       description: 'Удаляет ключ из объекта.',
       graphType: all,
+      evaluator: require('./nodes/object_delete').evaluate,
       pins: {
         inputs: [
           { id: 'object', name: 'Объект', type: 'Object', required: true },
@@ -906,6 +1022,7 @@ class NodeRegistry {
       category: 'Объект',
       description: 'Проверяет наличие ключа в объекте и возвращает значение.',
       graphType: all,
+      evaluator: require('./nodes/object_has_key').evaluate,
       pins: {
         inputs: [
           { id: 'object', name: 'Объект', type: 'Object', required: true },
@@ -924,6 +1041,7 @@ class NodeRegistry {
       category: 'Данные',
       graphType: 'all',
       description: 'Возвращает массив с именами всех игроков на сервере.',
+      evaluator: require('./nodes/data_get_server_players').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -938,6 +1056,7 @@ class NodeRegistry {
       category: 'Логика',
       description: 'Сравнивает два значения.',
       graphType: all,
+      evaluator: require('./nodes/logic_compare').evaluate,
       pins: {
         inputs: [
           { id: 'a', name: 'A', type: 'Wildcard' },
@@ -955,6 +1074,7 @@ class NodeRegistry {
       category: 'Бот',
       description: 'Возвращает текущую позицию бота в мире.',
       graphType: all,
+      evaluator: require('./nodes/bot_get_position').evaluate,
       pins: {
         inputs: [],
         outputs: [
@@ -970,6 +1090,7 @@ class NodeRegistry {
         category: 'Пользователи',
         description: 'Проверяет, находится ли пользователь в черном списке.',
         graphType: all,
+        evaluator: require('./nodes/user_check_blacklist').evaluate,
         pins: {
             inputs: [
                 { id: 'user', name: 'Пользователь', type: 'User', required: true }
@@ -986,6 +1107,7 @@ class NodeRegistry {
         category: 'Пользователи',
         description: 'Добавляет или убирает пользователя из черного списка.',
         graphType: all,
+        executor: require('./nodes/user_set_blacklist').execute,
         pins: {
             inputs: [
                 { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
@@ -1006,6 +1128,7 @@ class NodeRegistry {
       category: 'Пользователь',
       description: 'Возвращает массив названий групп, в которых состоит пользователь.',
       graphType: all,
+      evaluator: require('./nodes/user_get_groups').evaluate,
       pins: {
         inputs: [
           { id: 'user', name: 'Пользователь', type: 'User', required: true }
@@ -1022,6 +1145,7 @@ class NodeRegistry {
       category: 'Пользователь',
       description: 'Возвращает массив прав пользователя.',
       graphType: all,
+      evaluator: require('./nodes/user_get_permissions').evaluate,
       pins: {
         inputs: [
           { id: 'user', name: 'Пользователь', type: 'User', required: true }
@@ -1038,6 +1162,7 @@ class NodeRegistry {
       category: 'Данные',
       description: 'Получает различные данные из объекта пользователя.',
       graphType: all,
+      evaluator: require('./nodes/data_get_user_field').evaluate,
       pins: {
         inputs: [
           { id: 'user', name: 'Пользователь', type: 'User', required: true }
@@ -1066,12 +1191,30 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'event:health',
+      label: '❤️ Здоровье/Голод изменилось',
+      category: 'События',
+      description: 'Срабатывает при изменении здоровья, голода или насыщения бота.',
+      graphType: event,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec' },
+          { id: 'health', name: 'Здоровье', type: 'Number' },
+          { id: 'food', name: 'Голод', type: 'Number' },
+          { id: 'saturation', name: 'Насыщение', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'flow:switch',
       label: '🔄 Switch (свитч)',
       category: 'Поток',
       description: 'Выполняет разные действия в зависимости от значения. Автоматически определяет тип сравнения.',
       graphType: all,
       dynamicPins: true,
+      executor: require('./nodes/flow_switch').execute,
       pins: {
         inputs: [
           { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },

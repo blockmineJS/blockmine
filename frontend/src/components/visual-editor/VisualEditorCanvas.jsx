@@ -33,6 +33,10 @@ const VisualEditorCanvas = () => {
   const connectAndAddNode = useVisualEditorStore(state => state.connectAndAddNode);
   const addNode = useVisualEditorStore(state => state.addNode);
   const connectingPin = useVisualEditorStore(state => state.connectingPin);
+  const command = useVisualEditorStore(state => state.command);
+  // Используем state.variables напрямую из корня store для реактивности
+  const variables = useVisualEditorStore(state => state.variables);
+  const commandArguments = useVisualEditorStore(state => state.commandArguments);
 
   const nodeTypes = useMemo(() => {
     const types = {};
@@ -75,12 +79,18 @@ const VisualEditorCanvas = () => {
     [screenToFlowPosition]
   );
 
-  const handleAddNodeFromMenu = (nodeType) => {
+  const handleAddNodeFromMenu = (nodeType, nodeData = {}) => {
     if (connectingPin) {
       connectAndAddNode(nodeType, menuPosition.flowPosition);
     } else {
       if (menuPosition && menuPosition.flowPosition) {
-        addNode(nodeType, menuPosition.flowPosition);
+        const newNode = addNode(nodeType, menuPosition.flowPosition, false);
+        if (Object.keys(nodeData).length > 0) {
+          newNode.data = { ...newNode.data, ...nodeData };
+        }
+        useVisualEditorStore.setState(state => {
+          state.nodes.push(newNode);
+        });
       }
     }
     closeMenu();
@@ -122,14 +132,15 @@ const VisualEditorCanvas = () => {
     const sourceNodeConfig = allAvailableNodes.find(n => n.type === connectingPin.nodeType);
     if (!sourceNodeConfig) return availableNodes;
 
-    const sourcePin = sourceNodeConfig.outputs.find(p => p.id === connectingPin.handleId);
+    const sourcePin = (sourceNodeConfig.pins?.outputs || sourceNodeConfig.outputs || []).find(p => p.id === connectingPin.handleId);
     if (!sourcePin) return availableNodes;
 
     const filtered = {};
     Object.entries(availableNodes).forEach(([category, nodesInCategory]) => {
-      const compatibleNodes = nodesInCategory.filter(node =>
-        node.inputs.some(inputPin => inputPin.type === sourcePin.type || inputPin.type === 'Wildcard' || sourcePin.type === 'Wildcard')
-      );
+      const compatibleNodes = nodesInCategory.filter(node => {
+        const nodeInputs = node.pins?.inputs || node.inputs || [];
+        return nodeInputs.some(inputPin => inputPin.type === sourcePin.type || inputPin.type === 'Wildcard' || sourcePin.type === 'Wildcard');
+      });
       if (compatibleNodes.length > 0) {
         filtered[category] = compatibleNodes;
       }
@@ -186,13 +197,52 @@ const VisualEditorCanvas = () => {
               <CommandInput placeholder="Type a command or search..." />
               <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
+
+                  {/* Динамические пункты для переменных */}
+                  {variables && variables.length > 0 && (
+                    <CommandGroup heading="📦 Переменные">
+                      {variables.map(variable => (
+                        <React.Fragment key={`var-${variable.id}`}>
+                          <CommandItem
+                            value={`Получить переменную ${variable.name}`}
+                            onSelect={() => handleAddNodeFromMenu('data:get_variable', { variableName: variable.name })}
+                          >
+                            📤 Получить переменную {variable.name}
+                          </CommandItem>
+                          <CommandItem
+                            value={`Задать переменную ${variable.name}`}
+                            onSelect={() => handleAddNodeFromMenu('action:bot_set_variable', { variableName: variable.name })}
+                          >
+                            📥 Задать переменную {variable.name}
+                          </CommandItem>
+                        </React.Fragment>
+                      ))}
+                    </CommandGroup>
+                  )}
+
+                  {/* Динамические пункты для аргументов */}
+                  {commandArguments && commandArguments.length > 0 && (
+                    <CommandGroup heading="🎯 Аргументы">
+                      {commandArguments.map(arg => (
+                        <CommandItem
+                          key={`arg-${arg.id}`}
+                          value={`Получить аргумент ${arg.name}`}
+                          onSelect={() => handleAddNodeFromMenu('data:get_argument', { argumentName: arg.name })}
+                        >
+                          📤 Получить аргумент {arg.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+
+                  {/* Обычные ноды */}
                   {Object.entries(filteredNodes).map(([category, nodes]) => (
                     <CommandGroup key={category} heading={category}>
                       {nodes.map(node => (
-                        <CommandItem 
-                          key={node.type} 
-                          value={node.label} 
-                          onSelect={() => handleAddNodeFromMenu(node.type)} 
+                        <CommandItem
+                          key={node.type}
+                          value={node.label}
+                          onSelect={() => handleAddNodeFromMenu(node.type)}
                           disabled={false}
                         >
                           {node.label}
