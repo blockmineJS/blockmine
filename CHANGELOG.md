@@ -1,6 +1,21 @@
 # История версий
 
 
+## [1.21.0](https://github.com/blockmineJS/blockmine/compare/v1.20.0...v1.21.0) (2025-10-26)
+
+
+### 🛠 Рефакторинг
+
+* [graph-system] все ноды отрефакторены и перенесены. [@claude](https://github.com/claude) author ([55db1b8](https://github.com/blockmineJS/blockmine/commit/55db1b89dbe470691db129a72c7efe55030acfa6))
+
+
+### ✨ Новые возможности
+
+* [graph-system]  пкм. по названию переменной можно найти - Получить/Установить переменную ([83b822f](https://github.com/blockmineJS/blockmine/commit/83b822ff1d278dfb9e280909c81ab32fd0e58bc3))
+* [graph-system] конвертация нод при подключения не к тем типам ([03deac8](https://github.com/blockmineJS/blockmine/commit/03deac83c9468199a8f6ae2b2480248c52a39e57))
+* добавление виртуализации для списков плагинов и ботов ([ea7746f](https://github.com/blockmineJS/blockmine/commit/ea7746f5c7f05ed74e6893bb27774d8541e0c57f))
+* новая нода для http запросов ([3565d06](https://github.com/blockmineJS/blockmine/commit/3565d06bff419c2d2665eba719a4c94696db00ae))
+
 ## [1.20.0](https://github.com/blockmineJS/blockmine/compare/v1.19.1...v1.20.0) (2025-10-23)
 
 
