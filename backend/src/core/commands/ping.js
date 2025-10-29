@@ -9,7 +9,7 @@ class PingCommand extends Command {
             cooldown: 5,
             permissions: 'user.ping',
             owner: 'system',
-            allowedChatTypes: ['local', 'clan', 'private'],
+            allowedChatTypes: ['local', 'clan', 'private', 'websocket'],
             
             args: [
                 {
@@ -23,12 +23,18 @@ class PingCommand extends Command {
     }
 
     async handler(bot, typeChat, user, { target }) {
-
+        let message;
         if (target) {
-            bot.api.sendMessage(typeChat, `Понг, ${user.username}! Пингую игрока ${target}.`, user.username);
+            message = `Понг, ${user.username}! Пингую игрока ${target}.`;
         } else {
-            bot.api.sendMessage(typeChat, `Понг, ${user.username}!`, user.username);
+            message = `Понг, ${user.username}!`;
         }
+
+        if (typeChat === 'websocket') {
+            return message;
+        }
+
+        bot.sendMessage(typeChat, message, user.username);
     }
 }
 

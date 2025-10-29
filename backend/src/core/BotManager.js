@@ -49,6 +49,7 @@ class BotManager {
         this.botConfigs = new Map();
         this.nodeRegistry = nodeRegistry;
         this.pendingPlayerListRequests = new Map();
+        this.pendingCommandRequests = new Map();
         this.playerListCache = new Map();
         this.eventGraphManager = null;
         this.uiSubscriptions = new Map();
@@ -420,6 +421,18 @@ class BotManager {
             try {
                 switch (message.type) {
                     case 'event':
+                        // Отправляем сырые сообщения в WebSocket API
+                        if (message.eventType === 'raw_message') {
+                            try {
+                                const { getIO } = require('../real-time/socketHandler');
+                                const { broadcastToApiClients } = require('../real-time/botApi');
+                                broadcastToApiClients(getIO(), botId, 'chat:raw_message', {
+                                    raw_message: message.args.rawText || message.args.raw_message,
+                                    json: message.args.json
+                                });
+                            } catch (e) { /* Socket.IO может быть не инициализирован */ }
+                        }
+
                         if (this.eventGraphManager) {
                             this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
                         }
@@ -437,6 +450,12 @@ class BotManager {
                         }
                         break;
                     }
+                    case 'send_websocket_message': {
+                        const { getIO } = require('../real-time/socketHandler');
+                        const { botId, message: msg } = message.payload;
+                        getIO().to(`bot_${botId}`).emit('bot:message', { message: msg });
+                        break;
+                    }
                     case 'plugin:stopped':
                         break;
                     case 'log':
@@ -448,6 +467,13 @@ class BotManager {
                     case 'bot_ready':
                         this.emitStatusUpdate(botId, 'running', 'Бот успешно подключился к серверу.');
                         this.crashCounters.delete(botId);
+
+                        // Broadcast статуса в WebSocket API
+                        try {
+                            const { getIO } = require('../real-time/socketHandler');
+                            const { broadcastBotStatus } = require('../real-time/botApi');
+                            broadcastBotStatus(getIO(), botId, true);
+                        } catch (e) { /* Socket.IO может быть не инициализирован */ }
                         break;
                     case 'validate_and_run_command':
                         await this.handleCommandValidation(botConfig, message);
@@ -519,6 +545,19 @@ class BotManager {
                         }
                         break;
                     }
+                    case 'execute_command_response': {
+                        const { requestId, result, error } = message;
+                        const request = this.pendingCommandRequests.get(requestId);
+                        if (request) {
+                            if (error) {
+                                request.reject(new Error(error));
+                            } else {
+                                request.resolve(result);
+                            }
+                            this.pendingCommandRequests.delete(requestId);
+                        }
+                        break;
+                    }
                 }
             } catch (error) {
                 this.appendLog(botId, `[SYSTEM-ERROR] Критическая ошибка в обработчике сообщений от бота: ${error.stack}`);
@@ -538,6 +577,13 @@ class BotManager {
 
             this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
             this.updateAllResourceUsage();
+
+            // Broadcast статуса в WebSocket API
+            try {
+                const { getIO } = require('../real-time/socketHandler');
+                const { broadcastBotStatus } = require('../real-time/botApi');
+                broadcastBotStatus(getIO(), botId, false);
+            } catch (e) { /* Socket.IO может быть не инициализирован */ }
 
             if (code === 1) {
                 const MAX_RESTART_ATTEMPTS = 5;
@@ -825,6 +871,97 @@ class BotManager {
         }
         return { success: false, message: 'Бот не найден или уже остановлен' };
     }
+
+    async validateAndExecuteCommandForApi(botId, username, commandName, args) {
+        const botConfig = this.bots.get(botId)?.botConfig;
+        if (!botConfig) {
+            throw new Error('Bot configuration not found.');
+        }
+
+        const typeChat = 'websocket';
+
+        // --- Используем переданный username для всех проверок ---
+        let botConfigCache = this.botConfigs.get(botId);
+        if (!botConfigCache) {
+            botConfigCache = await this.loadConfigForBot(botId);
+        }
+
+        const user = await UserService.getUser(username, botId, botConfig);
+
+        if (user.isBlacklisted) {
+            throw new Error(`User '${username}' is blacklisted.`);
+        }
+
+        const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
+        const dbCommand = botConfigCache.commands.get(mainCommandName);
+
+        if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
+            throw new Error(`Command '${commandName}' not found or is disabled.`);
+        }
+
+        // WebSocket - универсальный транспорт, всегда разрешен
+        if (typeChat !== 'websocket') {
+            const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
+            if (!allowedTypes.includes(typeChat) && !user.isOwner) {
+                throw new Error(`Command '${commandName}' cannot be used in this chat type.`);
+            }
+        }
+
+        const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
+        if (permission && !user.hasPermission(permission.name)) {
+            throw new Error(`User '${username}' has insufficient permissions.`);
+        }
+        
+        const domain = (permission?.name || '').split('.')[0] || 'user';
+        const bypassCooldownPermission = `${domain}.cooldown.bypass`;
+
+        if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
+            const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
+            const now = Date.now();
+            const lastUsed = cooldowns.get(cooldownKey);
+
+            if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
+                const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
+                throw new Error(`Command on cooldown for user '${username}'. Please wait ${timeLeft} seconds.`);
+            }
+            cooldowns.set(cooldownKey, now);
+        }
+
+        // Если все проверки пройдены, отправляем на выполнение
+        return this._executeCommandInProcess(botId, dbCommand.name, args, user, typeChat);
+    }
+
+    async _executeCommandInProcess(botId, commandName, args, user, typeChat) {
+        return new Promise(async (resolve, reject) => {
+            const child = this.bots.get(botId);
+            if (!child || child.killed) {
+                return reject(new Error('Bot is not running'));
+            }
+
+            const requestId = uuidv4();
+            this.pendingCommandRequests.set(requestId, { resolve, reject });
+
+            // Передаем только username - User будет восстановлен в child process
+            // Это позволяет сохранить все методы класса User
+            child.send({
+                type: 'execute_command_request',
+                requestId,
+                payload: {
+                    commandName,
+                    args: args || {}, // Аргументы должны быть объектом
+                    username: user.username, // Только username
+                    typeChat
+                }
+            });
+
+            setTimeout(() => {
+                if (this.pendingCommandRequests.has(requestId)) {
+                    this.pendingCommandRequests.delete(requestId);
+                    reject(new Error('Command execution timed out.'));
+                }
+            }, 10000);
+        });
+    }
     
     sendMessageToBot(botId, message, chatType = 'command', username = null) {
         const child = this.bots.get(botId);
@@ -833,6 +970,11 @@ class BotManager {
             return { success: true };
         }
         return { success: false, message: 'Бот не найден или не запущен' };
+    }
+
+    isBotRunning(botId) {
+        const child = this.bots.get(botId);
+        return child && !child.killed;
     }
 
     invalidateUserCache(botId, username) {
