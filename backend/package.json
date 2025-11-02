@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node ../backend/cli.js",
     "dev": "cross-env NODE_ENV=development nodemon",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:verbose": "jest --verbose",
+    "test:ci": "jest --ci --coverage --maxWorkers=2"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -15,12 +19,17 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
+    "cross-env": "^7.0.3",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.2",
-    "cross-env": "^7.0.3"
+    "ts-jest": "^29.4.5"
   },
   "dependencies": {
+    "awilix": "^12.0.5",
     "express-validator": "^7.2.1",
-
+    "lru-cache": "^10.4.3",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0"
   }

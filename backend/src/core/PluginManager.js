@@ -38,7 +38,7 @@ function reportPluginDownload(pluginName) {
 
 
 class PluginManager {
-    constructor(botManager) {
+    constructor({ botManager } = {}) {
         this.botManager = botManager;
         this.ensureBaseDirExists();
     }
