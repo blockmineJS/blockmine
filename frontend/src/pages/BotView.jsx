@@ -74,16 +74,10 @@ export default function BotView() {
     return (
         <>
             <div className="flex flex-col h-full w-full overflow-hidden">
-                <header className="shrink-0 p-6 bg-gradient-to-br from-background via-muted/20 to-background border-b">
+                <header className="shrink-0 p-6 border-b">
                     <div className="flex flex-wrap items-center gap-3 mb-4">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg blur-sm opacity-20" />
-                            <div className="relative bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg">
-                                <Server className="h-6 w-6 text-white" />
-                            </div>
-                        </div>
                         <div className="flex-1">
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            <h1 className="text-2xl font-bold tracking-tight">
                                 {bot.username}
                             </h1>
                             <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">

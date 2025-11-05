@@ -125,27 +125,19 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     };
 
     return (
-        <Card className="h-full flex flex-col bg-gradient-to-br from-background via-muted/20 to-background">
+        <Card className="h-full flex flex-col">
             <CardHeader>
                 <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg blur-sm opacity-20" />
-                            <div className="relative bg-gradient-to-r from-purple-500 to-blue-500 p-2 rounded-lg">
-                                <Terminal className="h-6 w-6 text-white" />
-                            </div>
-                        </div>
-                        <div>
-                            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Команды</CardTitle>
-                            <CardDescription>Список всех команд, доступных боту. Кликните на карточку для просмотра деталей и настроек.</CardDescription>
-                        </div>
+                    <div>
+                        <CardTitle className="text-2xl font-bold tracking-tight">Команды</CardTitle>
+                        <CardDescription>Список всех команд, доступных боту. Кликните на карточку для просмотра деталей и настроек.</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                             <Upload className="mr-2 h-4 w-4" />
                             Импорт
                         </Button>
-                        <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow hover:from-green-600 hover:to-emerald-600">
+                        <Button onClick={() => setIsCreateDialogOpen(true)}>
                             <Sparkles className="mr-2 h-4 w-4" />Создать команду
                         </Button>
                     </div>

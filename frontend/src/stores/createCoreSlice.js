@@ -200,4 +200,8 @@ export const createCoreSlice = (set, get) => ({
         }
         set({ showChangelogDialog: false });
     },
+
+    setShowChangelogDialog: (show) => {
+        set({ showChangelogDialog: show });
+    },
 });

@@ -288,18 +288,13 @@ export default function GraphStorePage() {
     }, [selectedCategory, selectedType, searchQuery]);
 
     return (
-        <div className="flex flex-col h-full w-full p-4 sm:p-6 gap-4 sm:gap-6 overflow-y-auto">
-            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 sm:p-6 rounded-xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5 border border-blue-500/10">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 shadow-lg">
-                        <ShoppingBag className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                            Магазин графов
-                        </h1>
-                        <p className="text-muted-foreground mt-1">Публикуйте и устанавливайте визуальные графы для ваших ботов</p>
-                    </div>
+        <div className="flex flex-col h-full w-full p-6 sm:p-8 gap-6 overflow-y-auto">
+            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+                        Магазин графов
+                    </h1>
+                    <p className="text-muted-foreground mt-1">Публикуйте и устанавливайте визуальные графы для ваших ботов</p>
                 </div>
                 <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                     <DialogTrigger asChild>
