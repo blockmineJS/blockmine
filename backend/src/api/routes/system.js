@@ -13,6 +13,13 @@ const healthLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
+// Rate limiter for stats endpoint: max 5 requests per minute per IP
+const statsLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
+
 const serverStartTime = Date.now();
 
 let previousCpuInfo = null;
@@ -158,7 +165,7 @@ router.get('/health', healthLimiter, authenticate, async (req, res) => {
  * @desc Получить статистику системы
  * @access Требуется авторизация
  */
-router.get('/stats', authenticate, async (req, res) => {
+router.get('/stats', statsLimiter, authenticate, async (req, res) => {
     try {
         const prisma = req.app.get('prisma') || require('../../lib/prisma');
         
