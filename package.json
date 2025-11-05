@@ -46,7 +46,6 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.2.1",
     "express-validator": "^7.2.1",
-    "ip-address": "^10.0.1",
     "framer-motion": "^12.19.2",
     "fs-extra": "^11.3.0",
     "iconv-lite": "^0.6.3",

@@ -22,33 +22,16 @@ const statsLimiter = rateLimit({
 
 const serverStartTime = Date.now();
 
-let previousCpuInfo = null;
-
+/**
+ * Вычисляет системное использование CPU на основе средней загрузки
+ * Избегает состояния гонки, не используя глобальное состояние
+ */
 function getSystemCpuUsage() {
-    const cpus = os.cpus();
-    let totalIdle = 0;
-    let totalTick = 0;
-
-    cpus.forEach(cpu => {
-        for (const type in cpu.times) {
-            totalTick += cpu.times[type];
-        }
-        totalIdle += cpu.times.idle;
-    });
-
-    const currentCpuInfo = { idle: totalIdle, total: totalTick };
-
-    if (!previousCpuInfo) {
-        previousCpuInfo = currentCpuInfo;
-        return 0;
-    }
-
-    const idleDiff = currentCpuInfo.idle - previousCpuInfo.idle;
-    const totalDiff = currentCpuInfo.total - previousCpuInfo.total;
-    const cpuPercentage = 100 - Math.floor((100 * idleDiff) / totalDiff);
-
-    previousCpuInfo = currentCpuInfo;
-
+    // Используем среднюю загрузку системы за 1 минуту
+    const loadAvg = os.loadavg()[0]; // 1-минутное среднее
+    const cpuCount = os.cpus().length;
+    // Конвертируем в процент (loadAvg / cpuCount * 100)
+    const cpuPercentage = Math.round((loadAvg / cpuCount) * 100);
     return Math.max(0, Math.min(100, cpuPercentage));
 }
 
@@ -178,7 +161,7 @@ router.get('/stats', statsLimiter, authenticate, async (req, res) => {
         
         if (botManager && botManager.bots) {
             runningBots = Array.from(botManager.bots.values())
-                .filter(bot => bot.isRunning && bot.isRunning())
+                .filter(bot => typeof bot.isRunning === 'function' && bot.isRunning())
                 .length;
         }
         
