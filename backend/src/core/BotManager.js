@@ -26,15 +26,15 @@ class BotManager {
         this.bots = this.processManager.getAllProcesses();
         this.nodeRegistry = require('./NodeRegistry');
 
-        // Запускаем фоновые процессы
         this._startBackgroundTasks();
     }
 
     _startBackgroundTasks() {
         this.resourceMonitor.startMonitoring(5000);
         this.telemetry.startHeartbeat(5 * 60 * 1000);
+        
+        setInterval(() => this.updateAllResourceUsage(), 5000);
 
-        // Синхронизация статусов
         setInterval(() => this.syncBotStatuses(), 10000);
     }
 

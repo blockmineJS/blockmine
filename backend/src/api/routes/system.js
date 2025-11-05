@@ -1,0 +1,189 @@
+const express = require('express');
+const { authenticate } = require('../middleware/auth');
+const os = require('os');
+const pidusage = require('pidusage');
+
+const router = express.Router();
+
+const serverStartTime = Date.now();
+
+let previousCpuInfo = null;
+
+function getSystemCpuUsage() {
+    const cpus = os.cpus();
+    let totalIdle = 0;
+    let totalTick = 0;
+
+    cpus.forEach(cpu => {
+        for (const type in cpu.times) {
+            totalTick += cpu.times[type];
+        }
+        totalIdle += cpu.times.idle;
+    });
+
+    const currentCpuInfo = { idle: totalIdle, total: totalTick };
+
+    if (!previousCpuInfo) {
+        previousCpuInfo = currentCpuInfo;
+        return 0;
+    }
+
+    const idleDiff = currentCpuInfo.idle - previousCpuInfo.idle;
+    const totalDiff = currentCpuInfo.total - previousCpuInfo.total;
+    const cpuPercentage = 100 - Math.floor((100 * idleDiff) / totalDiff);
+
+    previousCpuInfo = currentCpuInfo;
+
+    return Math.max(0, Math.min(100, cpuPercentage));
+}
+
+/**
+ * @route GET /api/system/health
+ * @desc Получить информацию о здоровье системы
+ * @access Требуется авторизация
+ */
+router.get('/health', authenticate, async (req, res) => {
+    try {
+        const uptime = process.uptime();
+        const serverUptime = (Date.now() - serverStartTime) / 1000;
+        
+        const totalMemory = os.totalmem();
+        const freeMemory = os.freemem();
+        const usedMemory = totalMemory - freeMemory;
+        
+        const cpus = os.cpus();
+        
+        const systemCpuUsage = getSystemCpuUsage();
+        
+        let panelCpu = 0;
+        let panelMemory = 0;
+        try {
+            const stats = await pidusage(process.pid);
+            panelCpu = parseFloat(stats.cpu.toFixed(1));
+            panelMemory = parseFloat((stats.memory / 1024 / 1024).toFixed(1)); // MB
+        } catch (error) {
+            console.error('Ошибка получения статистики процесса:', error);
+        }
+        
+        const platform = process.platform;
+        const arch = process.arch;
+        
+        const platformName = {
+            'win32': 'Windows',
+            'linux': 'Linux',
+            'darwin': 'macOS',
+            'freebsd': 'FreeBSD',
+            'openbsd': 'OpenBSD',
+            'aix': 'AIX'
+        }[platform] || platform;
+        
+        // Форматируем uptime
+        const formatUptime = (seconds) => {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) return `${days}д ${hours}ч`;
+            if (hours > 0) return `${hours}ч ${minutes}м`;
+            return `${minutes}м`;
+        };
+
+        let websocketStatus = true;
+        let databaseStatus = true;
+        
+        try {
+            const prisma = req.app.get('prisma') || require('../../lib/prisma');
+            await prisma.$queryRaw`SELECT 1`;
+        } catch (error) {
+            databaseStatus = false;
+        }
+        
+        try {
+            const botManager = req.app.get('botManager');
+            websocketStatus = botManager !== null && botManager !== undefined;
+        } catch (error) {
+            websocketStatus = false;
+        }
+
+        res.json({
+            status: 'ok',
+            uptime: formatUptime(serverUptime),
+            uptimeSeconds: Math.floor(serverUptime),
+            processUptime: formatUptime(uptime),
+            memory: {
+                total: Math.round(totalMemory / 1024 / 1024), // MB
+                free: Math.round(freeMemory / 1024 / 1024), // MB
+                used: Math.round(usedMemory / 1024 / 1024), // MB
+                usedPercent: Math.round((usedMemory / totalMemory) * 100),
+                panel: panelMemory // Память используемая панелью
+            },
+            cpu: {
+                cores: cpus.length,
+                model: cpus[0]?.model || 'Unknown',
+                usage: systemCpuUsage,
+                panelUsage: panelCpu,
+                loadAverage: os.loadavg()
+            },
+            platform: platformName,
+            platformRaw: platform,
+            arch: arch,
+            osRelease: os.release(),
+            hostname: os.hostname(),
+            nodeVersion: process.version,
+            services: {
+                panel: true,
+                websocket: websocketStatus,
+                database: databaseStatus
+            }
+        });
+    } catch (error) {
+        console.error('Error getting system health:', error);
+        res.status(500).json({ 
+            error: 'Failed to get system health',
+            message: error.message 
+        });
+    }
+});
+
+/**
+ * @route GET /api/system/stats
+ * @desc Получить статистику системы
+ * @access Требуется авторизация
+ */
+router.get('/stats', authenticate, async (req, res) => {
+    try {
+        const prisma = req.app.get('prisma') || require('../../lib/prisma');
+        
+        const totalBots = await prisma.bot.count();
+        const totalServers = await prisma.server.count();
+        const totalUsers = await prisma.panelUser.count();
+        
+        const botManager = req.app.get('botManager');
+        let runningBots = 0;
+        
+        if (botManager && botManager.bots) {
+            runningBots = Array.from(botManager.bots.values())
+                .filter(bot => bot.isRunning && bot.isRunning())
+                .length;
+        }
+        
+        res.json({
+            bots: {
+                total: totalBots,
+                running: runningBots,
+                stopped: totalBots - runningBots
+            },
+            servers: totalServers,
+            users: totalUsers
+        });
+    } catch (error) {
+        console.error('Error getting system stats:', error);
+        res.status(500).json({ 
+            error: 'Failed to get system stats',
+            message: error.message 
+        });
+    }
+});
+
+module.exports = router;
+
