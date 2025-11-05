@@ -158,6 +158,7 @@ const gracefulShutdown = async (signal) => {
     console.log(`[Shutdown] Получен сигнал ${signal}. Начинаем корректное завершение...`);
 
     TaskScheduler.shutdown();
+    botManager.cleanup();
 
     const botIds = Array.from(botManager.bots.keys());
     if (botIds.length > 0) {
