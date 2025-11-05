@@ -555,9 +555,10 @@ process.on('message', async (message) => {
             let messageHandledByCustomParser = false;
 
             bot.on('message', (jsonMsg) => {
-                const ansiMessage = jsonMsg.toAnsi();
-                if (ansiMessage.trim()) {
-                    sendLog(ansiMessage);
+                const logContent = jsonMsg.toAnsi();
+
+                if (logContent.trim()) {
+                    sendLog(logContent);
                 }
 
                 messageHandledByCustomParser = false;
