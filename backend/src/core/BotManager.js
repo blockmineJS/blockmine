@@ -25,17 +25,27 @@ class BotManager {
         // Геттеры для обратной совместимости
         this.bots = this.processManager.getAllProcesses();
         this.nodeRegistry = require('./NodeRegistry');
+        
+        // Массив для хранения ссылок на интервалы
+        this.intervals = [];
 
-        // Запускаем фоновые процессы
         this._startBackgroundTasks();
     }
 
     _startBackgroundTasks() {
         this.resourceMonitor.startMonitoring(5000);
         this.telemetry.startHeartbeat(5 * 60 * 1000);
-
-        // Синхронизация статусов
-        setInterval(() => this.syncBotStatuses(), 10000);
+        
+        this.intervals.push(setInterval(() => this.updateAllResourceUsage(), 5000));
+        this.intervals.push(setInterval(() => this.syncBotStatuses(), 10000));
+    }
+    
+    /**
+     * Очистка интервалов при завершении работы
+     */
+    cleanup() {
+        this.intervals.forEach(interval => clearInterval(interval));
+        this.intervals = [];
     }
 
     initialize() {
