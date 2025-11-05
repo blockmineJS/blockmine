@@ -360,6 +360,24 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+        type: 'action:send_websocket_response',
+        label: '📤 Отправить ответ в WebSocket',
+        category: 'WebSocket API',
+        description: 'Отправляет данные обратно клиенту, вызвавшему граф через WebSocket API.',
+        graphType: event,
+        executor: require('./nodes/action_send_websocket_response').execute,
+        pins: {
+            inputs: [
+                { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+                { id: 'data', name: 'Данные', type: 'Wildcard', required: true }
+            ],
+            outputs: [
+                { id: 'exec', name: 'Выполнено', type: 'Exec' }
+            ]
+        }
+    });
+
+    this.registerNodeType({
       type: 'action:bot_look_at',
       label: '🤖 Бот: Посмотреть на',
       category: 'Действия',
@@ -1203,6 +1221,24 @@ class NodeRegistry {
           { id: 'health', name: 'Здоровье', type: 'Number' },
           { id: 'food', name: 'Голод', type: 'Number' },
           { id: 'saturation', name: 'Насыщение', type: 'Number' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'event:websocket_call',
+      label: '📡 Вызов из WebSocket API',
+      category: 'События',
+      description: 'Срабатывает, когда граф вызывается через WebSocket API методом callGraph().',
+      graphType: event,
+      pins: {
+        inputs: [],
+        outputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec' },
+          { id: 'graphName', name: 'Имя графа', type: 'String' },
+          { id: 'data', name: 'Данные', type: 'Object' },
+          { id: 'socketId', name: 'Socket ID', type: 'String' },
+          { id: 'keyPrefix', name: 'API ключ (префикс)', type: 'String' }
         ]
       }
     });

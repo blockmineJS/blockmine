@@ -42,6 +42,8 @@ model Bot {
   pluginData       PluginDataStore[]
 
   panelUserAccess  PanelUserBotAccess[]
+  apiKeys          BotApiKey[]
+  apiConnectionLogs ApiConnectionLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -241,4 +243,35 @@ model PluginDataStore {
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([pluginName, botId, key])
+}
+
+model BotApiKey {
+  id          Int              @id @default(autoincrement())
+  botId       Int
+  bot         Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  name        String           // Название ключа (н-р, "Discord-бот")
+  keyHash     String           @unique // Хэш ключа (bcrypt), не сам ключ
+  keyPrefix   String           // Первые 8 символов ключа для отображения в UI
+  permissions String           @default("ReadWrite") // "Read", "Write", "ReadWrite"
+
+  createdAt   DateTime         @default(now())
+  lastUsedAt  DateTime?
+
+  @@index([botId])
+}
+
+model ApiConnectionLog {
+  id          Int      @id @default(autoincrement())
+  botId       Int
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  keyPrefix   String   // Префикс ключа, который использовался для подключения
+  ipAddress   String?  // IP адрес клиента
+  userAgent   String?  // User-Agent клиента (если доступен)
+  action      String   // "connect" или "disconnect"
+
+  createdAt   DateTime @default(now())
+
+  @@index([botId, createdAt])
 }

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles } from 'lucide-react';
+import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi } from 'lucide-react';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import ExportBotDialog from '@/components/ExportBotDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -47,6 +47,7 @@ export default function BotView() {
         if (botId) {
             fetchUIExtensions(parseInt(botId, 10));
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [botId]);
 
     const handleDeleteConfirm = async () => {
@@ -183,17 +184,29 @@ export default function BotView() {
                                 <Zap className="h-4 w-4" />
                                 События
                             </NavLink>
-                            <NavLink 
-                                to="management" 
+                            <NavLink
+                                to="management"
                                 className={({isActive}) => cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
+                                    isActive
+                                        ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                 )}
                             >
                                 <Users className="h-4 w-4" />
                                 Управление
+                            </NavLink>
+                            <NavLink
+                                to="websocket"
+                                className={({isActive}) => cn(
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
+                                    isActive
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <Wifi className="h-4 w-4" />
+                                Веб-сокет
                             </NavLink>
                         </nav>
                         

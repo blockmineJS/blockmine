@@ -14,6 +14,8 @@ const NodeRegistry = require('./NodeRegistry');
 
 const UserService = require('./UserService');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
+const Transport = require('./system/Transport');
+const CommandContext = require('./system/CommandContext');
 
 let bot = null;
 const prisma = new PrismaClient();
@@ -240,7 +242,21 @@ process.on('message', async (message) => {
             bot.api = {
                 Command: Command,
                 events: bot.events,
-                sendMessage: (type, message, username) => bot.messageQueue.enqueue(type, message, username),
+                sendMessage: (type, message, username) => {
+                    if (type === 'websocket') {
+                        if (process.send) {
+                            process.send({
+                                type: 'send_websocket_message',
+                                payload: {
+                                    botId: bot.config.id,
+                                    message: message,
+                                }
+                            });
+                        }
+                    } else {
+                        bot.messageQueue.enqueue(type, message, username);
+                    }
+                },
                 sendMessageAndWaitForReply: (command, patterns, timeout) => bot.messageQueue.enqueueAndWait(command, patterns, timeout),
                 getUser: async (username) => {
                     return await UserService.getUser(username, bot.config.id, bot.config);
@@ -458,6 +474,11 @@ process.on('message', async (message) => {
                 }
             };
 
+            // Упрощенный alias для отправки сообщений (используется в командах и нодах)
+            bot.sendMessage = (type, message, username) => {
+                bot.api.sendMessage(type, message, username);
+            };
+
             const processApi = {
                 appendLog: (botId, message) => {
                     if (process.send) {
@@ -538,13 +559,14 @@ process.on('message', async (message) => {
                 if (ansiMessage.trim()) {
                     sendLog(ansiMessage);
                 }
-                
+
                 messageHandledByCustomParser = false;
                 const rawMessageText = jsonMsg.toString();
                 bot.events.emit('core:raw_message', rawMessageText, jsonMsg);
-                
+
                 sendEvent('raw_message', {
-                    rawText: rawMessageText
+                    rawText: rawMessageText,
+                    json: jsonMsg
                 });
             });
 
@@ -722,6 +744,81 @@ process.on('message', async (message) => {
                 sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
             });
         }
+    } else if (message.type === 'execute_command_request') {
+                const { requestId, payload } = message;
+                const { commandName, args, username, typeChat } = payload;
+
+                (async () => {
+                    try {
+                        const commandInstance = bot.commands.get(commandName);
+                        if (!commandInstance) {
+                            throw new Error(`Command '${commandName}' not found.`);
+                        }
+
+                        // Восстанавливаем полный User объект из username
+                        const user = await UserService.getUser(username, bot.config.id, bot.config);
+
+                        let result;
+
+                        // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
+                        const handlerParamCount = commandInstance.handler.length;
+
+                        if (handlerParamCount === 1) {
+                            // Новая сигнатура: handler(context)
+                            const transport = new Transport(typeChat, bot);
+                            const context = new CommandContext(bot, user, args, transport);
+
+                            if (typeChat === 'websocket') {
+                                result = await commandInstance.handler(context);
+                                if (process.send) {
+                                    process.send({ type: 'execute_command_response', requestId, result });
+                                }
+                            } else {
+                                commandInstance.handler(context).catch(e => {
+                                     sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
+                                });
+                            }
+                        } else {
+                            // Старая сигнатура: handler(bot, typeChat, user, args)
+                            if (typeChat === 'websocket') {
+                                // Для websocket перехватываем bot.sendMessage
+                                const originalSendMessage = bot.sendMessage;
+                                let resultFromSendMessage = null;
+                                let sendMessageCalled = false;
+
+                                bot.sendMessage = (type, message, username) => {
+                                    if (type === 'websocket') {
+                                        resultFromSendMessage = message;
+                                        sendMessageCalled = true;
+                                    } else {
+                                        originalSendMessage.call(bot, type, message, username);
+                                    }
+                                };
+
+                                try {
+                                    const returnValue = await commandInstance.handler(bot, typeChat, user, args);
+                                    result = sendMessageCalled ? resultFromSendMessage : returnValue;
+
+                                    if (process.send) {
+                                        process.send({ type: 'execute_command_response', requestId, result });
+                                    }
+                                } finally {
+                                    bot.sendMessage = originalSendMessage;
+                                }
+                            } else {
+                                // Для игровых команд просто выполняем
+                                commandInstance.handler(bot, typeChat, user, args).catch(e => {
+                                     sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
+                                });
+                            }
+                        }
+
+                    } catch (error) {
+                        if (process.send) {
+                            process.send({ type: 'execute_command_response', requestId, error: error.message });
+                        }
+                    }
+                })();
     } else if (message.type === 'invalidate_user_cache') {
         if (message.username && bot && bot.config) {
             UserService.clearCache(message.username, bot.config.id);

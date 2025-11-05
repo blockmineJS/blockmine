@@ -86,12 +86,13 @@ export function getConversionChain(sourceType, targetType, sourceNode) {
     };
   }
 
-  // Object (Entity) -> String (username или type)
+  // Object -> String (преобразование в JSON строку)
   if (sourceType === 'Object' && targetType === 'String') {
     return {
-      nodeType: 'data:get_entity_field',
-      inputPin: 'entity',
-      outputPin: 'username' // можно также 'type'
+      nodeType: 'data:cast',
+      inputPin: 'value',
+      outputPin: 'value',
+      targetType: 'String'
     };
   }
 

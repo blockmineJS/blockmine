@@ -273,6 +273,13 @@ class GraphExecutionEngine {
           case 'event:botDied':
               result = this.context[pinId];
               break;
+          case 'event:websocket_call':
+              if (pinId === 'graphName') result = this.context.graphName;
+              else if (pinId === 'data') result = this.context.data;
+              else if (pinId === 'socketId') result = this.context.socketId;
+              else if (pinId === 'keyPrefix') result = this.context.keyPrefix;
+              else result = this.context[pinId];
+              break;
 
           case 'flow:for_each': {
             if (pinId === 'element') {

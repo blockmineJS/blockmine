@@ -12,6 +12,7 @@ const { encrypt } = require('../../core/utils/crypto');
 const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
 const pluginIdeRouter = require('./pluginIde');
+const apiKeysRouter = require('./apiKeys');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
 
@@ -328,6 +329,7 @@ router.get('/:id/logs', conditionalListAuth, authenticate, checkBotAccess, (req,
 router.use(authenticate);
 router.use('/:botId/event-graphs', eventGraphsRouter);
 router.use('/:botId/plugins/ide', pluginIdeRouter);
+router.use('/:botId/api-keys', apiKeysRouter);
 
 async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
     const initialData = {

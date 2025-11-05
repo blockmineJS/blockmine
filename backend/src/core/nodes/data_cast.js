@@ -15,6 +15,14 @@ async function evaluate(node, pinId, context, helpers) {
 
         switch (targetType) {
             case 'String':
+                // Для объектов и массивов используем JSON.stringify
+                if (typeof value === 'object' && value !== null) {
+                    try {
+                        return JSON.stringify(value);
+                    } catch (e) {
+                        return String(value ?? '');
+                    }
+                }
                 return String(value ?? '');
             case 'Number':
                 const num = Number(value);

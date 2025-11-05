@@ -79,6 +79,8 @@ class EventGraphManager {
     }
 
     async handleEvent(botId, eventType, args) {
+        this.broadcastEventToApi(botId, eventType, args);
+
         const graphsForBot = this.activeGraphs.get(botId);
         if (!graphsForBot) return;
 
@@ -111,6 +113,11 @@ class EventGraphManager {
                 this.botManager.lookAt(botId, position);
             },
             getPlayerList: () => players,
+            api: {
+                emitApiEvent: (eventName, payload) => {
+                    this.emitCustomApiEvent(botId, eventName, payload);
+                },
+            },
         };
         
         const stateKey = `${botId}-${graph.id}`;
@@ -191,8 +198,85 @@ class EventGraphManager {
                 context.args = args.args;
                 context.chat_type = args.typeChat;
                 break;
+            case 'websocket_call':
+                context.graphName = args.graphName;
+                context.data = args.data || {};
+                context.socketId = args.socketId;
+                context.keyPrefix = args.keyPrefix;
+                context.sendResponse = args.sendResponse;
+                break;
         }
         return context;
+    }
+
+    /**
+     * Отправляет события в WebSocket API
+     */
+    broadcastEventToApi(botId, eventType, args) {
+        try {
+            // Динамический импорт для избежания циклической зависимости
+            const { getIO } = require('../real-time/socketHandler');
+            const { broadcastToApiClients } = require('../real-time/botApi');
+
+            const io = getIO();
+
+            switch (eventType) {
+                case 'chat':
+                case 'private':
+                case 'global':
+                case 'clan':
+                    broadcastToApiClients(io, botId, 'chat:message', {
+                        type: eventType,
+                        username: args.username,
+                        message: args.message,
+                        raw_message: args.rawText || args.raw_message,
+                    });
+                    break;
+
+                case 'playerJoined':
+                    broadcastToApiClients(io, botId, 'player:join', {
+                        username: args.user?.username || args.username,
+                    });
+                    break;
+
+                case 'playerLeft':
+                    broadcastToApiClients(io, botId, 'player:leave', {
+                        username: args.user?.username || args.username,
+                    });
+                    break;
+
+                case 'health':
+                    broadcastToApiClients(io, botId, 'bot:health', {
+                        health: args.health,
+                        food: args.food,
+                    });
+                    break;
+
+                case 'death':
+                    broadcastToApiClients(io, botId, 'bot:death', {});
+                    break;
+            }
+        } catch (error) {
+        }
+    }
+
+    /**
+     * Отправляет кастомное событие от плагина в WebSocket API
+     */
+    emitCustomApiEvent(botId, eventName, payload = {}) {
+        try {
+            const { getIO } = require('../real-time/socketHandler');
+            const { broadcastToApiClients } = require('../real-time/botApi');
+
+            const io = getIO();
+            broadcastToApiClients(io, botId, 'plugin:custom_event', {
+                eventName,
+                payload,
+                timestamp: new Date().toISOString(),
+            });
+        } catch (error) {
+            // Игнорируем ошибки - Socket.IO может быть еще не инициализирован
+        }
     }
 }
 

@@ -27,6 +27,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import PluginUIPage from "./pages/Bot/PluginUIPage";
 import GraphStorePage from "./pages/GraphStorePage";
 import ProxyConfigPage from "./pages/ProxyConfigPage";
+import WebSocketTab from "./pages/Bot/WebSocketTab";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -36,7 +37,7 @@ function Root() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
     setTheme(savedTheme);
-  }, [setTheme]);
+  }, []);
 
   useEffect(() => {
     if (!authInitialized) {
@@ -73,7 +74,7 @@ function ProtectedLayout() {
         return () => {
             disconnectSocket();
         }
-    }, [isAuthenticated, connectSocket, disconnectSocket, fetchInitialData, fetchTasks]);
+    }, [isAuthenticated]);
 
     if (needsSetup) {
         return <Navigate to="/setup" replace />;
@@ -120,8 +121,9 @@ const router = createBrowserRouter([
                   { path: "management", element: <ProtectedRoute requiredPermission="management:view"><ManagementPage /></ProtectedRoute> },
                   { path: "commands/visual/:commandId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
                   { path: "events", element: <ProtectedRoute requiredPermission="management:edit"><EventGraphsPage /></ProtectedRoute> },
-                  { path: "plugins/ui/:pluginName/:pluginPath", element: <PluginUIPage /> }, 
-                  { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> }
+                  { path: "plugins/ui/:pluginName/:pluginPath", element: <PluginUIPage /> },
+                  { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
+                  { path: "websocket", element: <ProtectedRoute requiredPermission="bot:update"><WebSocketTab /></ProtectedRoute> }
               ]
             },
             { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },

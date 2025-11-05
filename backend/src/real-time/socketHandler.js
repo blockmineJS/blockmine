@@ -3,6 +3,7 @@ const config = require('../config');
 
 const { botManager } = require('../core/services');
 const presence = require('./presence');
+const { initializeBotApiNamespace } = require('./botApi');
 
 let io;
 
@@ -18,9 +19,12 @@ function initializeSocket(httpServer) {
         transports: ['websocket', 'polling']
     });
 
+    // Инициализируем /bot-api namespace для WebSocket API
+    initializeBotApiNamespace(io);
+
     io.on('connection', (socket) => {
         presence.handleConnection(io, socket);
-        
+
         socket.on('disconnect', () => {
             botManager.handleSocketDisconnect(socket);
         });
@@ -33,7 +37,7 @@ function initializeSocket(httpServer) {
             botManager.unsubscribeFromPluginUi(botId, pluginName, socket);
         });
     });
-    
+
     return io;
 }
 
