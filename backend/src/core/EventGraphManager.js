@@ -5,11 +5,19 @@ const nodeRegistry = require('./NodeRegistry');
 const prisma = new PrismaClient();
 
 class EventGraphManager {
-    constructor(botManager) {
+    constructor(botManager = null) {
         this.botManager = botManager;
-        this.graphEngine = new GraphExecutionEngine(nodeRegistry, botManager);
+        this.graphEngine = botManager ? new GraphExecutionEngine(nodeRegistry, botManager) : null;
         this.activeGraphs = new Map();
         this.graphStates = new Map();
+    }
+
+    // Setter для установки botManager после создания (решение circular dependency)
+    setBotManager(botManager) {
+        this.botManager = botManager;
+        if (!this.graphEngine) {
+            this.graphEngine = new GraphExecutionEngine(nodeRegistry, botManager);
+        }
     }
 
     async loadGraphsForBot(botId) {

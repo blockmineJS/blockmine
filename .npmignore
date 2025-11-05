@@ -49,3 +49,5 @@ blockmine-proxy/
 .qoder
 /rules
 /packages
+coverage/
+**/coverage/
