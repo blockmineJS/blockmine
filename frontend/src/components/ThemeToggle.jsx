@@ -39,7 +39,7 @@ export default function ThemeToggle({ isCollapsed }) {
           Тёмная
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('system')} className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded-full bg-gradient-to-r from-yellow-400 to-blue-500" />
+          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
           Системная
         </DropdownMenuItem>
       </DropdownMenuContent>

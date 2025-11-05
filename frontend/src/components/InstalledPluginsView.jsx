@@ -71,7 +71,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 onMouseLeave={() => setIsHovered(false)}
             >
                 {plugin.isEnabled && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-500 to-green-600 rounded-l-lg" />
+                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500 rounded-l-lg" />
                 )}
                 
                 <div className="relative shrink-0 mt-1">
@@ -132,7 +132,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {updateInfo && onUpdate && (
                         <Button 
                             size="sm" 
-                            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
                             onClick={() => onUpdate.handle(plugin.id)} 
                             disabled={isUpdatingThisPlugin}
                         >
@@ -210,7 +209,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             onMouseLeave={() => setIsHovered(false)}
         >
             {plugin.isEnabled && (
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-600" />
+                <div className="absolute top-0 left-0 w-full h-1 bg-green-500" />
             )}
             
             {(isNew || updateInfo) && (
@@ -339,7 +338,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             <CardFooter className={cardStyles.footer}>
                 {updateInfo && onUpdate && (
                     <Button 
-                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
+                        className="w-full"
                         size="sm"
                         onClick={() => onUpdate.handle(plugin.id)} 
                         disabled={isUpdatingThisPlugin}
@@ -549,142 +548,82 @@ export default function InstalledPluginsView({
     return (
         <TooltipProvider delayDuration={100}>
             <div className="flex flex-col h-full">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-background/50 backdrop-blur border-b">
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <Package className="h-5 w-5 text-primary" />
-                            <div>
-                                <p className="text-2xl font-bold">{stats.total}</p>
-                                <p className="text-xs text-muted-foreground">Всего</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <Power className="h-5 w-5 text-green-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-green-500">{stats.enabled}</p>
-                                <p className="text-xs text-muted-foreground">Активно</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <PowerOff className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                                <p className="text-2xl font-bold">{stats.disabled}</p>
-                                <p className="text-xs text-muted-foreground">Выключено</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <ArrowUpCircle className="h-5 w-5 text-blue-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-blue-500">{stats.updates}</p>
-                                <p className="text-xs text-muted-foreground">Обновлений</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <Code className="h-5 w-5 text-purple-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-purple-500">{stats.local}</p>
-                                <p className="text-xs text-muted-foreground">Локальные</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <GitBranch className="h-5 w-5 text-orange-500" />
-                            <div>
-                                <p className="text-2xl font-bold text-orange-500">{stats.github}</p>
-                                <p className="text-xs text-muted-foreground">GitHub</p>                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 p-4 border-b bg-background/30">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-4 px-6 py-3 border-b bg-background/30">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Button 
-                            variant={filter === 'all' ? 'secondary' : 'ghost'} 
                             size="sm" 
                             onClick={() => setFilter('all')}
-                            className={cn(filter === 'all' && "bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:text-white")}
+                            variant={filter === 'all' ? "default" : "ghost"}
                         >
                             Все ({stats.total})
                         </Button>
+                        <div className="h-4 w-px bg-border" />
                         <Button 
-                            variant={filter === 'enabled' ? 'secondary' : 'ghost'} 
                             size="sm" 
                             onClick={() => setFilter('enabled')}
-                            className={cn(filter === 'enabled' && "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:text-white")}
+                            variant={filter === 'enabled' ? "default" : "ghost"}
                         >
-                            <Power className="mr-1 h-4 w-4"/>
-                            Включенные ({stats.enabled})
+                            <Power className="mr-1.5 h-3.5 w-3.5"/>
+                            Активно ({stats.enabled})
                         </Button>
                         <Button 
-                            variant={filter === 'disabled' ? 'secondary' : 'ghost'} 
                             size="sm" 
                             onClick={() => setFilter('disabled')}
+                            variant={filter === 'disabled' ? "default" : "ghost"}
                         >
-                            <PowerOff className="mr-1 h-4 w-4"/>
-                            Выключенные ({stats.disabled})
+                            <PowerOff className="mr-1.5 h-3.5 w-3.5"/>
+                            Выкл ({stats.disabled})
                         </Button>
                         {stats.updates > 0 && (
-                            <Button 
-                                variant={filter === 'updates' ? 'secondary' : 'ghost'} 
-                                size="sm" 
-                                onClick={() => setFilter('updates')} 
-                                className={cn(
-                                    "animate-pulse",
-                                    filter === 'updates' && "bg-gradientto-r from-blue-500 to-cyan-500 text-white hover:text-white"
-                                )}
-                            >
-                                <ArrowUpCircle className="mr-1 h-4 w-4"/>
-                                Обновления ({stats.updates})
-                            </Button>
+                            <>
+                                <div className="h-4 w-px bg-border" />
+                                <Button 
+                                    variant={filter === 'updates' ? 'default' : 'ghost'} 
+                                    size="sm" 
+                                    onClick={() => setFilter('updates')} 
+                                    className={cn(stats.updates > 0 && filter !== 'updates' && "text-blue-500")}
+                                >
+                                    <ArrowUpCircle className="mr-1.5 h-3.5 w-3.5"/>
+                                    Обновления ({stats.updates})
+                                </Button>
+                            </>
                         )}
+                        <div className="h-4 w-px bg-border" />
                         <Button 
-                            variant={filter === 'local' ? 'secondary' : 'ghost'} 
                             size="sm" 
                             onClick={() => setFilter('local')}
-                            className={cn(filter === 'local' && "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:text-white")}
+                            variant={filter === 'local' ? "default" : "ghost"}
                         >
-                            <Code className="mr-1 h-4 w-4"/>
+                            <Code className="mr-1.5 h-3.5 w-3.5"/>
                             Локальные ({stats.local})
                         </Button>
                         <Button 
-                            variant={filter === 'github' ? 'secondary' : 'ghost'} 
                             size="sm" 
                             onClick={() => setFilter('github')}
-                            className={cn(filter === 'github' && "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:text-white")}
+                            variant={filter === 'github' ? "default" : "ghost"}
                         >
-                            <GitBranch className="mr-1 h-4 w-4"/>
+                            <GitBranch className="mr-1.5 h-3.5 w-3.5"/>
                             GitHub ({stats.github})
                         </Button>
                     </div>
                     
                     <div className="flex items-center gap-2">
-                        <div className="relative w-64">
-                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <div className="relative w-48">
+                            <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
-                                placeholder="Поиск установленных..."
+                                placeholder="Поиск..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9"
+                                className="pl-8 h-8 text-sm"
                             />
                         </div>
                         <Tabs value={viewMode} onValueChange={setViewMode}>
-                            <TabsList>
-                                <TabsTrigger value="grid" className="flex items-center gap-2">
-                                    <LayoutGrid className="h-4 w-4" />
-                                    Сетка
+                            <TabsList className="h-8">
+                                <TabsTrigger value="grid" className="h-7 px-2">
+                                    <LayoutGrid className="h-3.5 w-3.5" />
                                 </TabsTrigger>
-                                <TabsTrigger value="list" className="flex items-center gap-2">
-                                    <List className="h-4 w-4" />
-                                    Список
+                                <TabsTrigger value="list" className="h-7 px-2">
+                                    <List className="h-3.5 w-3.5" />
                                 </TabsTrigger>
                             </TabsList>
                         </Tabs>

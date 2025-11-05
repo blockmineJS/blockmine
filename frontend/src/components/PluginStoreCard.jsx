@@ -29,8 +29,8 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                 )} />
                 
                 {isInstalled && (
-                    <div className="absolute top-0 right-0 bg-gradient-to-bl from-green-600 to-green-700 text-white p-6 rounded-bl-[40px] shadow-lg z-10">
-                        <Check className="h-5 w-5 absolute top-2 right-2" />
+                    <div className="absolute top-2 right-2 bg-green-600 text-white p-2 rounded-full shadow-lg z-10">
+                        <Check className="h-4 w-4" />
                     </div>
                 )}
                 

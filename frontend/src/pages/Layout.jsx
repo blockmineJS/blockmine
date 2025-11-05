@@ -95,10 +95,10 @@ const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDraggin
                 onClick={handleClick} 
                 data-bot-id={bot.id} 
                 className={({ isActive }) => cn(
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 ease-in-out cursor-move",
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 relative",
                     isActive 
-                        ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600 shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:shadow-sm",
+                        ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
                     isCollapsed && "justify-center"
                 )}
             >
@@ -109,13 +109,13 @@ const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDraggin
                             ? 'bg-green-500 animate-pulse' 
                             : 'bg-gray-500'
                     )} />
-                    {isCollapsed && (
-                        <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center shadow-sm">
-                            <span className="text-xs font-bold text-white">
-                                {bot.username.charAt(0).toUpperCase()}
-                            </span>
-                        </div>
-                    )}
+                  {isCollapsed && (
+                      <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary-foreground">
+                              {bot.username.charAt(0).toUpperCase()}
+                          </span>
+                      </div>
+                  )}
                 </div>
                 <div className={cn("flex flex-col overflow-hidden", isCollapsed && "hidden")}>
                     <span className="font-medium truncate text-xs">{bot.username}</span>
@@ -133,10 +133,10 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
             onClick={onLinkClick} 
             data-bot-id={bot.id} 
             className={({ isActive }) => cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 ease-in-out cursor-pointer",
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 relative",
                 isActive 
-                    ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-600 shadow-sm" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:shadow-sm",
+                    ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
                 isCollapsed && "justify-center"
             )}
         >
@@ -148,8 +148,8 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
                         : 'bg-gray-500'
                 )} />
                 {isCollapsed && (
-                    <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-md flex items-center justify-center shadow-sm">
-                        <span className="text-xs font-bold text-white">
+                    <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
+                        <span className="text-xs font-bold text-primary-foreground">
                             {bot.username.charAt(0).toUpperCase()}
                         </span>
                     </div>
@@ -327,8 +327,8 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     }, [isDragging, isSheetOpen]);
 
     const navLinkClasses = ({ isActive }) => cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-        isActive ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-blue-600" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+        isActive ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" : "text-muted-foreground hover:text-foreground hover:bg-accent",
         isCollapsed && "justify-center"
     );
 
@@ -526,15 +526,15 @@ export default function Layout() {
     };
 
     const sidebarContent = (isCollapsed) => (
-        <div className="flex flex-col h-full bg-gradient-to-b from-background via-muted/20 to-background overflow-hidden">
-            <div className={cn("p-4 border-b border-border/50", isCollapsed ? 'text-center' : '')}>
+        <div className="flex flex-col h-full bg-background overflow-hidden">
+            <div className={cn("p-4 border-b", isCollapsed ? 'text-center' : '')}>
                 <div className={cn("flex items-center", isCollapsed ? 'justify-center' : 'justify-between')}>
                     <div className={cn("flex items-center gap-3", isCollapsed && "hidden")}> 
                         <div className="relative">
-                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-10 h-10 rounded-lg shadow-lg bg-gradient-to-r from-blue-500 to-purple-500" style={{boxShadow: '0 0 24px 0 #6f6fff55'}} />
+                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-8 h-8 rounded" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            <h2 className="text-base font-bold">
                                 BlockMine
                             </h2>
                             <p className="text-xs text-muted-foreground">
@@ -559,12 +559,12 @@ export default function Layout() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setIsSidebarCollapsed(false)}
-                            className="mb-2 hover:bg-muted/50"
+                            className="mb-2 hover:bg-accent"
                         >
-                            <ChevronsRight className="h-5 w-5" />
+                            <ChevronsRight className="h-4 w-4" />
                         </Button>
-                        <div className="relative mx-auto w-10 h-10">
-                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-10 h-10 rounded-lg shadow-lg bg-gradient-to-r from-blue-500 to-purple-500" style={{boxShadow: '0 0 24px 0 #6f6fff55'}} />
+                        <div className="relative mx-auto w-8 h-8">
+                            <img src="/logo.png" alt="BlockMineJS Logo" className="w-8 h-8 rounded" />
                         </div>
                     </div>
                 )}
@@ -572,16 +572,16 @@ export default function Layout() {
 
             <SidebarNav onLinkClick={() => setIsSheetOpen(false)} isCollapsed={isCollapsed} isSheetOpen={isSheetOpen} />
             
-            <div className="mt-auto p-3 sm:p-4 border-t border-border/50 space-y-2.5">
+            <div className="mt-auto p-3 sm:p-4 border-t space-y-2">
                 {hasPermission('panel:user:list') && (
                     <NavLink 
                         to="/admin" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
                             isActive 
-                                ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-purple-600" 
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent",
                             isCollapsed && "justify-center"
                         )}
                     >
@@ -594,10 +594,10 @@ export default function Layout() {
                         to="/servers" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
                             isActive 
-                                ? "bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 text-blue-600" 
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent",
                             isCollapsed && "justify-center"
                         )}
                     >
@@ -606,17 +606,13 @@ export default function Layout() {
                     </NavLink>
                 )}
                 
-                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-2.5")}> 
+                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-2")}> 
                     {hasPermission('bot:create') && (
                         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                             <DialogTrigger asChild>
                                 <Button 
-                                    variant="outline" 
-                                    className={cn(
-                                        "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-600 hover:from-green-500/20 hover:to-emerald-500/20"
-                                    )}
-                                    size={isCollapsed ? "icon" : "default"}
+                                    className="w-full"
+                                    size={isCollapsed ? "icon" : "sm"}
                                 >
                                     <PlusCircle className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                                     {!isCollapsed && "Создать бота"}
@@ -637,12 +633,9 @@ export default function Layout() {
                         <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                             <DialogTrigger asChild>
                                 <Button 
-                                    variant="outline" 
-                                    className={cn(
-                                        "w-full transition-all",
-                                        isCollapsed ? "h-9 w-9 p-0" : "h-9 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-blue-500/20 text-blue-600 hover:from-blue-500/20 hover:to-indigo-500/20"
-                                    )}
-                                    size={isCollapsed ? "icon" : "default"}
+                                    variant="outline"
+                                    className="w-full"
+                                    size={isCollapsed ? "icon" : "sm"}
                                 >
                                     <Upload className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                                     {!isCollapsed && "Импорт бота"}
@@ -673,7 +666,7 @@ export default function Layout() {
                     {!isCollapsed && "Выйти"}
                 </Button>
                 
-                <div className={cn("pt-2 border-t border-border/50 text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
+                <div className={cn("pt-2 border-t text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
                     <a 
                         href="https://github.com/blockmineJS/blockmine" 
                         target="_blank" 

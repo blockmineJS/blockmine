@@ -1,80 +1,98 @@
 import React from 'react';
-import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
-import CardContent from '@mui/material/CardContent';
-import CardActions from '@mui/material/CardActions';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import StopCircleIcon from '@mui/icons-material/StopCircle';
-import ReplayIcon from '@mui/icons-material/Replay';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Play, Square, RotateCw, Edit, Trash2 } from 'lucide-react';
 
 export default function BotCard({ bot, status, logs, onStart, onStop, onRestart, onEdit, onDelete }) {
     const isRunning = status === 'running';
-    const statusColor = isRunning ? 'success' : 'error';
 
     return (
-        <Card sx={{ display: 'flex', flexDirection: 'column', marginBottom: 2 }}>
-            <CardHeader
-                title={bot.username}
-                subheader={`${bot.server.name} (${bot.server.host}:${bot.server.port})`}
-                action={
+        <Card className="flex flex-col">
+            <CardHeader>
+                <div className="flex justify-between items-start">
                     <div>
-                        <Tooltip title="Редактировать">
-                            <IconButton onClick={() => onEdit(bot)} disabled={isRunning}>
-                                <EditIcon />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Удалить">
-                            <IconButton onClick={() => onDelete(bot.id)} disabled={isRunning}>
-                                <DeleteIcon />
-                            </IconButton>
-                        </Tooltip>
+                        <CardTitle className="text-lg">{bot.username}</CardTitle>
+                        <CardDescription>
+                            {bot.server.name} ({bot.server.host}:{bot.server.port})
+                        </CardDescription>
                     </div>
-                }
-            />
-            <CardContent sx={{ flexGrow: 1 }}>
-                <p>Статус: <span style={{ fontWeight: 'bold', color: statusColor === 'success' ? '#4caf50' : '#f44336' }}>{status}</span></p>
-                <div style={{ backgroundColor: '#1a202c', color: '#fff', fontFamily: 'monospace', fontSize: '0.75rem', padding: '0.75rem', borderRadius: '0.375rem', height: '12rem', overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse' }}>
+                    <div className="flex gap-2">
+                        <Badge variant={isRunning ? "default" : "secondary"}>
+                            {isRunning ? 'Запущен' : 'Остановлен'}
+                        </Badge>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={() => onEdit(bot)} 
+                                        disabled={isRunning}
+                                    >
+                                        <Edit className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Редактировать</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={() => onDelete(bot.id)} 
+                                        disabled={isRunning}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Удалить</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="flex-grow">
+                <div className="bg-black/90 dark:bg-black/50 rounded p-3 font-mono text-xs h-48 overflow-y-auto flex flex-col-reverse text-foreground">
                     {logs.map((log, index) => (
-                        <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{log}</p>
+                        <p key={index} className="whitespace-pre-wrap">{log}</p>
                     ))}
                 </div>
             </CardContent>
-            <CardActions>
+            <CardFooter className="gap-2">
                 <Button
-                    startIcon={<PlayCircleOutlineIcon />}
                     onClick={() => onStart(bot.id)}
                     disabled={isRunning}
-                    variant="contained"
-                    color="primary"
-                    sx={{ width: '33.33%' }}
+                    size="sm"
+                    className="flex-1"
                 >
+                    <Play className="mr-2 h-4 w-4" />
                     Запустить
                 </Button>
                 <Button
-                    startIcon={<StopCircleIcon />}
                     onClick={() => onStop(bot.id)}
                     disabled={!isRunning}
-                    variant="contained"
-                    color="error"
-                    sx={{ width: '33.33%' }}
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
                 >
+                    <Square className="mr-2 h-4 w-4" />
                     Остановить
                 </Button>
                 <Button
-                    startIcon={<ReplayIcon />}
                     onClick={() => onRestart(bot.id)}
                     disabled={!isRunning}
-                    variant="contained"
-                    sx={{ width: '33.33%' }}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
                 >
+                    <RotateCw className="mr-2 h-4 w-4" />
                     Перезапустить
                 </Button>
-            </CardActions>
+            </CardFooter>
         </Card>
     );
 }

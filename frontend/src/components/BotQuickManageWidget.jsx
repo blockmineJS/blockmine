@@ -1,18 +1,22 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Play, Square, MoreHorizontal, RefreshCw, Settings, Terminal } from 'lucide-react';
+import { Play, Square, MoreHorizontal, RefreshCw, Settings, Terminal, Search, Filter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { apiHelper } from '@/lib/api';
 import { FixedSizeList } from 'react-window';
+import { cn } from '@/lib/utils';
 
 export default function BotQuickManageWidget({ bots, botStatuses }) {
     const { toast } = useToast();
     const navigate = useNavigate();
     const containerRef = useRef(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'running', 'stopped'
 
     const handleAction = async (bot, action) => {
         if (action === 'restart') {
@@ -32,6 +36,17 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
         }
     };
 
+    const filteredBots = useMemo(() => {
+        return bots.filter(bot => {
+            const matchesSearch = bot.username.toLowerCase().includes(searchQuery.toLowerCase());
+            const status = botStatuses[bot.id] || 'stopped';
+            const matchesStatus = statusFilter === 'all' || 
+                (statusFilter === 'running' && status === 'running') ||
+                (statusFilter === 'stopped' && status === 'stopped');
+            return matchesSearch && matchesStatus;
+        });
+    }, [bots, botStatuses, searchQuery, statusFilter]);
+
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -45,14 +60,26 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
     }, []);
 
     const Row = useCallback(({ index, style }) => {
-        const bot = bots[index];
+        const bot = filteredBots[index];
         if (!bot) return null;
         const status = botStatuses[bot.id] || 'stopped';
         const isRunning = status === 'running';
 
         return (
-            <div style={style} className="flex items-center px-4 border-b transition-colors hover:bg-muted/20 w-full">
-                <div className="flex-1 font-medium truncate pr-4">{bot.username}</div>
+            <div 
+                style={style} 
+                className="flex items-center px-4 border-b transition-all hover:bg-accent/50 w-full cursor-pointer group"
+                onClick={() => navigate(`/bots/${bot.id}`)}
+            >
+                <div className="flex items-center gap-2 flex-1 pr-4">
+                    <div className={cn(
+                        "w-2 h-2 rounded-full transition-all",
+                        isRunning ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                    )} />
+                    <span className="font-medium truncate group-hover:text-primary transition-colors">
+                        {bot.username}
+                    </span>
+                </div>
                 <div className="flex-1">
                     <span className={`px-3 py-1 text-xs rounded-full font-medium ${
                         isRunning 

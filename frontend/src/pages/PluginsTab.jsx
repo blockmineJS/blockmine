@@ -129,64 +129,43 @@ export default function PluginsTab() {
 
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col">
-            <div className="shrink-0 p-6 bg-gradient-to-br from-background via-muted/20 to-background border-b">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur-sm opacity-20" />
-                        <div className="relative bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg">
-                            <Puzzle className="h-6 w-6 text-white" />
+            <div className="shrink-0 px-6 py-4 border-b">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h1 className="text-xl font-bold tracking-tight">Плагины</h1>
                         </div>
+                        <TabsList className="h-9">
+                            <TabsTrigger value="installed" className="flex items-center gap-1.5 text-xs">
+                                <Package className="h-3.5 w-3.5" />
+                                Установленные ({installedPlugins.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="browser" className="flex items-center gap-1.5 text-xs" disabled={!canInstall}>
+                                <Puzzle className="h-3.5 w-3.5" />
+                                Обзор
+                            </TabsTrigger>
+                        </TabsList>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                            Управление плагинами
-                        </h1>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Расширяйте возможности бота с помощью плагинов
-                        </p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
-                        <div className="flex items-center gap-1 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
-                            <Sparkles className="h-3 w-3 text-green-500" />
-                            <span className="text-xs font-medium text-green-600">
-                                {installedPlugins.length} установлено
-                            </span>
-                        </div>
+                    
+                    <div className="flex items-center gap-2">
                         {Object.keys(updates).length > 0 && (
-                            <div className="flex items-center gap-1 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full animate-pulse">
+                            <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-md">
                                 <Zap className="h-3 w-3 text-blue-500" />
                                 <span className="text-xs font-medium text-blue-600">
-                                    {Object.keys(updates).length} обновлений
+                                    {Object.keys(updates).length}
                                 </span>
                             </div>
                         )}
-                    </div>
-                </div>
-                
-                <div className="flex items-center justify-between mb-4">
-                    <TabsList className="bg-muted/50 backdrop-blur-sm border border-border/50">
-                        <TabsTrigger value="installed" className="flex items-center gap-2">
-                            <Package className="h-4 w-4" />
-                            Установленные ({installedPlugins.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="browser" className="flex items-center gap-2" disabled={!canInstall}>
-                            <Puzzle className="h-4 w-4" />
-                            Обзор
-                        </TabsTrigger>
-                    </TabsList>
-                    
-                    <div className="flex items-center gap-2">
                         <TooltipProvider>
                         <Tooltip>
                         <TooltipTrigger asChild>
                         <span>
-                        <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates || !canUpdate} size="sm">
-                            <RefreshCw className={`mr-2 h-4 w-4 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
-                            Проверить обновления
+                        <Button onClick={handleCheckForUpdates} disabled={isCheckingUpdates || !canUpdate} size="sm" variant="ghost">
+                            <RefreshCw className={`h-4 w-4 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
                         </Button>
                         </span>
                         </TooltipTrigger>
-                        {!canUpdate && <TooltipContent>Недостаточно прав для обновления плагинов</TooltipContent>}
+                        <TooltipContent>Проверить обновления</TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
@@ -195,12 +174,11 @@ export default function PluginsTab() {
                             <TooltipTrigger asChild>
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="sm" disabled={!canInstall}>
-                                        <FolderPlus className="mr-2 h-4 w-4" />
-                                        Установить локально
+                                        <FolderPlus className="h-4 w-4" />
                                     </Button>
                                 </DialogTrigger>
                             </TooltipTrigger>
-                            {!canInstall && <TooltipContent>Недостаточно прав для установки плагинов</TooltipContent>}
+                            <TooltipContent>Установить локально</TooltipContent>
                             </Tooltip>
                             </TooltipProvider>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
@@ -210,12 +188,11 @@ export default function PluginsTab() {
                         <TooltipTrigger asChild>
                         <span>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
-                            <Code2 className="mr-2 h-4 w-4" />
-                            Создать плагин
+                            <Code2 className="h-4 w-4" />
                         </Button>
                         </span>
                         </TooltipTrigger>
-                        {!canDevelop && <TooltipContent>Недостаточно прав для разработки плагинов</TooltipContent>}
+                        <TooltipContent>Создать плагин</TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
                     </div>

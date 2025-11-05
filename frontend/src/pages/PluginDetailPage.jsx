@@ -158,9 +158,7 @@ export default function PluginDetailPage() {
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className="relative bg-gradient-to-br from-primary/20 via-purple-600/20 to-pink-600/20 p-8">
-                <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,rgba(255,255,255,0.6))]" />
-                
+            <div className="relative bg-muted/30 p-8 border-b">
                 <div className="relative max-w-6xl mx-auto">
                     <Link to={`/bots/${botId}/plugins`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
                         <ArrowLeft className="h-4 w-4" />
@@ -170,7 +168,7 @@ export default function PluginDetailPage() {
                     <div className="flex flex-col md:flex-row gap-6 items-start">
                         <div className="flex-grow">
                             <div className="flex items-center gap-3 mb-2">
-                                <h1 className="text-4xl font-bold gradient-text">{plugin.displayName || plugin.name}</h1>
+                                <h1 className="text-4xl font-bold tracking-tight">{plugin.displayName || plugin.name}</h1>
                                 {plugin.verified && (
                                     <Shield className="h-6 w-6 text-blue-500" />
                                 )}

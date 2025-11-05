@@ -124,26 +124,17 @@ export default function ConfigurationPage() {
     const hasChanges = Object.keys(changes).length > 0;
 
     return (
-        <div className="h-full flex flex-col bg-gradient-to-br from-background via-muted/20 to-background">
-            <header className="p-6 border-b flex justify-between items-center shrink-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10">
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg blur-sm opacity-20" />
-                        <div className="relative bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg">
-                            <Settings className="h-6 w-6 text-white" />
-                        </div>
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                            Конфигурация бота
-                        </h2>
-                        <p className="text-sm text-muted-foreground">Все настройки в одном месте. Нажмите "Сохранить", чтобы применить изменения.</p>
-                    </div>
+        <div className="h-full flex flex-col">
+            <header className="p-6 border-b flex justify-between items-center shrink-0">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">
+                        Конфигурация бота
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Все настройки в одном месте. Нажмите "Сохранить", чтобы применить изменения.</p>
                 </div>
                 <Button 
                     onClick={handleSaveAll} 
                     disabled={!hasChanges || isSaving || (!canEditBot && !canEditPlugin)}
-                    className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:from-green-600 hover:to-emerald-600 transition-all"
                     size="lg"
                 >
                     {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}

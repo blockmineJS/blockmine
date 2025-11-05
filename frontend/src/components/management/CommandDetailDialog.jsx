@@ -245,8 +245,8 @@ export default function CommandDetailDialog({ command, allPermissions = [], onSu
 
             <DialogFooter className="mt-auto pt-4 border-t">
                 <form id="command-edit-form" onSubmit={handleSubmit} className="flex gap-2">
-                    <Button type="button" variant="ghost" onClick={onCancel} className="transition-colors hover:bg-muted/50">Закрыть</Button>
-                    <Button type="submit" disabled={isSaving} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow hover:from-green-600 hover:to-emerald-600 transition-all">
+                    <Button type="button" variant="ghost" onClick={onCancel}>Закрыть</Button>
+                    <Button type="submit" disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Сохранить настройки
                     </Button>

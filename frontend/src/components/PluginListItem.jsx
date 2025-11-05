@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import Badge from '@mui/material/Badge';
-import Button from '@mui/material/Button';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Download as DownloadIcon, CheckCircle as CheckCircleIcon, Loader as LoaderIcon, GitMerge as GitMergeIcon, Server as ServerIcon, Globe as GlobeIcon, Github as GithubIcon, Puzzle as PuzzleIcon, ArrowDownToLine, Star as StarIcon, Sparkles as SparklesIcon, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -193,18 +193,28 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                 </div>
 <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
                     <Button
-                        size="small"
-                        variant="contained"
-                        endIcon={isInstalling ? <LoaderIcon className="animate-spin" /> : (isInstalled ? <CheckCircleIcon /> : <DownloadIcon />)}
-                        color={isInstalled ? "success" : "primary"}
+                        size="sm"
+                        variant={isInstalled ? "secondary" : "default"}
                         disabled={isInstalled || isInstalling}
                         onClick={() => onInstall(plugin)}
-                        sx={{
-                            minWidth: "120px",
-                            animation: isInstalling ? 'shimmer 1.5s infinite' : 'none',
-                        }}
+                        className="min-w-[120px]"
                     >
-                        {isInstalling ? 'Установка' : (isInstalled ? 'Установлен' : 'Установить')}
+                        {isInstalling ? (
+                            <>
+                                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                                Установка
+                            </>
+                        ) : isInstalled ? (
+                            <>
+                                <CheckCircleIcon className="mr-2 h-4 w-4" />
+                                Установлен
+                            </>
+                        ) : (
+                            <>
+                                <DownloadIcon className="mr-2 h-4 w-4" />
+                                Установить
+                            </>
+                        )}
                     </Button>
                     <span className="text-xs text-muted-foreground">v{plugin.latestTag.replace('v', '')}</span>
                 </div>

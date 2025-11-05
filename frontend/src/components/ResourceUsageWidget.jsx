@@ -26,12 +26,7 @@ export default function ResourceUsageWidget({ bots, resourceUsage }) {
     const runningBots = bots.filter(bot => resourceUsage[bot.id]);
 
     return (
-        <div className="h-full flex flex-col">
-            <div className="mb-4">
-                <CardTitle className="text-base font-semibold">Использование ресурсов</CardTitle>
-                <CardDescription className="text-sm">Нагрузка на CPU и использование RAM запущенными ботами</CardDescription>
-            </div>
-            
+        <div className="h-full flex flex-col p-5">
             <div className="flex-grow overflow-y-auto">
                 <div className="space-y-6">
                     {runningBots.length > 0 ? runningBots.map(bot => {
@@ -44,27 +39,23 @@ export default function ResourceUsageWidget({ bots, resourceUsage }) {
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-lg bg-blue-500/10">
-                                            <Cpu className="h-4 w-4 text-blue-500" />
-                                        </div>
+                                        <Cpu className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex-grow">
                                             <ProgressBar 
                                                 value={usage.cpu} 
                                                 max={100} 
-                                                colorClass="bg-gradient-to-r from-blue-500 to-blue-600" 
+                                                colorClass="bg-primary" 
                                                 label="CPU"
                                             />
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-lg bg-green-500/10">
-                                            <MemoryStick className="h-4 w-4 text-green-500" />
-                                        </div>
+                                        <MemoryStick className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex-grow">
                                             <ProgressBar 
                                                 value={usage.memory} 
                                                 max={500} 
-                                                colorClass="bg-gradient-to-r from-green-500 to-emerald-600" 
+                                                colorClass="bg-primary" 
                                                 label="RAM"
                                             />
                                         </div>
