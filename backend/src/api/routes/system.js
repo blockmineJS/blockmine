@@ -2,8 +2,16 @@ const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const os = require('os');
 const pidusage = require('pidusage');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limiter for health check endpoint: max 5 requests per minute per IP
+const healthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 const serverStartTime = Date.now();
 
@@ -42,7 +50,7 @@ function getSystemCpuUsage() {
  * @desc Получить информацию о здоровье системы
  * @access Требуется авторизация
  */
-router.get('/health', authenticate, async (req, res) => {
+router.get('/health', healthLimiter, authenticate, async (req, res) => {
     try {
         const uptime = process.uptime();
         const serverUptime = (Date.now() - serverStartTime) / 1000;
