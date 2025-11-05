@@ -51,9 +51,9 @@ jobs:
           fail_ci_if_error: false
 
       - name: Comment PR with coverage
-        if: github.event_name == 'pull_request' && matrix.node-version == '22.x'
+        if: github.event_name == 'pull_request' && matrix.node-version == '22.x' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
           lcov-file: ./backend/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          fail_ci_if_error: false
