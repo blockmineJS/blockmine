@@ -18,19 +18,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '22.x'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: |
-          cd backend
-          npm ci
+        run: npm ci
 
       - name: Run tests with coverage
-        run: |
-          cd backend
-          npm run test:coverage
+        run: npm run test:coverage --workspace=backend
 
       - name: Generate Coverage Badge
         uses: cicirello/jacoco-badge-generator@v2
