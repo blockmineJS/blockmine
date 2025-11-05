@@ -6,19 +6,6 @@ const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 
-// Rate limiter for health check endpoint: max 5 requests per minute per IP
-const healthLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: { error: 'Too many requests, please try again later.' }
-});
-
-// Rate limiter for stats endpoint: max 5 requests per minute per IP
-const statsLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: { error: 'Too many requests, please try again later.' }
-});
 
 const serverStartTime = Date.now();
 
@@ -40,7 +27,7 @@ function getSystemCpuUsage() {
  * @desc Получить информацию о здоровье системы
  * @access Требуется авторизация
  */
-router.get('/health', healthLimiter, authenticate, async (req, res) => {
+router.get('/health', authenticate, async (req, res) => {
     try {
         const uptime = process.uptime();
         const serverUptime = (Date.now() - serverStartTime) / 1000;
@@ -148,7 +135,7 @@ router.get('/health', healthLimiter, authenticate, async (req, res) => {
  * @desc Получить статистику системы
  * @access Требуется авторизация
  */
-router.get('/stats', statsLimiter, authenticate, async (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
     try {
         const prisma = req.app.get('prisma') || require('../../lib/prisma');
         
