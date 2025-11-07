@@ -125,7 +125,7 @@ class PluginManager {
         return newPlugin;
     }
 
-    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false) {
+    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
 
@@ -137,17 +137,32 @@ class PluginManager {
         try {
             const url = new URL(repoUrl);
             const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
-            const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
-            const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
-
-            let response = await fetch(archiveUrlMain);
-            if (!response.ok) {
-                console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
-                response = await fetch(archiveUrlMaster);
+            
+            let response;
+            
+            // Если указан тег - скачиваем конкретный релиз
+            if (tag) {
+                const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${tag}.zip`;
+                console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
+                response = await fetch(archiveUrlTag);
                 if (!response.ok) {
-                    throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
+                    throw new Error(`Не удалось скачать релиз ${tag}. Статус: ${response.status}. Возможно, тег не существует.`);
+                }
+            } else {
+                // Если тег не указан - скачиваем последний коммит из main/master (старое поведение)
+                const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
+                const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
+
+                response = await fetch(archiveUrlMain);
+                if (!response.ok) {
+                    console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
+                    response = await fetch(archiveUrlMaster);
+                    if (!response.ok) {
+                        throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
+                    }
                 }
             }
+            
             const buffer = await response.arrayBuffer();
 
             const zip = new AdmZip(Buffer.from(buffer));
@@ -324,6 +339,7 @@ class PluginManager {
                         sourceUri: plugin.sourceUri,
                         currentVersion: localVersion,
                         recommendedVersion: recommendedVersion,
+                        latestTag: catalogInfo.latestTag, // 🏷️ Добавляем тег для использования при обновлении
                     });
                 }
             } catch (error) {
@@ -333,21 +349,51 @@ class PluginManager {
         return updatesAvailable;
     }
 
-    async updatePlugin(pluginId) {
+    async updatePlugin(pluginId, targetTag = null) {
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin || plugin.sourceType !== 'GITHUB') {
             throw new Error('Плагин не найден или не является GitHub-плагином.');
         }
 
-        console.log(`[PluginManager] Начало обновления плагина ${plugin.name}...`);
+        console.log(`[PluginManager] Начало обновления плагина ${plugin.name}${targetTag ? ` до версии ${targetTag}` : ''}...`);
         
         const repoUrl = plugin.sourceUri;
         const botId = plugin.botId;
         
+        // Сохраняем настройки и важные данные перед удалением
+        const backupData = {
+            name: plugin.name,
+            settings: plugin.settings,
+            isEnabled: plugin.isEnabled,
+            // PluginDataStore сохранятся автоматически (привязаны к pluginName + botId)
+        };
+        console.log(`[PluginManager] Настройки плагина ${plugin.name} сохранены для миграции.`);
+        
+        // Удаляем старую версию
         await this.deletePlugin(pluginId);
         console.log(`[PluginManager] Старая версия ${plugin.name} удалена, устанавливаем новую...`);
         
-        return await this.installFromGithub(botId, repoUrl, prisma, true);
+        // Устанавливаем новую версию с конкретным тегом (если указан)
+        const newPlugin = await this.installFromGithub(botId, repoUrl, prisma, true, targetTag);
+        
+        // Восстанавливаем настройки
+        if (backupData.settings && newPlugin) {
+            try {
+                await prisma.installedPlugin.update({
+                    where: { id: newPlugin.id },
+                    data: {
+                        settings: backupData.settings,
+                        isEnabled: backupData.isEnabled,
+                    },
+                });
+                console.log(`[PluginManager] Настройки успешно восстановлены для ${plugin.name}`);
+            } catch (settingsError) {
+                console.error(`[PluginManager] Не удалось восстановить настройки для ${plugin.name}:`, settingsError);
+                // Не бросаем ошибку, т.к. плагин уже установлен
+            }
+        }
+        
+        return newPlugin;
     }
 
     async loadPluginGraphs(botId, pluginId, pluginPath) {
