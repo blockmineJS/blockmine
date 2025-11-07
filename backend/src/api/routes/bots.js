@@ -15,6 +15,7 @@ const pluginIdeRouter = require('./pluginIde');
 const apiKeysRouter = require('./apiKeys');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
+const { filterSecretSettings, prepareSettingsForSave } = require('../../core/utils/secretsFilter');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -643,7 +644,11 @@ router.get('/:botId/plugins/:pluginId/settings', authenticate, checkBotAccess, a
 		}
 
 		const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
-		res.json(finalSettings);
+		
+		// Фильтруем секретные значения перед отправкой на фронтенд
+		const filteredSettings = filterSecretSettings(finalSettings, manifestSettings, isGrouped);
+		
+		res.json(filteredSettings);
 	} catch (error) {
 		console.error("[API Error] /settings GET:", error);
 		res.status(500).json({ error: 'Не удалось получить настройки плагина' });
@@ -742,12 +747,35 @@ router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize(
         const pluginId = parseInt(req.params.pluginId);
         const { isEnabled, settings } = req.body;
         const dataToUpdate = {};
+        
         if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        if (settings) dataToUpdate.settings = JSON.stringify(settings);
+        
+        if (settings) {
+            // Получаем существующий плагин для обработки секретных значений
+            const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+            if (!plugin) return res.status(404).json({ error: 'Плагин не найден' });
+            
+            const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+            const existingSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
+            const manifestSettings = manifest.settings || {};
+            
+            // Определяем, использует ли плагин группированные настройки
+            const firstSettingValue = Object.values(manifestSettings)[0];
+            const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+            
+            // Подготавливаем настройки для сохранения (сохраняем существующие значения для замаскированных секретов)
+            const settingsToSave = prepareSettingsForSave(settings, existingSettings, manifestSettings, isGrouped);
+            
+            dataToUpdate.settings = JSON.stringify(settingsToSave);
+        }
+        
         if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
         const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
         res.json(updated);
-    } catch (error) { res.status(500).json({ error: 'Не удалось обновить плагин' }); }
+    } catch (error) { 
+        console.error("[API Error] /plugins/:pluginId PUT:", error);
+        res.status(500).json({ error: 'Не удалось обновить плагин' }); 
+    }
 });
 
 router.get('/:botId/management-data', authenticate, checkBotAccess, authorize('management:view'), async (req, res) => {
@@ -1170,13 +1198,22 @@ router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:upd
                 }
             }
 
+            const mergedSettings = deepMergeSettings(defaultSettings, savedSettings);
+            
+            // Определяем, использует ли плагин группированные настройки
+            const firstSettingValue = Object.values(manifest.settings || {})[0];
+            const isGroupedSettings = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+            
+            // Фильтруем секретные значения
+            const filteredSettings = filterSecretSettings(mergedSettings, manifest.settings, isGroupedSettings);
+            
             return {
                 id: plugin.id,
                 name: plugin.name,
                 description: plugin.description,
                 isEnabled: plugin.isEnabled,
                 manifest: manifest,
-                settings: deepMergeSettings(defaultSettings, savedSettings)
+                settings: filteredSettings
             };
         });
 
