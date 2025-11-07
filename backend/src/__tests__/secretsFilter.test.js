@@ -129,6 +129,34 @@ describe('secretsFilter', () => {
             expect(isMaskedValue(['key1', SECRET_MASK])).toBe(false);
             expect(isMaskedValue({ key1: 'value', key2: SECRET_MASK })).toBe(false);
         });
+
+        it('должен возвращать false для пустого массива', () => {
+            expect(isMaskedValue([])).toBe(false);
+        });
+
+        it('должен возвращать false для пустого объекта', () => {
+            expect(isMaskedValue({})).toBe(false);
+        });
+
+        it('должен возвращать false для массива с замаскированным и незамаскированным значением', () => {
+            expect(isMaskedValue([SECRET_MASK, 'real-value'])).toBe(false);
+            expect(isMaskedValue(['real-value', SECRET_MASK])).toBe(false);
+            expect(isMaskedValue([SECRET_MASK, null])).toBe(false);
+        });
+
+        it('должен возвращать false для объекта с замаскированным и незамаскированным значением', () => {
+            expect(isMaskedValue({ key1: SECRET_MASK, key2: 'real-value' })).toBe(false);
+            expect(isMaskedValue({ key1: 'real-value', key2: SECRET_MASK })).toBe(false);
+            expect(isMaskedValue({ key1: SECRET_MASK, key2: null })).toBe(false);
+        });
+
+        it('должен возвращать false для массива с разными типами', () => {
+            expect(isMaskedValue([SECRET_MASK, 123, true])).toBe(false);
+        });
+
+        it('должен возвращать false для объекта с разными типами', () => {
+            expect(isMaskedValue({ key1: SECRET_MASK, key2: 123, key3: true })).toBe(false);
+        });
     });
 
     describe('prepareSettingsForSave', () => {
