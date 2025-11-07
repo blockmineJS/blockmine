@@ -15,7 +15,7 @@ const pluginIdeRouter = require('./pluginIde');
 const apiKeysRouter = require('./apiKeys');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
-const { filterSecretSettings, prepareSettingsForSave } = require('../../core/utils/secretsFilter');
+const { filterSecretSettings, prepareSettingsForSave, isGroupedSettings } = require('../../core/utils/secretsFilter');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -604,9 +604,8 @@ router.get('/:botId/plugins/:pluginId/settings', authenticate, checkBotAccess, a
 		const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
 		const manifestSettings = manifest.settings || {};
 
-
-		const firstSettingValue = Object.values(manifestSettings)[0];
-		const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+		// Определяем тип настроек (обычные или группированные)
+		const isGrouped = isGroupedSettings(manifestSettings);
 
 		const processSetting = async (settingKey, config) => {
 			if (!config || !config.type) return;
@@ -759,21 +758,14 @@ router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize(
             const existingSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
             const manifestSettings = manifest.settings || {};
             
-            // Определяем, использует ли плагин группированные настройки
-            const firstSettingValue = Object.values(manifestSettings)[0];
-            const isGrouped = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+            // Определяем тип настроек (обычные или группированные)
+            const isGrouped = isGroupedSettings(manifestSettings);
             
             // Подготавливаем настройки для сохранения (сохраняем существующие значения для замаскированных секретов)
             const settingsToSave = prepareSettingsForSave(settings, existingSettings, manifestSettings, isGrouped);
 
             // Валидация структуры settingsToSave
-            const isValidSettings =
-                settingsToSave &&
-                typeof settingsToSave === 'object' &&
-                !Array.isArray(settingsToSave) &&
-                Object.keys(settingsToSave).length > 0;
-
-            if (!isValidSettings) {
+            if (!settingsToSave || typeof settingsToSave !== 'object' || Array.isArray(settingsToSave)) {
                 console.error("[Validation Error] prepareSettingsForSave вернул некорректную структуру:", settingsToSave);
                 return res.status(400).json({ error: "Некорректная структура настроек для сохранения" });
             }
@@ -1212,12 +1204,11 @@ router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:upd
 
             const mergedSettings = deepMergeSettings(defaultSettings, savedSettings);
             
-            // Определяем, использует ли плагин группированные настройки
-            const firstSettingValue = Object.values(manifest.settings || {})[0];
-            const isGroupedSettings = firstSettingValue && typeof firstSettingValue === 'object' && !firstSettingValue.type && firstSettingValue.label;
+            // Определяем тип настроек (обычные или группированные)
+            const isGrouped = isGroupedSettings(manifest.settings);
             
             // Фильтруем секретные значения
-            const filteredSettings = filterSecretSettings(mergedSettings, manifest.settings, isGroupedSettings);
+            const filteredSettings = filterSecretSettings(mergedSettings, manifest.settings, isGrouped);
             
             return {
                 id: plugin.id,

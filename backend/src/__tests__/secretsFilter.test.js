@@ -47,6 +47,23 @@ describe('secretsFilter', () => {
             expect(maskSecretValue(undefined, secretConfig)).toBe(undefined);
             expect(maskSecretValue('', secretConfig)).toBe('');
         });
+
+        it('должен маскировать числовое значение', () => {
+            expect(maskSecretValue(12345, secretConfig)).toBe(SECRET_MASK);
+            expect(maskSecretValue(0, secretConfig)).toBe(SECRET_MASK);
+            expect(maskSecretValue(-999, secretConfig)).toBe(SECRET_MASK);
+        });
+
+        it('должен маскировать булево значение', () => {
+            expect(maskSecretValue(true, secretConfig)).toBe(SECRET_MASK);
+            expect(maskSecretValue(false, secretConfig)).toBe(SECRET_MASK);
+        });
+
+        it('не должен маскировать несекретные числа и булевы значения', () => {
+            expect(maskSecretValue(12345, normalConfig)).toBe(12345);
+            expect(maskSecretValue(true, normalConfig)).toBe(true);
+            expect(maskSecretValue(false, normalConfig)).toBe(false);
+        });
     });
 
     describe('filterSecretSettings', () => {
@@ -267,6 +284,76 @@ describe('secretsFilter', () => {
             const result = prepareSettingsForSave(newSettings, existingSettings, manifest, false);
 
             expect(result.apiKeys).toEqual(['key1', 'key2']);  // сохранены старые
+        });
+
+        it('должен обрабатывать смешанные массивы (замаскированные и новые значения)', () => {
+            const newSettings = {
+                apiKeys: ['new-key-1', 'new-key-2', 'new-key-3'],
+                passwords: [SECRET_MASK, SECRET_MASK]
+            };
+
+            const existingSettings = {
+                apiKeys: ['old-key-1', 'old-key-2'],
+                passwords: ['old-pass-1', 'old-pass-2']
+            };
+
+            const manifest = {
+                apiKeys: { type: 'string[]', secret: true },
+                passwords: { type: 'string[]', secret: true }
+            };
+
+            const result = prepareSettingsForSave(newSettings, existingSettings, manifest, false);
+
+            expect(result.apiKeys).toEqual(['new-key-1', 'new-key-2', 'new-key-3']);  // новые сохранены
+            expect(result.passwords).toEqual(['old-pass-1', 'old-pass-2']);  // старые сохранены
+        });
+
+        it('должен обрабатывать смешанные объекты (замаскированные и новые значения)', () => {
+            const newSettings = {
+                secretObj: { key1: SECRET_MASK, key2: SECRET_MASK },
+                normalValue: 'updated-value'
+            };
+
+            const existingSettings = {
+                secretObj: { key1: 'secret1', key2: 'secret2' },
+                normalValue: 'old-value'
+            };
+
+            const manifest = {
+                secretObj: { type: 'object', secret: true },
+                normalValue: { type: 'string' }
+            };
+
+            const result = prepareSettingsForSave(newSettings, existingSettings, manifest, false);
+
+            expect(result.secretObj).toEqual({ key1: 'secret1', key2: 'secret2' });  // старые сохранены
+            expect(result.normalValue).toBe('updated-value');  // новое сохранено
+        });
+
+        it('должен правильно обрабатывать частичное обновление настроек', () => {
+            const newSettings = {
+                apiKey: SECRET_MASK,  // не изменилось
+                username: 'new_user',  // изменилось
+                // serverUrl отсутствует в новых настройках
+            };
+
+            const existingSettings = {
+                apiKey: 'secret-key',
+                username: 'old_user',
+                serverUrl: 'https://api.example.com'
+            };
+
+            const manifest = {
+                apiKey: { type: 'string', secret: true },
+                username: { type: 'string' },
+                serverUrl: { type: 'string' }
+            };
+
+            const result = prepareSettingsForSave(newSettings, existingSettings, manifest, false);
+
+            expect(result.apiKey).toBe('secret-key');  // старое сохранено
+            expect(result.username).toBe('new_user');  // новое сохранено
+            expect(result.serverUrl).toBeUndefined();  // отсутствует в новых настройках
         });
     });
 

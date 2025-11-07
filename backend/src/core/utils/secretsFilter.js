@@ -6,6 +6,60 @@
 const SECRET_MASK = '********';
 
 /**
+ * Создает глубокую копию объекта
+ * @param {any} obj - объект для клонирования
+ * @returns {any} - глубокая копия объекта
+ */
+function deepClone(obj) {
+    // Используем structuredClone если доступен (Node.js 17+)
+    if (typeof structuredClone !== 'undefined') {
+        try {
+            return structuredClone(obj);
+        } catch (e) {
+            // Fallback для случаев когда structuredClone не может обработать объект
+        }
+    }
+    
+    // Fallback на JSON parse/stringify
+    // Ограничения: не сохраняет функции, undefined, Symbol, circular references
+    try {
+        return JSON.parse(JSON.stringify(obj));
+    } catch (e) {
+        console.error('[secretsFilter] Ошибка клонирования объекта:', e);
+        return obj;
+    }
+}
+
+/**
+ * Определяет, использует ли плагин группированные настройки
+ * Группированные настройки имеют структуру: { "CategoryName": { label: "...", setting1: {...}, ... } }
+ * @param {Object} manifestSettings - настройки из манифеста плагина
+ * @returns {boolean}
+ */
+function isGroupedSettings(manifestSettings) {
+    if (!manifestSettings || typeof manifestSettings !== 'object') {
+        return false;
+    }
+    
+    const firstKey = Object.keys(manifestSettings)[0];
+    if (!firstKey) {
+        return false;
+    }
+    
+    const firstValue = manifestSettings[firstKey];
+    
+    // Проверяем, что первое значение - объект с label и без type
+    // (настройки имеют type, группы имеют label)
+    return (
+        firstValue &&
+        typeof firstValue === 'object' &&
+        !Array.isArray(firstValue) &&
+        'label' in firstValue &&
+        !('type' in firstValue)
+    );
+}
+
+/**
  * Определяет, является ли настройка секретной
  * @param {Object} settingConfig - конфигурация настройки из manifest
  * @returns {boolean}
@@ -145,7 +199,8 @@ function prepareSettingsForSave(newSettings, existingSettings, manifestSettings,
         return newSettings;
     }
 
-    const settingsToSave = { ...newSettings };
+    // Используем глубокое клонирование для избежания мутаций и side effects
+    const settingsToSave = deepClone(newSettings);
 
     if (isGrouped) {
         for (const categoryKey in manifestSettings) {
@@ -200,6 +255,8 @@ module.exports = {
     maskSecretValue,
     filterSecretSettings,
     isMaskedValue,
-    prepareSettingsForSave
+    prepareSettingsForSave,
+    isGroupedSettings,
+    deepClone
 };
 
