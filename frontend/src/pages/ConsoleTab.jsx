@@ -58,10 +58,18 @@ export default function ConsoleTab() {
     const [command, setCommand] = useState('');
     const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
     const [showPerformanceWarning, setShowPerformanceWarning] = useState(false);
-    const [gradientEnabled, setGradientEnabled] = useState(() => {
-        const saved = localStorage.getItem(`bot_${botId}_gradient`);
-        return saved !== null ? JSON.parse(saved) : true;
-    });
+const [gradientEnabled, setGradientEnabled] = useState(() => {
+    const saved = localStorage.getItem(`bot_${botId}_gradient`);
+    if (saved !== null) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            // Malformed data, fallback to default
+            return true;
+        }
+    }
+    return true;
+});
     const logContainerRef = useRef(null);
     const lastLogCount = useRef(0);
 
