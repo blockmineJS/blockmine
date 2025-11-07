@@ -112,11 +112,20 @@ function isMaskedValue(value) {
     }
 
     if (Array.isArray(value)) {
+        // Пустой массив не является замаскированным
+        if (value.length === 0) {
+            return false;
+        }
         return value.every(item => item === SECRET_MASK);
     }
 
     if (typeof value === 'object' && value !== null) {
-        return Object.values(value).every(v => v === SECRET_MASK);
+        const values = Object.values(value);
+        // Пустой объект не является замаскированным
+        if (values.length === 0) {
+            return false;
+        }
+        return values.every(v => v === SECRET_MASK);
     }
 
     return false;
