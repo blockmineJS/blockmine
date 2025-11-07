@@ -329,7 +329,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Right Column - Stats & System */}
-                    <div className="lg:col-span-4 space-y-6">
+                    <div className="lg:col-span-4 space-y-4">
                         {/* System Health */}
                         <Card>
                             <CardHeader>
@@ -398,7 +398,7 @@ export default function DashboardPage() {
                                 <CardTitle className="text-base">Распределение ботов</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -413,7 +413,7 @@ export default function DashboardPage() {
                                         </div>
                                         <span className="text-sm font-medium">{stats.stoppedBots}</span>
                                     </div>
-                                    <div className="pt-3 border-t">
+                                    <div className="pt-2 border-t">
                                         <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                             <div 
                                                 className="h-full bg-primary transition-all duration-500"

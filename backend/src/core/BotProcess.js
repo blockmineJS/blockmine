@@ -210,9 +210,9 @@ process.on('message', async (message) => {
                        client.setSocket(info.socket);
                        client.emit('connect');
                    }).catch(err => {
-                       sendLog(`[Proxy Error] ${err.message}`);
-                       sendLog(`[Debug] Full proxy error: ${JSON.stringify(err)}`);
+                       sendLog(`[Proxy Error] SOCKS connection failed: ${err.message}. Bot will attempt to restart.`);
                        client.emit('error', err);
+                       process.exit(1);
                    });
                 }
            } else {
@@ -555,9 +555,10 @@ process.on('message', async (message) => {
             let messageHandledByCustomParser = false;
 
             bot.on('message', (jsonMsg) => {
-                const ansiMessage = jsonMsg.toAnsi();
-                if (ansiMessage.trim()) {
-                    sendLog(ansiMessage);
+                const logContent = jsonMsg.toAnsi();
+
+                if (logContent.trim()) {
+                    sendLog(logContent);
                 }
 
                 messageHandledByCustomParser = false;
