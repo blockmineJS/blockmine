@@ -46,7 +46,8 @@ router.post('/check-updates/:botId', authenticate, authorize('plugin:update'), a
 router.post('/update/:pluginId', authenticate, authorize('plugin:update'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
-        const updatedPlugin = await pluginManager.updatePlugin(pluginId);
+        const { targetTag } = req.body; // Получаем тег из тела запроса (если указан)
+        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag);
         res.json(updatedPlugin);
     } catch (error) {
         res.status(500).json({ error: error.message });

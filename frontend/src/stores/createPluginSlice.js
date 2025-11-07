@@ -206,8 +206,19 @@ export const createPluginSlice = (set, get) => {
 
         updatePlugin: async (pluginId, botId) => {
             const pluginToUpdate = get().installedPlugins[botId]?.find(p => p.id === pluginId);
+            
+            // Получаем информацию об обновлении, включая тег
+            const updateInfo = pluginToUpdate ? get().pluginUpdates[botId]?.[pluginToUpdate.sourceUri] : null;
+            const targetTag = updateInfo?.latestTag || null;
 
-            await apiHelper(`/api/plugins/update/${pluginId}`, { method: 'POST' }, 'Плагин обновлен. Перезапустите бота.');
+            await apiHelper(
+                `/api/plugins/update/${pluginId}`, 
+                { 
+                    method: 'POST',
+                    body: JSON.stringify({ targetTag })
+                }, 
+                'Плагин обновлен. Перезапустите бота.'
+            );
 
             if (pluginToUpdate) {
                 set(produce(draft => {
