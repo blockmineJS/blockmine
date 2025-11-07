@@ -765,7 +765,19 @@ router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize(
             
             // Подготавливаем настройки для сохранения (сохраняем существующие значения для замаскированных секретов)
             const settingsToSave = prepareSettingsForSave(settings, existingSettings, manifestSettings, isGrouped);
-            
+
+            // Валидация структуры settingsToSave
+            const isValidSettings =
+                settingsToSave &&
+                typeof settingsToSave === 'object' &&
+                !Array.isArray(settingsToSave) &&
+                Object.keys(settingsToSave).length > 0;
+
+            if (!isValidSettings) {
+                console.error("[Validation Error] prepareSettingsForSave вернул некорректную структуру:", settingsToSave);
+                return res.status(400).json({ error: "Некорректная структура настроек для сохранения" });
+            }
+
             dataToUpdate.settings = JSON.stringify(settingsToSave);
         }
         
