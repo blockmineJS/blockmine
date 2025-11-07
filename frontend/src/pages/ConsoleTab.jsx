@@ -19,8 +19,8 @@ const ansiConverter = new AnsiToHtml({
 const stripGradientCodes = (text) => {
     return text
         .replace(/\u001b\[(38|48);2;\d{1,3};\d{1,3};\d{1,3}m/g, '')
-        .replace(/\u001b\[(38|48);5;([1-9]\d{1,2}|[2-9]\d)m/g, '')
-        .replace(/\u001b\[[3-4-9]m/g, '');
+        .replace(/\u001b\[(38|48);5;\d{1,3}m/g, '')
+        .replace(/\u001b\[[0-9]m/g, '');
 };
 
 const LogLine = React.memo(({ log, gradientEnabled }) => {
