@@ -142,7 +142,7 @@ class PluginManager {
             
             // Если указан тег - скачиваем конкретный релиз
             if (tag) {
-                const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${tag}.zip`;
+                const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
                 console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
                 try {
                     response = await fetch(archiveUrlTag);
@@ -152,7 +152,6 @@ class PluginManager {
                 if (!response.ok) {
                     throw new Error(`Не удалось скачать релиз ${tag}. Статус: ${response.status}. Возможно, тег не существует.`);
                 }
-            }
             } else {
                 // Если тег не указан - скачиваем последний коммит из main/master (старое поведение)
                 const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
