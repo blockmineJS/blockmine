@@ -110,7 +110,8 @@ class NodeRegistry {
           { id: 'command_name', name: 'Имя команды', type: 'String' },
           { id: 'user', name: 'Пользователь', type: 'User' },
           { id: 'args', name: 'Аргументы', type: 'Object' },
-          { id: 'chat_type', name: 'Тип чата', type: 'String' }
+          { id: 'chat_type', name: 'Тип чата', type: 'String' },
+          { id: 'success', name: 'Успешно', type: 'Boolean', description: 'Возвращает true, если команда не попала на ошибку (нет прав, кулдаун, неверный тип чата и т.д.)' }
         ]
       }
     });
@@ -601,6 +602,24 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
+      type: 'data:type_check',
+      label: '🔍 Проверка типа',
+      category: 'Данные',
+      description: 'Проверяет тип входного значения.',
+      graphType: all,
+      evaluator: require('./nodes/data_type_check').evaluate,
+      pins: {
+        inputs: [
+          { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
+        ],
+        outputs: [
+          { id: 'result', name: 'Совпадает?', type: 'Boolean', description: 'True, если значение соответствует выбранному типу' },
+          { id: 'type_name', name: 'Имя типа', type: 'String', description: 'Фактическое название типа значения' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
       type: 'data:length',
       label: '📏 Размер (длина)',
       category: 'Массив',
@@ -619,128 +638,110 @@ class NodeRegistry {
 
     this.registerNodeType({
       type: 'string:contains',
-      label: '🔍 Строка: Содержит',
+      label: '🔍 Строка содержит',
       category: 'Строки',
       description: 'Проверяет, содержит ли одна строка другую.',
       graphType: all,
-      executor: require('./nodes/string_contains').execute,
       evaluator: require('./nodes/string_contains').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'haystack', name: 'Строка', type: 'String', required: true },
           { id: 'needle', name: 'Подстрока', type: 'String', required: true },
           { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Содержит?', type: 'Boolean' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'string:matches',
-      label: '🔎 Строка: Совпадает с RegEx',
+      label: '🔎 RegEx совпадает',
       category: 'Строки',
-      description: 'Проверяет, совпадает ли строка с регулярным выражением.',
+      description: 'Проверяет совпадение с регулярным выражением.',
       graphType: all,
-      executor: require('./nodes/string_matches').execute,
       evaluator: require('./nodes/string_matches').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'string', name: 'Строка', type: 'String', required: true },
           { id: 'regex', name: 'RegEx', type: 'String', required: true }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Совпадает?', type: 'Boolean' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'string:equals',
-      label: 'Строка: Равно',
+      label: '🔤 Строка равна',
       category: 'Строки',
-      description: 'Проверяет, равны ли строки (с учетом/без учета регистра).',
+      description: 'Проверяет равенство двух строк.',
       graphType: all,
-      executor: require('./nodes/string_equals').execute,
       evaluator: require('./nodes/string_equals').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'a', name: 'A', type: 'String', required: true },
           { id: 'b', name: 'B', type: 'String', required: true },
           { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Равны?', type: 'Boolean' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'string:starts_with',
-      label: 'Строка: Начинается с',
+      label: '▶️ Начинается с',
       category: 'Строки',
-      description: 'Проверяет, начинается ли строка с указанной подстроки.',
+      description: 'Проверяет, начинается ли строка с подстроки.',
       graphType: all,
-      executor: require('./nodes/string_starts_with').execute,
       evaluator: require('./nodes/string_starts_with').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'string', name: 'Строка', type: 'String', required: true },
           { id: 'prefix', name: 'Префикс', type: 'String', required: true },
           { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Начинается?', type: 'Boolean' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'string:ends_with',
-      label: 'Строка: Заканчивается на',
+      label: '◀️ Заканчивается на',
       category: 'Строки',
-      description: 'Проверяет, заканчивается ли строка указанной подстрокой.',
+      description: 'Проверяет, заканчивается ли строка подстрокой.',
       graphType: all,
-      executor: require('./nodes/string_ends_with').execute,
       evaluator: require('./nodes/string_ends_with').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'string', name: 'Строка', type: 'String', required: true },
           { id: 'suffix', name: 'Суффикс', type: 'String', required: true },
           { id: 'case_sensitive', name: 'Учет регистра', type: 'Boolean', required: false }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Заканчивается?', type: 'Boolean' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'string:length',
-      label: 'Строка: Длина',
+      label: '📏 Длина строки',
       category: 'Строки',
-      description: 'Возвращает количество символов в строке.',
+      description: 'Возвращает количество символов.',
       graphType: all,
-      executor: require('./nodes/string_length').execute,
       evaluator: require('./nodes/string_length').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'string', name: 'Строка', type: 'String', required: true }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
           { id: 'length', name: 'Длина', type: 'Number' }
         ]
       }
@@ -748,20 +749,17 @@ class NodeRegistry {
 
     this.registerNodeType({
       type: 'string:split',
-      label: 'Строка: Разделить',
+      label: '✂️ Разделить строку',
       category: 'Строки',
-      description: 'Разделяет строку на массив подстрок по разделителю.',
+      description: 'Разделяет строку на массив по разделителю.',
       graphType: all,
-      executor: require('./nodes/string_split').execute,
       evaluator: require('./nodes/string_split').evaluate,
       pins: {
         inputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec', required: true },
           { id: 'string', name: 'Строка', type: 'String', required: true },
           { id: 'separator', name: 'Разделитель', type: 'String', required: true }
         ],
         outputs: [
-          { id: 'exec', name: 'Exec', type: 'Exec' },
           { id: 'array', name: 'Массив', type: 'Array' }
         ]
       }
@@ -905,6 +903,26 @@ class NodeRegistry {
         ],
         outputs: [
           { id: 'element', name: 'Элемент', type: 'Any' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'array:get_next',
+      label: '➡️ Следующий элемент',
+      category: 'Массив',
+      description: 'Получает следующий элемент массива.',
+      graphType: all,
+      evaluator: require('./nodes/array_get_next').evaluate,
+      pins: {
+        inputs: [
+          { id: 'array', name: 'Массив', type: 'Array', required: true },
+          { id: 'current_index', name: 'Текущий индекс', type: 'Number', required: true }
+        ],
+        outputs: [
+          { id: 'next_element', name: 'Следующий элемент', type: 'Any' },
+          { id: 'next_index', name: 'Следующий индекс', type: 'Number' },
+          { id: 'has_next', name: 'Есть следующий?', type: 'Boolean', description: 'True, если следующий элемент существует' }
         ]
       }
     });

@@ -247,7 +247,8 @@ class GraphExecutionEngine {
           case 'event:command':
               if (pinId === 'args') result = this.context.args || {};
               else if (pinId === 'user') result = this.context.user || {};
-              else if (pinId === 'chat_type') result = this.context.typeChat || 'chat';
+              else if (pinId === 'chat_type') result = this.context.chat_type || 'chat';
+              else if (pinId === 'success') result = this.context.success !== undefined ? this.context.success : true;
               else result = this.context[pinId];
               break;
           case 'event:chat':

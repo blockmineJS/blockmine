@@ -124,6 +124,9 @@ class EventGraphManager {
             getNearbyEntities: (position = null, radius = 32) => {
                 return this.botManager.getNearbyEntities(botId, position, radius);
             },
+            sendLog: (message) => {
+                this.botManager.appendLog(botId, message);
+            },
             entity: eventArgs.botEntity || null,
             api: {
                 emitApiEvent: (eventName, payload) => {
@@ -209,6 +212,7 @@ class EventGraphManager {
                 context.user = args.user;
                 context.args = args.args;
                 context.chat_type = args.typeChat;
+                context.success = args.success !== undefined ? args.success : true;
                 break;
             case 'websocket_call':
                 context.graphName = args.graphName;

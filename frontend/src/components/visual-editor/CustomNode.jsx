@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 const pinColors = {
   Exec: '#ffffff',
   Boolean: '#dc2626',
@@ -203,6 +205,19 @@ function CustomNode({ data, type, id: nodeId }) {
 
     return (
       <div key={pin.id} className="relative p-2 flex items-center">
+        {/* Для output пинов иконка слева от текста */}
+        {!isInput && pin.description && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="w-3 h-3 text-slate-400 cursor-help mr-2" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs bg-slate-900 text-white border-slate-700">
+                <p className="text-xs">{pin.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <Handle 
           type={isInput ? 'target' : 'source'} 
           position={position} 
@@ -211,6 +226,19 @@ function CustomNode({ data, type, id: nodeId }) {
           className="w-4 h-4"
         />
         <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
+        {/* Для input пинов иконка справа от текста */}
+        {isInput && pin.description && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="w-3 h-3 text-slate-400 cursor-help ml-2" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs bg-slate-900 text-white border-slate-700">
+                <p className="text-xs">{pin.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
     );
   };
@@ -237,6 +265,25 @@ function CustomNode({ data, type, id: nodeId }) {
                         <SelectItem value="String">String (Текст)</SelectItem>
                         <SelectItem value="Number">Number (Число)</SelectItem>
                         <SelectItem value="Boolean">Boolean (Да/Нет)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+        {type === 'data:type_check' && (
+            <div className="p-2 border-t border-slate-700">
+                <Label>Проверить тип:</Label>
+                <Select value={data.checkType || 'string'} onValueChange={(value) => updateNodeData(nodeId, { checkType: value })}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Выберите тип..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="string">String (Строка)</SelectItem>
+                        <SelectItem value="number">Number (Число)</SelectItem>
+                        <SelectItem value="numeric_string">Числовая строка ("100")</SelectItem>
+                        <SelectItem value="boolean">Boolean (Да/Нет)</SelectItem>
+                        <SelectItem value="array">Array (Массив)</SelectItem>
+                        <SelectItem value="object">Object (Объект)</SelectItem>
+                        <SelectItem value="null">Null/Undefined (Пусто)</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

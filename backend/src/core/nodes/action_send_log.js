@@ -13,11 +13,10 @@ async function execute(node, context, helpers) {
         message = JSON.stringify(message, null, 2);
     }
     
-    if (this.botManager?.appendLog && context?.botId) {
-        this.botManager.appendLog(context.botId, `[Graph] ${message}`);
-    } else if (context?.bot?.sendLog) {
+    if (context?.bot?.sendLog) {
         context.bot.sendLog(`[Graph] ${message}`);
     } else {
+        // Fallback - консоль терминала
         console.log(`[Graph Log] ${message}`);
     }
 
