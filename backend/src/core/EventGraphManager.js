@@ -121,6 +121,10 @@ class EventGraphManager {
                 this.botManager.lookAt(botId, position);
             },
             getPlayerList: () => players,
+            getNearbyEntities: (position = null, radius = 32) => {
+                return this.botManager.getNearbyEntities(botId, position, radius);
+            },
+            entity: eventArgs.botEntity || null,
             api: {
                 emitApiEvent: (eventName, payload) => {
                     this.emitCustomApiEvent(botId, eventName, payload);

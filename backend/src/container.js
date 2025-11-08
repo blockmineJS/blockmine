@@ -25,7 +25,6 @@ const EventGraphManager = require('./core/EventGraphManager');
 const PluginManager = require('./core/PluginManager');
 
 function createLogger() {
-    // Пока используем консоль, позже заменим на Pino
     return {
         debug: (...args) => console.log('[DEBUG]', ...args),
         info: (...args) => console.log('[INFO]', ...args),

@@ -137,6 +137,16 @@ export function getConversionChain(sourceType, targetType, sourceNode) {
     };
   }
 
+  // Array -> Object (первый элемент массива)
+  if (sourceType === 'Array' && targetType === 'Object') {
+    return {
+      nodeType: 'array:get_by_index',
+      inputPin: 'array',
+      outputPin: 'element',
+      secondInputPin: 'index',
+      defaultValue: 0  // Берем первый элемент (индекс 0)
+    };
+  }
 
   return null;
 }

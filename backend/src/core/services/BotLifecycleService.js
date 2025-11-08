@@ -181,6 +181,9 @@ class BotLifecycleService {
                     case 'get_player_list_response':
                         this.processManager.resolvePlayerListRequest(message.requestId, message.payload.players);
                         break;
+                    case 'get_nearby_entities_response':
+                        this.processManager.resolveNearbyEntitiesRequest(message.requestId, message.payload.entities);
+                        break;
                     case 'execute_command_response':
                         this.processManager.resolveCommandRequest(message.requestId, message.result, message.error);
                         break;
@@ -251,7 +254,7 @@ class BotLifecycleService {
     async _handleCommandRegistration(botId, commandConfig) {
         if (this.commandExecutionService) {
             await this.commandExecutionService.handleCommandRegistration(botId, commandConfig);
-            this.logger.debug({ botId, commandName: commandConfig.name }, 'Команда зарегистрирована');
+            // this.logger.debug({ botId, commandName: commandConfig.name }, 'Команда зарегистрирована');
         } else {
             this.logger.warn({ botId }, 'CommandExecutionService не доступен для регистрации команды');
         }
@@ -538,6 +541,35 @@ class BotLifecycleService {
             });
 
             this.processManager.sendMessage(botId, { type: 'system:get_player_list', requestId });
+        });
+    }
+
+    async getNearbyEntities(botId, position = null, radius = 32) {
+        if (!this.processManager.isRunning(botId)) {
+            return [];
+        }
+
+        return new Promise((resolve) => {
+            const { v4: uuidv4 } = require('uuid');
+            const requestId = uuidv4();
+
+            const timeout = setTimeout(() => {
+                resolve([]);
+            }, 5000);
+
+            this.processManager.addNearbyEntitiesRequest(requestId, {
+                resolve: (entities) => {
+                    clearTimeout(timeout);
+                    resolve(entities);
+                },
+                timeout
+            });
+
+            this.processManager.sendMessage(botId, { 
+                type: 'system:get_nearby_entities', 
+                requestId,
+                payload: { position, radius }
+            });
         });
     }
 

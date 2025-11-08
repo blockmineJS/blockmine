@@ -1101,6 +1101,62 @@ class NodeRegistry {
       }
     });
 
+    this.registerNodeType({
+      type: 'data:get_nearby_entities',
+      label: '👁️ Получить существ рядом',
+      category: 'Данные',
+      description: 'Возвращает массив существ в радиусе от бота.',
+      graphType: all,
+      evaluator: require('./nodes/data_get_nearby_entities').evaluate,
+      pins: {
+        inputs: [
+          { id: 'radius', name: 'Радиус', type: 'Number', required: false }
+        ],
+        outputs: [
+          { id: 'entities', name: 'Существа', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:get_nearby_players',
+      label: '👥 Игроки рядом',
+      category: 'Данные',
+      description: 'Возвращает массив игроков с расстоянием.',
+      graphType: all,
+      evaluator: require('./nodes/data_get_nearby_players').evaluate,
+      pins: {
+        inputs: [
+          { id: 'radius', name: 'Радиус', type: 'Number', required: false }
+        ],
+        outputs: [
+          { id: 'players', name: 'Игроки', type: 'Array' }
+        ]
+      }
+    });
+
+    this.registerNodeType({
+      type: 'data:entity_info',
+      label: '🔍 Информация о существе',
+      category: 'Данные',
+      description: 'Извлекает данные из объекта существа.',
+      graphType: all,
+      evaluator: require('./nodes/data_entity_info').evaluate,
+      pins: {
+        inputs: [
+          { id: 'entity', name: 'Существо', type: 'Object', required: true }
+        ],
+        outputs: [
+          { id: 'type', name: 'Тип', type: 'String' },
+          { id: 'username', name: 'Имя', type: 'String' },
+          { id: 'distance', name: 'Расстояние', type: 'Number' },
+          { id: 'position', name: 'Позиция', type: 'Object' },
+          { id: 'id', name: 'ID', type: 'Number' },
+          { id: 'isPlayer', name: 'Это игрок?', type: 'Boolean' }
+        ]
+      }
+    });
+
     // Пользователи
     this.registerNodeType({
         type: 'user:check_blacklist',

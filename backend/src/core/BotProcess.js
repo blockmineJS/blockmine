@@ -46,7 +46,16 @@ function sendLog(content) {
 
 function sendEvent(eventName, eventArgs) {
     if (process.send) {
-        process.send({ type: 'event', eventType: eventName, args: eventArgs });
+        // Добавляем информацию о боте (позицию) во все события
+        const enrichedArgs = {
+            ...eventArgs,
+            botEntity: bot && bot.entity ? {
+                position: bot.entity.position,
+                yaw: bot.entity.yaw,
+                pitch: bot.entity.pitch
+            } : null
+        };
+        process.send({ type: 'event', eventType: eventName, args: enrichedArgs });
     }
 }
 
@@ -170,6 +179,38 @@ process.on('message', async (message) => {
                 type: 'get_player_list_response',
                 requestId: message.requestId,
                 payload: { players: playerList }
+            });
+        }
+    } else if (message.type === 'system:get_nearby_entities') {
+        const entities = [];
+        if (bot && bot.entities) {
+            const centerPos = message.payload?.position || bot.entity?.position;
+            const radius = message.payload?.radius || 32;
+
+            if (centerPos) {
+                // Перебираем все сущности
+                for (const entity of Object.values(bot.entities)) {
+                    if (entity && entity.position && entity.isValid) {
+                        // Вычисляем расстояние
+                        const dx = entity.position.x - centerPos.x;
+                        const dy = entity.position.y - centerPos.y;
+                        const dz = entity.position.z - centerPos.z;
+                        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                        // Если существо в радиусе, добавляем в список
+                        if (distance <= radius) {
+                            entities.push(serializeEntity(entity));
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (process.send) {
+            process.send({
+                type: 'get_nearby_entities_response',
+                requestId: message.requestId,
+                payload: { entities }
             });
         }
     } else if (message.type === 'start') {
@@ -467,6 +508,31 @@ process.on('message', async (message) => {
                         bot.lookAt(position);
                     }
                 },
+                getNearbyEntities: (position = null, radius = 32) => {
+                    const entities = [];
+                    if (bot && bot.entities) {
+                        const centerPos = position || bot.entity?.position;
+                        
+                        if (centerPos) {
+                            for (const entity of Object.values(bot.entities)) {
+                                if (entity && entity.position && entity.isValid) {
+                                    const dx = entity.position.x - centerPos.x;
+                                    const dy = entity.position.y - centerPos.y;
+                                    const dz = entity.position.z - centerPos.z;
+                                    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                                    
+                                    if (distance <= radius) {
+                                        entities.push(serializeEntity(entity));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return entities;
+                },
+                sendLog: (message) => {
+                    sendLog(message);
+                },
                 sendUiUpdate: (pluginName, stateUpdate) => {
                     const currentState = pluginUiState.get(pluginName) || {};
                     const newState = { ...currentState, ...stateUpdate };
@@ -543,7 +609,20 @@ process.on('message', async (message) => {
                     visualCommand.handler = (botInstance, typeChat, user, args) => {
                         const playerList = bot ? Object.keys(bot.players) : [];
                         const botState = bot ? { yaw: bot.entity.yaw, pitch: bot.entity.pitch } : {};
-                        const context = { bot: botInstance.api, user, args, typeChat, players: playerList, botState };
+                        const botEntity = bot && bot.entity ? {
+                            position: bot.entity.position,
+                            yaw: bot.entity.yaw,
+                            pitch: bot.entity.pitch
+                        } : null;
+                        const context = { 
+                            bot: botInstance.api, 
+                            user, 
+                            args, 
+                            typeChat, 
+                            players: playerList, 
+                            botState,
+                            botEntity
+                        };
                         return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
                     bot.commands.set(visualCommand.name, visualCommand);

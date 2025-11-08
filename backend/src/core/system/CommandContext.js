@@ -20,6 +20,13 @@ class CommandContext {
 
         // Для обратной совместимости
         this.typeChat = transport.type;
+        
+        // Добавляем информацию о позиции бота
+        this.botEntity = bot.entity ? {
+            position: bot.entity.position,
+            yaw: bot.entity.yaw,
+            pitch: bot.entity.pitch
+        } : null;
     }
 
     /**

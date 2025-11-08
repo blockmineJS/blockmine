@@ -124,6 +124,25 @@ class BotProcessManager {
         }
     }
 
+    addNearbyEntitiesRequest(requestId, handler) {
+        if (!this.pendingNearbyEntitiesRequests) {
+            this.pendingNearbyEntitiesRequests = new Map();
+        }
+        this.pendingNearbyEntitiesRequests.set(requestId, handler);
+    }
+
+    resolveNearbyEntitiesRequest(requestId, entities) {
+        if (!this.pendingNearbyEntitiesRequests) {
+            this.pendingNearbyEntitiesRequests = new Map();
+        }
+        const request = this.pendingNearbyEntitiesRequests.get(requestId);
+        if (request) {
+            clearTimeout(request.timeout);
+            request.resolve(entities);
+            this.pendingNearbyEntitiesRequests.delete(requestId);
+        }
+    }
+
     addCommandRequest(requestId, handler) {
         this.pendingCommandRequests.set(requestId, handler);
     }

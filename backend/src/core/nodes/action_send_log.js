@@ -6,11 +6,17 @@
  * @param {function} helpers.traverse - Функция для перехода к следующему узлу.
  */
 async function execute(node, context, helpers) {
-    const message = await helpers.resolvePinValue(node, 'message', '');
+    let message = await helpers.resolvePinValue(node, 'message', '');
     
-    // this.botManager - это экземпляр botManager из GraphExecutionEngine
+    // Если сообщение - это объект или массив, форматируем как JSON
+    if (typeof message === 'object' && message !== null) {
+        message = JSON.stringify(message, null, 2);
+    }
+    
     if (this.botManager?.appendLog && context?.botId) {
         this.botManager.appendLog(context.botId, `[Graph] ${message}`);
+    } else if (context?.bot?.sendLog) {
+        context.bot.sendLog(`[Graph] ${message}`);
     } else {
         console.log(`[Graph Log] ${message}`);
     }

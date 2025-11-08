@@ -143,6 +143,10 @@ class BotManager {
         return this.lifecycleService.getPlayerList(botId);
     }
 
+    async getNearbyEntities(botId, position = null, radius = 32) {
+        return this.lifecycleService.getNearbyEntities(botId, position, radius);
+    }
+
     // === User cache ===
     invalidateUserCache(botId, username) {
         return this.lifecycleService.invalidateUserCache(botId, username);
