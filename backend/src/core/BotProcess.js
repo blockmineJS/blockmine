@@ -91,7 +91,8 @@ function handleIncomingCommand(type, username, message) {
         const parsedArgs = parseArguments(restOfMessage);
         let currentArgIndex = 0;
 
-        for (const argDef of commandInstance.isVisual ? JSON.parse(dbCommand.argumentsJson || '[]') : commandInstance.args) {
+        const argsDef = commandInstance.isVisual && commandInstance.args ? commandInstance.args : (commandInstance.args || []);
+        for (const argDef of argsDef) {
             if (argDef.type === 'greedy_string') {
                 if (currentArgIndex < parsedArgs.length) {
                     processedArgs[argDef.name] = parsedArgs.slice(currentArgIndex).join(' ');
@@ -269,7 +270,7 @@ process.on('message', async (message) => {
                     try {
                         let permissionId = null;
                         if (command.permissions) {
-                            const permission = await prisma.permission.findUnique({
+                            let permission = await prisma.permission.findUnique({
                                 where: {
                                     botId_name: {
                                         botId: bot.config.id,
@@ -278,11 +279,19 @@ process.on('message', async (message) => {
                                 },
                             });
 
-                            if (permission) {
-                                permissionId = permission.id;
-                            } else {
-                                sendLog(`[API] Внимание: право \"${command.permissions}\" не найдено для команды \"${command.name}\". Команда будет создана без привязанного права.`);
+                            if (!permission) {
+                                // Автоматически создаем право, если оно не найдено
+                                permission = await prisma.permission.create({
+                                    data: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                        description: `Автоматически создано для команды ${command.name}`,
+                                        owner: command.owner || 'system',
+                                    },
+                                });
+                                sendLog(`[API] Право \"${command.permissions}\" автоматически создано для команды \"${command.name}\".`);
                             }
+                            permissionId = permission.id;
                         }
 
                         let pluginOwnerId = null;
@@ -478,6 +487,9 @@ process.on('message', async (message) => {
             bot.sendMessage = (type, message, username) => {
                 bot.api.sendMessage(type, message, username);
             };
+            
+            // Добавляем bot.sendLog для команд
+            bot.sendLog = (message) => sendLog(message);
 
             const processApi = {
                 appendLog: (botId, message) => {
@@ -509,6 +521,12 @@ process.on('message', async (message) => {
                     existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
                     existingCommand.permissionId = dbCommand.permissionId;
                     existingCommand.allowedChatTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
+                    
+                    // Добавляем алиасы в bot.commands для быстрого доступа
+                    const aliases = JSON.parse(dbCommand.aliases || '[]');
+                    for (const alias of aliases) {
+                        bot.commands.set(alias, existingCommand);
+                    }
                 } else if (dbCommand.isVisual) {
                     const visualCommand = new Command({
                         name: dbCommand.name,
@@ -529,6 +547,23 @@ process.on('message', async (message) => {
                         return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
                     bot.commands.set(visualCommand.name, visualCommand);
+                    
+                    // Добавляем алиасы визуальных команд
+                    const visualAliases = JSON.parse(dbCommand.aliases || '[]');
+                    for (const alias of visualAliases) {
+                        bot.commands.set(alias, visualCommand);
+                    }
+                }
+            }
+            
+            // Добавляем алиасы для всех загруженных команд (системных и плагинов)
+            for (const cmd of bot.commands.values()) {
+                if (cmd.aliases && Array.isArray(cmd.aliases)) {
+                    for (const alias of cmd.aliases) {
+                        if (!bot.commands.has(alias)) {
+                            bot.commands.set(alias, cmd);
+                        }
+                    }
                 }
             }
 
@@ -740,10 +775,28 @@ process.on('message', async (message) => {
         const { commandName, username, args, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
-            const fakeUser = { username };
-            commandInstance.handler(bot, typeChat, fakeUser, args).catch(e => {
-                sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
-            });
+            (async () => {
+                try {
+                    // Получаем полный объект User из базы данных
+                    const user = await UserService.getUser(username, bot.config.id, bot.config);
+                    
+                    // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
+                    const handlerParamCount = commandInstance.handler.length;
+
+                    if (handlerParamCount === 1) {
+                        // Новая сигнатура: handler(context)
+                        const transport = new Transport(typeChat, bot);
+                        const context = new CommandContext(bot, user, args, transport);
+                        await commandInstance.handler(context);
+                    } else {
+                        // Старая сигнатура: handler(bot, typeChat, user, args)
+                        await commandInstance.handler(bot, typeChat, user, args);
+                    }
+                } catch (e) {
+                    sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
+                    sendLog(`[Handler Error] Stack trace: ${e.stack}`);
+                }
+            })();
         }
     } else if (message.type === 'execute_command_request') {
                 const { requestId, payload } = message;

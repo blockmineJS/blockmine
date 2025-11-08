@@ -30,13 +30,8 @@ class CommandExecutionService {
         const botId = botConfig.id;
 
         try {
-            let botConfigCache = this.cache.getBotConfig(botId);
-            if (!botConfigCache) {
-                this.logger.debug({ botId }, 'Кеш отсутствует, загрузка');
-                // Загрузка конфига должна быть через BotLifecycleService
-                // Но для обратной совместимости оставим здесь
-                return;
-            }
+            // Получаем конфигурацию из кеша или загружаем из БД
+            const botConfigCache = await this.cache.getOrLoadBotConfig(botId);
 
             const user = await UserService.getUser(username, botId, botConfig);
 
@@ -258,6 +253,10 @@ class CommandExecutionService {
             const updateData = {
                 description: commandConfig.description,
                 owner: commandConfig.owner,
+                permissionId: permissionId,
+                aliases: JSON.stringify(commandConfig.aliases || []),
+                allowedChatTypes: JSON.stringify(commandConfig.allowedChatTypes || []),
+                cooldown: commandConfig.cooldown || 0,
             };
 
             const existingCommand = await this.commandRepository.findByName(botId, commandConfig.name);

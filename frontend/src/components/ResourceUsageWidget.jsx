@@ -1,16 +1,15 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from './ui/badge';
 import { Cpu, MemoryStick } from 'lucide-react';
 
-const ProgressBar = ({ value, max, colorClass, label }) => {
+const ProgressBar = ({ value, max, colorClass, label, unit = '%', showPercentage = true }) => {
     const percentage = Math.min(100, (value / max) * 100);
+    const displayValue = showPercentage ? `${value.toFixed(1)}%` : `${value.toFixed(1)} ${unit}`;
     return (
         <div className="space-y-2">
             <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">{label}</span>
-                <span className="font-mono font-medium">{value.toFixed(1)}%</span>
+                <span className="font-mono font-medium">{displayValue}</span>
             </div>
             <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
                 <div 
@@ -54,9 +53,11 @@ export default function ResourceUsageWidget({ bots, resourceUsage }) {
                                         <div className="flex-grow">
                                             <ProgressBar 
                                                 value={usage.memory} 
-                                                max={500} 
+                                                max={1000} 
                                                 colorClass="bg-primary" 
                                                 label="RAM"
+                                                unit="MB"
+                                                showPercentage={false}
                                             />
                                         </div>
                                     </div>

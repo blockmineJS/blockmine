@@ -13,6 +13,7 @@ class BotLifecycleService {
         resourceMonitorService,
         telemetryService,
         eventGraphManager,
+        commandExecutionService,
         logger
     }) {
         this.botRepository = botRepository;
@@ -24,6 +25,7 @@ class BotLifecycleService {
         this.resourceMonitor = resourceMonitorService;
         this.telemetry = telemetryService;
         this.eventGraphManager = eventGraphManager;
+        this.commandExecutionService = commandExecutionService;
         this.logger = logger;
 
         this.logCache = new Map();
@@ -166,7 +168,12 @@ class BotLifecycleService {
                         this._handleBotReady(botId);
                         break;
                     case 'validate_and_run_command':
-                        // Делегируем в CommandExecutionService через события
+                        if (this.commandExecutionService) {
+                            const botConfig = child.botConfig;
+                            if (botConfig) {
+                                await this.commandExecutionService.handleCommandValidation(botConfig, message);
+                            }
+                        }
                         break;
                     case 'request_user_action':
                         await this._handleUserAction(botId, child, message);
@@ -176,6 +183,9 @@ class BotLifecycleService {
                         break;
                     case 'execute_command_response':
                         this.processManager.resolveCommandRequest(message.requestId, message.result, message.error);
+                        break;
+                    case 'register_command':
+                        await this._handleCommandRegistration(botId, message.commandConfig);
                         break;
                 }
             } catch (error) {
@@ -236,6 +246,15 @@ class BotLifecycleService {
             const { broadcastBotStatus } = require('../../real-time/botApi');
             broadcastBotStatus(getIO(), botId, true);
         } catch (e) { /* Socket.IO может быть не инициализирован */ }
+    }
+
+    async _handleCommandRegistration(botId, commandConfig) {
+        if (this.commandExecutionService) {
+            await this.commandExecutionService.handleCommandRegistration(botId, commandConfig);
+            this.logger.debug({ botId, commandName: commandConfig.name }, 'Команда зарегистрирована');
+        } else {
+            this.logger.warn({ botId }, 'CommandExecutionService не доступен для регистрации команды');
+        }
     }
 
     async _handleUserAction(botId, child, message) {

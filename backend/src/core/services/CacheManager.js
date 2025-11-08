@@ -1,7 +1,7 @@
 const { LRUCache } = require('lru-cache');
 
 class CacheManager {
-    constructor() {
+    constructor({ commandRepository, permissionRepository, logger } = {}) {
         // Кеш с TTL и максимальным размером
         this.tokenCache = new LRUCache({
             max: 500,
@@ -14,6 +14,11 @@ class CacheManager {
         });
 
         this.botConfigsCache = new Map();
+        
+        // Зависимости для автозагрузки конфигурации
+        this.commandRepository = commandRepository;
+        this.permissionRepository = permissionRepository;
+        this.logger = logger;
     }
 
     // Token cache
@@ -55,6 +60,51 @@ class CacheManager {
     clearBotCache(botId) {
         this.deleteBotConfig(botId);
         this.playerListCache.delete(botId);
+    }
+
+    /**
+     * Получает конфигурацию бота из кеша или загружает из БД
+     * @param {number} botId - ID бота
+     * @returns {Promise<object>} - Конфигурация бота
+     */
+    async getOrLoadBotConfig(botId) {
+        let config = this.botConfigsCache.get(botId);
+        
+        if (!config) {
+            if (this.logger) {
+                this.logger.debug({ botId }, 'Кеш конфигурации отсутствует, загрузка из БД');
+            }
+            
+            if (!this.commandRepository || !this.permissionRepository) {
+                throw new Error('CacheManager не имеет доступа к репозиториям для загрузки конфигурации');
+            }
+
+            const [commands, permissions] = await Promise.all([
+                this.commandRepository.findByBotId(botId),
+                this.permissionRepository.findByBotId(botId),
+            ]);
+
+            config = {
+                commands: new Map(commands.map(cmd => [cmd.name, cmd])),
+                permissionsById: new Map(permissions.map(p => [p.id, p])),
+                commandAliases: new Map()
+            };
+
+            for (const cmd of commands) {
+                const aliases = JSON.parse(cmd.aliases || '[]');
+                for (const alias of aliases) {
+                    config.commandAliases.set(alias, cmd.name);
+                }
+            }
+
+            this.botConfigsCache.set(botId, config);
+            
+            if (this.logger) {
+                this.logger.debug({ botId }, 'Конфигурация загружена и закеширована');
+            }
+        }
+
+        return config;
     }
 }
 
