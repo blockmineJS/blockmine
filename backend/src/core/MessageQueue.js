@@ -23,6 +23,18 @@ class MessageQueue {
         this.lastSendTimes[typeName] = 0;
     }
 
+    _unescapeString(str) {
+        const ESCAPE_MARKER = '\uE000';
+        return str
+            .replace(/\\\\/g, ESCAPE_MARKER)
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '\r')
+            .replace(/\\t/g, '\t')
+            .replace(/\\'/g, "'")
+            .replace(/\\"/g, '"')
+            .replace(new RegExp(ESCAPE_MARKER, 'g'), '\\');
+    }
+
     _enqueue(task) {
         this.queue.push(task);
         if (!this.isProcessing) {
@@ -40,12 +52,14 @@ class MessageQueue {
         if (Array.isArray(message)) {
             messagesToQueue = message;
         } else if (typeof message === 'string') {
-            messagesToQueue = message.split('\n');
+            const unescapedMessage = this._unescapeString(message);
+            const normalizedMessage = unescapedMessage.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            messagesToQueue = normalizedMessage.split('\n');
         }
 
         for (const msg of messagesToQueue) {
             const trimmedMsg = msg.trim();
-            if (typeof trimmedMsg === 'string' && trimmedMsg.length > 0) {
+            if (trimmedMsg.length > 0) {
                 this._enqueue({ type: 'simple', chatType, ...typeConfig, message: trimmedMsg, username });
             }
         }
