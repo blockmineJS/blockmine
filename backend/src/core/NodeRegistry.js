@@ -322,7 +322,25 @@ class NodeRegistry {
     });
 
     this.registerNodeType({
-      type: 'action:send_message',
+      type: 'flow:delay',
+      label: '⏱️ Задержка',
+      category: 'Поток',
+      description: 'Ожидает указанное количество миллисекунд, затем продолжает выполнение.',
+      graphType: all,
+      executor: require('./nodes/flow_delay').execute,
+      pins: {
+        inputs: [
+          { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+          { id: 'delay', name: 'Задержка (мс)', type: 'Number', required: false }
+        ],
+        outputs: [
+          { id: 'exec', name: 'Далее', type: 'Exec' }
+        ]
+      }
+    });
+
+     this.registerNodeType({
+       type: 'action:send_message',
       label: '🗣️ Отправить сообщение',
       category: 'Действия',
       description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
