@@ -811,10 +811,17 @@ process.on('message', async (message) => {
             });
 
             bot.on('spawn', () => {
-                sendLog('[Event: spawn] Бот заспавнился в мире.');
+                try {
+                        if (bot._client && bot._client.options) {
+                            bot._client.options.chat = 'enabled';
+                        }
+                        if (bot.chatEnabled !== undefined) {
+                            bot.chatEnabled = true;
+                        }
+                } catch (err) {
+                }
                 setTimeout(() => {
                     isReady = true;
-                    sendLog('[BotProcess] Бот готов к приему событий.');
                 }, 3000);
             });
         } catch (err) {
