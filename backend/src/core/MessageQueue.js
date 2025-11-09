@@ -30,20 +30,27 @@ class MessageQueue {
         }
     }
 
+
     enqueue(chatType, message, username = null) {
         const typeConfig = this.chatTypes[chatType];
         if (!typeConfig) return;
 
+        let messagesToQueue = [];
+
         if (Array.isArray(message)) {
-            for (const msg of message) {
-                if (typeof msg === 'string' && msg.trim().length > 0) {
-                    this._enqueue({ type: 'simple', chatType, ...typeConfig, message: msg, username });
-                }
-            }
+            messagesToQueue = message;
         } else if (typeof message === 'string') {
-            this._enqueue({ type: 'simple', chatType, ...typeConfig, message, username });
+            messagesToQueue = message.split('\n');
+        }
+
+        for (const msg of messagesToQueue) {
+            const trimmedMsg = msg.trim();
+            if (typeof trimmedMsg === 'string' && trimmedMsg.length > 0) {
+                this._enqueue({ type: 'simple', chatType, ...typeConfig, message: trimmedMsg, username });
+            }
         }
     }
+
 
     enqueueAndWait(command, patterns, timeout) {
         return new Promise((resolve, reject) => {
