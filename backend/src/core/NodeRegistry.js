@@ -1451,7 +1451,8 @@ class NodeRegistry {
       pins: {
         inputs: [
           { id: 'date_left', name: 'Дата А', type: 'DateTime', required: true },
-          { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true }
+          { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true },
+          { id: 'operation', name: 'Операция', type: 'String', required: false }
         ],
         outputs: [
           { id: 'result', name: 'Результат', type: 'Boolean' }

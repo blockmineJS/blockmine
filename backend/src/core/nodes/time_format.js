@@ -18,10 +18,10 @@ async function evaluate(node, pinId, context, helpers) {
             try {
                 return format(date, formatString);
             } catch (error) {
-                return new Date().toString();
+                return `Ошибка форматирования: ${error.message}`;
             }
         }
-        return new Date().toString();
+        return 'Ошибка: невалидная дата';
     }
 
     return null;

@@ -18,10 +18,11 @@ async function evaluate(node, pinId, context, helpers) {
             try {
                 return add(date, duration);
             } catch (error) {
-                return new Date();
+                // Либо пробросить ошибку, либо вернуть null
+                throw new Error(`Ошибка добавления продолжительности: ${error.message}`);
             }
         }
-        return new Date();
+        throw new Error('Невалидная входная дата');
     }
 
     return null;
