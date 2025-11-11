@@ -18,7 +18,7 @@ async function evaluate(node, pinId, context, helpers) {
             dateRight instanceof Date && !isNaN(dateRight.getTime())) {
             return differenceInMilliseconds(dateLeft, dateRight);
         }
-        return 0;
+        throw new Error('Ошибка: невалидная дата');
     }
 
     return null;

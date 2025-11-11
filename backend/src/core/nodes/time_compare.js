@@ -21,10 +21,10 @@ async function evaluate(node, pinId, context, helpers) {
                 case 'after': return isAfter(dateLeft, dateRight);
                 case 'before': return isBefore(dateLeft, dateRight);
                 case 'equal': return isEqual(dateLeft, dateRight);
-                default: return false;
+                default: throw new Error(`Неизвестная операция сравнения: ${op}`);
             }
         }
-        return false;
+        throw new Error('Ошибка: невалидная дата');
     }
 
     return null;
