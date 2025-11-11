@@ -1359,15 +1359,15 @@ class NodeRegistry {
       type: 'time:datetime_literal',
       label: '📅 Дата и время',
       category: 'Время',
-      description: 'Создает объект даты и времени из строки. Если строка пустая, вернет текущее время.',
+      description: 'Создает объект даты и времени из строки (например, "2023-10-27T10:00:00Z"). Если строка пустая, вернет текущее время.',
       graphType: all,
       evaluator: require('./nodes/data_datetime_literal').evaluate,
       pins: {
         inputs: [
-          { id: 'date', name: 'Дата (строка)', type: 'String', required: false }
+          { id: 'date', name: 'Дата (строка)', type: 'String', required: false, description: 'Строка в формате ISO 8601 или другом, поддерживаемом JS Date().' }
         ],
         outputs: [
-          { id: 'value', name: 'Дата', type: 'DateTime' }
+          { id: 'value', name: 'Дата', type: 'DateTime', description: 'Созданный объект DateTime.' }
         ]
       }
     });
@@ -1382,7 +1382,7 @@ class NodeRegistry {
       pins: {
         inputs: [],
         outputs: [
-          { id: 'now', name: 'Сейчас', type: 'DateTime' }
+          { id: 'now', name: 'Сейчас', type: 'DateTime', description: 'Текущий объект DateTime.' }
         ]
       }
     });
@@ -1391,31 +1391,37 @@ class NodeRegistry {
       type: 'time:format',
       label: '📝 Отформатировать дату',
       category: 'Время',
-      description: 'Форматирует дату в строку. Формат по-умолчанию: yyyy-MM-dd HH:mm:ss',
+      description: 'Форматирует дату в строку согласно указанному формату.',
       graphType: all,
       evaluator: require('./nodes/time_format').evaluate,
       pins: {
         inputs: [
           { id: 'date', name: 'Дата', type: 'DateTime', required: true },
-          { id: 'format', name: 'Формат', type: 'String', required: false }
+          { id: 'format', name: 'Формат', type: 'String', required: false, description: 'Строка формата, используемая date-fns. Например, "dd.MM.yyyy". По умолчанию "yyyy-MM-dd HH:mm:ss".' }
         ],
         outputs: [
-          { id: 'formatted', name: 'Строка', type: 'String' }
+          { id: 'formatted', name: 'Строка', type: 'String', description: 'Отформатированная строка даты.' }
         ]
       }
     });
 
     this.registerNodeType({
       type: 'time:add',
-      label: '➕ Прибавить время',
+      label: '➕/➖ Прибавить/Отнять время',
       category: 'Время',
-      description: 'Добавляет к дате указанный промежуток времени. Пример объекта продолжительности: { "seconds": 5, "minutes": 1 }',
+      description: 'Добавляет или отнимает от даты указанный промежуток времени. Для вычитания используйте отрицательные значения.',
       graphType: all,
       evaluator: require('./nodes/time_add').evaluate,
       pins: {
         inputs: [
           { id: 'date', name: 'Дата', type: 'DateTime', required: true },
-          { id: 'duration', name: 'Продолжительность (объект)', type: 'Object', required: true }
+          { id: 'years', name: 'Годы', type: 'Number', required: false },
+          { id: 'months', name: 'Месяцы', type: 'Number', required: false },
+          { id: 'weeks', name: 'Недели', type: 'Number', required: false },
+          { id: 'days', name: 'Дни', type: 'Number', required: false },
+          { id: 'hours', name: 'Часы', type: 'Number', required: false },
+          { id: 'minutes', name: 'Минуты', type: 'Number', required: false },
+          { id: 'seconds', name: 'Секунды', type: 'Number', required: false }
         ],
         outputs: [
           { id: 'result', name: 'Новая дата', type: 'DateTime' }
@@ -1427,7 +1433,7 @@ class NodeRegistry {
       type: 'time:diff',
       label: '↔️ Разница во времени',
       category: 'Время',
-      description: 'Вычисляет разницу между двумя датами в миллисекундах (Дата А - Дата Б).',
+      description: 'Вычисляет разницу между двумя датами (Дата А - Дата Б).',
       graphType: all,
       evaluator: require('./nodes/time_diff').evaluate,
       pins: {
@@ -1436,7 +1442,7 @@ class NodeRegistry {
           { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true }
         ],
         outputs: [
-          { id: 'diff', name: 'Разница (мс)', type: 'Number' }
+          { id: 'diff', name: 'Разница (мс)', type: 'Number', description: 'Разница между датами в миллисекундах.' }
         ]
       }
     });
@@ -1445,16 +1451,17 @@ class NodeRegistry {
       type: 'time:compare',
       label: '⚖️ Сравнить даты',
       category: 'Время',
-      description: 'Сравнивает две даты.',
+      description: 'Сравнивает две даты. В пин "Операция" можно передать "after", "before" или "equal". По умолчанию используется "after".',
       graphType: all,
       evaluator: require('./nodes/time_compare').evaluate,
       pins: {
         inputs: [
           { id: 'date_left', name: 'Дата А', type: 'DateTime', required: true },
-          { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true }
+          { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true },
+          { id: 'operation', name: 'Операция', type: 'String', required: false, description: 'Тип сравнения: "after" (А > Б), "before" (А < Б), "equal" (А = Б). По умолчанию "after".' }
         ],
         outputs: [
-          { id: 'result', name: 'Результат', type: 'Boolean' }
+          { id: 'result', name: 'Результат', type: 'Boolean', description: 'Возвращает true, если результат сравнения истинный.' }
         ]
       }
     });

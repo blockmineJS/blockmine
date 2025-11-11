@@ -12,12 +12,24 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (pinId === 'result') {
         const date = await resolvePinValue(node, 'date', new Date());
-        const duration = await resolvePinValue(node, 'duration', {});
 
-        if (date instanceof Date) {
-            return add(date, duration);
+        if (date instanceof Date && !isNaN(date.getTime())) {
+            try {
+                const duration = {
+                    years: await resolvePinValue(node, 'years', 0),
+                    months: await resolvePinValue(node, 'months', 0),
+                    weeks: await resolvePinValue(node, 'weeks', 0),
+                    days: await resolvePinValue(node, 'days', 0),
+                    hours: await resolvePinValue(node, 'hours', 0),
+                    minutes: await resolvePinValue(node, 'minutes', 0),
+                    seconds: await resolvePinValue(node, 'seconds', 0),
+                };
+                return add(date, duration);
+            } catch (error) {
+                throw new Error(`Ошибка добавления продолжительности: ${error.message}`);
+            }
         }
-        return new Date();
+        throw new Error('Невалидная входная дата');
     }
 
     return null;

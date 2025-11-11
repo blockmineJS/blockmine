@@ -13,9 +13,10 @@ async function evaluate(node, pinId, context, helpers) {
     if (pinId === 'result') {
         const dateLeft = await resolvePinValue(node, 'date_left', new Date());
         const dateRight = await resolvePinValue(node, 'date_right', new Date());
-        const op = node.data?.operation || 'after';
+        const op = await resolvePinValue(node, 'operation', 'after');
 
-        if (dateLeft instanceof Date && dateRight instanceof Date) {
+        if (dateLeft instanceof Date && !isNaN(dateLeft.getTime()) &&
+            dateRight instanceof Date && !isNaN(dateRight.getTime())) {
             switch (op) {
                 case 'after': return isAfter(dateLeft, dateRight);
                 case 'before': return isBefore(dateLeft, dateRight);

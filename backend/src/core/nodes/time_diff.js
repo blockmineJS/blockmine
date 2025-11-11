@@ -14,7 +14,8 @@ async function evaluate(node, pinId, context, helpers) {
         const dateLeft = await resolvePinValue(node, 'date_left', new Date());
         const dateRight = await resolvePinValue(node, 'date_right', new Date());
 
-        if (dateLeft instanceof Date && dateRight instanceof Date) {
+        if (dateLeft instanceof Date && !isNaN(dateLeft.getTime()) &&
+            dateRight instanceof Date && !isNaN(dateRight.getTime())) {
             return differenceInMilliseconds(dateLeft, dateRight);
         }
         return 0;

@@ -11,7 +11,10 @@ async function evaluate(node, pinId, context, helpers) {
     if (pinId === 'value') {
         const dateString = await resolvePinValue(node, 'date', '');
         if (dateString) {
-            return new Date(dateString);
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
         }
         return new Date();
     }

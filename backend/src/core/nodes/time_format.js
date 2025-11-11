@@ -14,10 +14,14 @@ async function evaluate(node, pinId, context, helpers) {
         const date = await resolvePinValue(node, 'date', new Date());
         const formatString = await resolvePinValue(node, 'format', 'yyyy-MM-dd HH:mm:ss');
 
-        if (date instanceof Date) {
-            return format(date, formatString);
+        if (date instanceof Date && !isNaN(date.getTime())) {
+            try {
+                return format(date, formatString);
+            } catch (error) {
+                throw new Error(`Ошибка форматирования: ${error.message}`);
+            }
         }
-        return new Date().toString();
+        throw new Error('Ошибка: невалидная дата');
     }
 
     return null;
