@@ -26,7 +26,7 @@ function registerNodes(registry) {
     type: 'math:random_number',
     label: '🎲 Случайное число',
     category: 'Математика',
-    graphType: 'all',
+    graphType: GRAPH_TYPES.ALL,
     description: 'Генерирует случайное число в заданном диапазоне.',
     evaluator: require('../nodes/math/random_number').evaluate,
     pins: {

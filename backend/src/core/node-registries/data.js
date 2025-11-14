@@ -166,7 +166,7 @@ function registerNodes(registry) {
     type: 'data:get_server_players',
     label: '👥 Список игроков',
     category: 'Данные',
-    graphType: 'all',
+    graphType: GRAPH_TYPES.ALL,
     description: 'Возвращает массив с именами всех игроков на сервере.',
     evaluator: require('../nodes/data/get_server_players').evaluate,
     pins: {
@@ -257,7 +257,7 @@ function registerNodes(registry) {
     type: 'data:length',
     label: '📏 Размер (длина)',
     category: 'Массив',
-    graphType: 'all',
+    graphType: GRAPH_TYPES.ALL,
     description: 'Возвращает количество элементов в массиве или длину строки.',
     evaluator: require('../nodes/data/length').evaluate,
     pins: {

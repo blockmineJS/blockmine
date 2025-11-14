@@ -9,7 +9,7 @@ function registerNodes(registry) {
     label: '▶️ При выполнении команды',
     category: 'События',
     description: 'Стартовая точка для графа команды.',
-    graphType: GRAPH_TYPES.ALL,
+    graphType: GRAPH_TYPES.ALL, // нужно что бы события можно было расширять делая систему событий более комплексную объединяю функии команды и так далее
     pins: {
       inputs: [],
       outputs: [
