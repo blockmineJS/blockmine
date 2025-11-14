@@ -1,6 +1,7 @@
 const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
 const { validateGraph } = require('./validation/nodeSchemas');
+const { VALIDATION_ENABLED, MAX_RECURSION_DEPTH } = require('./config/validation');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
@@ -15,7 +16,7 @@ class GraphExecutionEngine {
       this.activeGraph = null;
       this.context = null;
       this.memo = new Map();
-      this.validationEnabled = process.env.NODE_ENV !== 'production';
+      this.validationEnabled = VALIDATION_ENABLED;
   }
 
   async execute(graph, context, eventType) {
@@ -63,7 +64,10 @@ class GraphExecutionEngine {
                               break;
                           case 'array':
                               value = safeJsonParse(value, [], `variable ${variable.name}`);
-                              if (!Array.isArray(value)) value = [];
+                              if (!Array.isArray(value)) {
+                                  console.warn(`[GraphExecutionEngine] Failed to parse array for variable "${variable.name}". Falling back to empty array. Raw value:`, value);
+                                  value = [];
+                              }
                               break;
                       }
                   } catch (e) {
@@ -318,9 +322,8 @@ class GraphExecutionEngine {
   isNodeVolatile(node, visited = new Set(), depth = 0) {
     if (!node) return false;
 
-    const MAX_DEPTH = 100;
-    if (depth > MAX_DEPTH) {
-        console.warn(`[GraphExecutionEngine] isNodeVolatile достиг максимальной глубины рекурсии (${MAX_DEPTH})`);
+    if (depth > MAX_RECURSION_DEPTH) {
+        console.warn(`[GraphExecutionEngine] isNodeVolatile достиг максимальной глубины рекурсии (${MAX_RECURSION_DEPTH})`);
         return false;
     }
 

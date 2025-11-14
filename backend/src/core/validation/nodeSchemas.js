@@ -13,12 +13,19 @@ const NodeConfigSchema = z.object({
     label: z.string().min(1),
     category: z.string().min(1),
     description: z.string().optional(),
+    name: z.string().optional(),
+    graphType: z.enum(['all', 'command', 'event']).optional(),
+    isEvent: z.boolean().optional(),
+    dynamicPins: z.boolean().optional(),
     inputs: z.array(PinSchema).optional().default([]),
     outputs: z.array(PinSchema).optional().default([]),
+    pins: z.object({
+        inputs: z.array(PinSchema).optional().default([]),
+        outputs: z.array(PinSchema).optional().default([]),
+    }).optional(),
     executor: z.function().optional(),
     evaluator: z.function().optional(),
-    graphTypes: z.array(z.enum(['all', 'command', 'event'])).optional(),
-});
+}).passthrough();
 
 const NodeDataSchema = z.object({
     id: z.string().min(1),

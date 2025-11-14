@@ -44,7 +44,7 @@ function registerNodes(registry) {
   registry.registerNodeType({
     type: 'user:get_groups',
     label: '👥 Получить группы',
-    category: 'Пользователь',
+    category: 'Пользователи',
     description: 'Возвращает массив названий групп, в которых состоит пользователь.',
     graphType: all,
     evaluator: require('../nodes/users/get_groups').evaluate,
@@ -61,7 +61,7 @@ function registerNodes(registry) {
   registry.registerNodeType({
     type: 'user:get_permissions',
     label: '🔑 Получить права',
-    category: 'Пользователь',
+    category: 'Пользователи',
     description: 'Возвращает массив прав пользователя.',
     graphType: all,
     evaluator: require('../nodes/users/get_permissions').evaluate,

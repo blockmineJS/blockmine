@@ -1,4 +1,5 @@
 const { validateNodeConfig } = require('./validation/nodeSchemas');
+const { VALIDATION_ENABLED } = require('./config/validation');
 
 /**
  * @typedef {object} NodePin
@@ -25,7 +26,7 @@ const { validateNodeConfig } = require('./validation/nodeSchemas');
 class NodeRegistry {
   constructor() {
     this.nodes = new Map();
-    this.validationEnabled = process.env.NODE_ENV !== 'production';
+    this.validationEnabled = VALIDATION_ENABLED;
     this._registerBaseNodes();
   }
 

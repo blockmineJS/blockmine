@@ -46,7 +46,10 @@ class EventGraphManager {
                             case 'boolean': val = v.value === 'true'; break;
                             case 'array':
                                 val = safeJsonParse(v.value, [], `variable ${v.name}`);
-                                if (!Array.isArray(val)) val = [];
+                                if (!Array.isArray(val)) {
+                                    console.warn(`[EventGraphManager] Failed to parse variable "${v.name}" as array. Falling back to empty array. Value:`, v.value);
+                                    val = [];
+                                }
                                 break;
                             default: val = v.value;
                         }
