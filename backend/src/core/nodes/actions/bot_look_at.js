@@ -16,7 +16,7 @@ async function execute(node, context, helpers) {
         // Если цель - это сущность, у которой есть позиция
         if (target.position) {
             finalPosition = { ...target.position };
-        } 
+        }
         // Если цель - это объект с координатами
         else if (target.x !== undefined && target.y !== undefined && target.z !== undefined) {
             finalPosition = { ...target };
@@ -27,7 +27,7 @@ async function execute(node, context, helpers) {
             context.bot.lookAt(finalPosition);
         }
     }
-    
+
     await traverse(node, 'exec');
 }
 

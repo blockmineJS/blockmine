@@ -1,5 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('./PrismaService');
+const { safeJsonParse } = require('./utils/jsonParser');
+const { validateGraph } = require('./validation/nodeSchemas');
+const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
 
@@ -13,6 +15,7 @@ class GraphExecutionEngine {
       this.activeGraph = null;
       this.context = null;
       this.memo = new Map();
+      this.validationEnabled = process.env.NODE_ENV !== 'production';
   }
 
   async execute(graph, context, eventType) {
@@ -20,14 +23,20 @@ class GraphExecutionEngine {
 
       let parsedGraph;
       if (typeof graph === 'string') {
-          try {
-              parsedGraph = JSON.parse(graph);
-          } catch (e) {
-              console.error('[GraphExecutionEngine] Ошибка парсинга JSON графа:', e);
+          parsedGraph = safeJsonParse(graph, null, 'GraphExecutionEngine.execute');
+          if (!parsedGraph) {
               return context;
           }
       } else {
           parsedGraph = graph;
+      }
+
+      if (this.validationEnabled) {
+          const validation = validateGraph(parsedGraph);
+          if (!validation.success) {
+              console.error('[GraphExecutionEngine] Graph validation failed:', validation.error);
+              throw new Error(`Invalid graph structure: ${JSON.stringify(validation.error)}`);
+          }
       }
 
       if (!parsedGraph.nodes || !parsedGraph.connections) {
@@ -53,7 +62,8 @@ class GraphExecutionEngine {
                               value = value === 'true';
                               break;
                           case 'array':
-                              value = JSON.parse(value);
+                              value = safeJsonParse(value, [], `variable ${variable.name}`);
+                              if (!Array.isArray(value)) value = [];
                               break;
                       }
                   } catch (e) {
@@ -305,9 +315,20 @@ class GraphExecutionEngine {
       return result;
   }
 
-  isNodeVolatile(node) {
+  isNodeVolatile(node, visited = new Set(), depth = 0) {
     if (!node) return false;
-    
+
+    const MAX_DEPTH = 100;
+    if (depth > MAX_DEPTH) {
+        console.warn(`[GraphExecutionEngine] isNodeVolatile достиг максимальной глубины рекурсии (${MAX_DEPTH})`);
+        return false;
+    }
+
+    if (visited.has(node.id)) {
+        return false;
+    }
+    visited.add(node.id);
+
     if (node.type === 'data:get_variable') {
         return true;
     }
@@ -315,7 +336,7 @@ class GraphExecutionEngine {
     const connections = this.activeGraph.connections.filter(c => c.targetNodeId === node.id);
     for (const conn of connections) {
         const sourceNode = this.activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
-        if (this.isNodeVolatile(sourceNode)) {
+        if (this.isNodeVolatile(sourceNode, visited, depth + 1)) {
             return true;
         }
     }

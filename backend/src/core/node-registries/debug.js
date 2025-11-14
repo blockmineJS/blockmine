@@ -1,0 +1,26 @@
+/**
+ * Регистрация нод категории "Отладка"
+ */
+function registerNodes(registry) {
+  const all = 'all';
+
+  registry.registerNodeType({
+    type: 'debug:log',
+    label: '🐞 Отладка (консоль)',
+    category: 'Отладка',
+    description: 'Выводит значение в консоль терминала, где запущен бот.',
+    graphType: all,
+    executor: require('../nodes/debug/log').execute,
+    pins: {
+      inputs: [
+        { id: 'exec', name: 'Exec', type: 'Exec' },
+        { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
+      ],
+      outputs: [
+        { id: 'exec', name: 'Exec', type: 'Exec' }
+      ]
+    }
+  });
+}
+
+module.exports = { registerNodes };

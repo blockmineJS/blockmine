@@ -1,8 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 const nodeRegistry = require('./NodeRegistry');
+const prismaService = require('./PrismaService');
+const { safeJsonParse } = require('./utils/jsonParser');
 
-const prisma = new PrismaClient();
+const prisma = prismaService.getClient();
 
 class EventGraphManager {
     constructor(botManager = null) {
@@ -32,25 +33,24 @@ class EventGraphManager {
             if (!graph.triggers || graph.triggers.length === 0 || !graph.graphJson) continue;
 
             try {
-                const parsedGraph = JSON.parse(graph.graphJson);
-                if (!parsedGraph.nodes) continue;
+                const parsedGraph = safeJsonParse(graph.graphJson, null, `EventGraph ID ${graph.id}`);
+                if (!parsedGraph || !parsedGraph.nodes) continue;
 
                 const initialState = {};
                 if (graph.variables) {
-                    try {
-                        const parsedVars = JSON.parse(graph.variables);
-                        for (const v of parsedVars) {
-                            let val;
-                            switch (v.type) {
-                                case 'number': val = Number(v.value) || 0; break;
-                                case 'boolean': val = v.value === 'true'; break;
-                                case 'array': try { val = Array.isArray(JSON.parse(v.value)) ? JSON.parse(v.value) : []; } catch { val = []; } break;
-                                default: val = v.value;
-                            }
-                            initialState[v.name] = val;
+                    const parsedVars = safeJsonParse(graph.variables, [], `EventGraph ID ${graph.id} variables`);
+                    for (const v of parsedVars) {
+                        let val;
+                        switch (v.type) {
+                            case 'number': val = Number(v.value) || 0; break;
+                            case 'boolean': val = v.value === 'true'; break;
+                            case 'array':
+                                val = safeJsonParse(v.value, [], `variable ${v.name}`);
+                                if (!Array.isArray(val)) val = [];
+                                break;
+                            default: val = v.value;
                         }
-                    } catch (e) {
-                        console.error(`[EventGraphs] Ошибка парсинга переменных графа ID ${graph.id}:`, e);
+                        initialState[v.name] = val;
                     }
                 }
                 this.graphStates.set(`${botId}-${graph.id}`, initialState);
@@ -152,7 +152,10 @@ class EventGraphManager {
                     switch (v.type) {
                         case 'number': val = Number(v.value) || 0; break;
                         case 'boolean': val = v.value === 'true'; break;
-                        case 'array': try { val = Array.isArray(JSON.parse(v.value)) ? JSON.parse(v.value) : []; } catch { val = []; } break;
+                        case 'array':
+                            val = safeJsonParse(v.value, [], `variable ${v.name}`);
+                            if (!Array.isArray(val)) val = [];
+                            break;
                         default: val = v.value;
                     }
                     savedVariables[v.name] = val;

@@ -11,7 +11,7 @@ async function execute(node, context, helpers) {
     const varName = await resolvePinValue(node, 'name', '');
     const varValue = await resolvePinValue(node, 'value');
     let shouldPersist = await resolvePinValue(node, 'persist', false);
-    
+
     // В графах команд принудительно отключаем сохранение в БД, чтобы избежать случайных записей
     if (context.eventType === 'command') {
         shouldPersist = false;
@@ -23,7 +23,7 @@ async function execute(node, context, helpers) {
           context.persistenceIntent.set(varName, shouldPersist);
         }
     }
-    
+
     await traverse(node, 'exec');
 }
 

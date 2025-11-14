@@ -7,12 +7,12 @@
  */
 async function execute(node, context, helpers) {
     let message = await helpers.resolvePinValue(node, 'message', '');
-    
+
     // Если сообщение - это объект или массив, форматируем как JSON
     if (typeof message === 'object' && message !== null) {
         message = JSON.stringify(message, null, 2);
     }
-    
+
     if (context?.bot?.sendLog) {
         context.bot.sendLog(`[Graph] ${message}`);
     } else {

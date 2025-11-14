@@ -1,4 +1,4 @@
-const User = require('../UserService');
+const User = require('../../UserService');
 
 /**
  * @param {object} node - Экземпляр узла из графа.

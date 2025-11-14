@@ -1,4 +1,4 @@
-const BreakLoopSignal = require('../BreakLoopSignal');
+const BreakLoopSignal = require('../../BreakLoopSignal');
 
 /**
  * @param {object} node - Экземпляр узла из графа.

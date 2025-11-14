@@ -11,12 +11,12 @@ async function execute(node, context, helpers) {
     const value = await resolvePinValue(node, 'value');
     const caseCount = node.data?.caseCount || 0;
     let matched = false;
-    
+
     for (let i = 0; i < caseCount; i++) {
         const caseValue = node.data?.[`case_${i}`];
         if (caseValue !== undefined) {
             let isMatch = false;
-            
+
             if (Array.isArray(value) && Array.isArray(caseValue)) {
                 isMatch = JSON.stringify(value) === JSON.stringify(caseValue);
             } else if (typeof value === 'object' && typeof caseValue === 'object' && value !== null && caseValue !== null) {
@@ -28,7 +28,7 @@ async function execute(node, context, helpers) {
             } else {
                 isMatch = String(value) === String(caseValue);
             }
-            
+
             if (isMatch) {
                 await traverse(node, `case_${i}`);
                 matched = true;
@@ -36,7 +36,7 @@ async function execute(node, context, helpers) {
             }
         }
     }
-    
+
     if (!matched) {
         await traverse(node, 'default');
     }

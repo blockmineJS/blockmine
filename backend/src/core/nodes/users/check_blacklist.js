@@ -1,4 +1,4 @@
-const User = require('../UserService');
+const User = require('../../UserService');
 
 /**
  * @param {object} node - Экземпляр узла из графа.
@@ -12,7 +12,7 @@ async function evaluate(node, pinId, context, helpers) {
     const { resolvePinValue } = helpers;
 
     const userIdentifier = await resolvePinValue(node, 'user', null);
-    let permissions = [];
+    let isBlacklisted = false;
     let usernameToFind = null;
 
     if (typeof userIdentifier === 'string') {
@@ -23,12 +23,13 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (usernameToFind) {
         const user = await User.getUser(usernameToFind, context.botId);
-        if (user && user.permissionsSet) {
-            permissions = Array.from(user.permissionsSet);
+        if (user) {
+            isBlacklisted = user.isBlacklisted;
         }
     }
     
-    return permissions;
+    // Этот узел имеет только один выходной пин данных
+    return isBlacklisted;
 }
 
 module.exports = {

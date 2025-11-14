@@ -1,6 +1,6 @@
-const User = require('../UserService');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const User = require('../../UserService');
+const prismaService = require('../../PrismaService');
+const prisma = prismaService.getClient();
 
 /**
  * @param {object} node - Экземпляр узла из графа.
