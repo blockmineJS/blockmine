@@ -40,6 +40,7 @@ function BotVisualEditorPage() {
     const command = useVisualEditorStore(state => state.command);
     const availableNodes = useVisualEditorStore(state => state.availableNodes);
     const saveGraph = useVisualEditorStore(state => state.saveGraph);
+    const flushSaveGraph = useVisualEditorStore(state => state.flushSaveGraph);
     const nodes = useVisualEditorStore(state => state.nodes);
     const edges = useVisualEditorStore(state => state.edges);
     const onNodesChange = useVisualEditorStore(state => state.onNodesChange);
@@ -71,7 +72,12 @@ function BotVisualEditorPage() {
         if (botId && entityId) {
             init(botId, entityId, editorType);
         }
-    }, [botId, entityId, editorType, init]);
+
+        // Сохраняем несохраненные изменения при размонтировании компонента
+        return () => {
+            flushSaveGraph();
+        };
+    }, [botId, entityId, editorType, init, flushSaveGraph]);
 
     useEffect(() => {
         loadCategories();

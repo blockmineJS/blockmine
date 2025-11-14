@@ -1,5 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('./PrismaService');
+const { parseVariables } = require('./utils/variableParser');
+const validationService = require('./services/ValidationService');
+const { MAX_RECURSION_DEPTH } = require('./config/validation');
+const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
 
@@ -18,20 +21,13 @@ class GraphExecutionEngine {
   async execute(graph, context, eventType) {
       if (!graph || graph === 'null') return context;
 
-      let parsedGraph;
-      if (typeof graph === 'string') {
-          try {
-              parsedGraph = JSON.parse(graph);
-          } catch (e) {
-              console.error('[GraphExecutionEngine] Ошибка парсинга JSON графа:', e);
-              return context;
-          }
-      } else {
-          parsedGraph = graph;
+      const parsedGraph = validationService.parseGraph(graph, 'GraphExecutionEngine.execute');
+      if (!parsedGraph) {
+          return context;
       }
 
-      if (!parsedGraph.nodes || !parsedGraph.connections) {
-          console.error('[GraphExecutionEngine] Неверный формат графа. Отсутствуют nodes или connections.');
+      const validation = validationService.validateGraphStructure(parsedGraph, 'GraphExecutionEngine');
+      if (validation.shouldSkip) {
           return context;
       }
 
@@ -40,28 +36,10 @@ class GraphExecutionEngine {
           this.context = context;
           
           if (!this.context.variables) {
-            this.context.variables = {};
-            if (Array.isArray(this.activeGraph.variables)) {
-              for (const variable of this.activeGraph.variables) {
-                  let value = variable.value;
-                  try {
-                      switch(variable.type) {
-                          case 'number':
-                              value = Number(value);
-                              break;
-                          case 'boolean':
-                              value = value === 'true';
-                              break;
-                          case 'array':
-                              value = JSON.parse(value);
-                              break;
-                      }
-                  } catch (e) {
-                      console.error(`Error parsing variable default value for ${variable.name}:`, e);
-                  }
-                  this.context.variables[variable.name] = value;
-              }
-            }
+            this.context.variables = parseVariables(
+              this.activeGraph.variables,
+              'GraphExecutionEngine'
+            );
           }
 
           if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
@@ -305,9 +283,19 @@ class GraphExecutionEngine {
       return result;
   }
 
-  isNodeVolatile(node) {
+  isNodeVolatile(node, visited = new Set(), depth = 0) {
     if (!node) return false;
-    
+
+    if (depth > MAX_RECURSION_DEPTH) {
+        console.warn(`[GraphExecutionEngine] isNodeVolatile достиг максимальной глубины рекурсии (${MAX_RECURSION_DEPTH})`);
+        return false;
+    }
+
+    if (visited.has(node.id)) {
+        return false;
+    }
+    visited.add(node.id);
+
     if (node.type === 'data:get_variable') {
         return true;
     }
@@ -315,7 +303,7 @@ class GraphExecutionEngine {
     const connections = this.activeGraph.connections.filter(c => c.targetNodeId === node.id);
     for (const conn of connections) {
         const sourceNode = this.activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
-        if (this.isNodeVolatile(sourceNode)) {
+        if (this.isNodeVolatile(sourceNode, visited, depth + 1)) {
             return true;
         }
     }

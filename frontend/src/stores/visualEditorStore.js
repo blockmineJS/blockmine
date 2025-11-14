@@ -9,9 +9,15 @@ import { apiHelper } from '@/lib/api';
 import { toast } from "@/hooks/use-toast";
 import { randomUUID } from '@/lib/uuid';
 import { getConversionChain, createConverterNode } from '@/lib/typeConversionHelper';
+import { debounce } from '@/lib/debounce';
 
 export const useVisualEditorStore = create(
-  immer((set, get) => ({
+  immer((set, get) => {
+    const debouncedSaveGraph = debounce(() => {
+      get().saveGraph();
+    }, 1000);
+
+    return {
     nodes: [],
     edges: [],
     command: null,
@@ -656,5 +662,23 @@ export const useVisualEditorStore = create(
     setInitialState: (graphId, graphType, initialGraph) => {
       get().init(graphId, graphType, initialGraph);
     },
-  }))
+
+    autoSaveGraph: () => {
+      debouncedSaveGraph();
+    },
+
+    /**
+     * Принудительное сохранение графа с очисткой отложенного таймера
+     * Вызывается при выгрузке компонента для предотвращения потери изменений
+     *
+     * Метод flush() теперь автоматически вызывает отложенную функцию,
+     * поэтому больше не нужно дополнительно вызывать saveGraph()
+     */
+    flushSaveGraph: () => {
+      if (debouncedSaveGraph.flush) {
+        debouncedSaveGraph.flush();
+      }
+    },
+  };
+  })
 );

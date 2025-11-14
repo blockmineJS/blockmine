@@ -20,13 +20,8 @@ module.exports = {
     ],
 
     collectCoverageFrom: [
-        // Repositories (98.79% coverage)
         'src/repositories/**/*.js',
-
-        // Services (refactored)
         'src/core/services/**/*.js',
-
-        // Core files
         'src/container.js',
         'src/core/BotManager.js',
         'src/core/EventGraphManager.js',
@@ -40,19 +35,15 @@ module.exports = {
         'src/core/MessageQueue.js',
         'src/core/GraphExecutionEngine.js',
         'src/core/NodeRegistry.js',
-
-        // API Routes
+        'src/core/PrismaService.js',
         'src/api/routes/**/*.js',
-
-        // Utilities
         'src/core/utils/**/*.js',
-
-        // Exclude
+        'src/core/nodes/**/*.js',
         '!src/**/*.test.js',
         '!src/**/__tests__/**',
-        '!src/core/BotProcess.js',  // Child process - сложно тестировать
-        '!src/core/BotManager.old.js',  // Старый файл
-        '!src/test-refactor.js',  // Скрипт для проверки
+        '!src/core/BotProcess.js',
+        '!src/core/BotManager.old.js',
+        '!src/test-refactor.js',
     ],
 
 

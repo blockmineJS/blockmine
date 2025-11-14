@@ -1,0 +1,79 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
+/**
+ * Регистрация нод категории "Пользователи"
+ */
+function registerNodes(registry) {
+  registry.registerNodeType({
+    type: 'user:check_blacklist',
+    label: '❓ В черном списке?',
+    category: 'Пользователи',
+    description: 'Проверяет, находится ли пользователь в черном списке.',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/users/check_blacklist').evaluate,
+    pins: {
+      inputs: [
+        { id: 'user', name: 'Пользователь', type: 'User', required: true }
+      ],
+      outputs: [
+        { id: 'is_blacklisted', name: 'В ЧС', type: 'Boolean' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'user:set_blacklist',
+    label: '🚫 Установить ЧС',
+    category: 'Пользователи',
+    description: 'Добавляет или убирает пользователя из черного списка.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../nodes/users/set_blacklist').execute,
+    pins: {
+      inputs: [
+        { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+        { id: 'user', name: 'Пользователь', type: 'User', required: true },
+        { id: 'blacklist_status', name: 'Статус ЧС', type: 'Boolean', required: true }
+      ],
+      outputs: [
+        { id: 'exec', name: 'Далее', type: 'Exec' },
+        { id: 'updated_user', name: 'Обновленный пользователь', type: 'User' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'user:get_groups',
+    label: '👥 Получить группы',
+    category: 'Пользователи',
+    description: 'Возвращает массив названий групп, в которых состоит пользователь.',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/users/get_groups').evaluate,
+    pins: {
+      inputs: [
+        { id: 'user', name: 'Пользователь', type: 'User', required: true }
+      ],
+      outputs: [
+        { id: 'groups', name: 'Группы', type: 'Array' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'user:get_permissions',
+    label: '🔑 Получить права',
+    category: 'Пользователи',
+    description: 'Возвращает массив прав пользователя.',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/users/get_permissions').evaluate,
+    pins: {
+      inputs: [
+        { id: 'user', name: 'Пользователь', type: 'User', required: true }
+      ],
+      outputs: [
+        { id: 'permissions', name: 'Права', type: 'Array' }
+      ]
+    }
+  });
+}
+
+module.exports = { registerNodes };
