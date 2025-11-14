@@ -35,13 +35,16 @@ class GraphExecutionEngine {
       if (this.validationEnabled) {
           const validation = validateGraph(parsedGraph);
           if (!validation.success) {
-              const errorMsg = `Invalid graph structure: ${JSON.stringify(validation.error)}`;
-              console.error('[GraphExecutionEngine] Graph validation failed:', validation.error);
+              console.error('[GraphExecutionEngine] Graph validation failed:', {
+                  errors: validation.error
+              });
 
               if (VALIDATION_STRICT_MODE) {
-                  throw new Error(errorMsg);
+                  throw new Error('Invalid graph structure');
               }
-              // В production логируем, но продолжаем выполнение
+              // В production логируем и возвращаем контекст без выполнения
+              console.warn('[GraphExecutionEngine] Skipping graph execution due to validation errors in production mode');
+              return context;
           }
       }
 
