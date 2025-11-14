@@ -1,5 +1,4 @@
-const { validateNodeConfig } = require('./validation/nodeSchemas');
-const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE } = require('./config/validation');
+const validationService = require('./services/ValidationService');
 
 /**
  * @typedef {object} NodePin
@@ -26,7 +25,6 @@ const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE } = require('./config/validat
 class NodeRegistry {
   constructor() {
     this.nodes = new Map();
-    this.validationEnabled = VALIDATION_ENABLED;
     this._registerBaseNodes();
   }
 
@@ -39,21 +37,9 @@ class NodeRegistry {
       throw new Error('Node type is required');
     }
 
-    if (this.validationEnabled) {
-      const validation = validateNodeConfig(nodeConfig);
-      if (!validation.success) {
-        console.error(`[NodeRegistry] Validation failed for node type '${nodeConfig.type}':`, {
-          type: nodeConfig.type,
-          errors: validation.error
-        });
-
-        if (VALIDATION_STRICT_MODE) {
-          throw new Error(`Invalid node configuration for '${nodeConfig.type}'`);
-        }
-        // В production пропускаем невалидную ноду
-        console.warn(`[NodeRegistry] Skipping registration of invalid node '${nodeConfig.type}' in production mode`);
-        return;
-      }
+    const validation = validationService.validateNode(nodeConfig, 'NodeRegistry');
+    if (validation.shouldSkip) {
+      return;
     }
 
     if (this.nodes.has(nodeConfig.type)) {

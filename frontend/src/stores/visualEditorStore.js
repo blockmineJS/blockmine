@@ -670,12 +670,14 @@ export const useVisualEditorStore = create(
     /**
      * Принудительное сохранение графа с очисткой отложенного таймера
      * Вызывается при выгрузке компонента для предотвращения потери изменений
+     *
+     * Метод flush() теперь автоматически вызывает отложенную функцию,
+     * поэтому больше не нужно дополнительно вызывать saveGraph()
      */
     flushSaveGraph: () => {
       if (debouncedSaveGraph.flush) {
         debouncedSaveGraph.flush();
       }
-      get().saveGraph();
     },
   };
   })

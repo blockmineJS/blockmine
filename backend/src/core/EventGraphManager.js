@@ -3,6 +3,7 @@ const nodeRegistry = require('./NodeRegistry');
 const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
 const { parseVariables, parseVariableValue } = require('./utils/variableParser');
+const validationService = require('./services/ValidationService');
 
 const prisma = prismaService.getClient();
 
@@ -34,8 +35,8 @@ class EventGraphManager {
             if (!graph.triggers || graph.triggers.length === 0 || !graph.graphJson) continue;
 
             try {
-                const parsedGraph = safeJsonParse(graph.graphJson, null, `EventGraph ID ${graph.id}`);
-                if (!parsedGraph || !parsedGraph.nodes) continue;
+                const parsedGraph = validationService.parseGraph(graph.graphJson, `EventGraph ID ${graph.id}`);
+                if (!validationService.hasValidBasicStructure(parsedGraph)) continue;
 
                 const initialState = {};
                 if (graph.variables) {

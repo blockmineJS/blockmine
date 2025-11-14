@@ -1,8 +1,7 @@
 const prismaService = require('./PrismaService');
-const { safeJsonParse } = require('./utils/jsonParser');
 const { parseVariables } = require('./utils/variableParser');
-const { validateGraph } = require('./validation/nodeSchemas');
-const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE, MAX_RECURSION_DEPTH } = require('./config/validation');
+const validationService = require('./services/ValidationService');
+const { MAX_RECURSION_DEPTH } = require('./config/validation');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
@@ -17,39 +16,22 @@ class GraphExecutionEngine {
       this.activeGraph = null;
       this.context = null;
       this.memo = new Map();
-      this.validationEnabled = VALIDATION_ENABLED;
   }
 
   async execute(graph, context, eventType) {
       if (!graph || graph === 'null') return context;
 
-      let parsedGraph;
-      if (typeof graph === 'string') {
-          parsedGraph = safeJsonParse(graph, null, 'GraphExecutionEngine.execute');
-          if (!parsedGraph) {
-              return context;
-          }
-      } else {
-          parsedGraph = graph;
+      const parsedGraph = validationService.parseGraph(graph, 'GraphExecutionEngine.execute');
+      if (!parsedGraph) {
+          return context;
       }
 
-      if (this.validationEnabled) {
-          const validation = validateGraph(parsedGraph);
-          if (!validation.success) {
-              console.error('[GraphExecutionEngine] Graph validation failed:', {
-                  errors: validation.error
-              });
-
-              if (VALIDATION_STRICT_MODE) {
-                  throw new Error('Invalid graph structure');
-              }
-              // В production логируем и возвращаем контекст без выполнения
-              console.warn('[GraphExecutionEngine] Skipping graph execution due to validation errors in production mode');
-              return context;
-          }
+      const validation = validationService.validateGraphStructure(parsedGraph, 'GraphExecutionEngine');
+      if (validation.shouldSkip) {
+          return context;
       }
 
-      if (!parsedGraph.nodes || !parsedGraph.connections) {
+      if (!validationService.hasValidBasicStructure(parsedGraph)) {
           console.error('[GraphExecutionEngine] Неверный формат графа. Отсутствуют nodes или connections.');
           return context;
       }
