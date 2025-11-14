@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Отладка"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'debug:log',
     label: '🐞 Отладка (консоль)',
     category: 'Отладка',
     description: 'Выводит значение в консоль терминала, где запущен бот.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/debug/log').execute,
     pins: {
       inputs: [

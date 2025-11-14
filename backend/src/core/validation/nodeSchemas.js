@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { GRAPH_TYPES } = require('../constants/graphTypes');
 
 const PinSchema = z.object({
     id: z.string().min(1),
@@ -14,7 +15,7 @@ const NodeConfigSchema = z.object({
     category: z.string().min(1),
     description: z.string().optional(),
     name: z.string().optional(),
-    graphType: z.enum(['all', 'command', 'event']).optional(),
+    graphType: z.enum([GRAPH_TYPES.ALL, GRAPH_TYPES.COMMAND, GRAPH_TYPES.EVENT]).optional(),
     isEvent: z.boolean().optional(),
     dynamicPins: z.boolean().optional(),
     inputs: z.array(PinSchema).optional().default([]),

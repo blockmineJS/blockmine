@@ -1,4 +1,5 @@
 const validationService = require('./services/ValidationService');
+const { GRAPH_TYPES } = require('./constants/graphTypes');
 
 /**
  * @typedef {object} NodePin
@@ -75,7 +76,7 @@ class NodeRegistry {
   getNodesByCategory(graphType) {
     const result = {};
     for (const node of this.nodes.values()) {
-      if (node.graphType === 'all' || node.graphType === graphType) {
+      if (node.graphType === GRAPH_TYPES.ALL || node.graphType === graphType) {
         if (!result[node.category]) {
           result[node.category] = [];
         }
@@ -96,40 +97,39 @@ class NodeRegistry {
 
   /**
    * Регистрирует базовую библиотеку узлов.
+   * Автоматически обнаруживает и загружает все файлы из директории node-registries.
    * @private
    */
   _registerBaseNodes() {
-    // Импортируем модули регистрации нод
-    const eventsRegistry = require('./node-registries/events');
-    const flowRegistry = require('./node-registries/flow');
-    const actionsRegistry = require('./node-registries/actions');
-    const dataRegistry = require('./node-registries/data');
-    const timeRegistry = require('./node-registries/time');
-    const stringsRegistry = require('./node-registries/strings');
-    const arraysRegistry = require('./node-registries/arrays');
-    const mathRegistry = require('./node-registries/math');
-    const logicRegistry = require('./node-registries/logic');
-    const objectsRegistry = require('./node-registries/objects');
-    const usersRegistry = require('./node-registries/users');
-    const botRegistry = require('./node-registries/bot');
-    const debugRegistry = require('./node-registries/debug');
+    const fs = require('fs');
+    const path = require('path');
 
-    // Регистрируем все ноды
-    eventsRegistry.registerNodes(this);
-    flowRegistry.registerNodes(this);
-    actionsRegistry.registerNodes(this);
-    dataRegistry.registerNodes(this);
-    timeRegistry.registerNodes(this);
-    stringsRegistry.registerNodes(this);
-    arraysRegistry.registerNodes(this);
-    mathRegistry.registerNodes(this);
-    logicRegistry.registerNodes(this);
-    objectsRegistry.registerNodes(this);
-    usersRegistry.registerNodes(this);
-    botRegistry.registerNodes(this);
-    debugRegistry.registerNodes(this);
+    const registriesDir = path.join(__dirname, 'node-registries');
 
-    console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes`);
+    try {
+      // Получаем все файлы .js из директории node-registries
+      const files = fs.readdirSync(registriesDir)
+        .filter(file => file.endsWith('.js'));
+
+      // Загружаем и регистрируем ноды из каждого файла
+      for (const file of files) {
+        try {
+          const registry = require(path.join(registriesDir, file));
+
+          if (typeof registry.registerNodes === 'function') {
+            registry.registerNodes(this);
+          } else {
+            console.warn(`NodeRegistry: Файл ${file} не экспортирует функцию registerNodes`);
+          }
+        } catch (error) {
+          console.error(`NodeRegistry: Ошибка загрузки реестра из ${file}:`, error.message);
+        }
+      }
+
+      console.log(`NodeRegistry: Registered ${this.nodes.size} base nodes from ${files.length} registries`);
+    } catch (error) {
+      console.error('NodeRegistry: Ошибка чтения директории node-registries:', error.message);
+    }
   }
 
   getNodesByTypes(types) {

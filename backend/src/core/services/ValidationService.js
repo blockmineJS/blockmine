@@ -38,6 +38,19 @@ class ValidationService {
             return { success: true, shouldSkip: false };
         }
 
+        // Сначала проверяем базовую структуру
+        if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.connections)) {
+            console.error(`[${contextName}] Graph validation failed: missing or invalid nodes/connections arrays`);
+
+            if (this.strictMode) {
+                throw new Error('Invalid graph structure: missing nodes or connections');
+            }
+
+            console.warn(`[${contextName}] Skipping graph execution due to missing basic structure in production mode`);
+            return { success: false, error: 'Missing nodes or connections', shouldSkip: true };
+        }
+
+        // Затем выполняем полную валидацию схемы
         const validation = validateGraph(graph);
 
         if (!validation.success) {

@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Математика"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'math:operation',
     label: '🔢 Математика',
     category: 'Математика',
     description: 'Выполняет математическую операцию над двумя числами.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/math/operation').evaluate,
     pins: {
       inputs: [

@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Логика"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'logic:operation',
     label: '💡 Логика',
     category: 'Логика',
     description: 'Выполняет логическую операцию. Для НЕ (NOT) используется только вход А.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/logic/operation').evaluate,
     pins: {
@@ -28,7 +28,7 @@ function registerNodes(registry) {
     label: '⎗ Сравнение',
     category: 'Логика',
     description: 'Сравнивает два значения.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/logic/compare').evaluate,
     pins: {
       inputs: [

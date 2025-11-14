@@ -31,11 +31,6 @@ class GraphExecutionEngine {
           return context;
       }
 
-      if (!validationService.hasValidBasicStructure(parsedGraph)) {
-          console.error('[GraphExecutionEngine] Неверный формат графа. Отсутствуют nodes или connections.');
-          return context;
-      }
-
       try {
           this.activeGraph = parsedGraph;
           this.context = context;

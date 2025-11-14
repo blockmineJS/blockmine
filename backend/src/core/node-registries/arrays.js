@@ -1,14 +1,14 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Массивы"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'array:get_random_element',
     label: '🎲 Случайный элемент',
     category: 'Массив',
-    graphType: 'all',
+    graphType: GRAPH_TYPES.ALL,
     description: 'Возвращает случайный элемент из массива и его индекс.',
     evaluator: require('../nodes/arrays/get_random_element').evaluate,
     pins: {
@@ -27,7 +27,7 @@ function registerNodes(registry) {
     label: '🔍 Массив: Содержит',
     category: 'Массив',
     description: 'Проверяет, содержит ли массив указанный элемент и возвращает его индекс.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/contains').evaluate,
     pins: {
       inputs: [
@@ -46,7 +46,7 @@ function registerNodes(registry) {
     label: '📦 Элемент по индексу',
     category: 'Массив',
     description: 'Получает элемент массива по его индексу.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/get_by_index').evaluate,
     pins: {
       inputs: [
@@ -64,7 +64,7 @@ function registerNodes(registry) {
     label: '➡️ Следующий элемент',
     category: 'Массив',
     description: 'Получает следующий элемент массива.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/get_next').evaluate,
     pins: {
       inputs: [
@@ -84,7 +84,7 @@ function registerNodes(registry) {
     label: '➕ Добавить элемент',
     category: 'Массив',
     description: 'Добавляет элемент в конец массива.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/add_element').evaluate,
     pins: {
       inputs: [
@@ -102,7 +102,7 @@ function registerNodes(registry) {
     label: '➖ Удалить по индексу',
     category: 'Массив',
     description: 'Удаляет элемент из массива по его индексу.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/remove_by_index').evaluate,
     pins: {
       inputs: [
@@ -120,7 +120,7 @@ function registerNodes(registry) {
     label: '🔍 Найти индекс',
     category: 'Массив',
     description: 'Находит индекс элемента в массиве (или -1 если не найден).',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/arrays/find_index').evaluate,
     pins: {
       inputs: [

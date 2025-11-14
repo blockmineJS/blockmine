@@ -1,17 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "События"
  */
 function registerNodes(registry) {
-  const all = 'all';
-  const command = 'command';
-  const event = 'event';
-
   registry.registerNodeType({
     type: 'event:command',
     label: '▶️ При выполнении команды',
     category: 'События',
     description: 'Стартовая точка для графа команды.',
-    graphType: 'all',
+    graphType: GRAPH_TYPES.ALL,
     pins: {
       inputs: [],
       outputs: [
@@ -31,7 +29,7 @@ function registerNodes(registry) {
     label: '💬 Сообщение в чате',
     description: 'Срабатывает, когда в чат приходит сообщение.',
     category: 'События',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     isEvent: true,
     pins: {
       inputs: [],
@@ -50,7 +48,7 @@ function registerNodes(registry) {
     label: '📝 Сырое сообщение',
     description: 'Срабатывает при получении любого сообщения в сыром виде (до парсинга).',
     category: 'События',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     isEvent: true,
     pins: {
       inputs: [],
@@ -66,7 +64,7 @@ function registerNodes(registry) {
     label: '👋 Игрок зашел',
     category: 'События',
     description: 'Срабатывает, когда игрок заходит на сервер.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -81,7 +79,7 @@ function registerNodes(registry) {
     label: '🚪 Игрок вышел',
     category: 'События',
     description: 'Срабатывает, когда игрок покидает сервер.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -96,7 +94,7 @@ function registerNodes(registry) {
     label: '📦 Сущность появилась',
     category: 'События',
     description: 'Вызывается, когда новая сущность появляется в поле зрения бота.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -111,7 +109,7 @@ function registerNodes(registry) {
     label: '🧍 Сущность подвинулась',
     category: 'События',
     description: 'Вызывается, когда любая сущность перемещается.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -126,7 +124,7 @@ function registerNodes(registry) {
     label: '❌ Сущность исчезла',
     category: 'События',
     description: 'Вызывается, когда сущность пропадает из зоны видимости бота.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -141,7 +139,7 @@ function registerNodes(registry) {
     label: '💀 Бот умер',
     category: 'События',
     description: 'Срабатывает, когда бот умирает.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -155,7 +153,7 @@ function registerNodes(registry) {
     label: '❤️ Здоровье/Голод изменилось',
     category: 'События',
     description: 'Срабатывает при изменении здоровья, голода или насыщения бота.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [
@@ -172,7 +170,7 @@ function registerNodes(registry) {
     label: '📡 Вызов из WebSocket API',
     category: 'События',
     description: 'Срабатывает, когда граф вызывается через WebSocket API методом callGraph().',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     pins: {
       inputs: [],
       outputs: [

@@ -10,6 +10,8 @@ export function debounce(func, wait) {
     const later = () => {
       timeout = null;
       func.apply(lastContext, lastArgs);
+      lastArgs = null;
+      lastContext = null;
     };
 
     clearTimeout(timeout);

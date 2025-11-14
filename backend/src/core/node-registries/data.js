@@ -1,16 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Данные"
  */
 function registerNodes(registry) {
-  const all = 'all';
-  const command = 'command';
-
   registry.registerNodeType({
     type: 'data:get_argument',
     label: '📥 Получить аргумент',
     category: 'Данные',
     description: 'Получает значение аргумента команды по его имени.',
-    graphType: command,
+    graphType: GRAPH_TYPES.COMMAND,
     evaluator: require('../nodes/data/get_argument').evaluate,
     data: {
       argumentName: {
@@ -32,7 +31,7 @@ function registerNodes(registry) {
     label: '📤 Получить переменную',
     category: 'Данные',
     description: 'Получает значение переменной графа.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/get_variable').evaluate,
     pins: {
       inputs: [],
@@ -47,7 +46,7 @@ function registerNodes(registry) {
     label: '📦 Получить поле сущности',
     category: 'Данные',
     description: 'Получает определенное поле из объекта сущности (например, "position.x", "username").',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/get_entity_field').evaluate,
     pins: {
       inputs: [
@@ -67,7 +66,7 @@ function registerNodes(registry) {
     label: '📜 Строка',
     category: 'Данные',
     description: 'Текстовое значение с поддержкой переменных. Используйте {имя} для вставки значений.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/data/string_literal').evaluate,
     pins: {
@@ -83,7 +82,7 @@ function registerNodes(registry) {
     label: '🔢 Число',
     category: 'Данные',
     description: 'Простое числовое значение.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/number_literal').evaluate,
     pins: {
       inputs: [
@@ -100,7 +99,7 @@ function registerNodes(registry) {
     label: '✔️ Булево',
     category: 'Данные',
     description: 'Значение Истина/Ложь.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/boolean_literal').evaluate,
     pins: {
       inputs: [
@@ -117,7 +116,7 @@ function registerNodes(registry) {
     label: '🏗️ Собрать объект',
     category: 'Данные',
     description: 'Создает JSON-объект из пар ключ-значение.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/data/make_object').evaluate,
     pins: {
@@ -133,7 +132,7 @@ function registerNodes(registry) {
     label: '✨ Приведение типов',
     category: 'Данные',
     description: 'Приводит входящее значение к указанному целевому типу.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/cast').evaluate,
     pins: {
       inputs: [
@@ -150,7 +149,7 @@ function registerNodes(registry) {
     label: '🔍 Проверка типа',
     category: 'Данные',
     description: 'Проверяет тип входного значения.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/type_check').evaluate,
     pins: {
       inputs: [
@@ -183,7 +182,7 @@ function registerNodes(registry) {
     label: '👁️ Получить существ рядом',
     category: 'Данные',
     description: 'Возвращает массив существ в радиусе от бота.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/get_nearby_entities').evaluate,
     pins: {
       inputs: [
@@ -200,7 +199,7 @@ function registerNodes(registry) {
     label: '👥 Игроки рядом',
     category: 'Данные',
     description: 'Возвращает массив игроков с расстоянием.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/get_nearby_players').evaluate,
     pins: {
       inputs: [
@@ -217,7 +216,7 @@ function registerNodes(registry) {
     label: '🔍 Информация о существе',
     category: 'Данные',
     description: 'Извлекает данные из объекта существа.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/entity_info').evaluate,
     pins: {
       inputs: [
@@ -239,7 +238,7 @@ function registerNodes(registry) {
     label: '👤 Данные пользователя',
     category: 'Данные',
     description: 'Получает различные данные из объекта пользователя.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/get_user_field').evaluate,
     pins: {
       inputs: [
@@ -276,7 +275,7 @@ function registerNodes(registry) {
     label: '📋 Массив',
     category: 'Массив',
     description: 'Создает массив из элементов.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/data/array_literal').evaluate,
     pins: {

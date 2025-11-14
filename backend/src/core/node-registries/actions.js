@@ -1,16 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Действия"
  */
 function registerNodes(registry) {
-  const all = 'all';
-  const event = 'event';
-
   registry.registerNodeType({
     type: 'action:send_message',
     label: '🗣️ Отправить сообщение',
     category: 'Действия',
     description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     executor: require('../nodes/actions/send_message').execute,
     pins: {
@@ -31,7 +30,7 @@ function registerNodes(registry) {
     label: '📝 Записать в лог (веб)',
     category: 'Действия',
     description: 'Отправляет сообщение в консоль на странице бота.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/actions/send_log').execute,
     pins: {
       inputs: [
@@ -49,7 +48,7 @@ function registerNodes(registry) {
     label: '📤 Отправить ответ в WebSocket',
     category: 'WebSocket API',
     description: 'Отправляет данные обратно клиенту, вызвавшему граф через WebSocket API.',
-    graphType: event,
+    graphType: GRAPH_TYPES.EVENT,
     executor: require('../nodes/actions/send_websocket_response').execute,
     pins: {
       inputs: [
@@ -67,7 +66,7 @@ function registerNodes(registry) {
     label: '🤖 Бот: Посмотреть на',
     category: 'Действия',
     description: 'Поворачивает голову бота в сторону координат или сущности.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/actions/bot_look_at').execute,
     pins: {
       inputs: [
@@ -86,7 +85,7 @@ function registerNodes(registry) {
     label: '💾 Записать переменную',
     category: 'Действия',
     description: 'Сохраняет значение в переменную графа.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/actions/bot_set_variable').execute,
     pins: {
       inputs: [
@@ -106,7 +105,7 @@ function registerNodes(registry) {
     label: '🌐 HTTP-запрос',
     category: 'Действия',
     description: 'Выполняет HTTP-запрос (GET, POST, PUT, DELETE и т.д.) и возвращает ответ.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/actions/http_request').execute,
     pins: {
       inputs: [

@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Время"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'time:datetime_literal',
     label: '📅 Дата и время',
     category: 'Время',
     description: 'Создает объект даты и времени из строки. Если строка пустая, вернет текущее время.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/data/datetime_literal').evaluate,
     pins: {
       inputs: [
@@ -26,7 +26,7 @@ function registerNodes(registry) {
     label: '⏰ Текущее время',
     category: 'Время',
     description: 'Возвращает текущую дату и время.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/time/now').evaluate,
     pins: {
       inputs: [],
@@ -41,7 +41,7 @@ function registerNodes(registry) {
     label: '📝 Отформатировать дату',
     category: 'Время',
     description: 'Форматирует дату в строку. Формат по-умолчанию: yyyy-MM-dd HH:mm:ss',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/time/format').evaluate,
     pins: {
       inputs: [
@@ -59,7 +59,7 @@ function registerNodes(registry) {
     label: '➕ Прибавить время',
     category: 'Время',
     description: 'Добавляет к дате указанный промежуток времени. Пример объекта продолжительности: { "seconds": 5, "minutes": 1 }',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/time/add').evaluate,
     pins: {
       inputs: [
@@ -77,7 +77,7 @@ function registerNodes(registry) {
     label: '↔️ Разница во времени',
     category: 'Время',
     description: 'Вычисляет разницу между двумя датами в миллисекундах (Дата А - Дата Б).',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/time/diff').evaluate,
     pins: {
       inputs: [
@@ -95,7 +95,7 @@ function registerNodes(registry) {
     label: '⚖️ Сравнить даты',
     category: 'Время',
     description: 'Сравнивает две даты.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/time/compare').evaluate,
     pins: {
       inputs: [

@@ -1,4 +1,5 @@
 const validationService = require('../ValidationService');
+const { GRAPH_TYPES } = require('../../constants/graphTypes');
 
 describe('ValidationService', () => {
     describe('parseGraph', () => {
@@ -103,7 +104,7 @@ describe('ValidationService', () => {
                 description: 'Test description',
                 inputs: [],
                 outputs: [],
-                graphType: 'all'
+                graphType: GRAPH_TYPES.ALL
             };
 
             const result = validationService.validateNode(nodeConfig, 'test');

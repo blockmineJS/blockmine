@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Пользователи"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'user:check_blacklist',
     label: '❓ В черном списке?',
     category: 'Пользователи',
     description: 'Проверяет, находится ли пользователь в черном списке.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/users/check_blacklist').evaluate,
     pins: {
       inputs: [
@@ -26,7 +26,7 @@ function registerNodes(registry) {
     label: '🚫 Установить ЧС',
     category: 'Пользователи',
     description: 'Добавляет или убирает пользователя из черного списка.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/users/set_blacklist').execute,
     pins: {
       inputs: [
@@ -46,7 +46,7 @@ function registerNodes(registry) {
     label: '👥 Получить группы',
     category: 'Пользователи',
     description: 'Возвращает массив названий групп, в которых состоит пользователь.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/users/get_groups').evaluate,
     pins: {
       inputs: [
@@ -63,7 +63,7 @@ function registerNodes(registry) {
     label: '🔑 Получить права',
     category: 'Пользователи',
     description: 'Возвращает массив прав пользователя.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/users/get_permissions').evaluate,
     pins: {
       inputs: [

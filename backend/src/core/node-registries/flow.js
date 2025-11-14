@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Управление потоком" (Поток)
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'flow:branch',
     label: '↔️ Ветвление (Branch)',
     category: 'Поток',
     description: 'if/else логика',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/branch').execute,
     pins: {
       inputs: [
@@ -28,7 +28,7 @@ function registerNodes(registry) {
     label: '⛓️ Последовательность',
     category: 'Поток',
     description: 'Выполняет действия по очереди',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/sequence').execute,
     pins: {
       inputs: [
@@ -46,7 +46,7 @@ function registerNodes(registry) {
     label: '🔁 Перебор массива (цикл)',
     category: 'Поток',
     description: 'Выполняет "Тело цикла" для каждого элемента в "Массиве".',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/for_each').execute,
     pins: {
       inputs: [
@@ -67,7 +67,7 @@ function registerNodes(registry) {
     label: '🔁 Цикл While',
     category: 'Поток',
     description: 'Выполняет "Тело цикла" пока условие истинно.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/while').execute,
     evaluator: require('../nodes/flow/while').evaluate,
     pins: {
@@ -88,7 +88,7 @@ function registerNodes(registry) {
     label: '🛑 Выйти из цикла',
     category: 'Поток',
     description: 'Немедленно прерывает выполнение цикла (For Each Loop) и передает управление на его выход Completed.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/break').execute,
     pins: {
       inputs: [
@@ -103,7 +103,7 @@ function registerNodes(registry) {
     label: '⏱️ Задержка',
     category: 'Поток',
     description: 'Ожидает указанное количество миллисекунд, затем продолжает выполнение.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     executor: require('../nodes/flow/delay').execute,
     pins: {
       inputs: [
@@ -121,7 +121,7 @@ function registerNodes(registry) {
     label: '🔄 Switch (свитч)',
     category: 'Поток',
     description: 'Выполняет разные действия в зависимости от значения. Автоматически определяет тип сравнения.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     executor: require('../nodes/flow/switch').execute,
     pins: {

@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Строки"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'string:contains',
     label: '🔍 Строка содержит',
     category: 'Строки',
     description: 'Проверяет, содержит ли одна строка другую.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/contains').evaluate,
     pins: {
       inputs: [
@@ -28,7 +28,7 @@ function registerNodes(registry) {
     label: '🔎 RegEx совпадает',
     category: 'Строки',
     description: 'Проверяет совпадение с регулярным выражением.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/matches').evaluate,
     pins: {
       inputs: [
@@ -46,7 +46,7 @@ function registerNodes(registry) {
     label: '🔤 Строка равна',
     category: 'Строки',
     description: 'Проверяет равенство двух строк.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/equals').evaluate,
     pins: {
       inputs: [
@@ -65,7 +65,7 @@ function registerNodes(registry) {
     label: '▶️ Начинается с',
     category: 'Строки',
     description: 'Проверяет, начинается ли строка с подстроки.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/starts_with').evaluate,
     pins: {
       inputs: [
@@ -84,7 +84,7 @@ function registerNodes(registry) {
     label: '◀️ Заканчивается на',
     category: 'Строки',
     description: 'Проверяет, заканчивается ли строка подстрокой.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/ends_with').evaluate,
     pins: {
       inputs: [
@@ -103,7 +103,7 @@ function registerNodes(registry) {
     label: '📏 Длина строки',
     category: 'Строки',
     description: 'Возвращает количество символов.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/length').evaluate,
     pins: {
       inputs: [
@@ -120,7 +120,7 @@ function registerNodes(registry) {
     label: '✂️ Разделить строку',
     category: 'Строки',
     description: 'Разделяет строку на массив по разделителю.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/strings/split').evaluate,
     pins: {
       inputs: [
@@ -138,7 +138,7 @@ function registerNodes(registry) {
     label: 'Строка: Объединить',
     category: 'Строки',
     description: 'Объединяет две или более строки в одну.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/strings/concat').evaluate,
     pins: {

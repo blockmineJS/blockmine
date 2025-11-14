@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Бот"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'bot:get_position',
     label: '🤖 Позиция бота',
     category: 'Бот',
     description: 'Возвращает текущую позицию бота в мире.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/bot/get_position').evaluate,
     pins: {
       inputs: [],

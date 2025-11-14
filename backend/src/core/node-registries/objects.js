@@ -1,15 +1,15 @@
+const { GRAPH_TYPES } = require('../constants/graphTypes');
+
 /**
  * Регистрация нод категории "Объекты"
  */
 function registerNodes(registry) {
-  const all = 'all';
-
   registry.registerNodeType({
     type: 'object:create',
     label: '🏗️ Создать объект',
     category: 'Объект',
     description: 'Создает объект из пар ключ-значение.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     evaluator: require('../nodes/objects/create').evaluate,
     pins: {
@@ -25,7 +25,7 @@ function registerNodes(registry) {
     label: '📤 Получить значение',
     category: 'Объект',
     description: 'Получает значение по ключу из объекта.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/objects/get').evaluate,
     pins: {
       inputs: [
@@ -43,7 +43,7 @@ function registerNodes(registry) {
     label: '➕ Добавить/Изменить ключ',
     category: 'Объект',
     description: 'Добавляет или изменяет значение по ключу в объекте.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/objects/set').evaluate,
     pins: {
       inputs: [
@@ -62,7 +62,7 @@ function registerNodes(registry) {
     label: '➖ Удалить ключ',
     category: 'Объект',
     description: 'Удаляет ключ из объекта.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/objects/delete').evaluate,
     pins: {
       inputs: [
@@ -80,7 +80,7 @@ function registerNodes(registry) {
     label: '🔍 Проверить ключ',
     category: 'Объект',
     description: 'Проверяет наличие ключа в объекте и возвращает значение.',
-    graphType: all,
+    graphType: GRAPH_TYPES.ALL,
     evaluator: require('../nodes/objects/has_key').evaluate,
     pins: {
       inputs: [
