@@ -1,5 +1,6 @@
 const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
+const { parseVariables } = require('./utils/variableParser');
 const { validateGraph } = require('./validation/nodeSchemas');
 const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE, MAX_RECURSION_DEPTH } = require('./config/validation');
 const prisma = prismaService.getClient();
@@ -58,32 +59,10 @@ class GraphExecutionEngine {
           this.context = context;
           
           if (!this.context.variables) {
-            this.context.variables = {};
-            if (Array.isArray(this.activeGraph.variables)) {
-              for (const variable of this.activeGraph.variables) {
-                  let value = variable.value;
-                  try {
-                      switch(variable.type) {
-                          case 'number':
-                              value = Number(value);
-                              break;
-                          case 'boolean':
-                              value = value === 'true';
-                              break;
-                          case 'array':
-                              value = safeJsonParse(value, [], `variable ${variable.name}`);
-                              if (!Array.isArray(value)) {
-                                  console.warn(`[GraphExecutionEngine] Failed to parse array for variable "${variable.name}". Falling back to empty array. Raw value:`, value);
-                                  value = [];
-                              }
-                              break;
-                      }
-                  } catch (e) {
-                      console.error(`Error parsing variable default value for ${variable.name}:`, e);
-                  }
-                  this.context.variables[variable.name] = value;
-              }
-            }
+            this.context.variables = parseVariables(
+              this.activeGraph.variables,
+              'GraphExecutionEngine'
+            );
           }
 
           if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
