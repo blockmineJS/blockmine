@@ -666,6 +666,17 @@ export const useVisualEditorStore = create(
     autoSaveGraph: () => {
       debouncedSaveGraph();
     },
+
+    /**
+     * Принудительное сохранение графа с очисткой отложенного таймера
+     * Вызывается при выгрузке компонента для предотвращения потери изменений
+     */
+    flushSaveGraph: () => {
+      if (debouncedSaveGraph.flush) {
+        debouncedSaveGraph.flush();
+      }
+      get().saveGraph();
+    },
   };
   })
 );

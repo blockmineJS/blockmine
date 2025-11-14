@@ -1,7 +1,7 @@
 const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
 const { validateGraph } = require('./validation/nodeSchemas');
-const { VALIDATION_ENABLED, MAX_RECURSION_DEPTH } = require('./config/validation');
+const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE, MAX_RECURSION_DEPTH } = require('./config/validation');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
@@ -35,8 +35,13 @@ class GraphExecutionEngine {
       if (this.validationEnabled) {
           const validation = validateGraph(parsedGraph);
           if (!validation.success) {
+              const errorMsg = `Invalid graph structure: ${JSON.stringify(validation.error)}`;
               console.error('[GraphExecutionEngine] Graph validation failed:', validation.error);
-              throw new Error(`Invalid graph structure: ${JSON.stringify(validation.error)}`);
+
+              if (VALIDATION_STRICT_MODE) {
+                  throw new Error(errorMsg);
+              }
+              // В production логируем, но продолжаем выполнение
           }
       }
 

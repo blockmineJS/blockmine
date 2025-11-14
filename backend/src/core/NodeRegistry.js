@@ -1,5 +1,5 @@
 const { validateNodeConfig } = require('./validation/nodeSchemas');
-const { VALIDATION_ENABLED } = require('./config/validation');
+const { VALIDATION_ENABLED, VALIDATION_STRICT_MODE } = require('./config/validation');
 
 /**
  * @typedef {object} NodePin
@@ -42,8 +42,13 @@ class NodeRegistry {
     if (this.validationEnabled) {
       const validation = validateNodeConfig(nodeConfig);
       if (!validation.success) {
+        const errorMsg = `Invalid node configuration for '${nodeConfig.type}': ${JSON.stringify(validation.error)}`;
         console.error(`[NodeRegistry] Validation failed for node type '${nodeConfig.type}':`, validation.error);
-        throw new Error(`Invalid node configuration for '${nodeConfig.type}': ${JSON.stringify(validation.error)}`);
+
+        if (VALIDATION_STRICT_MODE) {
+          throw new Error(errorMsg);
+        }
+        // В production логируем, но продолжаем регистрацию
       }
     }
 
