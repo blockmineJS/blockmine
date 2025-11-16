@@ -68,7 +68,7 @@ class CommandExecutionService {
             }
 
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
-            if (permission && !user.hasPermission(permission.name)) {
+            if (permission && !user.hasPermission(permission.name) && !user.isOwner) {
                 child.send({
                     type: 'handle_permission_error',
                     commandName: dbCommand.name,
@@ -152,7 +152,7 @@ class CommandExecutionService {
         }
 
         const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
-        if (permission && !user.hasPermission(permission.name)) {
+        if (permission && !user.hasPermission(permission.name) && !user.isOwner) {
             throw new Error(`User '${username}' has insufficient permissions.`);
         }
 

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/command"
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
-import CustomNode from './CustomNode';
+import CustomNode from './CustomNode.new';
 
 const VisualEditorCanvas = () => {
   const reactFlowWrapper = useRef(null);

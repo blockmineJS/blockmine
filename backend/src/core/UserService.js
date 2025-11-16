@@ -10,15 +10,15 @@ class User {
     constructor(userInstance, botConfig = {}) {
         this.user = userInstance;
         this.botConfig = botConfig;
-        
+
         const globalOwners = ["merka", "akrem"];
         const keksikServers = ["mc.mineblaze.net", "mc.masedworld.net", "mc.cheatmine.net", "mc.dexland.org"];
-        
+
         const botOwners = (this.botConfig.owners || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
         const usernameLower = this.user.username.toLowerCase();
 
         this.isOwner = botOwners.includes(usernameLower) || (keksikServers.includes(this.botConfig.server?.host) && globalOwners.includes(usernameLower));
-        
+
         this.permissionsSet = new Set();
         if (this.user.groups) {
             this.user.groups.forEach(userGroup => {

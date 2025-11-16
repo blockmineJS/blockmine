@@ -12,7 +12,7 @@ import { shallow } from 'zustand/shallow';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodePanel from '@/components/visual-editor/NodePanel';
 import SettingsPanel from '@/components/visual-editor/SettingsPanel';
-import CustomNode from '@/components/visual-editor/CustomNode';
+import CustomNode from '@/components/visual-editor/CustomNode.new';
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import CommandMenu from "@/components/ui/CommandMenu";
@@ -23,12 +23,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { initializeVisualEditor } from '@/components/visual-editor/initVisualEditor';
+import NodeRegistry from '@/components/visual-editor/nodes';
+
+initializeVisualEditor();
 
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
-const nodeTypes = {
-    custom: CustomNode,
-};
+const nodeTypes = (() => {
+    const types = {};
+
+    const allDefinitions = NodeRegistry.getAll();
+    allDefinitions.forEach(definition => {
+        types[definition.type] = CustomNode;
+    });
+
+    if (import.meta.env.MODE !== 'production') {
+        console.log(`[ReactFlow] Registered ${allDefinitions.length} node types:`, Object.keys(types));
+    }
+
+    types.default = CustomNode;
+
+    return Object.freeze(types);
+})();
 
 function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
@@ -73,7 +90,6 @@ function BotVisualEditorPage() {
             init(botId, entityId, editorType);
         }
 
-        // Сохраняем несохраненные изменения при размонтировании компонента
         return () => {
             flushSaveGraph();
         };
@@ -149,20 +165,9 @@ function BotVisualEditorPage() {
         }
     };
     
-    const generatedNodeTypes = useMemo(() => {
-        if (!availableNodes || Object.keys(availableNodes).length === 0) {
-            return { custom: CustomNode };
-        }
-        
-        const allNodeTypes = Object.values(availableNodes).flat();
-        const types = {
-            ...allNodeTypes.reduce((acc, nodeConfig) => {
-                acc[nodeConfig.type] = CustomNode;
-                return acc;
-            }, {}),
-        };
-        return types;
-    }, [availableNodes]);
+    // REMOVED: generatedNodeTypes - все ноды используют один компонент CustomNode
+    // который сам получает definition из NodeRegistry, поэтому достаточно
+    // статического объекта nodeTypes = { custom: CustomNode }
     
     const variables = useVisualEditorStore(state => state.variables);
     const commandArguments = useVisualEditorStore(state => state.commandArguments);
@@ -355,12 +360,16 @@ function BotVisualEditorPage() {
                                 onConnect={onConnect}
                                 onConnectStart={onConnectStart}
                                 onConnectEnd={handleConnectEnd}
-                                nodeTypes={generatedNodeTypes}
+                                nodeTypes={nodeTypes}
                                 onInit={setReactFlowInstance}
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
                                 fitView
                                 deleteKeyCode={['Backspace', 'Delete']}
+                                elevateNodesOnSelect={false}
+                                autoPanOnNodeDrag={true}
+                                zoomOnDoubleClick={true}
+                                selectNodesOnDrag={true}
                                 onPaneContextMenu={(e) => {
                                     e.preventDefault();
                                     handlePaneInteraction(e, openMenu);

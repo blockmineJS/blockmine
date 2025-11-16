@@ -203,7 +203,6 @@ export const useVisualEditorStore = create(
       const botId = command.botId;
 
       try {
-        // Получаем конфигурации source и target нод
         const sourceNode = nodes.find(n => n.id === connection.source);
         const targetNode = nodes.find(n => n.id === connection.target);
 
@@ -238,13 +237,11 @@ export const useVisualEditorStore = create(
           return;
         }
 
-        // Проверяем совместимость типов
         const typesMatch = sourcePin.type === targetPin.type ||
                           sourcePin.type === 'Wildcard' ||
                           targetPin.type === 'Wildcard';
 
         if (typesMatch) {
-          // Типы совместимы, обычное подключение
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
@@ -256,7 +253,6 @@ export const useVisualEditorStore = create(
         const conversionChain = getConversionChain(sourcePin.type, targetPin.type, sourceNode);
 
         if (conversionChain) {
-          // Создаем конвертер и подключения
           const result = createConverterNode(
             connection,
             conversionChain,
@@ -282,7 +278,6 @@ export const useVisualEditorStore = create(
             state.connectingPin = null;
           });
         } else {
-          // Нет известной цепочки конвертации, делаем обычное подключение
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
@@ -290,12 +285,61 @@ export const useVisualEditorStore = create(
         }
       } catch (error) {
         console.error("Ошибка при создании подключения:", error);
-        // В случае ошибки делаем обычное подключение
         set(state => {
           state.edges = addEdge(connection, state.edges);
           state.connectingPin = null;
         });
       }
+    },
+
+    addEdgeWaypoint: (edgeId, position) => {
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: [...(edge.data?.waypoints || []), position]
+                }
+              }
+            : edge
+        )
+      }));
+    },
+
+    updateEdgeWaypoint: (edgeId, waypointIndex, position) => {
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId && edge.data?.waypoints?.[waypointIndex] !== undefined
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: edge.data.waypoints.map((wp, idx) =>
+                    idx === waypointIndex ? position : wp
+                  )
+                }
+              }
+            : edge
+        )
+      }));
+    },
+
+    removeEdgeWaypoint: (edgeId, waypointIndex) => {
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId && edge.data?.waypoints
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: edge.data.waypoints.filter((_, idx) => idx !== waypointIndex)
+                }
+              }
+            : edge
+        )
+      }));
     },
 
     addNode: (type, position, shouldUpdateState = true) => {

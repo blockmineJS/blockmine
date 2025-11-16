@@ -15,7 +15,6 @@ class EventGraphManager {
         this.graphStates = new Map();
     }
 
-    // Setter для установки botManager после создания (решение circular dependency)
     setBotManager(botManager) {
         this.botManager = botManager;
         if (!this.graphEngine) {

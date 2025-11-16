@@ -136,7 +136,7 @@ function handleIncomingCommand(type, username, message) {
                 }
             }
         }
-        
+
         if (process.send) {
             process.send({
                 type: 'validate_and_run_command',
@@ -572,16 +572,13 @@ process.on('message', async (message) => {
             const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
 
             for (const dbCommand of dbCommands) {
-                if (!dbCommand.isEnabled) {
-                    if (bot.commands.has(dbCommand.name)) {
-                        bot.commands.delete(dbCommand.name);
-                    }
-                    continue;
-                }
-
                 const existingCommand = bot.commands.get(dbCommand.name);
 
+                // Не удаляем выключенные команды, а помечаем их
+                // Владельцы смогут использовать выключенные команды через проверку в CommandExecutionService
+
                 if (existingCommand) {
+                    existingCommand.isEnabled = dbCommand.isEnabled;
                     existingCommand.description = dbCommand.description;
                     existingCommand.cooldown = dbCommand.cooldown;
                     existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
