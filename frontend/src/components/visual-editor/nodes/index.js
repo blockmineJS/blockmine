@@ -129,6 +129,7 @@ import {
   eventEntityMovedDefinition,
   eventEntityGoneDefinition,
   eventBotDiedDefinition,
+  eventBotStartupDefinition,
   eventHealthDefinition,
   eventWebsocketCallDefinition,
 } from './event';
@@ -236,6 +237,7 @@ export function registerAllNodes() {
   NodeRegistry.register(eventEntityMovedDefinition);
   NodeRegistry.register(eventEntityGoneDefinition);
   NodeRegistry.register(eventBotDiedDefinition);
+  NodeRegistry.register(eventBotStartupDefinition);
   NodeRegistry.register(eventHealthDefinition);
   NodeRegistry.register(eventWebsocketCallDefinition);
 

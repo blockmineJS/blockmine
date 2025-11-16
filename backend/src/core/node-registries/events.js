@@ -149,6 +149,20 @@ function registerNodes(registry) {
   });
 
   registry.registerNodeType({
+    type: 'event:botStartup',
+    label: '🚀 При запуске бота',
+    category: 'События',
+    description: 'Срабатывает один раз при запуске бота.',
+    graphType: GRAPH_TYPES.EVENT,
+    pins: {
+      inputs: [],
+      outputs: [
+        { id: 'exec', name: 'Выполнить', type: 'Exec' },
+      ]
+    }
+  });
+
+  registry.registerNodeType({
     type: 'event:health',
     label: '❤️ Здоровье/Голод изменилось',
     category: 'События',

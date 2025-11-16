@@ -249,6 +249,11 @@ class BotLifecycleService {
             const { broadcastBotStatus } = require('../../real-time/botApi');
             broadcastBotStatus(getIO(), botId, true);
         } catch (e) { /* Socket.IO может быть не инициализирован */ }
+
+        // Триггерим событие запуска бота
+        if (this.eventGraphManager) {
+            this.eventGraphManager.handleEvent(botId, 'botStartup', {});
+        }
     }
 
     async _handleCommandRegistration(botId, commandConfig) {

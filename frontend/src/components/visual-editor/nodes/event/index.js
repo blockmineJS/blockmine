@@ -7,5 +7,6 @@ export { eventEntitySpawnDefinition } from './eventEntitySpawn';
 export { eventEntityMovedDefinition } from './eventEntityMoved';
 export { eventEntityGoneDefinition } from './eventEntityGone';
 export { eventBotDiedDefinition } from './eventBotDied';
+export { eventBotStartupDefinition } from './eventBotStartup';
 export { eventHealthDefinition } from './eventHealth';
 export { eventWebsocketCallDefinition } from './eventWebsocketCall';
