@@ -12,32 +12,28 @@
 * много новых нод и обнов для граф системы ([8881aa5](https://github.com/blockmineJS/blockmine/commit/8881aa554b1b8c6cca4d87cb5900bb8cfe535d33))
 * новая большая механика. Вебсокеты ([acda500](https://github.com/blockmineJS/blockmine/commit/acda5005d01cfcb8ee7c85474af966c646c63fcd))
 * новая нода - задержка ([cde63db](https://github.com/blockmineJS/blockmine/commit/cde63db612062f3eb7782e8c1f6af35a22dc03e2))
-* отключение градиента в консоли ([ba11548](https://github.com/blockmineJS/blockmine/commit/ba1154827c2e5016c668b79f7b80386819cc7ab9))
+* отключение градиента в консоли. Автор - @artemscine ([ba11548](https://github.com/blockmineJS/blockmine/commit/ba1154827c2e5016c668b79f7b80386819cc7ab9))
 * разработчики плагинов теперь могут указать secret: true для маскировки чувствительных значений ([f6c67fb](https://github.com/blockmineJS/blockmine/commit/f6c67fbb0a9cc24eea2175e275593a1b0421d199))
-* разработчики плагинов теперь могут указать secret: true для маскировки чувствительных значений ([ed347f1](https://github.com/blockmineJS/blockmine/commit/ed347f1ba1d9cd2b7efba79636e3f2476eb35778))
 * сообщение в чате text\ntext разделяется на два. \n разделитель ([560ae7b](https://github.com/blockmineJS/blockmine/commit/560ae7b6c8ddbe0412d7f27d145c447bb5d750d2))
 * теперь при обновлении плагинов настройки тоже мигрируются ([48434e8](https://github.com/blockmineJS/blockmine/commit/48434e853c9f926168873f61ecd49cbb6c10971c))
-* Add and enhance date/time manipulation nodes ([0398eaa](https://github.com/blockmineJS/blockmine/commit/0398eaafd629fda60f48f31bb4a7bcb0cac11467))
-* Add and enhance date/time manipulation nodes ([b0e6669](https://github.com/blockmineJS/blockmine/commit/b0e666982170688fbb1b8f75a886c81efae51940))
 * Add date and time manipulation nodes ([80c8dbd](https://github.com/blockmineJS/blockmine/commit/80c8dbd9103a38a03b4ae4ea297322ae699d9c21))
 * websocket. Большая фича ([a321023](https://github.com/blockmineJS/blockmine/commit/a3210230d6e78d46928924d244a6b24acee45443))
 
 
 ### 🛠 Рефакторинг
 
-* большой рефакторинг бэкенд части ([49a543a](https://github.com/blockmineJS/blockmine/commit/49a543a122aced41b3725564c66a01269608dd2d))
-* большой рефакторинг нод ([85ac50f](https://github.com/blockmineJS/blockmine/commit/85ac50f1f0ea79832bd398f7345029f52f6910e1))
+* большой рефакторинг бэкенд части x2 ([49a543a](https://github.com/blockmineJS/blockmine/commit/49a543a122aced41b3725564c66a01269608dd2d))
+* большой рефакторинг нод системы ([85ac50f](https://github.com/blockmineJS/blockmine/commit/85ac50f1f0ea79832bd398f7345029f52f6910e1))
 * обновление компонентов UI и удаление зависимости от MUI ([86a4a5e](https://github.com/blockmineJS/blockmine/commit/86a4a5edfc91f024cd085cbe4282a5c9efb48b84))
 * полный рефакторинг бэкенда ([5e68fd8](https://github.com/blockmineJS/blockmine/commit/5e68fd8fa00a162ae68772bb24ef984d433e9ca5))
 
 
 ### 🐛 Исправления
 
-* 2 ([28c28cc](https://github.com/blockmineJS/blockmine/commit/28c28cc8ef6693364ad9120edbec0929f68350b9))
 * важный фикс команд ([16f7da2](https://github.com/blockmineJS/blockmine/commit/16f7da23167ece0877cb196c6ba01bbd6fbcc3a3))
 * корректная очистка ANSI ([a9ba9c7](https://github.com/blockmineJS/blockmine/commit/a9ba9c74ab31dbce7ce881a098c204f48aa4e82e))
-* рестарт после падения socks ([bf98505](https://github.com/blockmineJS/blockmine/commit/bf985052c40d30add6a717748efe37eeb15d5d74))
-* уменьшение отступов в дашборде ([af52a07](https://github.com/blockmineJS/blockmine/commit/af52a07a0615d29c97c6848ea758c83544236cad))
+* рестарт после падения socks. Автор - @artemscine ([bf98505](https://github.com/blockmineJS/blockmine/commit/bf985052c40d30add6a717748efe37eeb15d5d74))
+* уменьшение отступов в дашборде Автор - @artemscine ([af52a07](https://github.com/blockmineJS/blockmine/commit/af52a07a0615d29c97c6848ea758c83544236cad))
 * remove problematic lcov-reporter-action and update to Node.js 22.x ([ac83208](https://github.com/blockmineJS/blockmine/commit/ac83208eefff2e71075d02fb46c603e8e22a6b9b))
 * resolve CodeRabbit review issues ([a45ee47](https://github.com/blockmineJS/blockmine/commit/a45ee47a02409c67284e165248ac19e6adbd369f))
 
