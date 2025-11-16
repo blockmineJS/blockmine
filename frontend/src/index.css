@@ -95,3 +95,28 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
+
+/* React Flow Performance Optimizations */
+.react-flow__node {
+  will-change: transform;
+}
+
+.react-flow__edge {
+  pointer-events: stroke;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #10b981 !important;
+  stroke-width: 2.5px !important;
+}
+
+.react-flow__handle {
+  pointer-events: all;
+}
+
+/* Отключаем transitions при движении для производительности */
+.react-flow__node.dragging,
+.react-flow__node.dragging * {
+  transition: none !important;
+}

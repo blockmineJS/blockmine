@@ -1,0 +1,8 @@
+export { arrayLiteralDefinition } from './arrayLiteral';
+export { arrayGetRandomElementDefinition } from './arrayGetRandomElement';
+export { arrayContainsDefinition } from './arrayContains';
+export { arrayGetByIndexDefinition } from './arrayGetByIndex';
+export { arrayGetNextDefinition } from './arrayGetNext';
+export { arrayAddElementDefinition } from './arrayAddElement';
+export { arrayRemoveByIndexDefinition } from './arrayRemoveByIndex';
+export { arrayFindIndexDefinition } from './arrayFindIndex';
