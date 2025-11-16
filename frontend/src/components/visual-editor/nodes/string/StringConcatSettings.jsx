@@ -16,9 +16,9 @@ const StringConcatSettings = ({ nodeId, data, updateNodeData }) => {
       >
         Добавить
       </Button>
-      {(data.pinCount > 2) && (
+      {((data.pinCount ?? 2) > 2) && (
         <Button
-          onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) - 1 })}
+          onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount ?? 2) - 1 })}
           variant="destructive"
           className="h-8 rounded-md px-3 text-xs"
         >

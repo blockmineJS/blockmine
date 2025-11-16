@@ -22,19 +22,22 @@ function CustomNode({ data, type, id: nodeId }) {
     [availableNodes, type]
   );
 
+  const context = useMemo(
+    () => ({ variables, commandArguments }),
+    [variables, commandArguments]
+  );
+
+  const inputs = useMemo(
+    () => definition ? definition.getInputs(data, context) : [],
+    [definition, data, context]
+  );
+
+  const outputs = useMemo(
+    () => definition ? definition.getOutputs(data, context) : [],
+    [definition, data, context]
+  );
+
   if (definition) {
-    const context = { variables, commandArguments };
-
-    const inputs = useMemo(
-      () => definition.getInputs(data, context),
-      [definition, data, variables, commandArguments]
-    );
-
-    const outputs = useMemo(
-      () => definition.getOutputs(data, context),
-      [definition, data, variables, commandArguments]
-    );
-
     return (
       <BaseNode
         nodeId={nodeId}
