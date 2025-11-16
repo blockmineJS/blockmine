@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Настройки для ноды flow:while
  */
-function FlowWhileSettings({ data, updateNodeData }) {
+function FlowWhileSettings({ nodeId, data, updateNodeData }) {
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">

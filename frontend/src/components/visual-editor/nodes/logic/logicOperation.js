@@ -17,7 +17,7 @@ export const logicOperationDefinition = new NodeDefinition({
 
     if (operation === 'NOT') {
       inputs.push({
-        id: 'a',
+        id: 'pin_0',
         name: 'A',
         type: 'Boolean',
         required: false,

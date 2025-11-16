@@ -203,17 +203,13 @@ export const reactFlowConfig = {
   },
 };
 
-// ============================================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ============================================================================
-
 /**
  * Получить цвет для типа данных
  * @param {string} type - тип данных
  * @returns {string} цвет в формате hex
  */
 export const getPinColor = (type) => {
-  return pinColors[type] || pinColors.any;
+  return pinColors[type] || pinColors.Wildcard;
 };
 
 /**

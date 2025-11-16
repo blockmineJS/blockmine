@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 /**
  * Настройки для ноды flow:delay
  */
-function FlowDelaySettings({ data, updateNodeData }) {
+function FlowDelaySettings({ nodeId, data, updateNodeData }) {
   return (
     <div className="space-y-4">
       <div>
@@ -15,7 +15,7 @@ function FlowDelaySettings({ data, updateNodeData }) {
           type="number"
           min="0"
           value={data.delay ?? 1000}
-          onChange={(e) => updateNodeData({ delay: parseInt(e.target.value) || 0 })}
+          onChange={(e) => updateNodeData(nodeId, { delay: parseInt(e.target.value) || 0 })}
           placeholder="1000"
         />
         <p className="text-xs text-muted-foreground mt-1">

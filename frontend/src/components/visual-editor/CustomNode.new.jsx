@@ -3,43 +3,25 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import BaseNode from './core/base/BaseNode';
 
-/**
- * CustomNode - оркестратор для рендеринга нод
- *
- * Новая архитектура:
- * 1. Получает тип ноды
- * 2. Находит NodeDefinition в реестре
- * 3. Вычисляет inputs/outputs через definition
- * 4. Рендерит BaseNode с SettingsComponent
- *
- * Преимущества:
- * - CustomNode.jsx уменьшился с 680 строк до ~100
- * - Добавление нового типа = создание NodeDefinition + регистрация
- * - Легко тестировать отдельные компоненты
- *
- * АГРЕССИВНАЯ ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ:
- * - НЕТ подписки на edges - это самая дорогая операция
- * - Используем селекторы только для данных, которые редко меняются
- * - React.memo с кастомным компаратором для предотвращения лишних ререндеров
- */
-
 function CustomNode({ data, type, id: nodeId }) {
-  // ОПТИМИЗАЦИЯ: Подписываемся только на функции и редко меняющиеся данные
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
   const variables = useVisualEditorStore(state => state.variables);
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
   const edges = useVisualEditorStore(state => state.edges);
+  const availableNodes = useVisualEditorStore(state => state.availableNodes);
 
-  // Фильтруем edges для этой ноды - useMemo предотвратит пересоздание массива
   const nodeEdges = useMemo(
     () => edges.filter(e => e.target === nodeId || e.source === nodeId),
     [edges, nodeId]
   );
 
-  // Получаем определение ноды из реестра (это кэшируется в реестре)
   const definition = NodeRegistry.get(type);
 
-  // Если нода зарегистрирована в новом реестре - используем новую систему
+  const nodeConfig = useMemo(() =>
+    Object.values(availableNodes).flat().find(n => n.type === type),
+    [availableNodes, type]
+  );
+
   if (definition) {
     const context = { variables, commandArguments };
 
@@ -71,13 +53,6 @@ function CustomNode({ data, type, id: nodeId }) {
     );
   }
 
-  // Fallback для старых нод (на данный момент таких нет, но код оставлен для совместимости)
-  const availableNodes = useVisualEditorStore(state => state.availableNodes);
-  const nodeConfig = useMemo(() =>
-    Object.values(availableNodes).flat().find(n => n.type === type),
-    [availableNodes, type]
-  );
-
   if (!nodeConfig) {
     return (
       <div className="min-w-64 bg-red-900 border-red-600 text-white p-4 rounded">
@@ -105,7 +80,6 @@ function arePropsEqual(prevProps, nextProps) {
     return false;
   }
 
-  // Сравниваем data по содержимому, а не по ссылке
   const prevData = prevProps.data;
   const nextData = nextProps.data;
 

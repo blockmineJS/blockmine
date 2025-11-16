@@ -26,10 +26,17 @@ class NodeRegistry {
 
     this.definitions.set(definition.type, definition);
 
-    if (!this.categories.has(definition.category)) {
-      this.categories.set(definition.category, []);
+    const categoryKey = definition.category;
+    if (!this.categories.has(categoryKey)) {
+      this.categories.set(categoryKey, []);
     }
-    this.categories.get(definition.category).push(definition);
+    const items = this.categories.get(categoryKey);
+    const existingIndex = items.findIndex(d => d.type === definition.type);
+    if (existingIndex >= 0) {
+      items[existingIndex] = definition;
+    } else {
+      items.push(definition);
+    }
 
     return this;
   }

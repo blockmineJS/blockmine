@@ -46,8 +46,8 @@ export const actionBotSetVariableDefinition = new NodeDefinition({
       required: false,
       inlineField: true,
       inlineFieldOptions: [
-        { value: 'false', label: 'Нет' },
-        { value: 'true', label: 'Да' }
+        { value: false, label: 'Нет' },
+        { value: true, label: 'Да' }
       ]
     },
   ],

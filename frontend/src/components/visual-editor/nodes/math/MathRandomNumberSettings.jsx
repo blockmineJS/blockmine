@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 /**
  * Настройки для ноды math:random_number
  */
-function MathRandomNumberSettings({ data, updateNodeData }) {
+function MathRandomNumberSettings({ nodeId, data, updateNodeData }) {
   return (
     <div className="space-y-4">
       <div>
@@ -14,7 +14,7 @@ function MathRandomNumberSettings({ data, updateNodeData }) {
           id="min"
           type="text"
           value={data.min ?? '0'}
-          onChange={(e) => updateNodeData({ min: e.target.value })}
+          onChange={(e) => updateNodeData(nodeId, { min: e.target.value })}
           placeholder="0"
         />
         <p className="text-xs text-muted-foreground mt-1">
@@ -28,7 +28,7 @@ function MathRandomNumberSettings({ data, updateNodeData }) {
           id="max"
           type="text"
           value={data.max ?? '1'}
-          onChange={(e) => updateNodeData({ max: e.target.value })}
+          onChange={(e) => updateNodeData(nodeId, { max: e.target.value })}
           placeholder="1"
         />
         <p className="text-xs text-muted-foreground mt-1">

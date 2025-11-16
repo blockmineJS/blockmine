@@ -9,7 +9,7 @@ const StringLiteralSettings = ({ nodeId, data, updateNodeData }) => {
     <div className="p-2 w-full">
       <AutosizeInput
         className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden w-full"
-        value={data.value || ''}
+        value={data.value ?? ''}
         onChange={(e) => updateNodeData(nodeId, { value: e.target.value })}
         placeholder="Привет, {username}!"
       />

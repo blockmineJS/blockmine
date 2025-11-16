@@ -131,7 +131,7 @@ const Pin = React.memo(({ pin, isInput, nodeId, data, updateNodeData, context = 
       {pinContent}
       <AutosizeInput
         className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
-        value={data[pin.id] || ''}
+        value={data[pin.id] ?? ''}
         onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
         placeholder={pin.placeholder || ''}
       />

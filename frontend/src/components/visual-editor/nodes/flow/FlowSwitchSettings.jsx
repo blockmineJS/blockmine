@@ -31,10 +31,10 @@ const FlowSwitchSettings = ({ nodeId, data, updateNodeData }) => {
                 onClick={() => {
                   const currentCount = data.caseCount || 0;
                   if (currentCount > 0) {
-                    const newData = { caseCount: currentCount - 1 };
-                    // Удаляем последний case
-                    delete newData[`case_${currentCount - 1}`];
-                    updateNodeData(nodeId, newData);
+                    updateNodeData(nodeId, {
+                      caseCount: currentCount - 1,
+                      [`case_${currentCount - 1}`]: undefined
+                    });
                   }
                 }}
                 className="h-6 px-2 text-xs"
@@ -51,7 +51,7 @@ const FlowSwitchSettings = ({ nodeId, data, updateNodeData }) => {
             <Label className="text-xs w-12">Case {i}:</Label>
             <AutosizeInput
               className="nodrag flex-1 bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
-              value={data[`case_${i}`] || ''}
+              value={data[`case_${i}`] ?? ''}
               onChange={(e) => updateNodeData(nodeId, { [`case_${i}`]: e.target.value })}
               placeholder="Значение для сравнения"
             />
