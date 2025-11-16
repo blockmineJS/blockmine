@@ -78,8 +78,14 @@ function CustomNode({ data, type, id: nodeId }) {
 // Кастомный компаратор для React.memo - ререндер только если изменились важные props
 function arePropsEqual(prevProps, nextProps) {
   // Не ререндерим если изменилась только позиция (selected, dragging и т.д.)
-  // Поверхностное сравнение data — достаточно благодаря Immer-middleware,
-  // который гарантирует новые ссылки при всех иммутабельных обновлениях
+  //
+  // ВАЖНО: Поверхностное сравнение data безопасно, потому что:
+  // 1. visualEditorStore использует Immer middleware (см. visualEditorStore.js)
+  // 2. Immer гарантирует создание новых ссылок на объекты при любом изменении
+  // 3. Все обновления data идут через updateNodeData, который использует Immer
+  // 4. Поэтому если data изменился - ссылка будет другая, если не изменился - та же
+  //
+  // Глубокое сравнение НЕ требуется и было бы избыточным.
   if (prevProps.id !== nextProps.id || prevProps.type !== nextProps.type) {
     return false;
   }
