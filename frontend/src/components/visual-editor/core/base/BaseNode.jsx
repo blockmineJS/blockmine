@@ -104,7 +104,7 @@ const Pin = React.memo(({ pin, isInput, nodeId, data, updateNodeData, context = 
       <div className="relative p-2 flex items-center w-full">
         {pinContent}
         <Select
-          value={String(data[pin.id] ?? pin.defaultValue ?? (options[0]?.value || 'false'))}
+          value={String(data[pin.id] ?? pin.defaultValue ?? options[0]?.value)}
           onValueChange={(value) => {
             const parsedValue = pin.type === 'Boolean' ? value === 'true' : value;
             updateNodeData(nodeId, { [pin.id]: parsedValue });
@@ -115,7 +115,7 @@ const Pin = React.memo(({ pin, isInput, nodeId, data, updateNodeData, context = 
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <SelectItem key={String(option.value)} value={String(option.value)}>
                 {option.label}
               </SelectItem>
             ))}
