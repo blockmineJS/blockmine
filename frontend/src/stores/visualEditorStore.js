@@ -293,32 +293,53 @@ export const useVisualEditorStore = create(
     },
 
     addEdgeWaypoint: (edgeId, position) => {
-      set(state => {
-        const edge = state.edges.find(e => e.id === edgeId);
-        if (edge) {
-          if (!edge.data) edge.data = {};
-          if (!edge.data.waypoints) edge.data.waypoints = [];
-          edge.data.waypoints.push(position);
-        }
-      });
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: [...(edge.data?.waypoints || []), position]
+                }
+              }
+            : edge
+        )
+      }));
     },
 
     updateEdgeWaypoint: (edgeId, waypointIndex, position) => {
-      set(state => {
-        const edge = state.edges.find(e => e.id === edgeId);
-        if (edge && edge.data && edge.data.waypoints && edge.data.waypoints[waypointIndex]) {
-          edge.data.waypoints[waypointIndex] = position;
-        }
-      });
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId && edge.data?.waypoints?.[waypointIndex] !== undefined
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: edge.data.waypoints.map((wp, idx) =>
+                    idx === waypointIndex ? position : wp
+                  )
+                }
+              }
+            : edge
+        )
+      }));
     },
 
     removeEdgeWaypoint: (edgeId, waypointIndex) => {
-      set(state => {
-        const edge = state.edges.find(e => e.id === edgeId);
-        if (edge && edge.data && edge.data.waypoints) {
-          edge.data.waypoints.splice(waypointIndex, 1);
-        }
-      });
+      set(state => ({
+        edges: state.edges.map(edge =>
+          edge.id === edgeId && edge.data?.waypoints
+            ? {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  waypoints: edge.data.waypoints.filter((_, idx) => idx !== waypointIndex)
+                }
+              }
+            : edge
+        )
+      }));
     },
 
     addNode: (type, position, shouldUpdateState = true) => {

@@ -22,7 +22,7 @@ export const dataGetArgumentDefinition = new NodeDefinition({
   ],
 
   computeOutputs: (data, context) => {
-    const argumentName = data.argumentName;
+    const { argumentName } = data;
     if (!argumentName) {
       return [{ id: 'value', name: 'Value', type: 'Wildcard' }];
     }

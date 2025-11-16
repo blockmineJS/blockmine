@@ -38,7 +38,9 @@ const nodeTypes = (() => {
         types[definition.type] = CustomNode;
     });
 
-    console.log(`[ReactFlow] Registered ${allDefinitions.length} node types:`, Object.keys(types));
+    if (import.meta.env.MODE !== 'production') {
+        console.log(`[ReactFlow] Registered ${allDefinitions.length} node types:`, Object.keys(types));
+    }
 
     types.default = CustomNode;
 

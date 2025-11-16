@@ -22,7 +22,7 @@ export const dataGetVariableDefinition = new NodeDefinition({
   ],
 
   computeOutputs: (data, context) => {
-    const variableName = data.variableName;
+    const { variableName } = data;
     if (!variableName) {
       return [{ id: 'value', name: 'Value', type: 'Wildcard' }];
     }
