@@ -78,7 +78,8 @@ function CustomNode({ data, type, id: nodeId }) {
 // Кастомный компаратор для React.memo - ререндер только если изменились важные props
 function arePropsEqual(prevProps, nextProps) {
   // Не ререндерим если изменилась только позиция (selected, dragging и т.д.)
-  // Глубокое сравнение data для избежания ложных ререндеров
+  // Поверхностное сравнение data — достаточно благодаря Immer-middleware,
+  // который гарантирует новые ссылки при всех иммутабельных обновлениях
   if (prevProps.id !== nextProps.id || prevProps.type !== nextProps.type) {
     return false;
   }
