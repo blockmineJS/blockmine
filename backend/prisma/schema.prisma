@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:C:\\Users\\user\\.blockmine\\blockmine.db"
+  url      = env("DATABASE_URL")
 }
 
 model Server {
