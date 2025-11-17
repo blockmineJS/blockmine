@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
 import {
   applyNodeChanges,
   applyEdgeChanges,
@@ -10,6 +11,10 @@ import { toast } from "@/hooks/use-toast";
 import { randomUUID } from '@/lib/uuid';
 import { getConversionChain, createConverterNode } from '@/lib/typeConversionHelper';
 import { debounce } from '@/lib/debounce';
+import { io } from 'socket.io-client';
+import { useAppStore } from './appStore';
+
+enableMapSet();
 
 export const useVisualEditorStore = create(
   immer((set, get) => {
@@ -33,6 +38,25 @@ export const useVisualEditorStore = create(
     variables: [],
     commandArguments: [],
     availablePlugins: [],
+
+    // Trace visualization state
+    trace: null, // Текущая трассировка для просмотра
+    isTraceViewerOpen: false, // Открыт ли TraceViewer
+    highlightedNodeIds: new Set(), // Ноды, которые нужно подсветить
+    currentActiveNodeId: null, // ID текущей активной ноды в трассировке
+    playbackState: {
+      isPlaying: false,
+      currentStepIndex: -1,
+      speed: 1, // 0.5x, 1x, 2x // upd. не используется. по дефолту 1. потом выреать или дополнить
+    },
+
+    // Debug system state
+    breakpoints: new Map(), // Map<nodeId, Breakpoint>
+    debugSession: null, // Текущая сессия отладки
+    whatIfOverrides: new Map(), // Map<nodeId:pinId, value>
+    debugMode: 'trace', // 'trace' | 'live'
+    connectedDebugUsers: [], // Array<{socketId, userId, username}>
+    socket: null,
 
     init: async (botId, id, type) => {
       set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
@@ -721,6 +745,337 @@ export const useVisualEditorStore = create(
     flushSaveGraph: () => {
       if (debouncedSaveGraph.flush) {
         debouncedSaveGraph.flush();
+      }
+    },
+
+    // Trace visualization methods
+    setTrace: (trace) => {
+      set({ trace });
+    },
+
+    openTraceViewer: (trace) => {
+      const executionSteps = trace.steps.filter(step => step.type !== 'traversal');
+      const lastStepIndex = executionSteps.length > 0 ? executionSteps.length - 1 : -1;
+
+      // Вычисляем подсветку для последнего шага
+      const nodeIds = new Set();
+      let currentActiveNodeId = null;
+      if (lastStepIndex >= 0) {
+        const steps = executionSteps.slice(0, lastStepIndex + 1);
+        for (const step of steps) {
+          if (step.nodeId && step.status === 'executed') {
+            nodeIds.add(step.nodeId);
+          }
+        }
+        // Устанавливаем последнюю ноду как активную
+        currentActiveNodeId = executionSteps[lastStepIndex]?.nodeId || null;
+      }
+
+      set({
+        trace,
+        isTraceViewerOpen: true,
+        highlightedNodeIds: nodeIds,
+        currentActiveNodeId,
+        playbackState: {
+          isPlaying: false,
+          currentStepIndex: lastStepIndex,
+          speed: 1,
+        },
+      });
+    },
+
+    closeTraceViewer: () => {
+      set({
+        trace: null,
+        isTraceViewerOpen: false,
+        highlightedNodeIds: new Set(),
+        currentActiveNodeId: null,
+        playbackState: {
+          isPlaying: false,
+          currentStepIndex: -1,
+          speed: 1,
+        },
+      });
+    },
+
+    playTrace: () => {
+      set(state => {
+        state.playbackState.isPlaying = true;
+      });
+    },
+
+    pauseTrace: () => {
+      set(state => {
+        state.playbackState.isPlaying = false;
+      });
+    },
+
+    setTraceStep: (stepIndex) => {
+      set(state => {
+        state.playbackState.currentStepIndex = stepIndex;
+
+        // Обновляем подсветку нод на основе текущего шага
+        // Фильтруем только шаги выполнения (без traversals)
+        if (state.trace && stepIndex >= 0) {
+          const executionSteps = state.trace.steps.filter(step => step.type !== 'traversal');
+
+          if (stepIndex < executionSteps.length) {
+            const steps = executionSteps.slice(0, stepIndex + 1);
+            const nodeIds = new Set();
+
+            for (const step of steps) {
+              if (step.nodeId && step.status === 'executed') {
+                nodeIds.add(step.nodeId);
+              }
+            }
+
+            state.highlightedNodeIds = nodeIds;
+
+            // Устанавливаем текущую активную ноду (последняя выполненная на текущем шаге)
+            const currentStep = executionSteps[stepIndex];
+            state.currentActiveNodeId = currentStep?.nodeId || null;
+          } else {
+            state.highlightedNodeIds = new Set();
+            state.currentActiveNodeId = null;
+          }
+        } else {
+          state.highlightedNodeIds = new Set();
+          state.currentActiveNodeId = null;
+        }
+      });
+    },
+
+    setTraceSpeed: (speed) => {
+      set(state => {
+        state.playbackState.speed = speed;
+      });
+    },
+
+    highlightNode: (nodeId) => {
+      set(state => {
+        state.highlightedNodeIds.add(nodeId);
+      });
+    },
+
+    clearHighlights: () => {
+      set({ highlightedNodeIds: new Set() });
+    },
+
+    // Debug system methods
+    addBreakpoint: (nodeId, condition = null) => {
+      const { socket, command } = get();
+      if (!socket) return;
+
+      socket.emit('debug:set-breakpoint', {
+        graphId: command.id,
+        nodeId,
+        condition
+      });
+    },
+
+    removeBreakpoint: (nodeId) => {
+      const { socket, command } = get();
+      if (!socket) return;
+
+      socket.emit('debug:remove-breakpoint', {
+        graphId: command.id,
+        nodeId
+      });
+    },
+
+    toggleBreakpoint: (nodeId) => {
+      const { socket, command, breakpoints } = get();
+      if (!socket) return;
+
+      const bp = breakpoints.get(nodeId);
+      if (bp) {
+        socket.emit('debug:toggle-breakpoint', {
+          graphId: command.id,
+          nodeId,
+          enabled: !bp.enabled
+        });
+      }
+    },
+
+    continueExecution: (overrides = null) => {
+      const { socket, debugSession } = get();
+      if (!socket || !debugSession) {
+        console.warn('[Debug] Cannot continue - no socket or debug session');
+        return;
+      }
+
+      console.log('[Debug] Sending debug:continue with sessionId:', debugSession.sessionId, 'overrides:', overrides);
+      socket.emit('debug:continue', {
+        sessionId: debugSession.sessionId,
+        overrides
+      });
+    },
+
+    stopExecution: () => {
+      const { socket, debugSession } = get();
+      if (!socket || !debugSession) return;
+
+      socket.emit('debug:stop', {
+        sessionId: debugSession.sessionId
+      });
+    },
+
+    setDebugMode: (mode) => {
+      const { socket } = get();
+
+      // Если переключаемся в trace режим и есть активный сокет - отключаем
+      if (mode === 'trace' && socket) {
+        get().disconnectDebugSocket();
+      }
+
+      // Если переключаемся в live режим и нет сокета - подключаем
+      if (mode === 'live' && !socket) {
+        get().connectDebugSocket();
+      }
+
+      // Обновляем режим
+      set({ debugMode: mode });
+    },
+
+    connectDebugSocket: () => {
+      const { socket, command } = get();
+      if (socket || !command) return; // Уже подключен или нет команды
+
+      // Получаем токен из appStore
+      const token = useAppStore.getState().token;
+      if (!token) {
+        console.warn('[Debug] Cannot connect - no auth token');
+        return;
+      }
+
+      console.log('[Debug] Creating WebSocket connection...');
+
+      const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin;
+      const newSocket = io(SOCKET_URL, {
+        path: "/socket.io/",
+        auth: { token },
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
+      });
+
+      set({ socket: newSocket });
+
+      newSocket.on('connect', () => {
+        console.log('[Debug] WebSocket connected, sending debug:join...');
+
+        newSocket.emit('debug:join', {
+          botId: command.botId,
+          graphId: command.id
+        });
+      });
+
+      newSocket.on('disconnect', (reason) => {
+        console.log('[Debug] WebSocket disconnected, reason:', reason);
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('[Debug] WebSocket connection error:', error);
+      });
+
+      newSocket.on('error', (error) => {
+        console.error('[Debug] WebSocket error:', error);
+      });
+
+      // Устанавливаем все обработчики событий
+      newSocket.on('debug:state', (data) => {
+        set(state => {
+          state.breakpoints = new Map(
+            data.breakpoints.map(bp => [bp.nodeId, bp])
+          );
+          state.debugSession = data.activeExecution;
+          state.connectedDebugUsers = data.connectedUsers || [];
+        });
+      });
+
+      newSocket.on('debug:breakpoint-added', ({ breakpoint }) => {
+        set(state => {
+          state.breakpoints.set(breakpoint.nodeId, breakpoint);
+        });
+      });
+
+      newSocket.on('debug:breakpoint-removed', ({ nodeId }) => {
+        set(state => {
+          state.breakpoints.delete(nodeId);
+        });
+      });
+
+      newSocket.on('debug:breakpoint-toggled', ({ nodeId, enabled }) => {
+        set(state => {
+          const bp = state.breakpoints.get(nodeId);
+          if (bp) {
+            bp.enabled = enabled;
+          }
+        });
+      });
+
+      newSocket.on('debug:paused', (data) => {
+        console.log('[Debug] Received debug:paused event:', data);
+        set(state => {
+          state.debugSession = {
+            ...data,
+            status: 'paused'
+          };
+          state.currentActiveNodeId = data.nodeId;
+        });
+      });
+
+      newSocket.on('debug:resumed', () => {
+        console.log('[Debug] Received debug:resumed event');
+        set(state => {
+          state.debugSession = null;
+          state.currentActiveNodeId = null;
+        });
+      });
+
+      newSocket.on('debug:completed', ({ trace }) => {
+        console.log('[Debug] Received debug:completed event, trace:', trace);
+        set(state => {
+          state.debugSession = null;
+          state.currentActiveNodeId = null;
+          if (trace) {
+            state.trace = trace;
+          }
+        });
+      });
+
+      newSocket.on('debug:user-joined', ({ userCount, users }) => {
+        set({ connectedDebugUsers: users || [] });
+      });
+
+      newSocket.on('debug:user-left', ({ userCount, users }) => {
+        set({ connectedDebugUsers: users || [] });
+      });
+    },
+
+    disconnectDebugSocket: () => {
+      const { socket } = get();
+      if (socket) {
+        socket.off('debug:state');
+        socket.off('debug:breakpoint-added');
+        socket.off('debug:breakpoint-removed');
+        socket.off('debug:breakpoint-toggled');
+        socket.off('debug:paused');
+        socket.off('debug:resumed');
+        socket.off('debug:completed');
+        socket.off('debug:user-joined');
+        socket.off('debug:user-left');
+
+        socket.disconnect();
+
+        set({
+          socket: null,
+          breakpoints: new Map(),
+          debugSession: null,
+          connectedDebugUsers: []
+        });
       }
     },
   };

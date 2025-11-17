@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:C:\\Users\\user\\.blockmine\\blockmine.db"
 }
 
 model Server {
@@ -44,6 +44,7 @@ model Bot {
   panelUserAccess  PanelUserBotAccess[]
   apiKeys          BotApiKey[]
   apiConnectionLogs ApiConnectionLog[]
+  executionTraces  ExecutionTrace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -107,6 +108,7 @@ model EventGraph {
   variables   String? @default("[]")
 
   triggers    EventTrigger[]
+  executionTraces ExecutionTrace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -274,4 +276,26 @@ model ApiConnectionLog {
   createdAt   DateTime @default(now())
 
   @@index([botId, createdAt])
+}
+
+model ExecutionTrace {
+  id          String   @id @default(uuid())
+  graphId     Int
+  botId       Int
+  eventType   String
+  eventArgs   String   // JSON
+  startTime   DateTime
+  endTime     DateTime?
+  status      String   // running, completed, error
+  error       String?
+  steps       String   // JSON array of ExecutionStep
+
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  graph       EventGraph @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([botId, graphId])
+  @@index([createdAt])
+  @@map("execution_traces")
 }

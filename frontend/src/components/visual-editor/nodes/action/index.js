@@ -4,3 +4,6 @@ export { actionSendLogDefinition } from './actionSendLog';
 export { actionSendWebsocketResponseDefinition } from './actionSendWebsocketResponse';
 export { actionBotLookAtDefinition } from './actionBotLookAt';
 export { actionBotSetVariableDefinition } from './actionBotSetVariable';
+export { actionCreateCommandDefinition } from './actionCreateCommand';
+export { actionUpdateCommandDefinition } from './actionUpdateCommand';
+export { actionDeleteCommandDefinition } from './actionDeleteCommand';

@@ -129,9 +129,12 @@ class EventGraphManager {
         const initialContext = this.getInitialContextForEvent(eventType, eventArgs);
         initialContext.bot = botApi;
         initialContext.botId = botId;
+        initialContext.botManager = this.botManager;
+        initialContext.graphId = graph.id;
+        initialContext.eventArgs = eventArgs;
         initialContext.players = players;
         initialContext.botState = eventArgs.botState || {};
-        
+
         const savedVariables = { ...(this.graphStates.get(stateKey) || {}) };
         
         if (graph.variables && Array.isArray(graph.variables)) {

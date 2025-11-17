@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Vec3 } = require('vec3');
 const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
+const { getRuntimeCommandRegistry } = require('./system/RuntimeCommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
 const Command = require('./system/Command');
@@ -90,10 +91,19 @@ function handleIncomingCommand(type, username, message) {
     const commandName = commandParts.shift().toLowerCase();
     const restOfMessage = commandParts.join(' ');
 
-    const commandInstance = bot.commands.get(commandName) ||
+    // Сначала проверяем стандартные команды
+    let commandInstance = bot.commands.get(commandName) ||
     Array.from(bot.commands.values()).find(cmd => cmd.aliases.includes(commandName));
 
-    if (!commandInstance) return;
+    if (!commandInstance) {
+        // Если не найдена, проверяем временные команды из runtime registry
+        const runtimeRegistry = getRuntimeCommandRegistry();
+        commandInstance = runtimeRegistry.get(bot.config.id, commandName);
+    }
+
+    if (!commandInstance) {
+        return;
+    }
 
     try {
         const processedArgs = {};
@@ -854,25 +864,71 @@ process.on('message', async (message) => {
             const { message: msg, chatType, username } = message.payload;
             bot.messageQueue.enqueue(chatType, msg, username);
         }
+    } else if (message.type === 'register_temp_command') {
+        // Регистрация временной команды из главного процесса
+        const { commandData } = message;
+
+        try {
+            const tempCommand = new Command({
+                name: commandData.name,
+                description: commandData.description || '',
+                aliases: commandData.aliases || [],
+                cooldown: commandData.cooldown || 0,
+                allowedChatTypes: commandData.allowedChatTypes || ['chat', 'private'],
+                args: [],
+                owner: 'runtime',
+            });
+
+            tempCommand.permissionId = commandData.permissionId || null;
+            tempCommand.isTemporary = true;
+            tempCommand.tempId = commandData.tempId;
+            tempCommand.isVisual = false;
+            tempCommand.handler = () => {};
+
+            // Регистрируем команду в bot.commands
+            bot.commands.set(commandData.name, tempCommand);
+
+            if (Array.isArray(commandData.aliases)) {
+                for (const alias of commandData.aliases) {
+                    bot.commands.set(alias, tempCommand);
+                }
+            }
+        } catch (error) {
+            sendLog(`[BotProcess] Ошибка регистрации временной команды: ${error.message}`);
+        }
+    } else if (message.type === 'unregister_temp_command') {
+        const { commandName, aliases } = message;
+
+        try {
+            if (bot.commands.has(commandName)) {
+                bot.commands.delete(commandName);
+            }
+
+            if (Array.isArray(aliases)) {
+                for (const alias of aliases) {
+                    if (bot.commands.has(alias)) {
+                        bot.commands.delete(alias);
+                    }
+                }
+            }
+        } catch (error) {
+            sendLog(`[BotProcess] Ошибка удаления временной команды: ${error.message}`);
+        }
     } else if (message.type === 'execute_handler') {
         const { commandName, username, args, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
             (async () => {
                 try {
-                    // Получаем полный объект User из базы данных
                     const user = await UserService.getUser(username, bot.config.id, bot.config);
                     
-                    // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
                     const handlerParamCount = commandInstance.handler.length;
 
                     if (handlerParamCount === 1) {
-                        // Новая сигнатура: handler(context)
                         const transport = new Transport(typeChat, bot);
                         const context = new CommandContext(bot, user, args, transport);
                         await commandInstance.handler(context);
                     } else {
-                        // Старая сигнатура: handler(bot, typeChat, user, args)
                         await commandInstance.handler(bot, typeChat, user, args);
                     }
                 } catch (e) {
@@ -892,16 +948,13 @@ process.on('message', async (message) => {
                             throw new Error(`Command '${commandName}' not found.`);
                         }
 
-                        // Восстанавливаем полный User объект из username
                         const user = await UserService.getUser(username, bot.config.id, bot.config);
 
                         let result;
 
-                        // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
                         const handlerParamCount = commandInstance.handler.length;
 
                         if (handlerParamCount === 1) {
-                            // Новая сигнатура: handler(context)
                             const transport = new Transport(typeChat, bot);
                             const context = new CommandContext(bot, user, args, transport);
 

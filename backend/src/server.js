@@ -22,6 +22,7 @@ const panelRoutes = require('./api/routes/panel');
 const changelogRoutes = require('./api/routes/changelog');
 const logsRoutes = require('./api/routes/logs');
 const systemRoutes = require('./api/routes/system');
+const tracesRoutes = require('./api/routes/traces');
 
 const app = express();
 const server = http.createServer(app);
@@ -66,6 +67,7 @@ app.use('/api/panel', panelRoutes);
 app.use('/api/changelog', changelogRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/traces', tracesRoutes);
 
 app.use(express.static(frontendPath));
 

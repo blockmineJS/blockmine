@@ -127,6 +127,76 @@ function registerNodes(registry) {
       ]
     }
   });
+
+  registry.registerNodeType({
+    type: 'action:create_command',
+    label: '➕ Создать команду',
+    category: 'Действия',
+    description: 'Создает новую команду (временную или постоянную)',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../nodes/actions/create_command').execute,
+    pins: {
+      inputs: [
+        { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+        { id: 'name', name: 'Имя команды', type: 'String', required: true },
+        { id: 'description', name: 'Описание', type: 'String', required: false },
+        { id: 'aliases', name: 'Алиасы', type: 'Array', required: false },
+        { id: 'cooldown', name: 'Кулдаун (сек)', type: 'Number', required: false },
+        { id: 'allowedChatTypes', name: 'Типы чата', type: 'Array', required: false },
+        { id: 'permissionName', name: 'Название права', type: 'String', required: false },
+        { id: 'temporary', name: 'Временная?', type: 'Boolean', required: false }
+      ],
+      outputs: [
+        { id: 'exec', name: 'Выполнено', type: 'Exec' },
+        { id: 'commandId', name: 'ID команды', type: 'Number' },
+        { id: 'success', name: 'Успешно', type: 'Boolean' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'action:update_command',
+    label: '✏️ Редактировать команду',
+    category: 'Действия',
+    description: 'Изменяет параметры существующей команды',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../nodes/actions/update_command').execute,
+    pins: {
+      inputs: [
+        { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+        { id: 'commandName', name: 'Имя команды', type: 'String', required: true },
+        { id: 'newName', name: 'Новое имя', type: 'String', required: false },
+        { id: 'description', name: 'Описание', type: 'String', required: false },
+        { id: 'aliases', name: 'Алиасы', type: 'Array', required: false },
+        { id: 'cooldown', name: 'Кулдаун (сек)', type: 'Number', required: false },
+        { id: 'allowedChatTypes', name: 'Типы чата', type: 'Array', required: false },
+        { id: 'permissionName', name: 'Название права', type: 'String', required: false }
+      ],
+      outputs: [
+        { id: 'exec', name: 'Выполнено', type: 'Exec' },
+        { id: 'success', name: 'Успешно', type: 'Boolean' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'action:delete_command',
+    label: '🗑️ Удалить команду',
+    category: 'Действия',
+    description: 'Удаляет существующую команду бота',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../nodes/actions/delete_command').execute,
+    pins: {
+      inputs: [
+        { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+        { id: 'commandName', name: 'Имя команды', type: 'String', required: true }
+      ],
+      outputs: [
+        { id: 'exec', name: 'Выполнено', type: 'Exec' },
+        { id: 'success', name: 'Успешно', type: 'Boolean' }
+      ]
+    }
+  });
 }
 
 module.exports = { registerNodes };

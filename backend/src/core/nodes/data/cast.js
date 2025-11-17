@@ -9,21 +9,25 @@
 async function evaluate(node, pinId, context, helpers) {
     const { resolvePinValue } = helpers;
 
-    if (pinId === 'value') {
+    // Поддерживаем оба варианта: 'result' (новая версия) и 'value' (старая версия для обратной совместимости)
+    if (pinId === 'result' || pinId === 'value') {
         const value = await resolvePinValue(node, 'value');
         const targetType = node.data?.targetType || 'String';
+
 
         switch (targetType) {
             case 'String':
                 // Для объектов и массивов используем JSON.stringify
                 if (typeof value === 'object' && value !== null) {
                     try {
-                        return JSON.stringify(value);
+                        const result = JSON.stringify(value);
+                        return result;
                     } catch (e) {
                         return String(value ?? '');
                     }
                 }
-                return String(value ?? '');
+                const stringResult = String(value ?? '');
+                return stringResult;
             case 'Number':
                 const num = Number(value);
                 return isNaN(num) ? 0 : num;
@@ -34,6 +38,7 @@ async function evaluate(node, pinId, context, helpers) {
         }
     }
 
+    console.log('[data:cast] pinId !== result, returning null', { pinId });
     return null;
 }
 

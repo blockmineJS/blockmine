@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const UserService = require('../UserService');
+const { getRuntimeCommandRegistry } = require('../system/RuntimeCommandRegistry');
 
 // Кулдауны и предупреждения - глобальные для всех инстансов
 const cooldowns = new Map();
@@ -49,7 +50,25 @@ class CommandExecutionService {
             }
 
             const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
-            const dbCommand = botConfigCache.commands.get(mainCommandName);
+            let dbCommand = botConfigCache.commands.get(mainCommandName);
+
+            // Если команда не найдена в БД, проверяем runtime registry (временные команды)
+            if (!dbCommand) {
+                const runtimeRegistry = getRuntimeCommandRegistry();
+                const tempCommand = runtimeRegistry.get(botId, mainCommandName);
+
+                if (tempCommand) {
+                    // Преобразуем временную команду в формат dbCommand
+                    dbCommand = {
+                        name: tempCommand.name,
+                        isEnabled: true,
+                        allowedChatTypes: JSON.stringify(tempCommand.allowedChatTypes || ['chat', 'private']),
+                        permissionId: tempCommand.permissionId || null,
+                        cooldown: tempCommand.cooldown || 0,
+                        isTemporary: true
+                    };
+                }
+            }
 
             if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
                 return;
@@ -137,7 +156,25 @@ class CommandExecutionService {
         }
 
         const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
-        const dbCommand = botConfigCache.commands.get(mainCommandName);
+        let dbCommand = botConfigCache.commands.get(mainCommandName);
+
+        // Если команда не найдена в БД, проверяем runtime registry (временные команды)
+        if (!dbCommand) {
+            const runtimeRegistry = getRuntimeCommandRegistry();
+            const tempCommand = runtimeRegistry.get(botId, mainCommandName);
+
+            if (tempCommand) {
+                // Преобразуем временную команду в формат dbCommand
+                dbCommand = {
+                    name: tempCommand.name,
+                    isEnabled: true,
+                    allowedChatTypes: JSON.stringify(tempCommand.allowedChatTypes || ['chat', 'private']),
+                    permissionId: tempCommand.permissionId || null,
+                    cooldown: tempCommand.cooldown || 0,
+                    isTemporary: true
+                };
+            }
+        }
 
         if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
             throw new Error(`Command '${commandName}' not found or is disabled.`);

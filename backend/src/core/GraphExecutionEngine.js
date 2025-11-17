@@ -5,6 +5,8 @@ const { MAX_RECURSION_DEPTH } = require('./config/validation');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
+const { getTraceCollector } = require('./services/TraceCollectorService');
+const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 
 class GraphExecutionEngine {
   constructor(nodeRegistry, botManagerOrApi = null) {
@@ -16,6 +18,8 @@ class GraphExecutionEngine {
       this.activeGraph = null;
       this.context = null;
       this.memo = new Map();
+      this.traceCollector = getTraceCollector();
+      this.currentTraceId = null;
   }
 
   async execute(graph, context, eventType) {
@@ -31,10 +35,21 @@ class GraphExecutionEngine {
           return context;
       }
 
+      const graphId = context.graphId || null;
+      const botId = context.botId || null;
+      if (graphId && botId) {
+          this.currentTraceId = await this.traceCollector.startTrace(
+              botId,
+              graphId,
+              eventType || 'command',
+              context.eventArgs || {}
+          );
+      }
+
       try {
           this.activeGraph = parsedGraph;
           this.context = context;
-          
+
           if (!this.context.variables) {
             this.context.variables = parseVariables(
               this.activeGraph.variables,
@@ -49,12 +64,46 @@ class GraphExecutionEngine {
           const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
 
           if (startNode) {
+              // Записываем event ноду как начальный шаг трассировки
+              if (this.currentTraceId) {
+                  this.traceCollector.recordStep(this.currentTraceId, {
+                      nodeId: startNode.id,
+                      nodeType: startNode.type,
+                      status: 'executed',
+                      duration: 0,
+                      inputs: {},
+                      outputs: await this._captureNodeOutputs(startNode),
+                  });
+              }
+
               await this.traverse(startNode, 'exec');
           } else if (!eventType) {
               throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
           }
 
+          // Завершаем трассировку успешно
+          if (this.currentTraceId) {
+              await this.traceCollector.completeTrace(this.currentTraceId);
+
+              if (graphId) {
+                  const debugManager = getGlobalDebugManager();
+                  const debugState = debugManager.get(graphId);
+                  if (debugState && debugState.activeExecution) {
+                      debugState.broadcast('debug:completed', {
+                          trace: await this.traceCollector.getTrace(this.currentTraceId)
+                      });
+                  }
+              }
+
+              this.currentTraceId = null;
+          }
+
       } catch (error) {
+          if (this.currentTraceId) {
+              await this.traceCollector.failTrace(this.currentTraceId, error);
+              this.currentTraceId = null;
+          }
+
           if (!(error instanceof BreakLoopSignal)) {
             console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
           }
@@ -70,10 +119,25 @@ class GraphExecutionEngine {
       const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
       if (!nextNode) return;
 
+      // Записываем traversal в трассировку
+      if (this.currentTraceId) {
+          this.traceCollector.recordTraversal(
+              this.currentTraceId,
+              node.id,
+              fromPinId,
+              nextNode.id
+          );
+      }
+
       await this.executeNode(nextNode);
   }
 
   async executeNode(node) {
+      const startTime = Date.now();
+
+      // Проверка брейкпоинта ПЕРЕД выполнением
+      await this.checkBreakpoint(node);
+
       const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
       if (nodeConfig && typeof nodeConfig.executor === 'function') {
           const helpers = {
@@ -82,7 +146,44 @@ class GraphExecutionEngine {
               memo: this.memo,
               clearLoopBodyMemo: this.clearLoopBodyMemo.bind(this),
           };
-          await nodeConfig.executor.call(this, node, this.context, helpers);
+
+          try {
+              // Записываем шаг ДО выполнения, чтобы сохранить правильный порядок
+              if (this.currentTraceId) {
+                  this.traceCollector.recordStep(this.currentTraceId, {
+                      nodeId: node.id,
+                      nodeType: node.type,
+                      status: 'executed',
+                      duration: null,
+                      inputs: await this._captureNodeInputs(node),
+                      outputs: {},
+                  });
+              }
+
+              await nodeConfig.executor.call(this, node, this.context, helpers);
+
+              // Вычисляем время выполнения
+              const executionTime = Date.now() - startTime;
+
+              // Обновляем outputs и duration после выполнения
+              if (this.currentTraceId) {
+                  this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
+                  this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
+              }
+          } catch (error) {
+              // Записываем ошибку выполнения
+              if (this.currentTraceId) {
+                  this.traceCollector.recordStep(this.currentTraceId, {
+                      nodeId: node.id,
+                      nodeType: node.type,
+                      status: 'error',
+                      duration: Date.now() - startTime,
+                      error: error.message,
+                  });
+              }
+              throw error;
+          }
+
           return;
       }
 
@@ -92,6 +193,46 @@ class GraphExecutionEngine {
       }
       this.memo.set(execCacheKey, true);
 
+      // Записываем выполнение для нод без executor (legacy nodes, event nodes)
+      try {
+          // Записываем шаг ДО выполнения, чтобы сохранить правильный порядок
+          if (this.currentTraceId) {
+              this.traceCollector.recordStep(this.currentTraceId, {
+                  nodeId: node.id,
+                  nodeType: node.type,
+                  status: 'executed',
+                  duration: null,
+                  inputs: await this._captureNodeInputs(node),
+                  outputs: {},
+              });
+          }
+
+          await this._executeLegacyNode(node);
+
+          // Вычисляем время выполнения
+          const executionTime = Date.now() - startTime;
+
+          // Обновляем outputs и duration после выполнения
+          if (this.currentTraceId) {
+              this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
+              this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
+          }
+      } catch (error) {
+          // Записываем ошибку выполнения
+          if (this.currentTraceId) {
+              this.traceCollector.recordStep(this.currentTraceId, {
+                  nodeId: node.id,
+                  nodeType: node.type,
+                  status: 'error',
+                  duration: Date.now() - startTime,
+                  error: error.message,
+              });
+          }
+          throw error;
+      }
+  }
+
+  async _executeLegacyNode(node) {
       switch (node.type) {
 
 
@@ -195,7 +336,7 @@ class GraphExecutionEngine {
 
   async evaluateOutputPin(node, pinId, defaultValue = null) {
       if (!node) return defaultValue;
-      
+
       const cacheKey = `${node.id}:${pinId}`;
       if (this.memo.has(cacheKey)) {
           return this.memo.get(cacheKey);
@@ -207,12 +348,52 @@ class GraphExecutionEngine {
               resolvePinValue: this.resolvePinValue.bind(this),
               memo: this.memo,
           };
+
+          // Записываем data ноду в трассировку перед вычислением (только один раз)
+          const traceKey = `trace_recorded:${node.id}`;
+          const isDataNode = !nodeConfig.pins.inputs.some(p => p.type === 'Exec');
+
+          if (this.currentTraceId && isDataNode && !this.memo.has(traceKey)) {
+              // Это data нода (нет exec пинов) и она ещё не записана - записываем её inputs
+              const inputs = await this._captureNodeInputs(node);
+
+              this.traceCollector.recordStep(this.currentTraceId, {
+                  nodeId: node.id,
+                  nodeType: node.type,
+                  status: 'executed',
+                  duration: 0,
+                  inputs,
+                  outputs: {},
+              });
+
+              // Помечаем, что нода уже записана в трассировку
+              this.memo.set(traceKey, true);
+          }
+
           const result = await nodeConfig.evaluator.call(this, node, pinId, this.context, helpers);
-          
+
           const isVolatile = this.isNodeVolatile(node);
           if (!isVolatile) {
               this.memo.set(cacheKey, result);
           }
+
+          // Обновляем outputs для data ноды после вычисления И после записи в memo
+          // Обновляем только один раз для всей ноды (не для каждого пина отдельно)
+          const traceOutputsKey = `trace_outputs_recorded:${node.id}`;
+          if (this.currentTraceId && isDataNode && this.memo.has(traceKey) && !this.memo.has(traceOutputsKey)) {
+              const outputs = {};
+              for (const outputPin of nodeConfig.pins.outputs) {
+                  if (outputPin.type !== 'Exec') {
+                      const outKey = `${node.id}:${outputPin.id}`;
+                      if (this.memo.has(outKey)) {
+                          outputs[outputPin.id] = this.memo.get(outKey);
+                      }
+                  }
+              }
+              this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
+              this.memo.set(traceOutputsKey, true); // Помечаем, что outputs уже записаны
+          }
+
           return result;
       }
 
@@ -313,9 +494,190 @@ class GraphExecutionEngine {
 
   hasConnection(node, pinId) {
       if (!this.activeGraph || !this.activeGraph.connections) return false;
-      return this.activeGraph.connections.some(conn => 
+      return this.activeGraph.connections.some(conn =>
           conn.targetNodeId === node.id && conn.targetPinId === pinId
       );
+  }
+
+  /**
+   * Захватить значения входов ноды для трассировки
+   */
+  async _captureNodeInputs(node) {
+      const inputs = {};
+
+      // Получаем конфигурацию ноды
+      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+      if (!nodeConfig || !nodeConfig.pins || !nodeConfig.pins.inputs) {
+          return inputs;
+      }
+
+      // Захватываем значения всех входов
+      for (const inputPin of nodeConfig.pins.inputs) {
+          if (inputPin.type === 'Exec') continue; // Пропускаем exec пины
+
+          try {
+              // Используем resolvePinValue для получения актуального значения
+              const value = await this.resolvePinValue(node, inputPin.id);
+              console.log(`[_captureNodeInputs] Node ${node.type} (${node.id}), pin ${inputPin.id}:`, value);
+              // Записываем все значения, включая undefined и null
+              inputs[inputPin.id] = value;
+          } catch (error) {
+              console.error(`[_captureNodeInputs] Error capturing pin ${inputPin.id}:`, error);
+              inputs[inputPin.id] = '<error capturing>';
+          }
+      }
+
+      console.log(`[_captureNodeInputs] Final inputs for ${node.type}:`, inputs);
+      return inputs;
+  }
+
+  /**
+   * Захватить значения выходов ноды для трассировки
+   */
+  async _captureNodeOutputs(node) {
+      const outputs = {};
+
+      // Получаем конфигурацию ноды
+      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+      if (!nodeConfig || !nodeConfig.pins || !nodeConfig.pins.outputs) {
+          return outputs;
+      }
+
+      // Захватываем значения всех выходов
+      for (const outputPin of nodeConfig.pins.outputs) {
+          if (outputPin.type === 'Exec') continue; // Пропускаем exec пины
+
+          try {
+              // Активно вызываем evaluateOutputPin вместо чтения из memo
+              // Это необходимо для event нод, которые используют switch-case и не пишут в memo
+              const value = await this.evaluateOutputPin(node, outputPin.id);
+              console.log(`[_captureNodeOutputs] Node ${node.type} (${node.id}), pin ${outputPin.id}:`, value);
+              // Записываем все значения, включая undefined и null
+              outputs[outputPin.id] = value;
+          } catch (error) {
+              console.error(`[_captureNodeOutputs] Error capturing pin ${outputPin.id}:`, error);
+              outputs[outputPin.id] = '<error capturing>';
+          }
+      }
+
+      console.log(`[_captureNodeOutputs] Final outputs for ${node.type}:`, outputs);
+      return outputs;
+  }
+
+  /**
+   * Проверить брейкпоинт перед выполнением ноды
+   */
+  async checkBreakpoint(node) {
+      try {
+          const debugManager = getGlobalDebugManager();
+          const graphId = this.context.graphId;
+
+          if (!graphId) return;
+
+          const debugState = debugManager.get(graphId);
+          if (!debugState) return;
+
+          const breakpoint = debugState.breakpoints.get(node.id);
+          if (!breakpoint || !breakpoint.enabled) return;
+
+          const shouldPause = await this.evaluateBreakpointCondition(breakpoint);
+
+          if (shouldPause) {
+              console.log(`[Debug] Hit breakpoint at node ${node.id}, pausing execution`);
+
+              breakpoint.hitCount++;
+
+              const inputs = await this._captureNodeInputs(node);
+
+              const executedSteps = this.currentTraceId
+                  ? await this.traceCollector.getTrace(this.currentTraceId)
+                  : null;
+
+              const overrides = await debugState.pause({
+                  nodeId: node.id,
+                  nodeType: node.type,
+                  inputs,
+                  executedSteps, // Добавляем выполненные шаги
+                  context: {
+                      user: this.context.user,
+                      variables: this.context.variables,
+                      commandArguments: this.context.commandArguments,
+                  },
+                  breakpoint: {
+                      condition: breakpoint.condition,
+                      hitCount: breakpoint.hitCount
+                  }
+              });
+
+              if (overrides && overrides.__stopped) {
+                  throw new Error('Execution stopped by debugger');
+              }
+
+              if (overrides) {
+                  this.applyWhatIfOverrides(node, overrides);
+              }
+          }
+      } catch (error) {
+          if (error.message === 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
+              return;
+          }
+          throw error;
+      }
+  }
+
+  /**
+   * Оценить условие брейкпоинта
+   */
+  async evaluateBreakpointCondition(breakpoint) {
+      // Если нет условия, всегда срабатывает
+      if (!breakpoint.condition || breakpoint.condition.trim() === '') {
+          return true;
+      }
+
+      try {
+          // Создаем sandbox для безопасного выполнения условия
+          const sandbox = {
+              user: this.context.user || {},
+              args: this.context.commandArguments || {},
+              variables: this.context.variables || {},
+              context: this.context
+          };
+
+          // Используем Function constructor для безопасного выполнения
+          const fn = new Function(
+              ...Object.keys(sandbox),
+              `return (${breakpoint.condition})`
+          );
+
+          const result = fn(...Object.values(sandbox));
+
+          return Boolean(result);
+      } catch (error) {
+          console.error(`[Debug] Error evaluating breakpoint condition: ${error.message}`);
+          console.error(`[Debug] Condition was: ${breakpoint.condition}`);
+          return false;
+      }
+  }
+
+  /**
+   * Применить what-if overrides к ноде
+   */
+  applyWhatIfOverrides(node, overrides) {
+      if (!overrides || typeof overrides !== 'object') return;
+
+      console.log(`[Debug] Applying what-if overrides to node ${node.id}:`, overrides);
+
+      // Применяем overrides к node.data
+      if (!node.data) {
+          node.data = {};
+      }
+
+      for (const [key, value] of Object.entries(overrides)) {
+          if (key !== '__stopped') {
+              node.data[key] = value;
+              console.log(`[Debug] Override applied: ${key} = ${value}`);
+          }
+      }
   }
 }
 

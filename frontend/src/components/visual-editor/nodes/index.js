@@ -88,6 +88,9 @@ import {
   actionSendWebsocketResponseDefinition,
   actionBotLookAtDefinition,
   actionBotSetVariableDefinition,
+  actionCreateCommandDefinition,
+  actionUpdateCommandDefinition,
+  actionDeleteCommandDefinition,
 } from './action';
 
 // Time nodes
@@ -206,6 +209,9 @@ export function registerAllNodes() {
   NodeRegistry.register(actionSendWebsocketResponseDefinition);
   NodeRegistry.register(actionBotLookAtDefinition);
   NodeRegistry.register(actionBotSetVariableDefinition);
+  NodeRegistry.register(actionCreateCommandDefinition);
+  NodeRegistry.register(actionUpdateCommandDefinition);
+  NodeRegistry.register(actionDeleteCommandDefinition);
 
   // Time category
   NodeRegistry.register(timeDateTimeLiteralDefinition);
