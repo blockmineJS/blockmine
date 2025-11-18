@@ -30,6 +30,12 @@ class GraphCollaborationManager {
                 botId,
                 graphId,
                 users: new Map(),
+                // Храним текущее состояние графа для синхронизации при переподключении
+                graphState: {
+                    nodes: [],
+                    connections: [],
+                    lastUpdate: null,
+                },
             });
             console.log(`[GraphCollaboration] Created room for bot ${botId}, graph ${graphId}`);
         }
@@ -65,7 +71,9 @@ class GraphCollaborationManager {
                 cursor: u.cursor,
                 selectedNodes: u.selectedNodes,
                 debugMode: u.debugMode,
-            }))
+            })),
+            // Отправляем текущее состояние графа (если есть другие пользователи)
+            graphState: room.users.size > 1 ? room.graphState : null,
         });
 
         // Уведомляем остальных о новом пользователе
@@ -238,6 +246,31 @@ class GraphCollaborationManager {
      */
     broadcastNodeChange(socket, { botId, graphId, type, data }) {
         const roomKey = this.getRoomKey(botId, graphId);
+        const room = this.rooms.get(roomKey);
+
+        if (room) {
+            // Обновляем состояние графа в комнате
+            switch (type) {
+                case 'create':
+                    room.graphState.nodes.push(data);
+                    break;
+                case 'delete':
+                    room.graphState.nodes = room.graphState.nodes.filter(n => n.id !== data.id);
+                    // Удаляем связанные connections
+                    room.graphState.connections = room.graphState.connections.filter(
+                        c => c.source !== data.id && c.target !== data.id
+                    );
+                    break;
+                case 'update':
+                case 'move':
+                    const nodeIndex = room.graphState.nodes.findIndex(n => n.id === data.id);
+                    if (nodeIndex !== -1) {
+                        room.graphState.nodes[nodeIndex] = { ...room.graphState.nodes[nodeIndex], ...data };
+                    }
+                    break;
+            }
+            room.graphState.lastUpdate = Date.now();
+        }
 
         // Отправляем всем кроме отправителя
         socket.to(roomKey).emit('collab:node-changed', {
@@ -252,6 +285,23 @@ class GraphCollaborationManager {
      */
     broadcastEdgeChange(socket, { botId, graphId, type, data }) {
         const roomKey = this.getRoomKey(botId, graphId);
+        const room = this.rooms.get(roomKey);
+
+        if (room) {
+            // Обновляем состояние графа в комнате
+            switch (type) {
+                case 'create':
+                    room.graphState.connections.push(data);
+                    break;
+                case 'delete':
+                    room.graphState.connections = room.graphState.connections.filter(
+                        c => !(c.source === data.source && c.sourceHandle === data.sourceHandle &&
+                               c.target === data.target && c.targetHandle === data.targetHandle)
+                    );
+                    break;
+            }
+            room.graphState.lastUpdate = Date.now();
+        }
 
         socket.to(roomKey).emit('collab:edge-changed', {
             type, // 'create' | 'delete'

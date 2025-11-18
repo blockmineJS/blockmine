@@ -1195,9 +1195,18 @@ export const useVisualEditorStore = create(
       // ========== COLLABORATIVE EDITING EVENTS ==========
 
       // Состояние комнаты при подключении
-      newSocket.on('collab:state', ({ users }) => {
-        console.log('[Collab] Received room state:', users);
+      newSocket.on('collab:state', ({ users, graphState }) => {
+        console.log('[Collab] Received room state:', users, graphState);
         set({ collabUsers: users });
+
+        // Если есть состояние графа от других пользователей - применяем его
+        if (graphState && graphState.nodes && graphState.connections) {
+          console.log('[Collab] Applying synced graph state from other users');
+          set({
+            nodes: graphState.nodes,
+            connections: graphState.connections,
+          });
+        }
       });
 
       // Новый пользователь присоединился
