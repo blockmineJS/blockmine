@@ -1200,12 +1200,24 @@ export const useVisualEditorStore = create(
         set({ collabUsers: users });
 
         // Если есть состояние графа от других пользователей - применяем его
-        if (graphState && graphState.nodes && graphState.connections) {
+        if (graphState && graphState.nodes && graphState.edges) {
           console.log('[Collab] Applying synced graph state from other users');
           set({
             nodes: graphState.nodes,
-            connections: graphState.connections,
+            edges: graphState.edges,
           });
+        } else {
+          // Мы первые в комнате - отправляем наше состояние графа для синхронизации
+          const { nodes, edges, command } = get();
+          if (nodes.length > 0 || edges.length > 0) {
+            console.log('[Collab] Initializing graph state for other users:', nodes.length, 'nodes,', edges.length, 'edges');
+            newSocket.emit('collab:init-graph-state', {
+              botId: command.botId,
+              graphId: command.id,
+              nodes,
+              edges,
+            });
+          }
         }
       });
 

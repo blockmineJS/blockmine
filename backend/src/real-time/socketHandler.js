@@ -274,6 +274,16 @@ function initializeSocket(httpServer) {
             }
         });
 
+        // Инициализация состояния графа (вызывается первым пользователем после загрузки)
+        socket.on('collab:init-graph-state', ({ botId, graphId, nodes, edges }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.initializeGraphState(socket, { botId, graphId, nodes, edges });
+            } catch (error) {
+                console.error('[Collab] Error initializing graph state:', error);
+            }
+        });
+
         // Изменение нод (движение, создание, удаление, обновление)
         socket.on('collab:nodes', ({ botId, graphId, type, data }) => {
             try {
