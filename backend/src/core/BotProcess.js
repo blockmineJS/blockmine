@@ -245,6 +245,34 @@ process.on('message', async (message) => {
                         return;
                     }
                     bot.messageQueue.enqueue('command', command);
+                },
+                lookAt: async (x, y, z) => {
+                    if (!bot) return;
+                    const target = new Vec3(x, y, z);
+                    await bot.lookAt(target);
+                },
+                navigate: async (x, y, z) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
+                    await bot.pathfinder.goto(goal);
+                },
+                attack: (entityId) => {
+                    if (!bot) return;
+                    const entity = bot.entities[entityId];
+                    if (entity) bot.attack(entity);
+                },
+                follow: (username) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const player = bot.players[username];
+                    if (player && player.entity) {
+                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
+                        bot.pathfinder.setGoal(goal, true);
+                    }
+                },
+                stopFollow: () => {
+                    if (bot && bot.pathfinder) {
+                        bot.pathfinder.setGoal(null);
+                    }
                 }
             };
 

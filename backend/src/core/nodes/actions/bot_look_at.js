@@ -24,7 +24,7 @@ async function execute(node, context, helpers) {
 
         if (finalPosition) {
             finalPosition.y += Number(yOffset || 0);
-            context.bot.lookAt(finalPosition);
+            await context.bot.lookAt(finalPosition.x, finalPosition.y, finalPosition.z);
         }
     }
 
