@@ -1155,6 +1155,9 @@ export const useVisualEditorStore = create(
       const newSocket = io(SOCKET_URL, {
         path: "/socket.io/",
         auth: { token },
+        query: {
+          initialPath: window.location.pathname  // Передаем текущий путь для presence
+        },
         transports: ['websocket', 'polling'],
         withCredentials: true,
         reconnection: true,
@@ -1166,6 +1169,15 @@ export const useVisualEditorStore = create(
 
       newSocket.on('connect', () => {
         console.log('[Collab] WebSocket connected, joining graph...');
+
+        // Обновляем presence с актуальным путем при (пере)подключении
+        newSocket.emit('presence:update', {
+          path: window.location.pathname,
+          metadata: {
+            graphName: command.name,
+            botName: botName
+          }
+        });
 
         // Присоединяемся к графу для collaborative editing с текущим режимом
         const { debugMode } = get();
