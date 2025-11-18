@@ -228,7 +228,6 @@ process.on('message', async (message) => {
         const { botId, graph, eventType, eventArgs } = message;
 
         try {
-            sendLog(`[EventGraph] Executing ${eventType} graph in child process`);
 
             const playerList = bot ? Object.keys(bot.players) : [];
             const botApi = {

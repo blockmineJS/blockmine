@@ -1171,12 +1171,9 @@ export const useVisualEditorStore = create(
         console.log('[Collab] WebSocket connected, joining graph...');
 
         // Обновляем presence с актуальным путем при (пере)подключении
+        // metadata будут обновлены из VisualEditorPage.jsx
         newSocket.emit('presence:update', {
-          path: window.location.pathname,
-          metadata: {
-            graphName: command.name,
-            botName: botName
-          }
+          path: window.location.pathname
         });
 
         // Присоединяемся к графу для collaborative editing с текущим режимом
