@@ -10,6 +10,7 @@ import {
 import { shallow } from 'zustand/shallow';
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
+import { useAppStore } from '@/stores/appStore';
 import NodePanel from '@/components/visual-editor/NodePanel';
 import SettingsPanel from '@/components/visual-editor/SettingsPanel';
 import CustomNode from '@/components/visual-editor/CustomNode.new';
@@ -31,6 +32,9 @@ import { toast } from 'sonner';
 import { initializeVisualEditor } from '@/components/visual-editor/initVisualEditor';
 import NodeRegistry from '@/components/visual-editor/nodes';
 import { apiHelper } from '@/lib/api';
+import CollaborativeUsersHeader from '@/components/visual-editor/CollaborativeUsersHeader';
+import CollaborativeCursors from '@/components/visual-editor/CollaborativeCursors';
+import CollaborativeConnections from '@/components/visual-editor/CollaborativeConnections';
 
 initializeVisualEditor();
 
@@ -62,6 +66,9 @@ function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
 
+    const [botName, setBotName] = useState(null);
+    const appSocket = useAppStore(state => state.socket);
+    const bots = useAppStore(state => state.bots);
     const init = useVisualEditorStore(state => state.init);
     const isLoading = useVisualEditorStore(state => state.isLoading);
     const isSaving = useVisualEditorStore(state => state.isSaving);
@@ -85,6 +92,7 @@ function BotVisualEditorPage() {
     const isTraceViewerOpen = useVisualEditorStore(state => state.isTraceViewerOpen);
     const debugMode = useVisualEditorStore(state => state.debugMode);
     const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
+    const socket = useVisualEditorStore(state => state.socket);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);
@@ -108,8 +116,79 @@ function BotVisualEditorPage() {
 
         return () => {
             flushSaveGraph();
+            // Отключаемся от collaborative socket при уходе со страницы
+            const disconnectGraphSocket = useVisualEditorStore.getState().disconnectGraphSocket;
+            disconnectGraphSocket();
         };
     }, [botId, entityId, editorType, init, flushSaveGraph]);
+
+    // Загружаем информацию о боте из store
+    useEffect(() => {
+        if (!botId || !bots) return;
+
+        const bot = bots.find(b => b.id === parseInt(botId));
+        if (bot) {
+            setBotName(bot.username || bot.name || `Бот ${botId}`);
+        } else {
+            setBotName(`Бот ${botId}`);
+        }
+    }, [botId, bots]);
+
+    // Отправляем метаданные для presence (название графа и бота)
+    useEffect(() => {
+        if (!appSocket || !command || !botName) return;
+
+        appSocket.emit('presence:update', {
+            path: location.pathname,
+            metadata: {
+                graphName: command.name,
+                botName: botName
+            }
+        });
+    }, [appSocket, command, botName, location.pathname]);
+
+    // Global mouse tracking для collaborative cursors
+    useEffect(() => {
+        if (!socket || !command || !reactFlowInstance) return;
+
+        const handleMouseMove = (event) => {
+            const position = reactFlowInstance.screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+
+            socket.emit('collab:cursor', {
+                botId: command.botId,
+                graphId: command.id,
+                x: position.x,
+                y: position.y,
+            });
+
+            // Если сейчас создаем соединение, отправляем обновление
+            if (connectingPin) {
+                socket.emit('collab:connection-update', {
+                    botId: command.botId,
+                    graphId: command.id,
+                    toX: position.x,
+                    toY: position.y,
+                });
+            }
+        };
+
+        // Throttled version
+        let timeout = null;
+        const throttledHandleMouseMove = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => handleMouseMove(event), 10); // ~100fps
+        };
+
+        document.addEventListener('mousemove', throttledHandleMouseMove);
+
+        return () => {
+            document.removeEventListener('mousemove', throttledHandleMouseMove);
+            if (timeout) clearTimeout(timeout);
+        };
+    }, [socket, command, reactFlowInstance, connectingPin]);
 
     useEffect(() => {
         loadCategories();
@@ -333,6 +412,28 @@ function BotVisualEditorPage() {
         handler(event.clientY, event.clientX, position);
     };
 
+    const handleConnectStart = (event, { nodeId, handleId, handleType }) => {
+        // Вызываем оригинальный onConnectStart из store
+        onConnectStart(event, { handleType, nodeId, handleId });
+
+        // Broadcast начало создания соединения
+        if (socket && command && reactFlowInstance) {
+            const position = reactFlowInstance.screenToFlowPosition({
+                x: event.clientX || 0,
+                y: event.clientY || 0,
+            });
+
+            socket.emit('collab:connection-start', {
+                botId: command.botId,
+                graphId: command.id,
+                fromX: position.x,
+                fromY: position.y,
+                fromNodeId: nodeId,
+                fromHandleId: handleId,
+            });
+        }
+    };
+
     const handleConnectEnd = (event) => {
         if (!connectingPin) return;
         const targetIsPane = event.target.classList.contains('react-flow__pane');
@@ -340,6 +441,14 @@ function BotVisualEditorPage() {
             handlePaneInteraction(event, openMenu);
         }
         setConnectingPin(null);
+
+        // Broadcast завершение создания соединения
+        if (socket && command) {
+            socket.emit('collab:connection-end', {
+                botId: command.botId,
+                graphId: command.id,
+            });
+        }
     };
 
     const onDragOver = (event) => {
@@ -367,14 +476,15 @@ function BotVisualEditorPage() {
             <div className="h-full w-full flex flex-col">
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">Редактор: {command?.name}</h1>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                        <CollaborativeUsersHeader />
                         <Button
                             variant={debugMode === 'live' ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setDebugMode(debugMode === 'live' ? 'trace' : 'live')}
+                            onClick={() => setDebugMode(debugMode === 'live' ? 'normal' : 'live')}
                         >
                             <Bug className="w-4 h-4 mr-2" />
-                            {debugMode === 'live' ? 'Live Debug' : 'Trace режим'}
+                            {debugMode === 'live' ? 'Live Debug Вкл' : 'Live Debug'}
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleViewLastTrace()}>
                             <Zap className="w-4 h-4 mr-2" />
@@ -476,7 +586,7 @@ function BotVisualEditorPage() {
                                 onNodesChange={onNodesChange}
                                 onEdgesChange={onEdgesChange}
                                 onConnect={onConnect}
-                                onConnectStart={onConnectStart}
+                                onConnectStart={handleConnectStart}
                                 onConnectEnd={handleConnectEnd}
                                 nodeTypes={nodeTypes}
                                 edgeTypes={edgeTypes}
@@ -497,6 +607,14 @@ function BotVisualEditorPage() {
                                 <Controls />
                                 <Background />
                             </ReactFlow>
+
+                            {/* Collaborative overlays */}
+                            {reactFlowInstance && (
+                                <>
+                                    <CollaborativeCursors flowToScreenPosition={reactFlowInstance.flowToScreenPosition} />
+                                    <CollaborativeConnections flowToScreenPosition={reactFlowInstance.flowToScreenPosition} />
+                                </>
+                            )}
                         </div>
                     </ResizablePanel>
                     <ResizableHandle withHandle />
