@@ -533,34 +533,37 @@ class GraphExecutionEngine {
               else result = this.context.eventArgs?.[pinId];
               break;
           case 'event:chat':
-              if (pinId === 'username') result = this.context.username;
-              else if (pinId === 'message') result = this.context.message;
-              else if (pinId === 'chatType') result = this.context.chat_type;
-              else result = this.context[pinId];
+              if (pinId === 'username') result = this.context.eventArgs?.username || this.context.username;
+              else if (pinId === 'message') result = this.context.eventArgs?.message || this.context.message;
+              else if (pinId === 'chatType') result = this.context.eventArgs?.chatType || this.context.chat_type;
+              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
           case 'event:raw_message':
-              if (pinId === 'rawText') result = this.context.rawText;
-              else result = this.context[pinId];
+              if (pinId === 'rawText') result = this.context.eventArgs?.rawText || this.context.rawText;
+              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
           case 'event:playerJoined':
           case 'event:playerLeft':
-              result = this.context[pinId];
+              if (pinId === 'user') result = this.context.eventArgs?.user || this.context.user;
+              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
           case 'event:entitySpawn':
           case 'event:entityMoved':
           case 'event:entityGone':
-              result = this.context[pinId];
+              if (pinId === 'entity') result = this.context.eventArgs?.entity || this.context.entity;
+              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
           case 'event:health':
           case 'event:botDied':
-              result = this.context[pinId];
+          case 'event:botStartup':
+              result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
           case 'event:websocket_call':
-              if (pinId === 'graphName') result = this.context.graphName;
-              else if (pinId === 'data') result = this.context.data;
-              else if (pinId === 'socketId') result = this.context.socketId;
-              else if (pinId === 'keyPrefix') result = this.context.keyPrefix;
-              else result = this.context[pinId];
+              if (pinId === 'graphName') result = this.context.eventArgs?.graphName || this.context.graphName;
+              else if (pinId === 'data') result = this.context.eventArgs?.data || this.context.data;
+              else if (pinId === 'socketId') result = this.context.eventArgs?.socketId || this.context.socketId;
+              else if (pinId === 'keyPrefix') result = this.context.eventArgs?.keyPrefix || this.context.keyPrefix;
+              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
               break;
 
           case 'flow:for_each': {

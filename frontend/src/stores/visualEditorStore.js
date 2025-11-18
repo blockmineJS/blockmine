@@ -64,6 +64,9 @@ export const useVisualEditorStore = create(
     collabSelections: new Map(), // Map<socketId, {nodeIds: [], username, color}>
     collabConnections: new Map(), // Map<socketId, {fromX, fromY, toX, toY, username, color}>
 
+    // Viewport state (для правильного отображения collaborative курсоров)
+    viewport: { x: 0, y: 0, zoom: 1 },
+
     init: async (botId, id, type) => {
       set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
       try {
@@ -1513,6 +1516,10 @@ export const useVisualEditorStore = create(
           }
         });
       });
+    },
+
+    setViewport: (viewport) => {
+      set({ viewport });
     },
 
     disconnectGraphSocket: () => {

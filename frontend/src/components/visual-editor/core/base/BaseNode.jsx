@@ -100,28 +100,41 @@ const Pin = React.memo(({
       <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
       {/* Отображаем значение из трассировки, если есть */}
       {traceValue !== undefined && (
-        <span
-          className={cn(
-            "px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded border border-green-700",
-            isInput ? "ml-2" : "mr-2",
-            debugMode === 'live' && onEditValue && "cursor-pointer hover:bg-green-800/50 hover:border-green-600 transition-colors"
-          )}
-          onClick={(e) => {
-            if (debugMode === 'live' && onEditValue) {
-              e.stopPropagation();
-              onEditValue({
-                nodeId,
-                pinId: pin.id,
-                pinName: pin.name,
-                value: traceValue,
-                isInput
-              });
-            }
-          }}
-          title={debugMode === 'live' ? 'Нажмите для редактирования' : undefined}
-        >
-          {formatValueForDisplay(traceValue)}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={cn(
+                "px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded border border-green-700",
+                isInput ? "ml-2" : "mr-2",
+                debugMode === 'live' && onEditValue && "cursor-pointer hover:bg-green-800/50 hover:border-green-600 transition-colors"
+              )}
+              onClick={(e) => {
+                if (debugMode === 'live' && onEditValue) {
+                  e.stopPropagation();
+                  onEditValue({
+                    nodeId,
+                    pinId: pin.id,
+                    pinName: pin.name,
+                    value: traceValue,
+                    isInput
+                  });
+                }
+              }}
+            >
+              {formatValueForDisplay(traceValue)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side={isInput ? "right" : "left"} className="max-w-md bg-slate-900 text-white border-slate-700">
+            <div className="text-xs">
+              <div className="font-semibold mb-1 text-green-400">{pin.name}</div>
+              <pre className="whitespace-pre-wrap break-all">
+                {typeof traceValue === 'object'
+                  ? JSON.stringify(traceValue, null, 2)
+                  : String(traceValue)}
+              </pre>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
       {/* Для input пинов иконка справа от текста */}
       {isInput && pin.description && (

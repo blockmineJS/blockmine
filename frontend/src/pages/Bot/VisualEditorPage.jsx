@@ -93,6 +93,7 @@ function BotVisualEditorPage() {
     const debugMode = useVisualEditorStore(state => state.debugMode);
     const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
     const socket = useVisualEditorStore(state => state.socket);
+    const setViewport = useVisualEditorStore(state => state.setViewport);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);
@@ -608,6 +609,9 @@ function BotVisualEditorPage() {
                                 autoPanOnNodeDrag={true}
                                 zoomOnDoubleClick={true}
                                 selectNodesOnDrag={true}
+                                onMove={(event, viewport) => {
+                                    setViewport(viewport);
+                                }}
                                 onPaneContextMenu={(e) => {
                                     e.preventDefault();
                                     handlePaneInteraction(e, openMenu);

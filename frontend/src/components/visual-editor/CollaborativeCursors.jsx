@@ -4,6 +4,9 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
 const CollaborativeCursors = ({ flowToScreenPosition }) => {
   const collabCursors = useVisualEditorStore(state => state.collabCursors);
 
+  // Подписываемся на viewport чтобы курсоры обновлялись при pan/zoom
+  const viewport = useVisualEditorStore(state => state.viewport);
+
   return (
     <>
       {Array.from(collabCursors.entries()).map(([socketId, cursor]) => {
