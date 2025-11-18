@@ -184,7 +184,21 @@ export const useVisualEditorStore = create(
         });
 
         // Подключаемся к collaborative socket
-        get().connectGraphSocket();
+        // Передаем callback для инициализации graphState после получения collab:state
+        get().connectGraphSocket(() => {
+          // Callback вызывается после получения collab:state
+          // Если graphState пустой - отправляем наше состояние
+          const { nodes, edges, command } = get();
+          if (nodes.length > 0 || edges.length > 0) {
+            console.log('[Collab] Sending init-graph-state after connection');
+            get().socket?.emit('collab:init-graph-state', {
+              botId: command.botId,
+              graphId: command.id,
+              nodes,
+              edges,
+            });
+          }
+        });
       } catch (error) {
         console.error("Ошибка инициализации редактора:", error);
         toast({ variant: 'destructive', title: 'Ошибка загрузки', description: error.message });
@@ -1139,7 +1153,7 @@ export const useVisualEditorStore = create(
     },
 
     // Подключение к графу для collaborative editing (всегда активно)
-    connectGraphSocket: () => {
+    connectGraphSocket: (onConnectedCallback) => {
       const { socket, command } = get();
       if (socket || !command) return; // Уже подключен или нет команды
 
@@ -1209,23 +1223,17 @@ export const useVisualEditorStore = create(
         set({ collabUsers: users });
 
         // Если есть состояние графа от других пользователей - применяем его
-        if (graphState && graphState.nodes && graphState.edges) {
-          console.log('[Collab] Applying synced graph state from other users');
+        if (graphState && graphState.nodes && graphState.edges && graphState.nodes.length > 0) {
+          console.log('[Collab] Applying synced graph state from other users:', graphState.nodes.length, 'nodes,', graphState.edges.length, 'edges');
           set({
             nodes: graphState.nodes,
             edges: graphState.edges,
           });
         } else {
-          // Мы первые в комнате - отправляем наше состояние графа для синхронизации
-          const { nodes, edges, command } = get();
-          if (nodes.length > 0 || edges.length > 0) {
-            console.log('[Collab] Initializing graph state for other users:', nodes.length, 'nodes,', edges.length, 'edges');
-            newSocket.emit('collab:init-graph-state', {
-              botId: command.botId,
-              graphId: command.id,
-              nodes,
-              edges,
-            });
+          // Мы первые в комнате или graphState пустой - вызываем callback для инициализации
+          console.log('[Collab] No graph state from server, will initialize from loaded data');
+          if (onConnectedCallback) {
+            onConnectedCallback();
           }
         }
       });
