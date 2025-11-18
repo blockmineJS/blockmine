@@ -46,11 +46,11 @@ const DebugPanel = () => {
             <Switch
               id="debug-mode"
               checked={debugMode === 'live'}
-              onCheckedChange={(checked) => setDebugMode(checked ? 'live' : 'trace')}
+              onCheckedChange={(checked) => setDebugMode(checked ? 'live' : 'normal')}
             />
           </div>
           <Badge variant={debugMode === 'live' ? 'default' : 'secondary'}>
-            {debugMode === 'live' ? 'Live' : 'Трассировка'}
+            {debugMode === 'live' ? 'Live' : debugMode === 'trace' ? 'Трассировка' : 'Обычный'}
           </Badge>
         </div>
 
@@ -188,7 +188,15 @@ const DebugPanel = () => {
           )}
         </div>
 
-        {/* Инструкция для Trace режима */}
+        {/* Инструкции для разных режимов */}
+        {debugMode === 'normal' && (
+          <div className="p-3 bg-slate-700/50 border border-slate-600/30 rounded-lg">
+            <p className="text-xs text-slate-300">
+              <strong>Обычный режим:</strong> Редактирование графа.
+              Включите <strong>Live режим</strong> для отладки в реальном времени с брейкпоинтами.
+            </p>
+          </div>
+        )}
         {debugMode === 'trace' && (
           <div className="p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg">
             <p className="text-xs text-slate-300">

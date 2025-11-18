@@ -223,6 +223,57 @@ process.on('message', async (message) => {
                 payload: { entities }
             });
         }
+    } else if (message.type === 'execute_event_graph') {
+        // Выполнение event графа в child process
+        const { botId, graph, eventType, eventArgs } = message;
+
+        try {
+            sendLog(`[EventGraph] Executing ${eventType} graph in child process`);
+
+            const playerList = bot ? Object.keys(bot.players) : [];
+            const botApi = {
+                sendMessage: (chatType, message, recipient) => {
+                    if (!bot || !bot.messageQueue) {
+                        sendLog('[EventGraph] Bot not ready');
+                        return;
+                    }
+
+                    bot.messageQueue.enqueue(chatType, message, recipient);
+                },
+                executeCommand: (command) => {
+                    if (!bot || !bot.messageQueue) {
+                        sendLog('[EventGraph] Bot not ready');
+                        return;
+                    }
+                    bot.messageQueue.enqueue('command', command);
+                }
+            };
+
+            const context = {
+                bot: botApi,
+                eventArgs: eventArgs || {},
+                players: playerList,
+                botState: bot ? {
+                    health: bot.health,
+                    food: bot.food,
+                    position: bot.entity?.position,
+                    gameMode: bot.game?.gameMode
+                } : {},
+                botEntity: bot && bot.entity ? serializeEntity(bot.entity) : null,
+                botId: botId,
+                graphId: graph.id,
+                eventType: eventType,
+                eventArgs: eventArgs
+            };
+
+            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+            await engine.execute(graph, context, eventType);
+
+
+        } catch (error) {
+            sendLog(`[EventGraph] Error executing ${eventType} graph: ${error.message}`);
+            sendLog(`[EventGraph] Stack: ${error.stack}`);
+        }
     } else if (message.type === 'start') {
         const config = message.config;
         sendLog(`[System] Получена команда на запуск бота ${config.username}...`);
@@ -511,7 +562,9 @@ process.on('message', async (message) => {
                 },
                 executeCommand: (command) => {
                     sendLog(`[Graph] Выполнение серверной команды: ${command}`);
-                    bot.chat(command);
+                    if (bot && bot.messageQueue) {
+                        bot.messageQueue.enqueue('command', command);
+                    }
                 },
                 lookAt: (position) => {
                     if (bot && position) {
@@ -614,23 +667,34 @@ process.on('message', async (message) => {
                     visualCommand.graphJson = dbCommand.graphJson;
                     visualCommand.owner = 'visual_editor';
                     visualCommand.handler = (botInstance, typeChat, user, args) => {
-                        const playerList = bot ? Object.keys(bot.players) : [];
-                        const botState = bot ? { yaw: bot.entity.yaw, pitch: bot.entity.pitch } : {};
-                        const botEntity = bot && bot.entity ? {
-                            position: bot.entity.position,
-                            yaw: bot.entity.yaw,
-                            pitch: bot.entity.pitch
+                        const playerList = botInstance ? Object.keys(botInstance.players) : [];
+                        const botState = botInstance ? { yaw: botInstance.entity.yaw, pitch: botInstance.entity.pitch } : {};
+                        const botEntity = botInstance && botInstance.entity ? {
+                            position: botInstance.entity.position,
+                            yaw: botInstance.entity.yaw,
+                            pitch: botInstance.entity.pitch
                         } : null;
-                        const context = { 
-                            bot: botInstance.api, 
-                            user, 
-                            args, 
-                            typeChat, 
-                            players: playerList, 
+
+                        const context = {
+                            bot: botInstance.api,
+                            user,
+                            args,
+                            typeChat,
+                            players: playerList,
                             botState,
-                            botEntity
+                            botEntity,
+                            botId: botInstance.config.id,
+                            graphId: dbCommand.id,
+                            eventType: 'command',
+                            eventArgs: {
+                                commandName: dbCommand.name,
+                                user: { username: user?.username },
+                                args,
+                                typeChat
+                            }
                         };
-                        return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
+
+                        return botInstance.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
                     bot.commands.set(visualCommand.name, visualCommand);
                     
@@ -1082,8 +1146,97 @@ process.on('message', async (message) => {
             sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
         }
     } else if (message.type === 'server_command') {
-        if (bot && message.payload && message.payload.command) {
-            bot.chat(message.payload.command);
+        if (bot && bot.messageQueue && message.payload && message.payload.command) {
+            bot.messageQueue.enqueue('command', message.payload.command);
+        }
+    } else if (message.type === 'execute_event_graph') {
+        // Выполнение event графа в child process
+        const { graph, eventType, eventArgs } = message;
+
+        try {
+            if (!graph || !graph.nodes || graph.nodes.length === 0) {
+                return;
+            }
+
+            const config = bot?.config || bot?.botConfig || message.botConfig;
+
+            if (!config) {
+                sendLog('[ERROR] Bot config not available for event graph execution');
+                return;
+            }
+
+            const botApi = {
+                sendMessage: (chatType, messageText, recipient) => {
+                    if (!bot || !bot.messageQueue) return;
+                    bot.messageQueue.enqueue(chatType, messageText, recipient);
+                },
+                executeCommand: (command) => {
+                    if (!bot || !bot.messageQueue) return;
+                    bot.messageQueue.enqueue('command', command);
+                },
+                lookAt: async (x, y, z) => {
+                    if (!bot) return;
+                    const target = new Vec3(x, y, z);
+                    await bot.lookAt(target);
+                },
+                navigate: async (x, y, z) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
+                    await bot.pathfinder.goto(goal);
+                },
+                attack: (entityId) => {
+                    if (!bot) return;
+                    const entity = bot.entities[entityId];
+                    if (entity) bot.attack(entity);
+                },
+                follow: (username) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const player = bot.players[username];
+                    if (player && player.entity) {
+                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
+                        bot.pathfinder.setGoal(goal, true);
+                    }
+                },
+                stopFollow: () => {
+                    if (bot && bot.pathfinder) {
+                        bot.pathfinder.setGoal(null);
+                    }
+                }
+            };
+
+            const players = bot ? Object.keys(bot.players) : [];
+
+            const context = {
+                bot: botApi,
+                players,
+                botState: {
+                    health: bot?.health,
+                    food: bot?.food,
+                    position: bot?.entity?.position
+                },
+                botEntity: bot && bot.entity ? {
+                    position: bot.entity.position,
+                    velocity: bot.entity.velocity,
+                    yaw: bot.entity.yaw,
+                    pitch: bot.entity.pitch,
+                    onGround: bot.entity.onGround,
+                    height: bot.entity.height,
+                    width: bot.entity.width
+                } : null,
+                eventArgs,
+                botId: config.id,
+                graphId: graph.id,
+                eventType: eventType,
+                eventArgs: eventArgs
+            };
+
+            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+
+            await engine.execute(graph, context, eventType);
+
+        } catch (error) {
+            sendLog(`[ERROR] Error executing event graph for '${eventType}': ${error.message}`);
+            console.error(error);
         }
     }
 });

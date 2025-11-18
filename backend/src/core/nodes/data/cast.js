@@ -14,20 +14,17 @@ async function evaluate(node, pinId, context, helpers) {
         const value = await resolvePinValue(node, 'value');
         const targetType = node.data?.targetType || 'String';
 
-
         switch (targetType) {
             case 'String':
                 // Для объектов и массивов используем JSON.stringify
                 if (typeof value === 'object' && value !== null) {
                     try {
-                        const result = JSON.stringify(value);
-                        return result;
+                        return JSON.stringify(value);
                     } catch (e) {
                         return String(value ?? '');
                     }
                 }
-                const stringResult = String(value ?? '');
-                return stringResult;
+                return String(value ?? '');
             case 'Number':
                 const num = Number(value);
                 return isNaN(num) ? 0 : num;
@@ -38,7 +35,6 @@ async function evaluate(node, pinId, context, helpers) {
         }
     }
 
-    console.log('[data:cast] pinId !== result, returning null', { pinId });
     return null;
 }
 

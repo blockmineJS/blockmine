@@ -9,6 +9,7 @@ import { AutosizeInput } from '@/components/ui/AutosizeInput';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { cn } from '@/lib/utils';
 import BreakpointDialog from '../../BreakpointDialog';
+import ValueEditor from '../../ValueEditor';
 
 /**
  * BaseNode - базовый UI компонент для всех нод
@@ -25,8 +26,41 @@ import BreakpointDialog from '../../BreakpointDialog';
  * - Разделение пинов выполняется один раз через useMemo
  */
 
+/**
+ * Форматирует значение для отображения в бейдже
+ * - Обрезает длинные строки
+ * - Показывает JSON для объектов
+ */
+const formatValueForDisplay = (value, maxLength = 30) => {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+
+  let str;
+  if (typeof value === 'object') {
+    str = JSON.stringify(value);
+  } else {
+    str = String(value);
+  }
+
+  if (str.length > maxLength) {
+    return str.substring(0, maxLength) + '...';
+  }
+  return str;
+};
+
 // Компонент для рендеринга одного пина с опциональным инлайн-полем
-const Pin = React.memo(({ pin, isInput, nodeId, data, updateNodeData, context = {}, nodeEdges = [], traceValue = undefined }) => {
+const Pin = React.memo(({
+  pin,
+  isInput,
+  nodeId,
+  data,
+  updateNodeData,
+  context = {},
+  nodeEdges = [],
+  traceValue = undefined,
+  onEditValue = null,
+  debugMode = null
+}) => {
   const position = isInput ? Position.Left : Position.Right;
   const style = {
     background: pinColors[pin.type] || '#333',
@@ -66,11 +100,27 @@ const Pin = React.memo(({ pin, isInput, nodeId, data, updateNodeData, context = 
       <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
       {/* Отображаем значение из трассировки, если есть */}
       {traceValue !== undefined && (
-        <span className={cn(
-          "px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded border border-green-700",
-          isInput ? "ml-2" : "mr-2"
-        )}>
-          {typeof traceValue === 'object' ? JSON.stringify(traceValue) : String(traceValue)}
+        <span
+          className={cn(
+            "px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded border border-green-700",
+            isInput ? "ml-2" : "mr-2",
+            debugMode === 'live' && onEditValue && "cursor-pointer hover:bg-green-800/50 hover:border-green-600 transition-colors"
+          )}
+          onClick={(e) => {
+            if (debugMode === 'live' && onEditValue) {
+              e.stopPropagation();
+              onEditValue({
+                nodeId,
+                pinId: pin.id,
+                pinName: pin.name,
+                value: traceValue,
+                isInput
+              });
+            }
+          }}
+          title={debugMode === 'live' ? 'Нажмите для редактирования' : undefined}
+        >
+          {formatValueForDisplay(traceValue)}
         </span>
       )}
       {/* Для input пинов иконка справа от текста */}
@@ -172,11 +222,48 @@ const BaseNode = ({
   isActiveNode = false,
   isTraceActive = false,
   breakpoint = null,
+  isPausedNode = false,
 }) => {
   const [isBreakpointDialogOpen, setIsBreakpointDialogOpen] = useState(false);
+  const [editingValue, setEditingValue] = useState(null);
+
   const debugMode = useVisualEditorStore(state => state.debugMode);
+  const socket = useVisualEditorStore(state => state.socket);
+  const command = useVisualEditorStore(state => state.command);
   const addBreakpoint = useVisualEditorStore(state => state.addBreakpoint);
   const removeBreakpoint = useVisualEditorStore(state => state.removeBreakpoint);
+
+  // Обработчик редактирования значения
+  const handleEditValue = ({ nodeId, pinId, pinName, value, isInput }) => {
+    setEditingValue({
+      nodeId,
+      pinId,
+      pinName,
+      value,
+      isInput
+    });
+  };
+
+  // Обработчик сохранения изменений
+  const handleSaveValue = (newValue) => {
+    if (!editingValue || !socket || !command) return;
+
+    const { nodeId, pinId, isInput } = editingValue;
+
+    // Формируем ключ для override
+    // Формат: "nodeId.out.pinId" или "nodeId.in.pinId"
+    const key = `${nodeId}.${isInput ? 'in' : 'out'}.${pinId}`;
+
+    // Отправляем изменение через WebSocket
+    socket.emit('debug:update-value', {
+      botId: command.bot_id,
+      graphId: command.id,
+      key,
+      value: newValue
+    });
+
+    setEditingValue(null);
+  };
   // Разделяем пины на Exec и Data ОДИН РАЗ
   const { execInputs, dataInputs, execOutputs, dataOutputs } = useMemo(() => {
     return {
@@ -263,16 +350,18 @@ const BaseNode = ({
       <Card
         className={cn(
           "min-w-64 bg-slate-800 border-slate-600 text-white transition-all duration-300",
-          isHighlighted && !isActiveNode && "border-green-500 border-2 shadow-lg shadow-green-500/50",
-          isActiveNode && "border-green-400 border-[3px] shadow-xl shadow-green-400/70 ring-2 ring-green-400/30",
+          isHighlighted && !isActiveNode && !isPausedNode && "border-green-500 border-2 shadow-lg shadow-green-500/50",
+          isActiveNode && !isPausedNode && "border-green-400 border-[3px] shadow-xl shadow-green-400/70 ring-2 ring-green-400/30",
+          isPausedNode && "border-amber-500 border-[3px] shadow-xl shadow-amber-500/70 ring-2 ring-amber-500/30",
           shouldDim && "opacity-40"
         )}
         onContextMenu={handleContextMenu}
       >
         <CardHeader className={cn(
           "bg-slate-700 p-2 rounded-t-lg relative",
-          isHighlighted && !isActiveNode && "bg-green-900/30",
-          isActiveNode && "bg-green-800/50"
+          isHighlighted && !isActiveNode && !isPausedNode && "bg-green-900/30",
+          isActiveNode && !isPausedNode && "bg-green-800/50",
+          isPausedNode && "bg-amber-900/50"
         )}>
           {/* Breakpoint click zone - только в Live режиме */}
           {debugMode === 'live' && (
@@ -363,6 +452,8 @@ const BaseNode = ({
                   context={context}
                   nodeEdges={nodeEdges}
                   traceValue={traceInputs?.[pin.id]}
+                  onEditValue={handleEditValue}
+                  debugMode={debugMode}
                 />
               ))}
               {dataInputs.map(pin => (
@@ -376,6 +467,8 @@ const BaseNode = ({
                   context={context}
                   nodeEdges={nodeEdges}
                   traceValue={traceInputs?.[pin.id]}
+                  onEditValue={handleEditValue}
+                  debugMode={debugMode}
                 />
               ))}
             </div>
@@ -393,6 +486,8 @@ const BaseNode = ({
                   context={context}
                   nodeEdges={nodeEdges}
                   traceValue={traceOutputs?.[pin.id]}
+                  onEditValue={handleEditValue}
+                  debugMode={debugMode}
                 />
               ))}
               {dataOutputs.map(pin => (
@@ -406,6 +501,8 @@ const BaseNode = ({
                   context={context}
                   nodeEdges={nodeEdges}
                   traceValue={traceOutputs?.[pin.id]}
+                  onEditValue={handleEditValue}
+                  debugMode={debugMode}
                 />
               ))}
             </div>
@@ -428,6 +525,18 @@ const BaseNode = ({
         onClose={() => setIsBreakpointDialogOpen(false)}
         nodeId={nodeId}
       />
+
+      {/* Value Editor */}
+      {editingValue && (
+        <ValueEditor
+          isOpen={true}
+          onClose={() => setEditingValue(null)}
+          value={editingValue.value}
+          onSave={handleSaveValue}
+          title={`Редактировать значение`}
+          pinName={editingValue.pinName}
+        />
+      )}
     </TooltipProvider>
   );
 };

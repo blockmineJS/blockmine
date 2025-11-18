@@ -209,6 +209,10 @@ class BotManager {
         this.lifecycleService.eventGraphManager = manager;
     }
 
+    getChildProcess(botId) {
+        return this.lifecycleService.getChildProcess(botId);
+    }
+
     // === Legacy async methods для migration ===
     async _syncSystemPermissions(botId) {
         return this.lifecycleService._syncSystemPermissions(botId);

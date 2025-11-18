@@ -6,17 +6,24 @@ import { Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
-const routeTitles = (path) => {
+const routeTitles = (path, metadata = {}) => {
 	if (path === '/') return 'Дашборд';
 	if (path.startsWith('/bots/')) {
 		const parts = path.split('/');
 		const id = parts[2];
-		if (path.endsWith('/console')) return `Консоль бота ${id}`;
-		if (path.endsWith('/plugins')) return `Плагины бота ${id}`;
-		if (path.endsWith('/settings')) return `Настройки бота ${id}`;
-		if (path.endsWith('/events')) return `События бота ${id}`;
-		if (path.endsWith('/management')) return `Управление бота ${id}`;
-		return `Страница бота ${id}`;
+		const botName = metadata.botName || `Бот ${id}`;
+
+		// Проверяем любой путь с визуальным редактором (visual-editor или events/visual)
+		if (path.includes('/visual-editor/') || path.includes('/events/visual/') || path.includes('/commands/visual/')) {
+			const graphName = metadata.graphName || 'граф';
+			return `✏️ Редактор "${graphName}" бота "${botName}"`;
+		}
+		if (path.endsWith('/console')) return `Консоль бота "${botName}"`;
+		if (path.endsWith('/plugins')) return `Плагины бота "${botName}"`;
+		if (path.endsWith('/settings')) return `Настройки бота "${botName}"`;
+		if (path.endsWith('/events')) return `События бота "${botName}"`;
+		if (path.endsWith('/management')) return `Управление бота "${botName}"`;
+		return `Страница бота "${botName}"`;
 	}
 	return path;
 };
@@ -31,8 +38,10 @@ function sinceText(ts) {
 export default function PresenceButton() {
 	const socket = useAppStore((s) => s.socket);
 	const currentUser = useAppStore((s) => s.user);
+	const bots = useAppStore((s) => s.bots);
 	const { toast } = useToast();
 	const [list, setList] = useState([]);
+	const [enrichedList, setEnrichedList] = useState([]);
 	const [tick, setTick] = useState(0);
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -68,7 +77,7 @@ export default function PresenceButton() {
 					if (!currentUser || user.userId !== currentUser.id) {
 						const lastLeft = lastLeftAtRef.current.get(user.userId);
 						if (!lastLeft || now - lastLeft >= 5 * 60 * 1000) {
-							toast({ title: `${user.username} зашел в панель`, description: routeTitles(user.path) });
+							toast({ title: `${user.username} зашел в панель`, description: routeTitles(user.path, user.metadata) });
 						}
 					}
 				}
@@ -96,7 +105,37 @@ export default function PresenceButton() {
 		return () => clearInterval(interval);
 	}, []);
 
-	const count = list.length;
+	// Обогащаем список пользователей именами ботов
+	useEffect(() => {
+		const enrichedUsers = list.map((user) => {
+			// Извлекаем botId из пути
+			const match = user.path.match(/^\/bots\/(\d+)/);
+			if (match && !user.metadata?.botName) {
+				const botId = parseInt(match[1]);
+
+				// Ищем бота в списке
+				const bot = bots.find(b => b.id === botId);
+
+				if (bot) {
+					const botName = bot.username || bot.name || `Бот ${botId}`;
+
+					return {
+						...user,
+						metadata: {
+							...user.metadata,
+							botName
+						}
+					};
+				}
+			}
+
+			return user;
+		});
+
+		setEnrichedList(enrichedUsers);
+	}, [list, bots]);
+
+	const count = enrichedList.length;
 
 	return (
 		<Popover>
@@ -111,11 +150,11 @@ export default function PresenceButton() {
 					<div className="text-xs text-muted-foreground">Никого нет онлайн.</div>
 				) : (
 					<ul className="space-y-1 max-h-64 overflow-auto">
-						{list.map((u) => (
+						{enrichedList.map((u) => (
 							<li key={u.userId} className="text-sm flex items-center justify-between">
 								<div>
 									<div className="font-medium">{u.username}</div>
-									<div className="text-xs text-muted-foreground truncate">{routeTitles(u.path)}</div>
+									<div className="text-xs text-muted-foreground truncate">{routeTitles(u.path, u.metadata)}</div>
 									<div className="text-[10px] text-muted-foreground">{sinceText(u.lastSeen)}</div>
 								</div>
 								<Button size="sm" variant="secondary" onClick={() => navigate(u.path)}>Открыть</Button>

@@ -109,15 +109,21 @@ class MessageQueue {
                 await this._handleWaitableTask(task);
             } else {
                 let fullMessage;
-                if (task.chatType === 'private' && task.username) {
+                const typeConfig = this.chatTypes[task.chatType];
+
+                // Для private/whisper добавляем username
+                if ((task.chatType === 'private' || task.chatType === 'whisper') && task.username) {
                     fullMessage = `/msg ${task.username} ${task.message}`;
-                } else if (task.chatType === 'clan') {
-                    fullMessage = `/cc ${task.message}`;
-                } else if (task.chatType === 'global') {
-                    fullMessage = `!${task.message}`;
-                } else {
+                }
+                // Для остальных типов используем prefix из конфига
+                else if (typeConfig && typeConfig.prefix) {
+                    fullMessage = `${typeConfig.prefix}${task.message}`;
+                }
+                // Если нет prefix (command, chat) - отправляем как есть
+                else {
                     fullMessage = task.message;
                 }
+
                 this.bot.chat(fullMessage);
             }
         } catch (error) {

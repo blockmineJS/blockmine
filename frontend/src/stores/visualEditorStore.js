@@ -58,6 +58,12 @@ export const useVisualEditorStore = create(
     connectedDebugUsers: [], // Array<{socketId, userId, username}>
     socket: null,
 
+    // Collaborative editing state
+    collabUsers: [], // Array<{socketId, username, userId, color}>
+    collabCursors: new Map(), // Map<socketId, {x, y, username, color}>
+    collabSelections: new Map(), // Map<socketId, {nodeIds: [], username, color}>
+    collabConnections: new Map(), // Map<socketId, {fromX, fromY, toX, toY, username, color}>
+
     init: async (botId, id, type) => {
       set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
       try {
@@ -176,6 +182,9 @@ export const useVisualEditorStore = create(
           edges: reactFlowEdges,
           isLoading: false,
         });
+
+        // Подключаемся к collaborative socket
+        get().connectGraphSocket();
       } catch (error) {
         console.error("Ошибка инициализации редактора:", error);
         toast({ variant: 'destructive', title: 'Ошибка загрузки', description: error.message });
@@ -214,27 +223,111 @@ export const useVisualEditorStore = create(
         });
         state.nodes = applyNodeChanges(deletableChanges, state.nodes);
       });
+
+      // Синхронизация с другими пользователями
+      const { socket, command } = get();
+      if (socket && command) {
+        // Отправляем изменения позиций (движение нод)
+        const positionChanges = changes.filter(c => c.type === 'position' && c.position);
+        if (positionChanges.length > 0) {
+          socket.emit('collab:nodes', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'move',
+            data: positionChanges.map(c => ({
+              id: c.id,
+              position: c.position
+            }))
+          });
+        }
+
+        // Отправляем удаления нод
+        const removeChanges = changes.filter(c => c.type === 'remove');
+        if (removeChanges.length > 0) {
+          socket.emit('collab:nodes', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'delete',
+            data: {
+              nodeIds: removeChanges.map(c => c.id)
+            }
+          });
+        }
+
+        // Отправляем выбор нод
+        const selectChanges = changes.filter(c => c.type === 'select' && c.selected);
+        if (selectChanges.length > 0) {
+          const selectedNodeIds = get().nodes.filter(n => n.selected).map(n => n.id);
+          socket.emit('collab:selection', {
+            botId: command.botId,
+            graphId: command.id,
+            nodeIds: selectedNodeIds
+          });
+        }
+      }
     },
 
     onEdgesChange: (changes) => {
       set(state => {
         state.edges = applyEdgeChanges(changes, state.edges);
       });
+
+      // Синхронизация удаления связей с другими пользователями
+      const { socket, command } = get();
+      if (socket && command) {
+        const removeChanges = changes.filter(c => c.type === 'remove');
+        if (removeChanges.length > 0) {
+          socket.emit('collab:edges', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'delete',
+            data: {
+              edgeIds: removeChanges.map(c => c.id)
+            }
+          });
+        }
+      }
     },
 
     onConnect: async (connection) => {
-      const { nodes, edges, command } = get();
+      const { nodes, edges, command, socket } = get();
       const botId = command.botId;
+
+      // Helper function to broadcast edge creation
+      const broadcastEdgeCreation = (edge) => {
+        if (socket && command) {
+          socket.emit('collab:edges', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'create',
+            data: { edge }
+          });
+        }
+      };
+
+      // Helper function to broadcast node creation
+      const broadcastNodeCreation = (node) => {
+        if (socket && command) {
+          socket.emit('collab:nodes', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'create',
+            data: { node }
+          });
+        }
+      };
 
       try {
         const sourceNode = nodes.find(n => n.id === connection.source);
         const targetNode = nodes.find(n => n.id === connection.target);
 
         if (!sourceNode || !targetNode) {
+          const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
           });
+          broadcastEdgeCreation(newEdge);
           return;
         }
 
@@ -243,10 +336,12 @@ export const useVisualEditorStore = create(
         const targetNodeConfig = nodeConfigs.find(n => n.type === targetNode.type);
 
         if (!sourceNodeConfig || !targetNodeConfig) {
+          const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
           });
+          broadcastEdgeCreation(newEdge);
           return;
         }
 
@@ -254,10 +349,12 @@ export const useVisualEditorStore = create(
         const targetPin = (targetNodeConfig.pins?.inputs || targetNodeConfig.inputs || []).find(p => p.id === connection.targetHandle);
 
         if (!sourcePin || !targetPin) {
+          const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
           });
+          broadcastEdgeCreation(newEdge);
           return;
         }
 
@@ -266,10 +363,12 @@ export const useVisualEditorStore = create(
                           targetPin.type === 'Wildcard';
 
         if (typesMatch) {
+          const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
           });
+          broadcastEdgeCreation(newEdge);
           return;
         }
 
@@ -301,18 +400,26 @@ export const useVisualEditorStore = create(
 
             state.connectingPin = null;
           });
+
+          // Broadcast созданные ноды и edges
+          result.additionalNodes.forEach(broadcastNodeCreation);
+          result.newEdges.forEach(broadcastEdgeCreation);
         } else {
+          const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
           set(state => {
             state.edges = addEdge(connection, state.edges);
             state.connectingPin = null;
           });
+          broadcastEdgeCreation(newEdge);
         }
       } catch (error) {
         console.error("Ошибка при создании подключения:", error);
+        const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
         set(state => {
           state.edges = addEdge(connection, state.edges);
           state.connectingPin = null;
         });
+        broadcastEdgeCreation(newEdge);
       }
     },
 
@@ -387,6 +494,17 @@ export const useVisualEditorStore = create(
 
       if (shouldUpdateState) {
         set(state => { state.nodes.push(newNode) });
+
+        // Broadcast создания ноды
+        const { socket, command } = get();
+        if (socket && command) {
+          socket.emit('collab:nodes', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'create',
+            data: { node: newNode }
+          });
+        }
       }
       return newNode;
     },
@@ -410,6 +528,17 @@ export const useVisualEditorStore = create(
           state.nodes.forEach(n => n.selected = false);
           state.nodes.push(newNode);
       });
+
+      // Broadcast создания дубликата ноды
+      const { socket, command } = get();
+      if (socket && command) {
+        socket.emit('collab:nodes', {
+          botId: command.botId,
+          graphId: command.id,
+          type: 'create',
+          data: { node: newNode }
+        });
+      }
     },
 
     appendNode: (newNode) => {
@@ -543,6 +672,20 @@ export const useVisualEditorStore = create(
             nodeToUpdate.data = { ...nodeToUpdate.data, ...data };
         }
       });
+
+      // Broadcast изменения данных ноды
+      const { socket, command } = get();
+      if (socket && command) {
+        socket.emit('collab:nodes', {
+          botId: command.botId,
+          graphId: command.id,
+          type: 'update',
+          data: {
+            nodeId,
+            nodeData: data
+          }
+        });
+      }
     },
 
     openMenu: (top, left, flowPosition) => set({ isMenuOpen: true, menuPosition: { top, left, flowPosition } }),
@@ -648,6 +791,13 @@ export const useVisualEditorStore = create(
           : `/api/bots/${botId}/event-graphs/${id}`;
 
         await apiHelper(url, { method: 'PUT', body: payload });
+
+        // Отправляем событие для hot reload графов (только для event-графов)
+        const { socket } = get();
+        if (socket && editorType === 'event') {
+          console.log('[Graph Hot Reload] Sending graph:updated event...');
+          socket.emit('graph:updated', { botId, graphId: id });
+        }
 
         toast({ title: 'Успешно', description: 'Граф сохранен.' });
       } catch (error) {
@@ -782,6 +932,9 @@ export const useVisualEditorStore = create(
           speed: 1,
         },
       });
+
+      // Переключаемся в режим просмотра трассировки
+      get().setDebugMode('trace');
     },
 
     closeTraceViewer: () => {
@@ -796,6 +949,9 @@ export const useVisualEditorStore = create(
           speed: 1,
         },
       });
+
+      // Возвращаемся в обычный режим
+      get().setDebugMode('normal');
     },
 
     playTrace: () => {
@@ -907,7 +1063,23 @@ export const useVisualEditorStore = create(
       console.log('[Debug] Sending debug:continue with sessionId:', debugSession.sessionId, 'overrides:', overrides);
       socket.emit('debug:continue', {
         sessionId: debugSession.sessionId,
-        overrides
+        overrides,
+        stepMode: false
+      });
+    },
+
+    stepExecution: (overrides = null) => {
+      const { socket, debugSession } = get();
+      if (!socket || !debugSession) {
+        console.warn('[Debug] Cannot step - no socket or debug session');
+        return;
+      }
+
+      console.log('[Debug] Sending debug:continue with stepMode=true, sessionId:', debugSession.sessionId);
+      socket.emit('debug:continue', {
+        sessionId: debugSession.sessionId,
+        overrides,
+        stepMode: true
       });
     },
 
@@ -921,34 +1093,63 @@ export const useVisualEditorStore = create(
     },
 
     setDebugMode: (mode) => {
-      const { socket } = get();
+      const { socket, command } = get();
 
-      // Если переключаемся в trace режим и есть активный сокет - отключаем
-      if (mode === 'trace' && socket) {
-        get().disconnectDebugSocket();
+      // Уведомляем других пользователей о смене режима
+      if (socket && command) {
+        socket.emit('collab:mode-change', {
+          botId: command.botId,
+          graphId: command.id,
+          debugMode: mode
+        });
       }
 
-      // Если переключаемся в live режим и нет сокета - подключаем
-      if (mode === 'live' && !socket) {
-        get().connectDebugSocket();
+      // Если переключаемся в live режим и есть socket - присоединяемся к debug
+      if (mode === 'live' && socket && command) {
+        console.log('[Debug] Joining debug session...');
+        socket.emit('debug:join', {
+          botId: command.botId,
+          graphId: command.id
+        });
+      }
+
+      // Если переключаемся из live режима (в trace или normal) - покидаем debug
+      if ((mode === 'trace' || mode === 'normal') && get().debugMode === 'live' && socket && command) {
+        console.log('[Debug] Leaving debug session...');
+        socket.emit('debug:leave', {
+          botId: command.botId,
+          graphId: command.id
+        });
+
+        // Очищаем debug state
+        set({
+          breakpoints: new Map(),
+          debugSession: null,
+          connectedDebugUsers: [],
+        });
+      }
+
+      // Закрываем TraceViewer при переключении в live режим
+      if (mode === 'live') {
+        set({ isTraceViewerOpen: false });
       }
 
       // Обновляем режим
       set({ debugMode: mode });
     },
 
-    connectDebugSocket: () => {
+    // Подключение к графу для collaborative editing (всегда активно)
+    connectGraphSocket: () => {
       const { socket, command } = get();
       if (socket || !command) return; // Уже подключен или нет команды
 
-      // Получаем токен из appStore
       const token = useAppStore.getState().token;
       if (!token) {
-        console.warn('[Debug] Cannot connect - no auth token');
+        console.warn('[Collab] Cannot connect - no auth token');
         return;
       }
 
-      console.log('[Debug] Creating WebSocket connection...');
+      console.log('[Collab] Creating WebSocket connection for collaborative editing...');
 
       const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin;
       const newSocket = io(SOCKET_URL, {
@@ -964,27 +1165,221 @@ export const useVisualEditorStore = create(
       set({ socket: newSocket });
 
       newSocket.on('connect', () => {
-        console.log('[Debug] WebSocket connected, sending debug:join...');
+        console.log('[Collab] WebSocket connected, joining graph...');
 
-        newSocket.emit('debug:join', {
+        // Присоединяемся к графу для collaborative editing с текущим режимом
+        const { debugMode } = get();
+        newSocket.emit('collab:join', {
           botId: command.botId,
-          graphId: command.id
+          graphId: command.id,
+          debugMode: debugMode || 'normal'
         });
+
+        // Если в live debug режиме, также присоединяемся к debug
+        if (debugMode === 'live') {
+          newSocket.emit('debug:join', {
+            botId: command.botId,
+            graphId: command.id
+          });
+        }
       });
 
       newSocket.on('disconnect', (reason) => {
-        console.log('[Debug] WebSocket disconnected, reason:', reason);
+        console.log('[Collab] WebSocket disconnected, reason:', reason);
       });
 
       newSocket.on('connect_error', (error) => {
-        console.error('[Debug] WebSocket connection error:', error);
+        console.error('[Collab] WebSocket connection error:', error);
       });
 
-      newSocket.on('error', (error) => {
-        console.error('[Debug] WebSocket error:', error);
+      // ========== COLLABORATIVE EDITING EVENTS ==========
+
+      // Состояние комнаты при подключении
+      newSocket.on('collab:state', ({ users }) => {
+        console.log('[Collab] Received room state:', users);
+        set({ collabUsers: users });
       });
 
-      // Устанавливаем все обработчики событий
+      // Новый пользователь присоединился
+      newSocket.on('collab:user-joined', ({ user }) => {
+        console.log('[Collab] User joined:', user);
+        set(state => {
+          if (!state.collabUsers.find(u => u.socketId === user.socketId)) {
+            state.collabUsers.push(user);
+          }
+        });
+        toast({
+          title: '👋 Пользователь присоединился',
+          description: `${user.username} начал редактировать граф`
+        });
+      });
+
+      // Пользователь покинул
+      newSocket.on('collab:user-left', ({ socketId, username }) => {
+        console.log('[Collab] User left:', socketId);
+        set(state => {
+          state.collabUsers = state.collabUsers.filter(u => u.socketId !== socketId);
+          state.collabCursors.delete(socketId);
+          state.collabSelections.delete(socketId);
+        });
+        toast({
+          title: '👋 Пользователь отключился',
+          description: `${username} покинул редактор`
+        });
+      });
+
+      // Движение курсора
+      newSocket.on('collab:cursor-move', ({ socketId, username, color, x, y }) => {
+        set(state => {
+          state.collabCursors.set(socketId, { x, y, username, color });
+        });
+      });
+
+      // Изменение выбора нод
+      newSocket.on('collab:selection-changed', ({ socketId, username, color, nodeIds }) => {
+        set(state => {
+          state.collabSelections.set(socketId, { nodeIds, username, color });
+        });
+      });
+
+      // Изменение режима отладки
+      newSocket.on('collab:mode-changed', ({ socketId, username, debugMode }) => {
+        console.log(`[Collab] User ${username} switched to ${debugMode} mode`);
+        set(state => {
+          const user = state.collabUsers.find(u => u.socketId === socketId);
+          if (user) {
+            user.debugMode = debugMode;
+          }
+        });
+
+        // Показываем уведомление
+        const modeLabels = {
+          'live': '🐛 Live Debug',
+          'trace': '📊 Просмотр трассировки',
+          'normal': '✏️ Обычный режим'
+        };
+        toast({
+          title: `${username} переключился`,
+          description: modeLabels[debugMode] || debugMode
+        });
+      });
+
+      // Изменения нод
+      newSocket.on('collab:node-changed', ({ type, data, username }) => {
+        console.log('[Collab] Node changed:', type, data, 'by', username);
+
+        switch (type) {
+          case 'move': {
+            // data = [{ id, position }]
+            set(state => {
+              data.forEach(change => {
+                const node = state.nodes.find(n => n.id === change.id);
+                if (node) {
+                  node.position = change.position;
+                }
+              });
+            });
+            break;
+          }
+          case 'create': {
+            // data = { node }
+            set(state => {
+              if (!state.nodes.find(n => n.id === data.node.id)) {
+                state.nodes.push(data.node);
+              }
+            });
+            break;
+          }
+          case 'delete': {
+            // data = { nodeIds: [] }
+            set(state => {
+              state.nodes = state.nodes.filter(n => !data.nodeIds.includes(n.id));
+            });
+            break;
+          }
+          case 'update': {
+            // data = { nodeId, nodeData }
+            set(state => {
+              const node = state.nodes.find(n => n.id === data.nodeId);
+              if (node) {
+                node.data = { ...node.data, ...data.nodeData };
+              }
+            });
+            break;
+          }
+        }
+      });
+
+      // Изменения связей
+      newSocket.on('collab:edge-changed', ({ type, data, username }) => {
+        console.log('[Collab] Edge changed:', type, data, 'by', username);
+
+        switch (type) {
+          case 'create': {
+            // data = { edge }
+            set(state => {
+              if (!state.edges.find(e => e.id === data.edge.id)) {
+                state.edges.push(data.edge);
+              }
+            });
+            break;
+          }
+          case 'delete': {
+            // data = { edgeIds: [] }
+            set(state => {
+              state.edges = state.edges.filter(e => !data.edgeIds.includes(e.id));
+            });
+            break;
+          }
+        }
+      });
+
+      // Hot reload графа
+      newSocket.on('collab:graph-reloaded', ({ botId, graphId }) => {
+        console.log('[Collab] Graph reloaded for bot', botId, 'graphId:', graphId);
+        toast({
+          title: '🔄 Граф перезагружен',
+          description: 'Изменения применены без перезапуска бота'
+        });
+      });
+
+      // Начало создания соединения
+      newSocket.on('collab:connection-start', ({ socketId, username, color, fromX, fromY, fromNodeId, fromHandleId }) => {
+        console.log('[Collab] Connection started by', username);
+        set(state => {
+          state.collabConnections.set(socketId, {
+            fromX,
+            fromY,
+            toX: fromX,
+            toY: fromY,
+            username,
+            color,
+            fromNodeId,
+            fromHandleId
+          });
+        });
+      });
+
+      // Обновление позиции соединения
+      newSocket.on('collab:connection-update', ({ socketId, toX, toY }) => {
+        set(state => {
+          const connection = state.collabConnections.get(socketId);
+          if (connection) {
+            connection.toX = toX;
+            connection.toY = toY;
+          }
+        });
+      });
+
+      // Завершение создания соединения
+      newSocket.on('collab:connection-end', ({ socketId }) => {
+        set(state => {
+          state.collabConnections.delete(socketId);
+        });
+      });
+
+      // ========== DEBUG EVENTS (только в live mode) ==========
+
       newSocket.on('debug:state', (data) => {
         set(state => {
           state.breakpoints = new Map(
@@ -1017,13 +1412,23 @@ export const useVisualEditorStore = create(
       });
 
       newSocket.on('debug:paused', (data) => {
+        const currentState = get();
         console.log('[Debug] Received debug:paused event:', data);
+        console.log('[Debug] Current debugMode:', currentState.debugMode);
+        console.log('[Debug] Current isTraceViewerOpen:', currentState.isTraceViewerOpen);
+
+        // Always set debugSession when paused, regardless of mode
         set(state => {
+          console.log('[Debug] Setting debugSession in state');
           state.debugSession = {
-            ...data,
-            status: 'paused'
+            sessionId: data.sessionId,
+            nodeId: data.nodeId,
+            nodeType: data.nodeType,
+            inputs: data.inputs,
+            executedSteps: data.executedSteps,
+            status: 'paused'  // IMPORTANT: Add status field
           };
-          state.currentActiveNodeId = data.nodeId;
+          console.log('[Debug] debugSession set:', state.debugSession);
         });
       });
 
@@ -1031,7 +1436,6 @@ export const useVisualEditorStore = create(
         console.log('[Debug] Received debug:resumed event');
         set(state => {
           state.debugSession = null;
-          state.currentActiveNodeId = null;
         });
       });
 
@@ -1039,10 +1443,7 @@ export const useVisualEditorStore = create(
         console.log('[Debug] Received debug:completed event, trace:', trace);
         set(state => {
           state.debugSession = null;
-          state.currentActiveNodeId = null;
-          if (trace) {
-            state.trace = trace;
-          }
+          state.trace = trace;
         });
       });
 
@@ -1053,30 +1454,77 @@ export const useVisualEditorStore = create(
       newSocket.on('debug:user-left', ({ userCount, users }) => {
         set({ connectedDebugUsers: users || [] });
       });
+
+      newSocket.on('debug:value-updated', ({ key, value, updatedBy }) => {
+        console.log('[Debug] Value updated by', updatedBy, ':', key, '=', value);
+        set(state => {
+          if (!state.debugSession?.executedSteps) return;
+
+          const parts = key.split('.');
+          if (parts.length !== 3) return;
+
+          const [nodeId, direction, pinId] = parts;
+          const step = state.debugSession.executedSteps.steps?.find(s => s.nodeId === nodeId);
+
+          if (step) {
+            if (direction === 'out' && step.outputs) {
+              step.outputs[pinId] = value;
+            } else if (direction === 'in' && step.inputs) {
+              step.inputs[pinId] = value;
+            }
+          }
+        });
+      });
     },
 
-    disconnectDebugSocket: () => {
-      const { socket } = get();
-      if (socket) {
-        socket.off('debug:state');
-        socket.off('debug:breakpoint-added');
-        socket.off('debug:breakpoint-removed');
-        socket.off('debug:breakpoint-toggled');
-        socket.off('debug:paused');
-        socket.off('debug:resumed');
-        socket.off('debug:completed');
-        socket.off('debug:user-joined');
-        socket.off('debug:user-left');
+    disconnectGraphSocket: () => {
+      const { socket, command } = get();
+      if (!socket || !command) return;
 
-        socket.disconnect();
+      console.log('[Collab] Disconnecting from graph...');
 
-        set({
-          socket: null,
-          breakpoints: new Map(),
-          debugSession: null,
-          connectedDebugUsers: []
-        });
-      }
+      // Покидаем комнату
+      socket.emit('collab:leave', {
+        botId: command.botId,
+        graphId: command.id
+      });
+
+      // Отключаем все обработчики
+      socket.off('collab:state');
+      socket.off('collab:user-joined');
+      socket.off('collab:user-left');
+      socket.off('collab:cursor-move');
+      socket.off('collab:selection-changed');
+      socket.off('collab:mode-changed');
+      socket.off('collab:node-changed');
+      socket.off('collab:edge-changed');
+      socket.off('collab:graph-reloaded');
+      socket.off('collab:connection-start');
+      socket.off('collab:connection-update');
+      socket.off('collab:connection-end');
+      socket.off('debug:state');
+      socket.off('debug:breakpoint-added');
+      socket.off('debug:breakpoint-removed');
+      socket.off('debug:breakpoint-toggled');
+      socket.off('debug:paused');
+      socket.off('debug:resumed');
+      socket.off('debug:completed');
+      socket.off('debug:user-joined');
+      socket.off('debug:user-left');
+      socket.off('debug:value-updated');
+
+      socket.disconnect();
+
+      set({
+        socket: null,
+        collabUsers: [],
+        collabCursors: new Map(),
+        collabSelections: new Map(),
+        collabConnections: new Map(),
+        breakpoints: new Map(),
+        debugSession: null,
+        connectedDebugUsers: [],
+      });
     },
   };
   })

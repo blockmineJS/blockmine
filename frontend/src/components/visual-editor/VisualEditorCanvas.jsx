@@ -12,11 +12,14 @@ import {
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import CustomNode from './CustomNode.new';
+import CollaborativeCursors from './CollaborativeCursors';
+import CollaborativeConnections from './CollaborativeConnections';
 
 const VisualEditorCanvas = () => {
+
   const reactFlowWrapper = useRef(null);
   const menuRef = useRef(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, flowToScreenPosition } = useReactFlow();
 
   const nodes = useVisualEditorStore(state => state.nodes);
   const edges = useVisualEditorStore(state => state.edges);
@@ -36,6 +39,7 @@ const VisualEditorCanvas = () => {
   const command = useVisualEditorStore(state => state.command);
   const variables = useVisualEditorStore(state => state.variables);
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
+  const socket = useVisualEditorStore(state => state.socket);
 
   const nodeTypes = useMemo(() => {
     const types = {};
@@ -113,15 +117,40 @@ const VisualEditorCanvas = () => {
       } else {
         setConnectingPin(null);
       }
+
+      // Broadcast завершение создания соединения
+      if (socket && command) {
+        socket.emit('collab:connection-end', {
+          botId: command.botId,
+          graphId: command.id,
+        });
+      }
     },
-    [screenToFlowPosition, openMenu, setConnectingPin]
+    [screenToFlowPosition, openMenu, setConnectingPin, socket, command]
   );
 
-  const onConnectStart = useCallback((_, { nodeId, handleId, handleType }) => {
+  const onConnectStart = useCallback((event, { nodeId, handleId, handleType }) => {
     const sourceNode = nodes.find(n => n.id === nodeId);
     if (!sourceNode) return;
     setConnectingPin({ nodeId, handleId, handleType, nodeType: sourceNode.type });
-  }, [nodes, setConnectingPin]);
+
+    // Broadcast начало создания соединения
+    if (socket && command) {
+      const position = screenToFlowPosition({
+        x: event.clientX || 0,
+        y: event.clientY || 0,
+      });
+
+      socket.emit('collab:connection-start', {
+        botId: command.botId,
+        graphId: command.id,
+        fromX: position.x,
+        fromY: position.y,
+        fromNodeId: nodeId,
+        fromHandleId: handleId,
+      });
+    }
+  }, [nodes, setConnectingPin, socket, command, screenToFlowPosition]);
 
   const filteredNodes = useMemo(() => {
     if (!connectingPin) {
@@ -166,7 +195,10 @@ const VisualEditorCanvas = () => {
   }, [isMenuOpen, closeMenu]);
 
   return (
-    <div style={{ height: '100%', width: '100%' }} ref={reactFlowWrapper}>
+    <div
+      style={{ height: '100%', width: '100%', position: 'relative' }}
+      ref={reactFlowWrapper}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -187,6 +219,10 @@ const VisualEditorCanvas = () => {
         <Background />
         <Controls />
       </ReactFlow>
+
+      {/* Collaborative overlays - рендерим вне ReactFlow для правильного позиционирования */}
+      <CollaborativeCursors flowToScreenPosition={flowToScreenPosition} />
+      <CollaborativeConnections flowToScreenPosition={flowToScreenPosition} />
       {isMenuOpen && (
           <div
             ref={menuRef}

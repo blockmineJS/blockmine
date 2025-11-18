@@ -36,17 +36,11 @@ const WhatIfEditor = () => {
     return null;
   }
 
-  const { nodeId, nodeType, inputs, context } = debugSession;
+  const { nodeId, nodeType, context } = debugSession;
 
   // Находим ноду для получения её label
   const node = nodes.find(n => n.id === nodeId);
   const nodeLabel = node?.data?.label || nodeType;
-
-  // Объединяем все данные для редактирования
-  const allData = {
-    ...inputs,
-    ...(context?.variables || {}),
-  };
 
   const handleEdit = (key) => {
     setEditingKey(key);
@@ -157,30 +151,24 @@ const WhatIfEditor = () => {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Input Values */}
-        {Object.keys(inputs || {}).length > 0 && (
-          <div>
-            <Label className="text-xs text-slate-400 mb-2 block">Входные значения</Label>
-            <div className="space-y-2">
-              {Object.entries(inputs).map(([key, value]) => (
-                <div key={key} className="space-y-1">
-                  <Label className="text-xs font-mono">{key}</Label>
-                  {renderValue(key, value)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="text-sm text-slate-300">
+          <p className="mb-2">
+            💡 Редактируйте значения прямо на нодах - кликните на зелёные бейджи с данными
+          </p>
+          <p className="text-xs text-slate-400">
+            Все изменения синхронизируются в реальном времени между пользователями
+          </p>
+        </div>
 
         {/* Variables */}
         {Object.keys(context?.variables || {}).length > 0 && (
           <div>
-            <Label className="text-xs text-slate-400 mb-2 block">Переменные</Label>
+            <Label className="text-xs text-slate-400 mb-2 block">📦 Переменные графа</Label>
             <div className="space-y-2">
               {Object.entries(context.variables).map(([key, value]) => (
                 <div key={key} className="space-y-1">
                   <Label className="text-xs font-mono">{key}</Label>
-                  {renderValue(key, value)}
+                  {renderValue(`var.${key}`, value)}
                 </div>
               ))}
             </div>

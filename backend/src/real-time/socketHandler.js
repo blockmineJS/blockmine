@@ -6,6 +6,7 @@ const presence = require('./presence');
 const { initializeBotApiNamespace } = require('./botApi');
 const { getTraceCollector } = require('../core/services/TraceCollectorService');
 const { initializeDebugManager, getGlobalDebugManager } = require('../core/services/DebugSessionManager');
+const { initializeCollaborationManager, getGlobalCollaborationManager } = require('../core/services/GraphCollaborationManager');
 
 let io;
 
@@ -26,6 +27,7 @@ function initializeSocket(httpServer) {
     traceCollector.setSocketIO(io);
 
     initializeDebugManager(io);
+    initializeCollaborationManager(io);
 
 
     initializeBotApiNamespace(io);
@@ -96,64 +98,242 @@ function initializeSocket(httpServer) {
             });
         });
 
+        socket.on('debug:leave', ({ botId, graphId }) => {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.get(graphId);
+
+            if (!debugState) {
+                return;
+            }
+
+            const room = debugState.getRoomName();
+            debugState.removeUser(socket.id);
+
+            // Если это был последний пользователь - очищаем breakpoints
+            if (debugState.connectedUsers.size === 0) {
+                debugState.clearAllBreakpoints();
+
+                // Если есть активное выполнение на паузе - останавливаем его
+                if (debugState.activeExecution) {
+                    debugState.stop();
+                }
+            }
+
+            socket.leave(room);
+
+            socket.to(room).emit('debug:user-left', {
+                userCount: debugState.connectedUsers.size,
+                users: Array.from(debugState.connectedUsers.values())
+            });
+        });
+
         socket.on('debug:set-breakpoint', ({ graphId, nodeId, condition }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.get(graphId);
             if (!debugState) {
-                console.warn(`[Debug] Graph ${graphId} not found for set-breakpoint`);
                 return;
             }
 
             debugState.addBreakpoint(nodeId, condition, socket.id);
-            console.log(`[Debug] Breakpoint added to node ${nodeId} in graph ${graphId}`);
         });
 
         socket.on('debug:remove-breakpoint', ({ graphId, nodeId }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.get(graphId);
             if (!debugState) {
-                console.warn(`[Debug] Graph ${graphId} not found for remove-breakpoint`);
                 return;
             }
 
             debugState.removeBreakpoint(nodeId);
-            console.log(`[Debug] Breakpoint removed from node ${nodeId} in graph ${graphId}`);
         });
 
         socket.on('debug:toggle-breakpoint', ({ graphId, nodeId, enabled }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.get(graphId);
             if (!debugState) {
-                console.warn(`[Debug] Graph ${graphId} not found for toggle-breakpoint`);
                 return;
             }
 
             debugState.toggleBreakpoint(nodeId, enabled);
-            console.log(`[Debug] Breakpoint toggled for node ${nodeId} in graph ${graphId}, enabled: ${enabled}`);
         });
 
-        socket.on('debug:continue', ({ sessionId, overrides }) => {
+        socket.on('debug:continue', ({ sessionId, overrides, stepMode }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.getBySessionId(sessionId);
             if (!debugState) {
-                console.warn(`[Debug] Session ${sessionId} not found for continue`);
                 return;
             }
 
-            console.log(`[Debug] Continuing execution for session ${sessionId}`);
-            debugState.resume(overrides);
+            debugState.resume(overrides, stepMode || false);
         });
 
         socket.on('debug:stop', ({ sessionId }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.getBySessionId(sessionId);
             if (!debugState) {
-                console.warn(`[Debug] Session ${sessionId} not found for stop`);
                 return;
             }
 
-            console.log(`[Debug] Stopping execution for session ${sessionId}`);
             debugState.stop();
+        });
+
+        socket.on('debug:update-value', ({ botId, graphId, key, value }) => {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.get(graphId);
+            if (!debugState) {
+                return;
+            }
+
+            console.log(`[Debug] Value updated by ${socket.decoded?.username || 'Unknown'}: ${key} =`, value);
+
+            // Сохраняем изменение в pendingOverrides
+            debugState.setValue(key, value);
+
+            // Транслируем изменение всем подключенным пользователям
+            debugState.broadcast('debug:value-updated', {
+                key,
+                value,
+                updatedBy: socket.decoded?.username || 'Unknown'
+            });
+        });
+
+        // Hot reload графов при сохранении
+        socket.on('graph:updated', async ({ botId, graphId }) => {
+
+            try {
+                const eventGraphManager = botManager.eventGraphManager;
+
+                if (eventGraphManager) {
+                    // Перезагружаем графы для бота
+                    await eventGraphManager.loadGraphsForBot(botId);
+
+
+                    // Уведомляем всех пользователей о перезагрузке через collaboration manager
+                    const collabManager = getGlobalCollaborationManager();
+                    collabManager.broadcastGraphReloaded(botId, graphId);
+                } else {
+                    console.warn(`[Graph Hot Reload] EventGraphManager not found!`);
+                }
+            } catch (error) {
+                console.error(`[Graph Hot Reload] Error reloading graphs for bot ${botId}:`, error);
+            }
+        });
+
+        // ========== COLLABORATIVE EDITING EVENTS ==========
+
+        // Присоединение к графу для совместного редактирования
+        socket.on('collab:join', ({ botId, graphId, debugMode }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                const username = socket.decoded?.username || 'Anonymous';
+                const userId = socket.decoded?.userId || null;
+
+                collabManager.joinGraph(socket, { botId, graphId, username, userId, debugMode });
+            } catch (error) {
+                console.error('[Collab] Error joining graph:', error);
+            }
+        });
+
+        // Покидание графа
+        socket.on('collab:leave', ({ botId, graphId }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.leaveGraph(socket, { botId, graphId });
+            } catch (error) {
+                console.error('[Collab] Error leaving graph:', error);
+            }
+        });
+
+        // Обновление позиции курсора
+        socket.on('collab:cursor', ({ botId, graphId, x, y }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.updateCursor(socket, { botId, graphId, x, y });
+            } catch (error) {
+                console.error('[Collab] Error updating cursor:', error);
+            }
+        });
+
+        // Обновление выбранных нод
+        socket.on('collab:selection', ({ botId, graphId, nodeIds }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.updateSelectedNodes(socket, { botId, graphId, nodeIds });
+            } catch (error) {
+                console.error('[Collab] Error updating selection:', error);
+            }
+        });
+
+        // Изменение режима отладки
+        socket.on('collab:mode-change', ({ botId, graphId, debugMode }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.updateDebugMode(socket, { botId, graphId, debugMode });
+            } catch (error) {
+                console.error('[Collab] Error updating debug mode:', error);
+            }
+        });
+
+        // Изменение нод (движение, создание, удаление, обновление)
+        socket.on('collab:nodes', ({ botId, graphId, type, data }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.broadcastNodeChange(socket, { botId, graphId, type, data });
+            } catch (error) {
+                console.error('[Collab] Error broadcasting node change:', error);
+            }
+        });
+
+        // Изменение связей (создание, удаление)
+        socket.on('collab:edges', ({ botId, graphId, type, data }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.broadcastEdgeChange(socket, { botId, graphId, type, data });
+            } catch (error) {
+                console.error('[Collab] Error broadcasting edge change:', error);
+            }
+        });
+
+        // Начало создания соединения (пользователь начал тянуть линию)
+        socket.on('collab:connection-start', ({ botId, graphId, fromX, fromY, fromNodeId, fromHandleId }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.startConnection(socket, { botId, graphId, fromX, fromY, fromNodeId, fromHandleId });
+            } catch (error) {
+                console.error('[Collab] Error starting connection:', error);
+            }
+        });
+
+        // Обновление позиции соединения (пользователь двигает мышью с зажатой линией)
+        socket.on('collab:connection-update', ({ botId, graphId, toX, toY }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.updateConnection(socket, { botId, graphId, toX, toY });
+            } catch (error) {
+                console.error('[Collab] Error updating connection:', error);
+            }
+        });
+
+        // Завершение создания соединения (пользователь отпустил линию)
+        socket.on('collab:connection-end', ({ botId, graphId }) => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.endConnection(socket, { botId, graphId });
+            } catch (error) {
+                console.error('[Collab] Error ending connection:', error);
+            }
+        });
+
+        // При отключении удаляем пользователя из всех комнат
+        socket.on('disconnect', () => {
+            try {
+                const collabManager = getGlobalCollaborationManager();
+                collabManager.removeUserFromAllRooms(socket);
+            } catch (error) {
+                if (error.message !== 'GraphCollaborationManager not initialized! Call initializeCollaborationManager(io) first.') {
+                    console.error('[Collab] Error on disconnect:', error);
+                }
+            }
         });
     });
 

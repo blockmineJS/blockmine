@@ -2,6 +2,7 @@ const prismaService = require('./PrismaService');
 const { parseVariables } = require('./utils/variableParser');
 const validationService = require('./services/ValidationService');
 const { MAX_RECURSION_DEPTH } = require('./config/validation');
+const debugConfig = require('../config/debug.config');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
@@ -9,6 +10,11 @@ const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 
 class GraphExecutionEngine {
+  // Static флаг для предотвращения дублирования IPC handler
+  static _ipcHandlerAttached = false;
+  // Static Map для хранения всех pending requests из всех instances
+  static _allPendingRequests = new Map();
+
   constructor(nodeRegistry, botManagerOrApi = null) {
       if (!nodeRegistry || typeof nodeRegistry.getNodeConfig !== 'function') {
           throw new Error('GraphExecutionEngine requires a valid NodeRegistry instance.');
@@ -20,6 +26,18 @@ class GraphExecutionEngine {
       this.memo = new Map();
       this.traceCollector = getTraceCollector();
       this.currentTraceId = null;
+
+      // Используем статическую Map для всех instance
+      this.pendingDebugRequests = GraphExecutionEngine._allPendingRequests;
+
+      if (process.on && !GraphExecutionEngine._ipcHandlerAttached) {
+          process.on('message', (message) => {
+              if (message.type === 'debug:breakpoint_response' || message.type === 'debug:step_response') {
+                  GraphExecutionEngine._handleGlobalDebugResponse(message);
+              }
+          });
+          GraphExecutionEngine._ipcHandlerAttached = true;
+      }
   }
 
   async execute(graph, context, eventType) {
@@ -37,6 +55,7 @@ class GraphExecutionEngine {
 
       const graphId = context.graphId || null;
       const botId = context.botId || null;
+
       if (graphId && botId) {
           this.currentTraceId = await this.traceCollector.startTrace(
               botId,
@@ -64,7 +83,6 @@ class GraphExecutionEngine {
           const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
 
           if (startNode) {
-              // Записываем event ноду как начальный шаг трассировки
               if (this.currentTraceId) {
                   this.traceCollector.recordStep(this.currentTraceId, {
                       nodeId: startNode.id,
@@ -81,17 +99,35 @@ class GraphExecutionEngine {
               throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
           }
 
-          // Завершаем трассировку успешно
           if (this.currentTraceId) {
-              await this.traceCollector.completeTrace(this.currentTraceId);
+              const trace = await this.traceCollector.completeTrace(this.currentTraceId);
 
+              // Если работаем в дочернем процессе (BotProcess), отправляем трассировку в главный процесс
+              if (trace && process.send) {
+                  process.send({
+                      type: 'trace:completed',
+                      trace: {
+                          ...trace,
+                          steps: trace.steps,
+                          eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
+                      }
+                  });
+              }
+
+              // Отправляем debug событие только если DebugSessionManager инициализирован
+              // (он может быть не инициализирован в дочерних процессах BotProcess)
               if (graphId) {
-                  const debugManager = getGlobalDebugManager();
-                  const debugState = debugManager.get(graphId);
-                  if (debugState && debugState.activeExecution) {
-                      debugState.broadcast('debug:completed', {
-                          trace: await this.traceCollector.getTrace(this.currentTraceId)
-                      });
+                  try {
+                      const debugManager = getGlobalDebugManager();
+                      const debugState = debugManager.get(graphId);
+                      if (debugState && debugState.activeExecution) {
+                          debugState.broadcast('debug:completed', {
+                              trace: await this.traceCollector.getTrace(this.currentTraceId)
+                          });
+                      }
+                  } catch (error) {
+                      // DebugSessionManager не инициализирован - это нормально для дочерних процессов
+                      // Просто игнорируем
                   }
               }
 
@@ -100,7 +136,20 @@ class GraphExecutionEngine {
 
       } catch (error) {
           if (this.currentTraceId) {
-              await this.traceCollector.failTrace(this.currentTraceId, error);
+              const trace = await this.traceCollector.failTrace(this.currentTraceId, error);
+
+              // Если работаем в дочернем процессе (BotProcess), отправляем трассировку с ошибкой в главный процесс
+              if (trace && process.send) {
+                  process.send({
+                      type: 'trace:completed',
+                      trace: {
+                          ...trace,
+                          steps: trace.steps,
+                          eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
+                      }
+                  });
+              }
+
               this.currentTraceId = null;
           }
 
@@ -119,7 +168,6 @@ class GraphExecutionEngine {
       const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
       if (!nextNode) return;
 
-      // Записываем traversal в трассировку
       if (this.currentTraceId) {
           this.traceCollector.recordTraversal(
               this.currentTraceId,
@@ -135,8 +183,23 @@ class GraphExecutionEngine {
   async executeNode(node) {
       const startTime = Date.now();
 
-      // Проверка брейкпоинта ПЕРЕД выполнением
+      // Записываем шаг ДО проверки брейкпоинта, чтобы в trace были данные о предыдущих нодах
+      if (this.currentTraceId) {
+          this.traceCollector.recordStep(this.currentTraceId, {
+              nodeId: node.id,
+              nodeType: node.type,
+              status: 'executed',
+              duration: null,
+              inputs: await this._captureNodeInputs(node),
+              outputs: {},
+          });
+      }
+
+      // Проверка брейкпоинта ПЕРЕД выполнением (но ПОСЛЕ записи в trace)
       await this.checkBreakpoint(node);
+
+      // Проверка step mode ПЕРЕД выполнением (важно делать ДО executor, чтобы поймать ноду до traverse)
+      await this._checkStepMode(node);
 
       const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
       if (nodeConfig && typeof nodeConfig.executor === 'function') {
@@ -148,38 +211,22 @@ class GraphExecutionEngine {
           };
 
           try {
-              // Записываем шаг ДО выполнения, чтобы сохранить правильный порядок
-              if (this.currentTraceId) {
-                  this.traceCollector.recordStep(this.currentTraceId, {
-                      nodeId: node.id,
-                      nodeType: node.type,
-                      status: 'executed',
-                      duration: null,
-                      inputs: await this._captureNodeInputs(node),
-                      outputs: {},
-                  });
-              }
-
               await nodeConfig.executor.call(this, node, this.context, helpers);
 
-              // Вычисляем время выполнения
               const executionTime = Date.now() - startTime;
 
-              // Обновляем outputs и duration после выполнения
               if (this.currentTraceId) {
                   this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
                   this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
               }
           } catch (error) {
-              // Записываем ошибку выполнения
               if (this.currentTraceId) {
-                  this.traceCollector.recordStep(this.currentTraceId, {
-                      nodeId: node.id,
-                      nodeType: node.type,
-                      status: 'error',
-                      duration: Date.now() - startTime,
-                      error: error.message,
-                  });
+                  this.traceCollector.updateStepError(
+                      this.currentTraceId,
+                      node.id,
+                      error.message,
+                      Date.now() - startTime
+                  );
               }
               throw error;
           }
@@ -193,43 +240,117 @@ class GraphExecutionEngine {
       }
       this.memo.set(execCacheKey, true);
 
-      // Записываем выполнение для нод без executor (legacy nodes, event nodes)
       try {
-          // Записываем шаг ДО выполнения, чтобы сохранить правильный порядок
-          if (this.currentTraceId) {
-              this.traceCollector.recordStep(this.currentTraceId, {
-                  nodeId: node.id,
-                  nodeType: node.type,
-                  status: 'executed',
-                  duration: null,
-                  inputs: await this._captureNodeInputs(node),
-                  outputs: {},
-              });
-          }
-
           await this._executeLegacyNode(node);
 
-          // Вычисляем время выполнения
+
           const executionTime = Date.now() - startTime;
 
-          // Обновляем outputs и duration после выполнения
           if (this.currentTraceId) {
               this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
               this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
           }
       } catch (error) {
-          // Записываем ошибку выполнения
           if (this.currentTraceId) {
-              this.traceCollector.recordStep(this.currentTraceId, {
-                  nodeId: node.id,
-                  nodeType: node.type,
-                  status: 'error',
-                  duration: Date.now() - startTime,
-                  error: error.message,
-              });
+              this.traceCollector.updateStepError(
+                  this.currentTraceId,
+                  node.id,
+                  error.message,
+                  Date.now() - startTime
+              );
           }
           throw error;
       }
+  }
+
+  async _checkStepMode(node) {
+      try {
+          // Если работаем в дочернем процессе, используем IPC
+          if (process.send) {
+              return await this._checkStepModeViaIpc(node);
+          }
+
+          // Иначе используем прямой доступ к DebugManager
+          const { getGlobalDebugManager } = require('./services/DebugSessionManager');
+          const debugManager = getGlobalDebugManager();
+          const graphId = this.activeGraph?.id;
+
+          if (graphId) {
+              const debugState = debugManager.get(graphId);
+              if (debugState && debugState.shouldStepPause(node.id)) {
+                  console.log(`[Debug] Step mode: pausing after executing node ${node.id}`);
+
+                  // Получаем inputs для отправки в debug session
+                  const inputs = await this._captureNodeInputs(node);
+
+                  // Получаем текущую трассировку для отображения выполненных шагов
+                  const executedSteps = this.currentTraceId
+                      ? await this.traceCollector.getTrace(this.currentTraceId)
+                      : null;
+
+                  // Паузим выполнение
+                  await debugState.pause({
+                      nodeId: node.id,
+                      nodeType: node.type,
+                      inputs,
+                      executedSteps,
+                      context: {
+                          user: this.context.user,
+                          variables: this.context.variables,
+                          commandArguments: this.context.commandArguments,
+                      }
+                  });
+              }
+          }
+      } catch (error) {
+          if (error.message !== 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
+              throw error;
+          }
+      }
+  }
+
+  async _checkStepModeViaIpc(node) {
+      // Step mode работает аналогично breakpoint, просто отправляем тип 'step'
+      const { randomUUID } = require('crypto');
+      const requestId = randomUUID();
+
+      const inputs = await this._captureNodeInputs(node);
+      const executedSteps = this.currentTraceId
+          ? await this.traceCollector.getTrace(this.currentTraceId)
+          : null;
+
+      process.send({
+          type: 'debug:check_step_mode',
+          requestId,
+          payload: {
+              graphId: this.context.graphId,
+              nodeId: node.id,
+              nodeType: node.type,
+              inputs,
+              executedSteps,
+              context: {
+                  user: this.context.user,
+                  variables: this.context.variables,
+                  commandArguments: this.context.commandArguments,
+              }
+          }
+      });
+
+      // Ждём ответа (если step mode не активен, ответ придёт сразу)
+      await new Promise((resolve) => {
+          this.pendingDebugRequests.set(requestId, resolve);
+
+          // Таймаут на случай, если ответ не придёт
+          const timeoutId = setTimeout(() => {
+              if (this.pendingDebugRequests.has(requestId)) {
+                  this.pendingDebugRequests.delete(requestId);
+                  resolve(null);
+              }
+          }, debugConfig.STEP_MODE_TIMEOUT);
+
+          // Сохраняем timeoutId для возможной отмены
+          this.pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
+      });
   }
 
   async _executeLegacyNode(node) {
@@ -404,11 +525,12 @@ class GraphExecutionEngine {
               result = this.memo.get(`${node.id}:updated_user`);
               break;
           case 'event:command':
-              if (pinId === 'args') result = this.context.args || {};
-              else if (pinId === 'user') result = this.context.user || {};
-              else if (pinId === 'chat_type') result = this.context.chat_type || 'chat';
+              if (pinId === 'args') result = this.context.eventArgs?.args || {};
+              else if (pinId === 'user') result = this.context.eventArgs?.user || {};
+              else if (pinId === 'chat_type') result = this.context.eventArgs?.typeChat || 'chat';
+              else if (pinId === 'command_name') result = this.context.eventArgs?.commandName;
               else if (pinId === 'success') result = this.context.success !== undefined ? this.context.success : true;
-              else result = this.context[pinId];
+              else result = this.context.eventArgs?.[pinId];
               break;
           case 'event:chat':
               if (pinId === 'username') result = this.context.username;
@@ -518,16 +640,12 @@ class GraphExecutionEngine {
           try {
               // Используем resolvePinValue для получения актуального значения
               const value = await this.resolvePinValue(node, inputPin.id);
-              console.log(`[_captureNodeInputs] Node ${node.type} (${node.id}), pin ${inputPin.id}:`, value);
               // Записываем все значения, включая undefined и null
               inputs[inputPin.id] = value;
           } catch (error) {
-              console.error(`[_captureNodeInputs] Error capturing pin ${inputPin.id}:`, error);
               inputs[inputPin.id] = '<error capturing>';
           }
       }
-
-      console.log(`[_captureNodeInputs] Final inputs for ${node.type}:`, inputs);
       return inputs;
   }
 
@@ -551,16 +669,12 @@ class GraphExecutionEngine {
               // Активно вызываем evaluateOutputPin вместо чтения из memo
               // Это необходимо для event нод, которые используют switch-case и не пишут в memo
               const value = await this.evaluateOutputPin(node, outputPin.id);
-              console.log(`[_captureNodeOutputs] Node ${node.type} (${node.id}), pin ${outputPin.id}:`, value);
               // Записываем все значения, включая undefined и null
               outputs[outputPin.id] = value;
           } catch (error) {
-              console.error(`[_captureNodeOutputs] Error capturing pin ${outputPin.id}:`, error);
               outputs[outputPin.id] = '<error capturing>';
           }
       }
-
-      console.log(`[_captureNodeOutputs] Final outputs for ${node.type}:`, outputs);
       return outputs;
   }
 
@@ -569,6 +683,12 @@ class GraphExecutionEngine {
    */
   async checkBreakpoint(node) {
       try {
+          // Если работаем в дочернем процессе, используем IPC
+          if (process.send) {
+              return await this._checkBreakpointViaIpc(node);
+          }
+
+          // Иначе используем прямой доступ к DebugManager
           const debugManager = getGlobalDebugManager();
           const graphId = this.context.graphId;
 
@@ -618,10 +738,12 @@ class GraphExecutionEngine {
               }
           }
       } catch (error) {
+          console.error(`[checkBreakpoint] ERROR:`, error.message, error.stack);
           if (error.message === 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
               return;
           }
-          throw error;
+          // НЕ пробрасываем ошибку дальше, чтобы не сломать выполнение
+          console.error(`[checkBreakpoint] Ignoring error to continue execution`);
       }
   }
 
@@ -662,20 +784,137 @@ class GraphExecutionEngine {
   /**
    * Применить what-if overrides к ноде
    */
+  /**
+   * Проверить брейкпоинт через IPC (для дочерних процессов)
+   */
+  async _checkBreakpointViaIpc(node) {
+      try {
+          const { randomUUID } = require('crypto');
+          const requestId = randomUUID();
+
+          const inputs = await this._captureNodeInputs(node);
+          const executedSteps = this.currentTraceId
+              ? await this.traceCollector.getTrace(this.currentTraceId)
+              : null;
+
+          // Отправляем запрос в главный процесс
+          process.send({
+              type: 'debug:check_breakpoint',
+              requestId,
+              payload: {
+                  graphId: this.context.graphId,
+                  nodeId: node.id,
+                  nodeType: node.type,
+                  inputs,
+                  executedSteps,
+                  context: {
+                      user: this.context.user,
+                      variables: this.context.variables,
+                      commandArguments: this.context.commandArguments,
+                  }
+              }
+          });
+
+          // Ждём ответа
+          const overrides = await new Promise((resolve) => {
+              this.pendingDebugRequests.set(requestId, resolve);
+
+              // Таймаут на случай, если ответ не придёт
+              const timeoutId = setTimeout(() => {
+                  if (this.pendingDebugRequests.has(requestId)) {
+                      this.pendingDebugRequests.delete(requestId);
+                      resolve(null);
+                  }
+              }, debugConfig.BREAKPOINT_TIMEOUT);
+
+              // Сохраняем timeoutId для возможной отмены
+              this.pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
+          });
+
+          if (overrides && overrides.__stopped) {
+              throw new Error('Execution stopped by debugger');
+          }
+
+          if (overrides) {
+              this.applyWhatIfOverrides(node, overrides);
+          }
+      } catch (error) {
+          if (error.message === 'Execution stopped by debugger') {
+              throw error;
+          }
+      }
+  }
+
+  /**
+   * Статический обработчик IPC ответов (глобальный для всех instances)
+   */
+  static _handleGlobalDebugResponse(message) {
+      const { requestId, overrides } = message;
+      const resolve = GraphExecutionEngine._allPendingRequests.get(requestId);
+
+      if (resolve) {
+          // Отменяем таймаут
+          const timeoutId = GraphExecutionEngine._allPendingRequests.get(`${requestId}_timeout`);
+          if (timeoutId) {
+              clearTimeout(timeoutId);
+              GraphExecutionEngine._allPendingRequests.delete(`${requestId}_timeout`);
+          }
+
+          GraphExecutionEngine._allPendingRequests.delete(requestId);
+          resolve(overrides);
+      }
+  }
+
+  /**
+   * Обработать IPC ответ от главного процесса (legacy wrapper)
+   */
+  _handleDebugResponse(message) {
+      GraphExecutionEngine._handleGlobalDebugResponse(message);
+  }
+
   applyWhatIfOverrides(node, overrides) {
       if (!overrides || typeof overrides !== 'object') return;
 
       console.log(`[Debug] Applying what-if overrides to node ${node.id}:`, overrides);
 
-      // Применяем overrides к node.data
-      if (!node.data) {
-          node.data = {};
-      }
-
       for (const [key, value] of Object.entries(overrides)) {
-          if (key !== '__stopped') {
+          if (key === '__stopped') continue;
+
+          // Парсим ключ для определения типа изменения
+          // Форматы:
+          // - "var.varName" - переменная графа
+          // - "nodeId.out.pinName" - выходной пин ноды
+          // - "nodeId.in.pinName" - входной пин ноды
+          // - "pinName" - входной пин текущей ноды
+
+          if (key.startsWith('var.')) {
+              // Изменение переменной графа
+              const varName = key.substring(4);
+              if (!this.context.variables) {
+                  this.context.variables = {};
+              }
+              this.context.variables[varName] = value;
+              console.log(`[Debug] Variable override: ${varName} = ${JSON.stringify(value)}`);
+          }
+          else if (key.includes('.out.')) {
+              // Изменение выходного пина ноды
+              const [nodeId, , pinName] = key.split('.');
+              const memoKey = `${nodeId}:${pinName}`;
+              this.memo.set(memoKey, value);
+              console.log(`[Debug] Output override: ${memoKey} = ${JSON.stringify(value)}`);
+          }
+          else if (key.includes('.in.')) {
+              // Изменение входного пина ноды (пока не применяется, но можно расширить)
+              const [nodeId, , pinName] = key.split('.');
+              console.log(`[Debug] Input override (informational): ${nodeId}.${pinName} = ${JSON.stringify(value)}`);
+              // Входы можно изменить через изменение outputs предыдущих нод или переменных
+          }
+          else {
+              // Изменение входного пина текущей ноды
+              if (!node.data) {
+                  node.data = {};
+              }
               node.data[key] = value;
-              console.log(`[Debug] Override applied: ${key} = ${value}`);
           }
       }
   }

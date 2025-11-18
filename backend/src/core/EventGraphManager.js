@@ -1,8 +1,6 @@
-const GraphExecutionEngine = require('./GraphExecutionEngine');
-const nodeRegistry = require('./NodeRegistry');
 const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
-const { parseVariables, parseVariableValue } = require('./utils/variableParser');
+const { parseVariables } = require('./utils/variableParser');
 const validationService = require('./services/ValidationService');
 
 const prisma = prismaService.getClient();
@@ -10,16 +8,12 @@ const prisma = prismaService.getClient();
 class EventGraphManager {
     constructor(botManager = null) {
         this.botManager = botManager;
-        this.graphEngine = botManager ? new GraphExecutionEngine(nodeRegistry, botManager) : null;
         this.activeGraphs = new Map();
         this.graphStates = new Map();
     }
 
     setBotManager(botManager) {
         this.botManager = botManager;
-        if (!this.graphEngine) {
-            this.graphEngine = new GraphExecutionEngine(nodeRegistry, botManager);
-        }
     }
 
     async loadGraphsForBot(botId) {
@@ -86,128 +80,33 @@ class EventGraphManager {
 
         for (const graph of graphsToRun) {
             try {
-                await this.executeGraph(botId, eventType, graph, args);
+                await this.executeGraphInChildProcess(botId, eventType, graph, args);
             } catch (error) {
-                console.error(`[EventGraphManager] Uncaught error during graph execution for event '${eventType}':`, error);
-                this.botManager.appendLog(botId, `[ERROR] Uncaught error in graph execution: ${error.message}`);
+                console.error(`[EventGraphManager] Error sending event to child process for '${eventType}':`, error);
+                this.botManager.appendLog(botId, `[ERROR] Error in event graph: ${error.message}`);
             }
         }
     }
 
-    async executeGraph(botId, eventType, graph, eventArgs) {
+    /**
+     * Отправляет граф в child process для выполнения
+     */
+    async executeGraphInChildProcess(botId, eventType, graph, eventArgs) {
         if (!graph || !graph.nodes || graph.nodes.length === 0) return;
 
-        const players = await this.botManager.getPlayerList(botId);
-
-        const botApi = {
-            sendMessage: (chatType, message, recipient) => {
-                this.botManager.sendMessageToBot(botId, message, chatType, recipient);
-            },
-            executeCommand: (command) => {
-                this.botManager.sendMessageToBot(botId, command, 'command');
-            },
-            lookAt: (position) => {
-                this.botManager.lookAt(botId, position);
-            },
-            getPlayerList: () => players,
-            getNearbyEntities: (position = null, radius = 32) => {
-                return this.botManager.getNearbyEntities(botId, position, radius);
-            },
-            sendLog: (message) => {
-                this.botManager.appendLog(botId, message);
-            },
-            entity: eventArgs.botEntity || null,
-            api: {
-                emitApiEvent: (eventName, payload) => {
-                    this.emitCustomApiEvent(botId, eventName, payload);
-                },
-            },
-        };
-        
-        const stateKey = `${botId}-${graph.id}`;
-
-        const initialContext = this.getInitialContextForEvent(eventType, eventArgs);
-        initialContext.bot = botApi;
-        initialContext.botId = botId;
-        initialContext.botManager = this.botManager;
-        initialContext.graphId = graph.id;
-        initialContext.eventArgs = eventArgs;
-        initialContext.players = players;
-        initialContext.botState = eventArgs.botState || {};
-
-        const savedVariables = { ...(this.graphStates.get(stateKey) || {}) };
-        
-        if (graph.variables && Array.isArray(graph.variables)) {
-            for (const v of graph.variables) {
-                if (!savedVariables.hasOwnProperty(v.name)) {
-                    savedVariables[v.name] = parseVariableValue(v, `EventGraph ID ${graph.id}`);
-                }
-            }
+        const childProcess = this.botManager.getChildProcess(botId);
+        if (!childProcess || !childProcess.send) {
+            console.error(`[EventGraphManager] No child process found for bot ${botId}`);
+            return;
         }
-        
-        initialContext.variables = savedVariables;
 
-        try {
-            const finalContext = await this.graphEngine.execute(graph, initialContext, eventType);
-
-            if (finalContext && finalContext.variables) {
-                this.graphStates.set(stateKey, finalContext.variables);
-            }
-        } catch (error) {
-            console.error(`[EventGraphManager] Error during execution or saving state for graph '${graph.name}'`, error);
-        }
-    }
-
-    getInitialContextForEvent(eventType, args) {
-        const context = {};
-        switch (eventType) {
-            case 'chat':
-            case 'private':
-            case 'global':
-            case 'clan':
-                context.user = { username: args.username };
-                context.username = args.username;
-                context.message = args.message;
-                context.chat_type = args.chatType;
-                break;
-            case 'raw_message':
-                context.rawText = args.rawText;
-                break;
-            case 'playerJoined':
-            case 'playerLeft':
-                context.user = args.user;
-                break;
-            case 'botDied':
-                context.user = args.user;
-                break;
-            case 'health':
-                context.health = args.health;
-                context.food = args.food;
-                context.saturation = args.saturation;
-                break;
-            case 'tick':
-                break;
-            case 'entitySpawn':
-            case 'entityMoved':
-            case 'entityGone':
-                context.entity = args.entity;
-                break;
-            case 'command':
-                context.command_name = args.commandName;
-                context.user = args.user;
-                context.args = args.args;
-                context.chat_type = args.typeChat;
-                context.success = args.success !== undefined ? args.success : true;
-                break;
-            case 'websocket_call':
-                context.graphName = args.graphName;
-                context.data = args.data || {};
-                context.socketId = args.socketId;
-                context.keyPrefix = args.keyPrefix;
-                context.sendResponse = args.sendResponse;
-                break;
-        }
-        return context;
+        childProcess.send({
+            type: 'execute_event_graph',
+            botId: botId,
+            graph: graph,
+            eventType: eventType,
+            eventArgs: eventArgs
+        });
     }
 
     /**

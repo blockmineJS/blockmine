@@ -22,6 +22,13 @@ class GraphDebugState {
     // Для управления паузой выполнения
     this.pausePromise = null;
     this.resumeCallback = null;
+
+    // Измененные значения во время паузы (what-if)
+    this.pendingOverrides = {}; // Object<key, value>
+
+    // Режим пошагового выполнения (step over)
+    this.stepMode = false; // Если true, остановится на следующей ноде
+    this.stepFromNodeId = null; // ID ноды, с которой начали step over (чтобы её пропустить)
   }
 
   /**
@@ -35,7 +42,14 @@ class GraphDebugState {
    * Broadcast событие всем подключенным пользователям
    */
   broadcast(event, data) {
-    this.io.to(this.getRoomName()).emit(event, data);
+    const room = this.getRoomName();
+    console.log(`[GraphDebugState] Broadcasting ${event} to room ${room}`);
+    console.log(`[GraphDebugState] Connected users in this debug state:`, this.connectedUsers.size);
+
+    const socketsInRoom = this.io.sockets.adapter.rooms.get(room);
+    console.log(`[GraphDebugState] Sockets in room ${room}:`, socketsInRoom ? socketsInRoom.size : 0);
+
+    this.io.to(room).emit(event, data);
   }
 
   /**
@@ -52,10 +66,12 @@ class GraphDebugState {
       pausedAt: Date.now()
     };
 
+
     this.broadcast('debug:paused', {
       sessionId,
       ...state
     });
+
 
     // Создаем Promise, который будет ждать resume
     this.pausePromise = new Promise((resolve) => {
@@ -70,17 +86,40 @@ class GraphDebugState {
 
   /**
    * Возобновить выполнение
+   * @param {object} overrides - Изменения значений
+   * @param {boolean} stepMode - Если true, остановится на следующей ноде
    */
-  resume(overrides = null) {
+  resume(overrides = null, stepMode = false) {
     if (this.resumeCallback) {
-      this.resumeCallback(overrides);
+      // Объединяем pendingOverrides с переданными overrides
+      const finalOverrides = {
+        ...this.pendingOverrides,
+        ...(overrides || {})
+      };
+
+      console.log('[GraphDebugState] Resuming with overrides:', finalOverrides, 'stepMode:', stepMode);
+
+      // Устанавливаем флаг stepMode и запоминаем текущую ноду
+      this.stepMode = stepMode;
+      if (stepMode && this.activeExecution) {
+        this.stepFromNodeId = this.activeExecution.nodeId;
+        console.log('[GraphDebugState] Step mode: will skip current node', this.stepFromNodeId);
+      }
+
+      this.resumeCallback(Object.keys(finalOverrides).length > 0 ? finalOverrides : null);
       this.resumeCallback = null;
       this.pausePromise = null;
     }
 
-    this.activeExecution = null;
+    // Если не step mode, очищаем состояние полностью
+    if (!stepMode) {
+      this.activeExecution = null;
+      this.stepFromNodeId = null;
+    }
 
-    this.broadcast('debug:resumed', {});
+    this.pendingOverrides = {}; // Очищаем после применения
+
+    this.broadcast('debug:resumed', { stepMode });
   }
 
   /**
@@ -94,6 +133,9 @@ class GraphDebugState {
     }
 
     this.activeExecution = null;
+    this.pendingOverrides = {}; // Очищаем при остановке
+    this.stepMode = false; // Сбрасываем step mode
+    this.stepFromNodeId = null; // Очищаем запомненную ноду
 
     this.broadcast('debug:stopped', {});
   }
@@ -136,6 +178,47 @@ class GraphDebugState {
       bp.enabled = enabled;
       this.broadcast('debug:breakpoint-toggled', { nodeId, enabled });
     }
+  }
+
+  /**
+   * Очистить все брейкпоинты
+   */
+  clearAllBreakpoints() {
+    const nodeIds = Array.from(this.breakpoints.keys());
+    this.breakpoints.clear();
+
+    // Уведомляем о каждом удаленном брейкпоинте
+    nodeIds.forEach(nodeId => {
+      this.broadcast('debug:breakpoint-removed', { nodeId });
+    });
+  }
+
+  /**
+   * Проверить, нужно ли остановиться в step mode
+   * @param {string} nodeId - ID текущей ноды
+   * @returns {boolean}
+   */
+  shouldStepPause(nodeId) {
+    if (this.stepMode) {
+      // Пропускаем ноду, с которой начали step
+      if (nodeId === this.stepFromNodeId) {
+        return false;
+      }
+
+      // Останавливаемся на следующей ноде
+      this.stepMode = false; // Сбрасываем после остановки
+      this.stepFromNodeId = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Установить измененное значение (what-if)
+   */
+  setValue(key, value) {
+    this.pendingOverrides[key] = value;
+    console.log(`[GraphDebugState] Set override: ${key} =`, value);
   }
 
   /**

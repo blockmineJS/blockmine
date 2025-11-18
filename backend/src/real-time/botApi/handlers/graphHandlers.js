@@ -66,8 +66,8 @@ async function handleTriggerGraph(socket, payload) {
         // Парсим граф
         const parsedGraph = JSON.parse(graph.graphJson);
 
-        // Запускаем граф напрямую через executeGraph
-        await botManager.eventGraphManager.executeGraph(
+        // Запускаем граф в child process через IPC
+        await botManager.eventGraphManager.executeGraphInChildProcess(
             socket.botId,
             'api_trigger', // Тип события
             {

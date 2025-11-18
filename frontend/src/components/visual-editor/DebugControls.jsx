@@ -6,6 +6,7 @@ import { Play, Square, ArrowRight } from 'lucide-react';
 const DebugControls = () => {
   const debugSession = useVisualEditorStore(state => state.debugSession);
   const continueExecution = useVisualEditorStore(state => state.continueExecution);
+  const stepExecution = useVisualEditorStore(state => state.stepExecution);
   const stopExecution = useVisualEditorStore(state => state.stopExecution);
 
   if (!debugSession || debugSession.status !== 'paused') {
@@ -34,7 +35,7 @@ const DebugControls = () => {
           variant="default"
           size="sm"
           className="bg-blue-600 hover:bg-blue-700"
-          onClick={() => continueExecution()}
+          onClick={() => stepExecution()}
         >
           <ArrowRight className="w-4 h-4 mr-2" />
           Шаг вперед (F10)

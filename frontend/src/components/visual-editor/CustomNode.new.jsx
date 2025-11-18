@@ -77,14 +77,19 @@ function CustomNode({ data, type, id: nodeId }) {
 
     // Если это не текущая нода, ищем её в executedSteps
     if (debugSession.executedSteps?.steps) {
+      console.log(`[CustomNode] Looking for node ${nodeId} in executedSteps:`, debugSession.executedSteps.steps.length, 'steps');
       const executionSteps = debugSession.executedSteps.steps.filter(step => step.type !== 'traversal');
+      console.log(`[CustomNode] After filtering traversals:`, executionSteps.length, 'steps');
       const nodeStep = executionSteps.reverse().find(step => step.nodeId === nodeId);
 
       if (nodeStep) {
+        console.log(`[CustomNode] Found step for node ${nodeId}:`, nodeStep);
         return {
           inputs: nodeStep.inputs || null,
           outputs: nodeStep.outputs || null
         };
+      } else {
+        console.log(`[CustomNode] No step found for node ${nodeId}`);
       }
     }
 
@@ -122,6 +127,7 @@ function CustomNode({ data, type, id: nodeId }) {
         isActiveNode={currentActiveNodeId === nodeId}
         isTraceActive={isTraceViewerOpen}
         breakpoint={breakpoint}
+        isPausedNode={debugSession?.status === 'paused' && debugSession?.nodeId === nodeId}
       />
     );
   }

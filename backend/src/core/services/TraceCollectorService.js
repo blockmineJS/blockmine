@@ -102,7 +102,7 @@ class TraceCollectorService {
   updateStepOutputs(traceId, nodeId, outputs) {
     const trace = this.activeTraces.get(traceId);
     if (!trace) {
-      console.warn(`[TraceCollector] Трассировка ${traceId} не найдена`);
+      // Трассировка уже завершена - это нормально, просто игнорируем
       return;
     }
 
@@ -110,7 +110,6 @@ class TraceCollectorService {
     for (let i = trace.steps.length - 1; i >= 0; i--) {
       if (trace.steps[i].nodeId === nodeId && trace.steps[i].type !== 'traversal') {
         trace.steps[i].outputs = outputs;
-        console.log(`[TraceCollector] Updated outputs for node ${nodeId}:`, outputs);
         break;
       }
     }
@@ -122,13 +121,33 @@ class TraceCollectorService {
   updateStepDuration(traceId, nodeId, duration) {
     const trace = this.activeTraces.get(traceId);
     if (!trace) {
-      console.warn(`[TraceCollector] Трассировка ${traceId} не найдена`);
+      // Трассировка уже завершена - это нормально, просто игнорируем
       return;
     }
 
     // Находим последний шаг с этим nodeId
     for (let i = trace.steps.length - 1; i >= 0; i--) {
       if (trace.steps[i].nodeId === nodeId && trace.steps[i].type !== 'traversal') {
+        trace.steps[i].duration = duration;
+        break;
+      }
+    }
+  }
+
+  /**
+   * Обновить статус ошибки для последнего шага с указанным nodeId
+   */
+  updateStepError(traceId, nodeId, error, duration) {
+    const trace = this.activeTraces.get(traceId);
+    if (!trace) {
+      return;
+    }
+
+    // Находим последний шаг с этим nodeId
+    for (let i = trace.steps.length - 1; i >= 0; i--) {
+      if (trace.steps[i].nodeId === nodeId && trace.steps[i].type !== 'traversal') {
+        trace.steps[i].status = 'error';
+        trace.steps[i].error = error;
         trace.steps[i].duration = duration;
         break;
       }
@@ -170,14 +189,25 @@ class TraceCollectorService {
       return;
     }
 
+    // Защита от race condition - помечаем trace как завершаемый
+    if (trace.isCompleting) {
+      console.warn(`[TraceCollector] Трассировка ${traceId} уже завершается`);
+      return trace;
+    }
+    trace.isCompleting = true;
+
     trace.endTime = new Date();
     trace.status = 'completed';
 
-    this.activeTraces.delete(traceId);
+    // Удаляем с небольшой задержкой, чтобы updateStepOutputs успел завершиться
+    setTimeout(() => {
+      this.activeTraces.delete(traceId);
+    }, 100);
 
     await this._storeCompletedTrace(trace);
 
-    if (this.config.persistToDb) {
+    // Не сохраняем трассировки команд в БД (только события)
+    if (this.config.persistToDb && trace.eventType !== 'command') {
       await this._persistTraceToDb(trace);
     }
 
@@ -209,7 +239,8 @@ class TraceCollectorService {
 
     await this._storeCompletedTrace(trace);
 
-    if (this.config.persistToDb) {
+    // Не сохраняем трассировки команд в БД (только события)
+    if (this.config.persistToDb && trace.eventType !== 'command') {
       await this._persistTraceToDb(trace);
     }
 
@@ -336,7 +367,24 @@ class TraceCollectorService {
   }
 
   /**
-   * Очистить старые трассировки
+   * Очистить все трассировки для конкретного бота (при остановке бота)
+   */
+  clearForBot(botId) {
+    // Удаляем активные трассировки этого бота
+    for (const [traceId, trace] of this.activeTraces.entries()) {
+      if (trace.botId === botId) {
+        this.activeTraces.delete(traceId);
+      }
+    }
+
+    // Удаляем завершённые трассировки
+    this.completedTraces.delete(botId);
+
+    console.log(`[TraceCollector] Очищены все трассировки для бота ${botId}`);
+  }
+
+  /**
+   * Очистить старые трассировки (периодическая очистка)
    */
   async cleanup() {
     const cutoffDate = new Date();

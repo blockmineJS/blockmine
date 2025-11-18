@@ -27,6 +27,7 @@ function broadcast(io) {
 		username: info.username,
 		path: info.path || '/',
 		lastSeen: info.lastSeen,
+		metadata: info.metadata || {},
 	}));
 	io.emit('presence:list', list);
 }
@@ -50,10 +51,11 @@ function handleConnection(io, socket) {
 		}
 	});
 
-	socket.on('presence:update', ({ path }) => {
+	socket.on('presence:update', ({ path, metadata }) => {
 		const info = presenceMap.get(userId) || { username, socketId: socket.id };
 		info.lastSeen = Date.now();
 		info.path = typeof path === 'string' ? path : '/';
+		info.metadata = metadata || {};
 		presenceMap.set(userId, info);
 		broadcast(io);
 	});

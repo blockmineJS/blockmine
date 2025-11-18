@@ -109,6 +109,11 @@ class BotLifecycleService {
         if (child) {
             this.eventGraphManager.unloadGraphsForBot(botId);
 
+            // Очищаем traces для этого бота
+            const { getTraceCollector } = require('./TraceCollectorService');
+            const traceCollector = getTraceCollector();
+            traceCollector.clearForBot(botId);
+
             child.send({ type: 'stop' });
 
             // Принудительное завершение через 5 секунд
@@ -127,6 +132,10 @@ class BotLifecycleService {
             return { success: true };
         }
         return { success: false, message: 'Бот не найден или уже остановлен' };
+    }
+
+    getChildProcess(botId) {
+        return this.processManager.getProcess(botId);
     }
 
     async restartBot(botId) {
@@ -189,6 +198,15 @@ class BotLifecycleService {
                         break;
                     case 'register_command':
                         await this._handleCommandRegistration(botId, message.commandConfig);
+                        break;
+                    case 'trace:completed':
+                        await this._handleTraceCompleted(botId, message.trace);
+                        break;
+                    case 'debug:check_breakpoint':
+                        await this._handleDebugBreakpointCheck(botId, child, message);
+                        break;
+                    case 'debug:check_step_mode':
+                        await this._handleDebugStepModeCheck(botId, child, message);
                         break;
                 }
             } catch (error) {
@@ -595,6 +613,141 @@ class BotLifecycleService {
         this.processManager.sendMessage(botId, { type: 'invalidate_all_user_cache' });
 
         return { success: true };
+    }
+
+    async _handleTraceCompleted(botId, trace) {
+        try {
+            const { getTraceCollector } = require('../services/TraceCollectorService');
+            const traceCollector = getTraceCollector();
+
+            // Сохраняем трассировку в главном TraceCollectorService
+            await traceCollector._storeCompletedTrace(trace);
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка обработки завершённой трассировки');
+        }
+    }
+
+    async _handleDebugBreakpointCheck(botId, child, message) {
+        const { requestId, payload } = message;
+        const { graphId, nodeId, nodeType, inputs, executedSteps, context } = payload;
+
+        try {
+            const { getGlobalDebugManager } = require('../services/DebugSessionManager');
+            const debugManager = getGlobalDebugManager();
+
+            const debugState = debugManager.get(graphId);
+            if (!debugState) {
+                // Нет debug сессии для этого графа - просто продолжаем выполнение
+                child.send({
+                    type: 'debug:breakpoint_response',
+                    requestId,
+                    overrides: null
+                });
+                return;
+            }
+
+            const breakpoint = debugState.breakpoints.get(nodeId);
+            if (!breakpoint || !breakpoint.enabled) {
+                // Нет брейкпоинта для этой ноды или он отключен
+                child.send({
+                    type: 'debug:breakpoint_response',
+                    requestId,
+                    overrides: null
+                });
+                return;
+            }
+
+            // Проверяем условие брейкпоинта (пока всегда срабатывает)
+            // TODO: добавить evaluateBreakpointCondition
+
+            breakpoint.hitCount++;
+
+            // Приостанавливаем выполнение и ждём действий от пользователя
+            const overrides = await debugState.pause({
+                nodeId,
+                nodeType,
+                inputs,
+                executedSteps,
+                context,
+                breakpoint: {
+                    condition: breakpoint.condition,
+                    hitCount: breakpoint.hitCount
+                }
+            });
+
+            // Отправляем результат обратно в дочерний процесс
+            child.send({
+                type: 'debug:breakpoint_response',
+                requestId,
+                overrides: overrides || null
+            });
+
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка обработки debug breakpoint check');
+            // В случае ошибки отправляем null чтобы продолжить выполнение
+            child.send({
+                type: 'debug:breakpoint_response',
+                requestId,
+                overrides: null
+            });
+        }
+    }
+
+    async _handleDebugStepModeCheck(botId, child, message) {
+        const { requestId, payload } = message;
+        const { graphId, nodeId, nodeType, inputs, executedSteps, context } = payload;
+
+        try {
+            const { getGlobalDebugManager } = require('../services/DebugSessionManager');
+            const debugManager = getGlobalDebugManager();
+
+            const debugState = debugManager.get(graphId);
+            if (!debugState) {
+                // Нет debug сессии - продолжаем выполнение
+                child.send({
+                    type: 'debug:breakpoint_response', // Используем тот же тип ответа
+                    requestId,
+                    overrides: null
+                });
+                return;
+            }
+
+            // Проверяем, нужно ли остановиться в step mode
+            if (!debugState.shouldStepPause(nodeId)) {
+                // Step mode не активен или не нужно останавливаться на этой ноде
+                child.send({
+                    type: 'debug:breakpoint_response',
+                    requestId,
+                    overrides: null
+                });
+                return;
+            }
+
+            // Приостанавливаем выполнение и ждём действий от пользователя
+            const overrides = await debugState.pause({
+                nodeId,
+                nodeType,
+                inputs,
+                executedSteps,
+                context
+            });
+
+            // Отправляем результат обратно в дочерний процесс
+            child.send({
+                type: 'debug:breakpoint_response',
+                requestId,
+                overrides: overrides || null
+            });
+
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка обработки debug step mode check');
+            // В случае ошибки отправляем null чтобы продолжить выполнение
+            child.send({
+                type: 'debug:breakpoint_response',
+                requestId,
+                overrides: null
+            });
+        }
     }
 }
 
