@@ -381,7 +381,7 @@ function BotVisualEditorPage() {
     }, [availableNodes, variables, commandArguments]);
 
     const handleMenuItemSelect = (item) => {
-        const { menuPosition, addNode, closeMenu } = useVisualEditorStore.getState();
+        const { menuPosition, addNode, closeMenu, socket, command } = useVisualEditorStore.getState();
         const newNode = addNode(item.type, menuPosition.flowPosition, false);
 
         // Если есть дополнительные данные (для переменных/аргументов), применяем их
@@ -393,6 +393,15 @@ function BotVisualEditorPage() {
         useVisualEditorStore.setState(state => {
             state.nodes.push(newNode);
         });
+
+        if (socket && command) {
+            socket.emit('collab:nodes', {
+                botId: command.botId,
+                graphId: command.id,
+                type: 'create',
+                data: { node: newNode }
+            });
+        }
 
         closeMenu();
     };
