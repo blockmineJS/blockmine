@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, GitBranch, Loader2, AlertCircle, CheckCircle, ExternalLink, Key, Github, Upload, Tag, AlertTriangle, List } from 'lucide-react';
+import { Package, GitBranch, Loader2, AlertCircle, CheckCircle, ExternalLink, Key, Github, Upload, Tag, AlertTriangle, List, ArrowUpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,9 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
 
     // Official list submission
     const [showOfficialListDialog, setShowOfficialListDialog] = useState(false);
+    const [isInOfficialList, setIsInOfficialList] = useState(false);
+    const [officialListVersion, setOfficialListVersion] = useState(null);
+    const [isCheckingOfficialList, setIsCheckingOfficialList] = useState(false);
 
     useEffect(() => {
         fetchPluginInfo();
@@ -79,6 +82,14 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
         setIsLoading(true);
         try {
             const data = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/info`);
+            // Парсим manifest если он строка
+            if (data && typeof data.manifest === 'string') {
+                try {
+                    data.manifest = JSON.parse(data.manifest);
+                } catch (e) {
+                    console.warn('Failed to parse manifest:', e);
+                }
+            }
             setPluginInfo(data);
             if (data.name && !newRepoName) {
                 setNewRepoName(data.name);
@@ -179,8 +190,41 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
     useEffect(() => {
         if (pluginInfo?.hasRepository && tokenSaved && githubToken) {
             fetchTags();
+            checkIfInOfficialList();
         }
     }, [pluginInfo?.hasRepository, tokenSaved, githubToken]);
+
+    const checkIfInOfficialList = async () => {
+        if (!pluginInfo?.repository?.url) return;
+
+        setIsCheckingOfficialList(true);
+        try {
+            // Загружаем официальный список с GitHub
+            const response = await fetch('https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json');
+            if (response.ok) {
+                const officialList = await response.json();
+
+                // Проверяем по repoUrl
+                const repoUrl = pluginInfo.repository.url.replace('.git', '');
+                const pluginInList = officialList.find(plugin =>
+                    plugin.repoUrl === repoUrl ||
+                    plugin.repoUrl === repoUrl + '.git'
+                );
+
+                if (pluginInList) {
+                    setIsInOfficialList(true);
+                    setOfficialListVersion(pluginInList.latestTag);
+                } else {
+                    setIsInOfficialList(false);
+                    setOfficialListVersion(null);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to check official list:', error);
+        } finally {
+            setIsCheckingOfficialList(false);
+        }
+    };
 
     const fetchTags = async () => {
         setIsLoadingTags(true);
@@ -556,25 +600,66 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                     )}
 
                     {/* Official List Submission */}
-                    {tokenSaved && latestTag && (
-                        <div className="bg-muted/30 border rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-3">
-                                <List className="h-4 w-4 text-primary" />
-                                <span className="font-medium">Официальный список плагинов</span>
+                    {tokenSaved && latestTag && (() => {
+                        const needsUpdate = isInOfficialList && officialListVersion && compareVersions(latestTag, officialListVersion) > 0;
+                        const isUpToDate = isInOfficialList && officialListVersion && compareVersions(latestTag, officialListVersion) === 0;
+
+                        return (
+                            <div className="bg-muted/30 border rounded-lg p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <List className="h-4 w-4 text-primary" />
+                                    <span className="font-medium">Официальный список плагинов</span>
+                                </div>
+                                {isCheckingOfficialList ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : isUpToDate ? (
+                                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                        <span className="text-sm">Плагин в официальном списке ({officialListVersion})</span>
+                                    </div>
+                                ) : needsUpdate ? (
+                                    <>
+                                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-3">
+                                            <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                                                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                                                <span>Доступно обновление версии</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Версия в списке: {officialListVersion}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Ваша версия: {latestTag}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => setShowOfficialListDialog(true)}
+                                            variant="outline"
+                                            className="w-full"
+                                        >
+                                            <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                            Обновить версию в списке
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-muted-foreground mb-3">
+                                            Добавьте ваш плагин в официальный список BlockMine что бы он появился в магазине плагинов
+                                        </p>
+                                        <Button
+                                            onClick={() => setShowOfficialListDialog(true)}
+                                            variant="outline"
+                                            className="w-full"
+                                        >
+                                            <List className="h-4 w-4 mr-2" />
+                                            Подать в официальный список
+                                        </Button>
+                                    </>
+                                )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-3">
-                                Добавьте ваш плагин в официальный список BlockMine что бы он появился в магазине плагинов
-                            </p>
-                            <Button
-                                onClick={() => setShowOfficialListDialog(true)}
-                                variant="outline"
-                                className="w-full"
-                            >
-                                <List className="h-4 w-4 mr-2" />
-                                Подать в официальный список
-                            </Button>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </div>
 
                 {/* Release Dialog */}
@@ -596,6 +681,12 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                     botId={botId}
                     pluginName={pluginName}
                     githubToken={githubToken}
+                    isUpdate={isInOfficialList && officialListVersion && compareVersions(latestTag, officialListVersion) > 0}
+                    currentVersion={officialListVersion}
+                    onSuccess={() => {
+                        setIsInOfficialList(true);
+                        setOfficialListVersion(latestTag);
+                    }}
                 />
             </div>
         );

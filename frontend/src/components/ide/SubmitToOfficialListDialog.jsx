@@ -21,7 +21,7 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
-export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo, repoUrl, latestTag, botId, pluginName, githubToken }) {
+export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo, repoUrl, latestTag, botId, pluginName, githubToken, onSuccess, isUpdate = false, currentVersion = null }) {
     const [pluginDisplayName, setPluginDisplayName] = useState('');
     const [icon, setIcon] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +30,9 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
     useEffect(() => {
         if (pluginInfo) {
             setPluginDisplayName(pluginInfo.name || '');
-            setIcon('package'); // Default icon
+            // При обновлении берем иконку из package.json, при первой подаче - package по умолчанию
+            const savedIcon = pluginInfo.manifest?.icon || pluginInfo.botpanel?.icon;
+            setIcon(savedIcon || 'package');
         }
     }, [pluginInfo]);
 
@@ -75,6 +77,11 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                     </div>
                 )
             });
+
+            // Вызываем callback для обновления статуса в родительском компоненте
+            if (onSuccess) {
+                onSuccess();
+            }
         } catch (error) {
             toast({
                 variant: 'destructive',
@@ -114,10 +121,13 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Icons.Package className="h-5 w-5" />
-                        Подать в официальный список
+                        {isUpdate ? 'Обновить версию в списке' : 'Подать в официальный список'}
                     </DialogTitle>
                     <DialogDescription>
-                        {prUrl ? 'Pull Request успешно создан!' : 'Автоматически создаст PR в blockmineJS/official-plugins-list'}
+                        {prUrl ? 'Pull Request успешно создан!' : isUpdate
+                            ? `Обновить версию с ${currentVersion} на ${latestTag}`
+                            : 'Автоматически создаст PR в blockmineJS/official-plugins-list'
+                        }
                     </DialogDescription>
                 </DialogHeader>
 
@@ -230,6 +240,26 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                                         {pluginInfo?.description || 'Нет описания'}
                                                     </p>
 
+                                                    {(() => {
+                                                        // Пытаемся получить categories из разных источников
+                                                        let cats = [];
+                                                        if (pluginInfo?.manifest?.categories) {
+                                                            cats = pluginInfo.manifest.categories;
+                                                        } else if (pluginInfo?.botpanel?.categories) {
+                                                            cats = pluginInfo.botpanel.categories;
+                                                        }
+
+                                                        return cats.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {cats.map((cat, i) => (
+                                                                    <Badge key={i} variant="secondary" className="text-xs">
+                                                                        {cat}
+                                                                    </Badge>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
+
                                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                         <div className="flex items-center gap-1">
                                                             <Icons.Users className="h-3 w-3" />
@@ -241,15 +271,53 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex flex-wrap gap-1">
-                                                        <Badge variant="outline" className="text-xs">
-                                                            <Icons.Globe className="h-3 w-3 mr-1" />
-                                                            Любой сервер
-                                                        </Badge>
-                                                    </div>
+                                                    {(() => {
+                                                        // Получаем supportedHosts
+                                                        let hosts = [];
+                                                        if (pluginInfo?.manifest?.supportedHosts) {
+                                                            hosts = pluginInfo.manifest.supportedHosts;
+                                                        } else if (pluginInfo?.botpanel?.supportedHosts) {
+                                                            hosts = pluginInfo.botpanel.supportedHosts;
+                                                        }
+
+                                                        return (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {!hosts || hosts.length === 0 ? (
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        <Icons.Globe className="h-3 w-3 mr-1" />
+                                                                        Любой сервер
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        <Icons.Server className="h-3 w-3 mr-1" />
+                                                                        {hosts.length <= 2 ? hosts.join(', ') : `${hosts.length} серверов`}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </CardContent>
 
                                                 <div className="p-5 relative z-10 flex flex-col items-start gap-3 mt-auto pt-4 border-t">
+                                                    {(() => {
+                                                        // Получаем dependencies
+                                                        let deps = [];
+                                                        if (pluginInfo?.manifest?.dependencies) {
+                                                            deps = pluginInfo.manifest.dependencies;
+                                                        } else if (pluginInfo?.botpanel?.dependencies) {
+                                                            deps = pluginInfo.botpanel.dependencies;
+                                                        }
+
+                                                        return deps.length > 0 && (
+                                                            <div className="w-full">
+                                                                <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600 text-xs">
+                                                                    <Icons.GitMerge className="h-3 w-3 mr-1" />
+                                                                    Требует {deps.length} зависимост{deps.length === 1 ? 'ь' : (deps.length < 5 ? 'и' : 'ей')}
+                                                                </Badge>
+                                                            </div>
+                                                        );
+                                                    })()}
+
                                                     <Button className="w-full relative overflow-hidden transition-all">
                                                         <Icons.Download className="mr-2 h-4 w-4" />
                                                         Установить
@@ -266,9 +334,9 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                 <p className="text-sm font-medium mb-2">ℹ️ Что произойдет:</p>
                                 <ol className="text-xs space-y-1 text-muted-foreground list-decimal list-inside">
                                     <li>Автоматически создастся ветка <code className="bg-muted px-1 rounded">add-plugin-{getRepoId()}</code></li>
-                                    <li>Ваш плагин будет добавлен в <code className="bg-muted px-1 rounded">index.json</code></li>
+                                    <li>{isUpdate ? 'Версия плагина будет обновлена' : 'Ваш плагин будет добавлен'} в <code className="bg-muted px-1 rounded">index.json</code></li>
                                     <li>Создастся Pull Request в <code className="bg-muted px-1 rounded">blockmineJS/official-plugins-list</code></li>
-                                    <li>После проверки и одобрения модераторами, плагин появится в официальном списке</li>
+                                    <li>После проверки и одобрения модераторами, {isUpdate ? 'новая версия появится в списке' : 'плагин появится в официальном списке'}</li>
                                 </ol>
                             </div>
                         </>

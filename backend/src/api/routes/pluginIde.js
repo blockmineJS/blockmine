@@ -89,6 +89,9 @@ router.post('/create', async (req, res) => {
             keywords: ['blockmine', 'blockmine-plugin', 'minecraft', 'mineflayer'],
             botpanel: {
                 main: 'index.js',
+                categories: [],
+                supportedHosts: [],
+                dependencies: [],
                 settings: {
                     "helloMessage": {
                         "type": "string",
@@ -1067,7 +1070,8 @@ router.get('/:pluginName/info', resolvePluginPath, async (req, res) => {
             description: packageJson.description,
             author: packageJson.author,
             license: packageJson.license,
-            repository: repositoryInfo
+            repository: repositoryInfo,
+            botpanel: packageJson.botpanel || null
         });
     } catch (error) {
         console.error(`[Plugin IDE Error] /info for ${req.params.pluginName}:`, error);
@@ -1955,6 +1959,22 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             return res.status(400).json({ error: 'Plugin must have at least one release tag.' });
         }
 
+        // Сохраняем иконку в package.json если её там нет
+        if (!packageJson.botpanel) {
+            packageJson.botpanel = {};
+        }
+
+        if (!packageJson.botpanel.icon) {
+            packageJson.botpanel.icon = icon;
+            await fse.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+            console.log(`[Plugin IDE] Saved icon "${icon}" to package.json`);
+        }
+
+        // Берём категории, зависимости и supportedHosts из package.json
+        const categories = packageJson.botpanel?.categories || [];
+        const supportedHosts = packageJson.botpanel?.supportedHosts || [];
+        const dependencies = packageJson.botpanel?.dependencies || [];
+
         // Формируем entry для официального списка
         const pluginEntry = {
             id: cleanRepoName,
@@ -1964,15 +1984,14 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             repoUrl: repoUrl.replace('.git', ''),
             icon: icon,
             latestTag: latestTag,
-            categories: [],
-            supportedHosts: [],
-            dependencies: []
+            categories: categories,
+            supportedHosts: supportedHosts,
+            dependencies: dependencies
         };
 
         // Работаем с official-plugins-list репозиторием
         const listOwner = 'blockmineJS';
         const listRepo = 'official-plugins-list';
-        const branchName = `add-plugin-${cleanRepoName}`;
 
         console.log(`[Plugin IDE] Creating PR for plugin ${cleanRepoName} in official list`);
 
@@ -1990,6 +2009,25 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             ref: `heads/${defaultBranch}`
         });
         const baseSha = refData.object.sha;
+
+        // Получаем текущий index.json для проверки, существует ли плагин
+        const { data: fileData } = await octokit.repos.getContent({
+            owner: listOwner,
+            repo: listRepo,
+            path: 'index.json',
+            ref: defaultBranch
+        });
+
+        const currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
+        const pluginsList = JSON.parse(currentContent);
+
+        // Проверяем, не добавлен ли уже плагин
+        const existingPlugin = pluginsList.find(p => p.id === cleanRepoName);
+        const isUpdate = !!existingPlugin;
+        const oldVersion = existingPlugin?.latestTag;
+
+        // Название ветки зависит от типа операции
+        const branchName = isUpdate ? `update-plugin-${cleanRepoName}` : `add-plugin-${cleanRepoName}`;
 
         // Проверяем, существует ли уже ветка с таким именем
         let branchExists = false;
@@ -2026,18 +2064,7 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             sha: baseSha
         });
 
-        // Получаем текущий index.json
-        const { data: fileData } = await octokit.repos.getContent({
-            owner: listOwner,
-            repo: listRepo,
-            path: 'index.json',
-            ref: defaultBranch
-        });
-
-        const currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
-        const pluginsList = JSON.parse(currentContent);
-
-        // Проверяем, не добавлен ли уже плагин
+        // Обновляем или добавляем плагин в список
         const existingIndex = pluginsList.findIndex(p => p.id === cleanRepoName);
         if (existingIndex !== -1) {
             // Обновляем существующий
@@ -2080,10 +2107,15 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             base_tree: baseCommit.tree.sha
         });
 
+        // Commit message и PR body зависят от типа операции
+        const commitMessage = isUpdate
+            ? `Update ${pluginDisplayName} to ${latestTag}`
+            : `Add ${pluginDisplayName} plugin`;
+
         const { data: commit } = await octokit.git.createCommit({
             owner: listOwner,
             repo: listRepo,
-            message: `Add ${pluginDisplayName} plugin`,
+            message: commitMessage,
             tree: tree.sha,
             parents: [baseSha]
         });
@@ -2096,7 +2128,31 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
         });
 
         // Создаем Pull Request
-        const prBody = `## Новый плагин: ${pluginDisplayName}
+        const prTitle = isUpdate
+            ? `🔄 Update ${pluginDisplayName} to ${latestTag}`
+            : `✨ Add ${pluginDisplayName} plugin`;
+
+        const prBody = isUpdate
+            ? `## Обновление плагина: ${pluginDisplayName}
+
+**ID**: \`${cleanRepoName}\`
+**Автор**: ${packageJson.author || owner}
+**Описание**: ${packageJson.description || 'Нет описания'}
+**Репозиторий**: ${repoUrl.replace('.git', '')}
+**Старая версия**: ${oldVersion}
+**Новая версия**: ${latestTag}
+
+---
+
+Этот PR был автоматически создан из BlockMine IDE.
+
+### Что нужно проверить:
+- [ ] Новая версия работает корректно
+- [ ] Обновленные данные плагина корректны
+- [ ] Заполнены \`categories\`, \`supportedHosts\`, \`dependencies\` (если нужно)
+- [ ] Иконка отображается корректно
+`
+            : `## Новый плагин: ${pluginDisplayName}
 
 **ID**: \`${cleanRepoName}\`
 **Автор**: ${packageJson.author || owner}
@@ -2122,7 +2178,7 @@ router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (re
             const { data: pr } = await octokit.pulls.create({
                 owner: listOwner,
                 repo: listRepo,
-                title: `✨ Add ${pluginDisplayName} plugin`,
+                title: prTitle,
                 head: branchName,
                 base: defaultBranch,
                 body: prBody
