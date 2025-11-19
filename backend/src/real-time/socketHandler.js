@@ -70,27 +70,6 @@ function initializeSocket(httpServer) {
 
         socket.on('plugin:ui:subscribe', ({ botId, pluginName }) => {
             botManager.subscribeToPluginUi(botId, pluginName, socket);
-            const debugState = debugManager.getOrCreate(botId, graphId);
-            const room = debugState.getRoomName();
-
-            socket.join(room);
-
-            // Получаем информацию о пользователе из токена
-            const userInfo = {
-                socketId: socket.id,
-                userId: socket.decoded?.userId,
-                username: socket.decoded?.username || 'Unknown'
-            };
-            debugState.addUser(socket.id, userInfo);
-
-            console.log(`[Debug] User ${userInfo.username} (${socket.id}) joined debug room for graph ${graphId}`);
-
-            socket.emit('debug:state', debugState.getState());
-
-            socket.to(room).emit('debug:user-joined', {
-                userCount: debugState.connectedUsers.size,
-                users: Array.from(debugState.connectedUsers.values())
-            });
         });
 
         socket.on('debug:join', ({ botId, graphId }) => {
