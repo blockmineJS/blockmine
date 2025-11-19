@@ -222,9 +222,19 @@ function broadcastLog(log) {
 const originalAddToLogBuffer = addToLogBuffer;
 addToLogBuffer = function(level, ...args) {
     const timestamp = new Date().toISOString();
-    const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
+    const message = args.map(arg => {
+        if (typeof arg === 'object') {
+            try {
+                return JSON.stringify(arg, null, 2);
+            } catch (e) {
+                if (arg instanceof Error) {
+                    return `${arg.name}: ${arg.message}`;
+                }
+                return '[Object with circular reference]';
+            }
+        }
+        return String(arg);
+    }).join(' ');
     
     const logEntry = {
         timestamp,
