@@ -261,7 +261,7 @@ export const createPluginSlice = (set, get) => {
                 botId,
                 `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
                 { method: 'POST' },
-                `Копия плагина "${pluginName}" успешно создана.`
+                `Плагин "${pluginName}" успешно превращен в локальный.`
             );
         },
     };

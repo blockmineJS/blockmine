@@ -1,7 +1,11 @@
 const express = require('express');
+const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+// Все роуты требуют аутентификации
+router.use(authenticate);
 
 router.get('/', async (req, res) => {
   const { query } = req.query;

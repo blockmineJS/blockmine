@@ -91,9 +91,12 @@ export default function PluginsTab() {
     const handleForkPlugin = async (plugin) => {
         setIsForking(true);
         try {
-            const forkedPlugin = await forkPlugin(intBotId, plugin.name);
-            if (forkedPlugin) {
-                navigate(`/bots/${intBotId}/plugins/edit/${forkedPlugin.name}`);
+            const updatedPlugin = await forkPlugin(intBotId, plugin.name);
+            if (updatedPlugin) {
+                // Обновляем список плагинов чтобы отобразить изменение sourceType
+                await fetchInstalledPlugins(intBotId);
+                // Переходим в редактор (имя плагина не меняется)
+                navigate(`/bots/${intBotId}/plugins/edit/${updatedPlugin.name}`);
             }
         } finally {
             setIsForking(false);

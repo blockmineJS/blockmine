@@ -10,7 +10,72 @@ const { execSync: execSyncRaw } = require('child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
 
+// Создаёт обёрнутый console для перехвата логов плагина
+function createPluginConsole(botId, pluginName, originalConsole) {
+    const emitLog = (level, args) => {
+        try {
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
 
+            // Фильтруем системные логи (не отправляем в IDE)
+            const systemLogPatterns = [
+                /^\[Config\]/,           // [Config] сообщения
+                /^\[System\]/,           // [System] сообщения
+                /^\[Internal\]/,         // [Internal] сообщения
+                /^\[Graph\]/,            // [Graph] логи от визуальных графов
+                /\[Graph Log\]/,         // [Graph Log] логи от нод графов
+            ];
+
+            const isSystemLog = systemLogPatterns.some(pattern => pattern.test(message));
+            if (isSystemLog) {
+                return; // Не отправляем системные логи в IDE
+            }
+
+            const logData = {
+                botId,
+                pluginName,
+                level,
+                message,
+                source: 'plugin',
+                timestamp: Date.now()
+            };
+
+            // Отправляем лог в parent process через IPC
+            if (process.send) {
+                process.send({
+                    type: 'plugin-log',
+                    log: logData
+                });
+            }
+        } catch (error) {
+            originalConsole.error(`[PluginLog] Error emitting log:`, error);
+        }
+    };
+
+    return {
+        log: (...args) => {
+            originalConsole.log(`[${pluginName}]`, ...args);
+            emitLog('info', args);
+        },
+        info: (...args) => {
+            originalConsole.info(`[${pluginName}]`, ...args);
+            emitLog('info', args);
+        },
+        warn: (...args) => {
+            originalConsole.warn(`[${pluginName}]`, ...args);
+            emitLog('warn', args);
+        },
+        error: (...args) => {
+            originalConsole.error(`[${pluginName}]`, ...args);
+            emitLog('error', args);
+        },
+        debug: (...args) => {
+            originalConsole.debug(`[${pluginName}]`, ...args);
+            emitLog('debug', args);
+        }
+    };
+}
 
 async function initializePlugins(bot, installedPlugins = [], prisma) {
     if (!installedPlugins || installedPlugins.length === 0) return;
@@ -70,23 +135,55 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                         }
                     }
 
+                    // Создаём обёрнутый console для перехвата логов плагина
+                    const originalConsole = global.console;
+                    const pluginConsole = createPluginConsole(bot.config.id, plugin.name, originalConsole);
+
+                    // Добавляем кастомный console в bot объект для использования плагинами
+                    bot.console = pluginConsole;
+
+                    // Подменяем глобальный console (не восстанавливаем чтобы перехватывать все логи)
+                    global.console = pluginConsole;
+
+                    // Опции плагина с кастомным console
+                    const pluginOptions = {
+                        settings: finalSettings,
+                        store,
+                        console: pluginConsole  // Передаём обёрнутый console в опциях
+                    };
+
                     if (typeof pluginModule === 'function') {
-                        pluginModule(bot, { settings: finalSettings, store });
+                        pluginModule(bot, pluginOptions);
                     } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-                        pluginModule.onLoad(bot, { settings: finalSettings, store });
+                        pluginModule.onLoad(bot, pluginOptions);
                     } else if (pluginModule && pluginModule.default && typeof pluginModule.default === 'function') {
-                        pluginModule.default(bot, { settings: finalSettings, store });
+                        pluginModule.default(bot, pluginOptions);
                     } else if (pluginModule && pluginModule.default && typeof pluginModule.default.onLoad === 'function') {
-                        pluginModule.default.onLoad(bot, { settings: finalSettings, store });
+                        pluginModule.default.onLoad(bot, pluginOptions);
                     } else {
                         sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
                     }
                 };
 
                 sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version}) из ${normalizedPath}`);
-                
+
                 try {
                     await loadAndInit();
+
+                    // Отправляем сообщение об успешной загрузке в IDE console
+                    const { getIOSafe } = require('../real-time/socketHandler');
+                    const io = getIOSafe();
+                    if (io) {
+                        const room = `plugin-logs:${bot.config.id}:${plugin.name}`;
+                        io.to(room).emit('plugin-log', {
+                            botId: bot.config.id,
+                            pluginName: plugin.name,
+                            level: 'success',
+                            message: `✓ Плагин ${plugin.name} v${plugin.version} успешно загружен`,
+                            source: 'system',
+                            timestamp: Date.now()
+                        });
+                    }
                 } catch (error) {
                     let handled = false;
                     let lastError = error;

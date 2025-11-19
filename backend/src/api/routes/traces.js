@@ -1,12 +1,15 @@
 const express = require('express');
+const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 const { getTraceCollector } = require('../../core/services/TraceCollectorService');
+
+router.use(authenticate);
 
 /**
  * GET /api/traces/:botId
  * Получить трассировки для бота
  */
-router.get('/:botId', async (req, res) => {
+router.get('/:botId', authorize('management:view'), async (req, res) => {
   try {
     const botId = parseInt(req.params.botId);
     const { limit, status, graphId } = req.query;
@@ -37,7 +40,7 @@ router.get('/:botId', async (req, res) => {
  * GET /api/traces/:botId/:traceId
  * Получить конкретную трассировку по ID
  */
-router.get('/:botId/:traceId', async (req, res) => {
+router.get('/:botId/:traceId', authorize('management:view'), async (req, res) => {
   try {
     const { traceId } = req.params;
 
@@ -74,7 +77,7 @@ router.get('/:botId/:traceId', async (req, res) => {
  * Получить последнюю трассировку для графа
  * Query params: eventType (опционально) - фильтр по типу события
  */
-router.get('/:botId/graph/:graphId/last', async (req, res) => {
+router.get('/:botId/graph/:graphId/last', authorize('management:view'), async (req, res) => {
   try {
     const botId = parseInt(req.params.botId);
     const graphId = parseInt(req.params.graphId);
@@ -107,7 +110,7 @@ router.get('/:botId/graph/:graphId/last', async (req, res) => {
  * GET /api/traces/stats
  * Получить статистику трассировок
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', authorize('management:view'), async (req, res) => {
   try {
     const traceCollector = getTraceCollector();
     const stats = traceCollector.getStats();

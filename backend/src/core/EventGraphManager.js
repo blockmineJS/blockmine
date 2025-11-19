@@ -115,10 +115,11 @@ class EventGraphManager {
     broadcastEventToApi(botId, eventType, args) {
         try {
             // Динамический импорт для избежания циклической зависимости
-            const { getIO } = require('../real-time/socketHandler');
+            const { getIOSafe } = require('../real-time/socketHandler');
             const { broadcastToApiClients } = require('../real-time/botApi');
 
-            const io = getIO();
+            const io = getIOSafe();
+            if (!io) return;
 
             switch (eventType) {
                 case 'chat':
@@ -165,17 +166,19 @@ class EventGraphManager {
      */
     emitCustomApiEvent(botId, eventName, payload = {}) {
         try {
-            const { getIO } = require('../real-time/socketHandler');
+            const { getIOSafe } = require('../real-time/socketHandler');
             const { broadcastToApiClients } = require('../real-time/botApi');
 
-            const io = getIO();
+            const io = getIOSafe();
+            if (!io) return;
+
             broadcastToApiClients(io, botId, 'plugin:custom_event', {
                 eventName,
                 payload,
                 timestamp: new Date().toISOString(),
             });
         } catch (error) {
-            // Игнорируем ошибки - Socket.IO может быть еще не инициализирован
+            // Игнорируем другие ошибки
         }
     }
 }

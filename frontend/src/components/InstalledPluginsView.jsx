@@ -160,10 +160,10 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFork(plugin)}>
-                                        <Copy className="h-4 w-4" />
+                                        <Code className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Создать локальную копию</TooltipContent>
+                                <TooltipContent>Сделать локальным</TooltipContent>
                             </Tooltip>
                         )}
                         {hasSettings && onOpenSettings && (
@@ -372,10 +372,10 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => onFork(plugin)}>
-                                    <Copy className="h-4 w-4" />
+                                    <Code className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Создать копию</TooltipContent>
+                            <TooltipContent>Сделать локальным</TooltipContent>
                         </Tooltip>
                     )}
                     {hasSettings && onOpenSettings && (

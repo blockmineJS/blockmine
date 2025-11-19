@@ -10,6 +10,10 @@ const { initializeCollaborationManager, getGlobalCollaborationManager } = requir
 
 let io;
 
+// Буфер логов для каждого плагина (последние 100 логов)
+const pluginLogsBuffer = new Map(); // key: 'botId:pluginName', value: array of logs
+const MAX_LOGS_PER_PLUGIN = 100;
+
 function initializeSocket(httpServer) {
     const corsOptions = {
         origin: true,
@@ -66,15 +70,6 @@ function initializeSocket(httpServer) {
 
         socket.on('plugin:ui:subscribe', ({ botId, pluginName }) => {
             botManager.subscribeToPluginUi(botId, pluginName, socket);
-        });
-
-        socket.on('plugin:ui:unsubscribe', ({ botId, pluginName }) => {
-            botManager.unsubscribeFromPluginUi(botId, pluginName, socket);
-        });
-
-        // Debug events
-        socket.on('debug:join', ({ botId, graphId }) => {
-            const debugManager = getGlobalDebugManager();
             const debugState = debugManager.getOrCreate(botId, graphId);
             const room = debugState.getRoomName();
 
@@ -96,6 +91,47 @@ function initializeSocket(httpServer) {
                 userCount: debugState.connectedUsers.size,
                 users: Array.from(debugState.connectedUsers.values())
             });
+        });
+
+        socket.on('debug:join', ({ botId, graphId }) => {
+            try {
+                const debugManager = getGlobalDebugManager();
+                const username = socket.decoded?.username || 'Anonymous';
+                const userId = socket.decoded?.userId || null;
+
+                console.log(`[Debug] User ${username} joining debug session for graph ${graphId} (bot ${botId})`);
+
+                // Получаем или создаем debug state для этого графа
+                const debugState = debugManager.getOrCreate(botId, graphId);
+
+                // Добавляем пользователя к debug session
+                debugState.addUser(socket.id, { userId, username, socketId: socket.id });
+
+                // Присоединяем socket к комнате
+                const room = debugState.getRoomName();
+                socket.join(room);
+
+                // Отправляем текущее состояние новому пользователю
+                socket.emit('debug:state', {
+                    breakpoints: Array.from(debugState.breakpoints.entries()).map(([nodeId, bp]) => ({
+                        nodeId,
+                        enabled: bp.enabled,
+                        condition: bp.condition
+                    })),
+                    connectedUsers: Array.from(debugState.connectedUsers.values())
+                });
+
+                // Уведомляем других пользователей о новом участнике
+                socket.to(room).emit('debug:user-joined', {
+                    username,
+                    socketId: socket.id,
+                    userCount: debugState.connectedUsers.size
+                });
+
+            } catch (error) {
+                console.error('[Debug] Error joining debug session:', error);
+                socket.emit('debug:error', { message: 'Failed to join debug session' });
+            }
         });
 
         socket.on('debug:leave', ({ botId, graphId }) => {
@@ -334,6 +370,31 @@ function initializeSocket(httpServer) {
             }
         });
 
+        // Plugin Logs - подписка на логи плагина
+        socket.on('subscribe-plugin-logs', ({ botId, pluginName }) => {
+            const room = `plugin-logs:${botId}:${pluginName}`;
+            socket.join(room);
+
+            // Отправляем буфер логов при подключении (одним массивом)
+            const bufferKey = `${botId}:${pluginName}`;
+            const bufferedLogs = pluginLogsBuffer.get(bufferKey) || [];
+
+            // Отправляем буфер отдельным событием, чтобы фронтенд мог сбросить state
+            socket.emit('plugin-logs-buffer', bufferedLogs);
+        });
+
+        // Plugin Logs - отписка от логов плагина
+        socket.on('unsubscribe-plugin-logs', ({ botId, pluginName }) => {
+            const room = `plugin-logs:${botId}:${pluginName}`;
+            socket.leave(room);
+        });
+
+        // Plugin Logs - очистка буфера логов плагина
+        socket.on('clear-plugin-logs', ({ botId, pluginName }) => {
+            const bufferKey = `${botId}:${pluginName}`;
+            pluginLogsBuffer.delete(bufferKey);
+        });
+
         // При отключении удаляем пользователя из всех комнат
         socket.on('disconnect', () => {
             try {
@@ -357,4 +418,31 @@ function getIO() {
     return io;
 }
 
-module.exports = { initializeSocket, getIO };
+function getIOSafe() {
+    if (!io) {
+        return {
+            emit: () => {},
+            to: () => ({ emit: () => {} }),
+            on: () => {},
+            off: () => {},
+        };
+    }
+    return io;
+}
+
+function addPluginLogToBuffer(botId, pluginName, logEntry) {
+    const bufferKey = `${botId}:${pluginName}`;
+
+    if (!pluginLogsBuffer.has(bufferKey)) {
+        pluginLogsBuffer.set(bufferKey, []);
+    }
+
+    const buffer = pluginLogsBuffer.get(bufferKey);
+    buffer.push(logEntry);
+
+    if (buffer.length > MAX_LOGS_PER_PLUGIN) {
+        buffer.shift();
+    }
+}
+
+module.exports = { initializeSocket, getIO, getIOSafe, addPluginLogToBuffer };

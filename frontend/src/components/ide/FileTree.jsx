@@ -8,6 +8,7 @@ import {
     ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import path from 'path-browserify';
+import FileIcon from './FileIcon';
 
 const InlineInput = ({ defaultValue = '', onCommit, onCancel, type = 'file' }) => {
     const [value, setValue] = useState(defaultValue);
@@ -50,7 +51,7 @@ const InlineInput = ({ defaultValue = '', onCommit, onCancel, type = 'file' }) =
     );
 };
 
-const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, onCreateFile, onCreateFolder, inlineAction, onCommit, onCancel, onMoveFile }) => {
+const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, onCreateFile, onCreateFolder, inlineAction, onCommit, onCancel, onMoveFile, focusedNode }) => {
     const [openFolders, setOpenFolders] = useState({});
     const [dragState, setDragState] = useState({ isDragging: false, draggedNode: null });
     const [dropTarget, setDropTarget] = useState(null);
@@ -82,18 +83,18 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
     const handleDragOver = (e, node) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        
+
         if (dragState.draggedNode && node.type === 'folder') {
             const draggedPath = dragState.draggedNode.path;
             const targetPath = node.path;
-            
+
             if (targetPath.startsWith(draggedPath + '/') || targetPath === draggedPath) {
                 e.dataTransfer.dropEffect = 'none';
                 setDropTarget(null);
                 return;
             }
         }
-        
+
         setDropTarget(node);
     };
 
@@ -103,25 +104,26 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
 
     const handleDrop = async (e, targetNode) => {
         e.preventDefault();
-        
+
         if (!dragState.draggedNode || !onMoveFile) return;
-        
+
         const draggedNode = dragState.draggedNode;
         const targetPath = targetNode.type === 'folder' ? targetNode.path : path.dirname(targetNode.path);
         const newPath = path.join(targetPath, draggedNode.name);
-        
+
         try {
             await onMoveFile(draggedNode.path, newPath);
         } catch (error) {
             console.error('Move failed:', error);
         }
-        
+
         setDragState({ isDragging: false, draggedNode: null });
         setDropTarget(null);
     };
 
     const renderNode = (node) => {
         const isSelected = selectedFile && selectedFile.path === node.path;
+        const isFocused = focusedNode && focusedNode.path === node.path;
         const isOpen = openFolders[node.path];
 
         if (inlineAction?.mode === 'rename' && inlineAction.node.path === node.path) {
@@ -139,17 +141,23 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
 
         const isDropTarget = dropTarget && dropTarget.path === node.path;
         const isBeingDragged = dragState.draggedNode && dragState.draggedNode.path === node.path;
-        
+
         const nodeContent = (
             <div
-                className={`flex items-center cursor-pointer p-1 rounded hover:bg-muted transition-colors ${
-                    isSelected ? 'bg-primary/20' : ''
-                } ${
-                    isDropTarget ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500' : ''
-                } ${
-                    isBeingDragged ? 'opacity-50' : ''
-                }`}
-                onClick={() => node.type === 'file' ? onSelectFile(node) : toggleFolder(node.path)}
+                className={`flex items-center cursor-pointer p-1 rounded hover:bg-muted transition-colors ${isSelected ? 'bg-primary/20' : ''
+                    } ${isFocused && !isSelected ? 'bg-muted/50 border border-primary/20' : ''
+                    } ${isDropTarget ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500' : ''
+                    } ${isBeingDragged ? 'opacity-50' : ''
+                    }`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (node.type === 'file') {
+                        onSelectFile(node);
+                    } else {
+                        onSelectFile(node); // Notify parent about focus
+                        toggleFolder(node.path);
+                    }
+                }}
                 draggable
                 onDragStart={(e) => handleDragStart(e, node)}
                 onDragEnd={handleDragEnd}
@@ -157,11 +165,10 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, node)}
             >
-                {node.type === 'folder' 
-                    ? (isOpen ? <FolderOpen className="h-4 w-4 mr-2" /> : <Folder className="h-4 w-4 mr-2" />)
-                    : <File className="h-4 w-4 mr-2 ml-1" />
-                }
-                <span>{node.name}</span>
+                <div className="mr-2 flex-shrink-0">
+                    <FileIcon name={node.name} isFolder={node.type === 'folder'} isOpen={isOpen} />
+                </div>
+                <span className="truncate">{node.name}</span>
             </div>
         );
 
@@ -194,7 +201,7 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
                         </ContextMenuContent>
                     </ContextMenu>
                     {isOpen && (
-                         <div className="pl-4 border-l border-muted-foreground/20 ml-2">
+                        <div className="pl-4 border-l border-muted-foreground/20 ml-2">
                             {node.children && node.children.length > 0 && node.children.map(renderNode)}
                             {isCreatingInThisFolder && (
                                 <InlineInput
@@ -203,9 +210,9 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
                                     type={inlineAction.mode === 'createFile' ? 'file' : 'folder'}
                                 />
                             )}
-                             {!isCreatingInThisFolder && node.children && node.children.length === 0 && (
-                                 <p className="text-xs text-muted-foreground italic p-1">Папка пуста</p>
-                             )}
+                            {!isCreatingInThisFolder && node.children && node.children.length === 0 && (
+                                <p className="text-xs text-muted-foreground italic p-1">Папка пуста</p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -215,7 +222,7 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
         return (
             <ContextMenu key={node.path}>
                 <ContextMenuTrigger>{nodeContent}</ContextMenuTrigger>
-                 <ContextMenuContent>
+                <ContextMenuContent>
                     <ContextMenuItem onClick={() => onCreateFile(node)}>
                         <FilePlus className="h-4 w-4 mr-2" />
                         Создать файл
@@ -237,7 +244,7 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
             </ContextMenu>
         );
     };
-    
+
     const parentOfNewNodeInRoot = inlineAction?.node ? (inlineAction.node.type === 'folder' ? inlineAction.node.path : path.dirname(inlineAction.node.path)) : null;
     const isCreatingInRoot = inlineAction?.mode.startsWith('create') && (parentOfNewNodeInRoot === '.' || parentOfNewNodeInRoot === '');
 
@@ -256,8 +263,8 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
                         </div>
                     )}
                     {!inlineAction && structure.length === 0 && (
-                         <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4 text-center">
-                            Правый клик, <br/> чтобы создать файл или папку.<br/>
+                        <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4 text-center">
+                            Правый клик, <br /> чтобы создать файл или папку.<br />
                             <span className="text-xs mt-2 block">Перетаскивайте файлы между папками</span>
                         </div>
                     )}
@@ -277,4 +284,4 @@ const FileTree = ({ structure, onSelectFile, selectedFile, onDelete, onRename, o
     );
 };
 
-export default FileTree; 
+export default FileTree;

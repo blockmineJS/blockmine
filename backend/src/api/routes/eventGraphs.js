@@ -1,7 +1,7 @@
 const express = require('express');
 const { param, body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
-const { authorize } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const logger = require('../../lib/logger');
 const crypto = require('crypto');
 const fse = require('fs-extra');
@@ -9,6 +9,9 @@ const path = require('path');
 
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
+
+// Все роуты требуют аутентификации
+router.use(authenticate);
 
 router.get('/', 
   authorize('management:view'),

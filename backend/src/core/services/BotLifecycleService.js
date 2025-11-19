@@ -1,6 +1,7 @@
 const DependencyService = require('../DependencyService');
 const { decrypt } = require('../utils/crypto');
 const UserService = require('../UserService');
+const PermissionManager = require('../PermissionManager');
 
 class BotLifecycleService {
     constructor({
@@ -170,6 +171,9 @@ class BotLifecycleService {
                     case 'log':
                         this.appendLog(botId, message.content);
                         break;
+                    case 'plugin-log':
+                        this._handlePluginLog(message.log);
+                        break;
                     case 'status':
                         this.emitStatusUpdate(botId, message.status);
                         break;
@@ -199,6 +203,15 @@ class BotLifecycleService {
                     case 'register_command':
                         await this._handleCommandRegistration(botId, message.commandConfig);
                         break;
+                    case 'register_permissions':
+                        await this._handlePermissionsRegistration(botId, message);
+                        break;
+                    case 'register_group':
+                        await this._handleGroupRegistration(botId, message);
+                        break;
+                    case 'add_permissions_to_group':
+                        await this._handleAddPermissionsToGroup(botId, message);
+                        break;
                     case 'trace:completed':
                         await this._handleTraceCompleted(botId, message.trace);
                         break;
@@ -227,9 +240,9 @@ class BotLifecycleService {
     async _handleEventMessage(botId, message) {
         if (message.eventType === 'raw_message') {
             try {
-                const { getIO } = require('../../real-time/socketHandler');
+                const { getIOSafe } = require('../../real-time/socketHandler');
                 const { broadcastToApiClients } = require('../../real-time/botApi');
-                broadcastToApiClients(getIO(), botId, 'chat:raw_message', {
+                broadcastToApiClients(getIOSafe(), botId, 'chat:raw_message', {
                     raw_message: message.args.rawText || message.args.raw_message,
                     json: message.args.json
                 });
@@ -252,10 +265,25 @@ class BotLifecycleService {
         }
     }
 
+    _handlePluginLog(logData) {
+        const { getIOSafe, addPluginLogToBuffer } = require('../../real-time/socketHandler');
+        const { botId, pluginName } = logData;
+
+        // Добавляем лог в буфер
+        addPluginLogToBuffer(botId, pluginName, logData);
+
+        // Отправляем через Socket.IO в комнату плагина
+        const io = getIOSafe();
+        if (io) {
+            const room = `plugin-logs:${botId}:${pluginName}`;
+            io.to(room).emit('plugin-log', logData);
+        }
+    }
+
     _handleWebSocketMessage(message) {
-        const { getIO } = require('../../real-time/socketHandler');
+        const { getIOSafe } = require('../../real-time/socketHandler');
         const { botId, message: msg } = message.payload;
-        getIO().to(`bot_${botId}`).emit('bot:message', { message: msg });
+        getIOSafe().to(`bot_${botId}`).emit('bot:message', { message: msg });
     }
 
     _handleBotReady(botId) {
@@ -263,9 +291,9 @@ class BotLifecycleService {
         this.crashCounters.delete(botId);
 
         try {
-            const { getIO } = require('../../real-time/socketHandler');
+            const { getIOSafe } = require('../../real-time/socketHandler');
             const { broadcastBotStatus } = require('../../real-time/botApi');
-            broadcastBotStatus(getIO(), botId, true);
+            broadcastBotStatus(getIOSafe(), botId, true);
         } catch (e) { /* Socket.IO может быть не инициализирован */ }
 
         // Триггерим событие запуска бота
@@ -280,6 +308,33 @@ class BotLifecycleService {
             // this.logger.debug({ botId, commandName: commandConfig.name }, 'Команда зарегистрирована');
         } else {
             this.logger.warn({ botId }, 'CommandExecutionService не доступен для регистрации команды');
+        }
+    }
+
+    async _handlePermissionsRegistration(botId, message) {
+        try {
+            await PermissionManager.registerPermissions(botId, message.permissions);
+            this.logger.debug({ botId, count: message.permissions.length }, 'Права зарегистрированы');
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка регистрации прав');
+        }
+    }
+
+    async _handleGroupRegistration(botId, message) {
+        try {
+            await PermissionManager.registerGroup(botId, message.groupConfig);
+            this.logger.debug({ botId, groupName: message.groupConfig.name }, 'Группа зарегистрирована');
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка регистрации группы');
+        }
+    }
+
+    async _handleAddPermissionsToGroup(botId, message) {
+        try {
+            await PermissionManager.addPermissionsToGroup(botId, message.groupName, message.permissionNames);
+            this.logger.debug({ botId, groupName: message.groupName, count: message.permissionNames.length }, 'Права добавлены в группу');
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка добавления прав в группу');
         }
     }
 
@@ -332,9 +387,9 @@ class BotLifecycleService {
         this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
 
         try {
-            const { getIO } = require('../../real-time/socketHandler');
+            const { getIOSafe } = require('../../real-time/socketHandler');
             const { broadcastBotStatus } = require('../../real-time/botApi');
-            broadcastBotStatus(getIO(), botId, false);
+            broadcastBotStatus(getIOSafe(), botId, false);
         } catch (e) { /* Socket.IO может быть не инициализирован */ }
 
         // Автоперезапуск при критических ошибках
@@ -414,12 +469,12 @@ class BotLifecycleService {
     }
 
     reloadBotConfigInRealTime(botId) {
-        const { getIO } = require('../../real-time/socketHandler');
+        const { getIOSafe } = require('../../real-time/socketHandler');
         this.invalidateConfigCache(botId);
 
         if (this.processManager.sendMessage(botId, { type: 'config:reload' })) {
             this.logger.info({ botId }, 'Отправлен config:reload');
-            getIO().emit('bot:config_reloaded', { botId });
+            getIOSafe().emit('bot:config_reloaded', { botId });
         }
     }
 
@@ -461,7 +516,7 @@ class BotLifecycleService {
     }
 
     appendLog(botId, logContent) {
-        const { getIO } = require('../../real-time/socketHandler');
+        const { getIOSafe } = require('../../real-time/socketHandler');
         const logEntry = {
             id: Date.now() + Math.random(),
             content: logContent,
@@ -471,7 +526,7 @@ class BotLifecycleService {
         const newLogs = [...currentLogs.slice(-199), logEntry];
         this.logCache.set(botId, newLogs);
 
-        getIO().emit('bot:log', { botId, log: logEntry });
+        getIOSafe().emit('bot:log', { botId, log: logEntry });
     }
 
     getBotLogs(botId) {
@@ -479,9 +534,9 @@ class BotLifecycleService {
     }
 
     emitStatusUpdate(botId, status, message = null) {
-        const { getIO } = require('../../real-time/socketHandler');
+        const { getIOSafe } = require('../../real-time/socketHandler');
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
-        getIO().emit('bot:status', { botId, status, message });
+        getIOSafe().emit('bot:status', { botId, status, message });
     }
 
     getFullState() {
@@ -523,8 +578,8 @@ class BotLifecycleService {
     async reloadPlugins(botId) {
         if (this.processManager.sendMessage(botId, { type: 'plugins:reload' })) {
             this.logger.info({ botId }, 'Отправлен plugins:reload');
-            const { getIO } = require('../../real-time/socketHandler');
-            getIO().emit('bot:plugins_reloaded', { botId });
+            const { getIOSafe } = require('../../real-time/socketHandler');
+            getIOSafe().emit('bot:plugins_reloaded', { botId });
             return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };
         }
         return { success: false, message: 'Бот не запущен.' };
