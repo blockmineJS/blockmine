@@ -29,19 +29,22 @@ const IGNORE_LIST = [
 
 // Вспомогательная функция для проверки игнорирования
 function shouldIgnore(filePath, ignoreList) {
+    // Нормализуем путь к forward slashes для кроссплатформенности
+    const normalizedPath = filePath.replace(/\\/g, '/');
+
     return ignoreList.some(pattern => {
         if (pattern.endsWith('/')) {
             const dirPattern = pattern.slice(0, -1);
-            const pathParts = filePath.split(path.sep);
-            return pathParts.includes(dirPattern) || filePath.startsWith(pattern) || filePath === dirPattern;
+            const pathParts = normalizedPath.split('/');
+            return pathParts.includes(dirPattern) || normalizedPath.startsWith(pattern) || normalizedPath === dirPattern;
         }
         if (pattern.startsWith('*.')) {
             const extension = pattern.substring(1);
-            return filePath.endsWith(extension);
+            return normalizedPath.endsWith(extension);
         }
-        const fileName = path.basename(filePath);
-        return filePath === pattern ||
-               filePath.startsWith(pattern + '/') ||
+        const fileName = path.basename(normalizedPath);
+        return normalizedPath === pattern ||
+               normalizedPath.startsWith(pattern + '/') ||
                fileName === pattern;
     });
 }
@@ -158,10 +161,11 @@ function createPluginTools(pluginPath, res, botId) {
                 }
             },
             execute: async () => {
-                console.log('getFullProjectContext called');
+                console.log('getFullProjectContext called for path:', pluginPath);
                 try {
                     const tree = getTreeStructure(pluginPath, pluginPath, '', IGNORE_LIST);
                     const allFiles = getAllFilesRecursive(pluginPath, pluginPath, [], IGNORE_LIST);
+                    console.log('Found files:', allFiles);
 
                     let result = `Древовидная структура плагина:\n${tree}\n\n`;
                     result += `Всего файлов: ${allFiles.length}\n\n`;
