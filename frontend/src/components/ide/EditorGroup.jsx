@@ -46,10 +46,12 @@ export default function EditorGroup({
     onSaveFile,
     unsavedFiles,
     onContentChange,
-    onProblemsChange
+    onProblemsChange,
+    onHighlightLines
 }) {
     const monaco = useMonaco();
     const editorRef = useRef(null);
+    const decorationsRef = useRef([]);
 
     const getLanguage = (filename) => {
         if (!filename) return 'plaintext';
@@ -80,9 +82,9 @@ export default function EditorGroup({
     }, []);
 
     const handleEditorWillMount = (monaco) => {
-        // Basic IntelliSense for Bot API - Configured globally once
+
         monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-            noSemanticValidation: false,  // Enable semantic validation to catch errors
+            noSemanticValidation: false, 
             noSyntaxValidation: false,
             diagnosticCodesToIgnore: [
                 2304,  // Cannot find module (для плагинов с внешними зависимостями)
@@ -135,7 +137,24 @@ export default function EditorGroup({
         });
     };
 
-    // Listen for revealLine events (from search results)
+    // Global keyboard handler for Russian layout (Ctrl+Ы)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'ы') {
+                e.preventDefault();
+                if (activeFileRef.current) {
+                    onSaveFile(activeFileRef.current);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onSaveFile]);
+
     useEffect(() => {
         const handleRevealLine = (event) => {
             if (editorRef.current && event.detail?.line) {
@@ -153,7 +172,59 @@ export default function EditorGroup({
         };
     }, []);
 
-    // Collect Monaco diagnostics (problems)
+    // Expose highlightLines function via ref
+    const highlightLines = useRef((lineRanges) => {
+        if (!editorRef.current || !lineRanges || lineRanges.length === 0) {
+            console.log('[EditorGroup] Cannot highlight - no editor or empty ranges');
+            return;
+        }
+
+        console.log('[EditorGroup] Highlighting lines:', lineRanges);
+
+        // Очищаем предыдущие decorations
+        decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+
+        // Создаём новые decorations для каждого диапазона
+        const newDecorations = lineRanges.map(range => ({
+            range: {
+                startLineNumber: range.start,
+                startColumn: 1,
+                endLineNumber: range.end,
+                endColumn: 1
+            },
+            options: {
+                isWholeLine: true,
+                className: 'ai-changed-line',
+                glyphMarginClassName: 'ai-changed-glyph',
+                overviewRuler: {
+                    color: 'rgba(34, 197, 94, 0.4)',
+                    position: 2
+                },
+                minimap: {
+                    color: 'rgba(34, 197, 94, 0.4)',
+                    position: 2
+                }
+            }
+        }));
+
+        decorationsRef.current = editorRef.current.deltaDecorations([], newDecorations);
+        console.log('[EditorGroup] Decorations applied:', decorationsRef.current);
+
+        // Автоматически убираем подсветку через 5 секунд
+        setTimeout(() => {
+            if (editorRef.current) {
+                decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+                console.log('[EditorGroup] Decorations cleared');
+            }
+        }, 15000);
+    });
+
+    useEffect(() => {
+        if (onHighlightLines) {
+            onHighlightLines(highlightLines.current);
+        }
+    }, [onHighlightLines]);
+
     useEffect(() => {
         if (!monaco || !onProblemsChange) return;
 
@@ -181,12 +252,10 @@ export default function EditorGroup({
             onProblemsChange(problems);
         };
 
-        // Initial collection with delay to allow models to load
         const initialTimer = setTimeout(() => {
             collectProblems();
         }, 1000);
 
-        // Listen for marker changes
         const disposable = monaco.editor.onDidChangeMarkers(() => {
             collectProblems();
         });

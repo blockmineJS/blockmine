@@ -26,8 +26,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
-router.use('/:botId(\\d+)/*', authenticate, (req, res, next) => checkBotAccess(req, res, next));
-
 const conditionalRestartAuth = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
         console.log('[Debug] Роут перезапуска бота доступен без проверки прав');

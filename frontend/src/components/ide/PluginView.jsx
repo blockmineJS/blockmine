@@ -64,6 +64,7 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
     const [officialListVersion, setOfficialListVersion] = useState(null);
     const [isCheckingOfficialList, setIsCheckingOfficialList] = useState(false);
 
+
     useEffect(() => {
         fetchPluginInfo();
         checkSavedToken();
@@ -330,7 +331,7 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                     token: githubToken,
                     tagName,
                     description,
-                    uploadFiles: true // Always upload files when creating release
+                    uploadFiles: true
                 })
             });
 
@@ -691,6 +692,7 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
             </div>
         );
     }
+
 
     // No repository - show setup
     return (

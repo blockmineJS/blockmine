@@ -319,7 +319,8 @@ export default function PluginIdePage() {
                     inlineAction: inlineAction,
                     onCommit: handleCommitInline,
                     onCancel: () => setInlineAction(null),
-                    onMoveFile: handleMoveFile
+                    onMoveFile: handleMoveFile,
+                    onRefresh: fetchStructure
                 }}
             />
         </div>

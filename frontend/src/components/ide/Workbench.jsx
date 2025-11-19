@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Bot } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import ActivityBar from './ActivityBar';
 import Sidebar from './Sidebar';
 import EditorGroup from './EditorGroup';
@@ -7,6 +9,7 @@ import Panel from './Panel';
 import StatusBar from './StatusBar';
 import Terminal from './Terminal';
 import QuickOpen from './QuickOpen';
+import AIAssistantChat from './AIAssistantChat';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export default function Workbench({
@@ -30,6 +33,8 @@ export default function Workbench({
     const [showSidebar, setShowSidebar] = useState(true);
     const [quickOpenVisible, setQuickOpenVisible] = useState(false);
     const [problems, setProblems] = useState([]);
+    const [showAIChat, setShowAIChat] = useState(false);
+    const highlightLinesCallbackRef = useRef(null);
 
     const handleProblemClick = (problem) => {
         if (!onOpenFileAtLine) return;
@@ -43,6 +48,61 @@ export default function Workbench({
             onOpenFileAtLine(matchingTab.path, problem.startLineNumber);
         } else {
             onOpenFileAtLine(problem.file, problem.startLineNumber);
+        }
+    };
+
+    const handleAIFileUpdate = (filePath, newContent, oldContent, changedLineRanges) => {
+
+        if (newContent === null && oldContent === null && !changedLineRanges) {
+            const file = files.find(f => f.path === filePath || f.path.endsWith(filePath));
+            if (file) {
+                onCloseFile(file);
+            }
+            if (onFileOperation?.onRefresh) {
+                setTimeout(() => {
+                    onFileOperation.onRefresh();
+                }, 300);
+            }
+            return;
+        }
+
+        const file = files.find(f => f.path === filePath || f.path.endsWith(filePath));
+
+        if (newContent === null) {
+            if (file) {
+                onSelectFile(file);
+            } else {
+                onSelectFile({ path: filePath });
+            }
+        } else if (file) {
+            onContentChange(file.path, newContent);
+
+            // Подсвечиваем изменения если есть старое содержимое
+            if (oldContent !== undefined && oldContent !== newContent && changedLineRanges) {
+                if (highlightLinesCallbackRef.current) {
+                    setTimeout(() => {
+                        highlightLinesCallbackRef.current(changedLineRanges);
+                    }, 200);
+                }
+            }
+
+        } else {
+
+            // Извлекаем имя файла из пути
+            const fileName = filePath.split('/').pop();
+
+            onSelectFile({
+                path: filePath,
+                name: fileName,
+                content: newContent
+            });
+            if (oldContent === '') {
+                if (onFileOperation?.onRefresh) {
+                    setTimeout(() => {
+                        onFileOperation.onRefresh();
+                    }, 500); // Небольшая задержка чтобы файл успел создаться
+                }
+            }
         }
     };
 
@@ -139,6 +199,7 @@ export default function Workbench({
                                     unsavedFiles={unsavedFiles}
                                     onContentChange={onContentChange}
                                     onProblemsChange={setProblems}
+                                    onHighlightLines={(fn) => { highlightLinesCallbackRef.current = fn; }}
                                     botId={botId}
                                 />
                             </ResizablePanel>
@@ -180,8 +241,22 @@ export default function Workbench({
                         setShowPanel(true);
                         setActivePanel('problems');
                     }}
+                    showAIChat={showAIChat}
+                    onToggleAIChat={() => setShowAIChat(!showAIChat)}
                 />
             </div>
+
+            {/* AI Assistant Panel - Right Side */}
+            {showAIChat && (
+                <div className="w-96 h-full border-l">
+                    <AIAssistantChat
+                        botId={botId}
+                        pluginName={pluginName}
+                        onClose={() => setShowAIChat(false)}
+                        onFileUpdated={handleAIFileUpdate}
+                    />
+                </div>
+            )}
         </div>
     );
 }

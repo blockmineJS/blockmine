@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { PanelBottom, Keyboard, AlertCircle, AlertTriangle } from 'lucide-react';
+import { PanelBottom, Keyboard, AlertCircle, AlertTriangle, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 
-export default function StatusBar({ botId, pluginName, activeFile, showPanel, onTogglePanel, problems = [], onProblemsClick }) {
+export default function StatusBar({ botId, pluginName, activeFile, showPanel, onTogglePanel, problems = [], onProblemsClick, showAIChat, onToggleAIChat }) {
     const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
     // Count errors and warnings
@@ -55,6 +55,13 @@ export default function StatusBar({ botId, pluginName, activeFile, showPanel, on
                 )}
             </div>
             <div className="flex items-center gap-2">
+                <div
+                    className={`cursor-pointer hover:bg-primary-foreground/20 px-1 rounded ${showAIChat ? 'bg-primary-foreground/30' : ''}`}
+                    onClick={onToggleAIChat}
+                    title="AI Помощник"
+                >
+                    <Bot className="h-3 w-3" />
+                </div>
                 <div
                     className="cursor-pointer hover:bg-primary-foreground/20 px-1 rounded"
                     onClick={() => setShowShortcutsHelp(true)}
