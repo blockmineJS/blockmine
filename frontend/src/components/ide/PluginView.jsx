@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, GitBranch, Loader2, AlertCircle, CheckCircle, ExternalLink, Key, Github, Upload, Tag, AlertTriangle } from 'lucide-react';
+import { Package, GitBranch, Loader2, AlertCircle, CheckCircle, ExternalLink, Key, Github, Upload, Tag, AlertTriangle, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { apiHelper } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import CreateReleaseDialog from './CreateReleaseDialog';
+import SubmitToOfficialListDialog from './SubmitToOfficialListDialog';
 
 const GITHUB_TOKEN_KEY = 'blockmine_github_token';
 
@@ -56,6 +57,9 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
     const [isCreatingRelease, setIsCreatingRelease] = useState(false);
     const [hasRepoAccess, setHasRepoAccess] = useState(null); // null = не проверено, true/false
     const [isCreatingPR, setIsCreatingPR] = useState(false);
+
+    // Official list submission
+    const [showOfficialListDialog, setShowOfficialListDialog] = useState(false);
 
     useEffect(() => {
         fetchPluginInfo();
@@ -550,6 +554,27 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                             )}
                         </div>
                     )}
+
+                    {/* Official List Submission */}
+                    {tokenSaved && latestTag && (
+                        <div className="bg-muted/30 border rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <List className="h-4 w-4 text-primary" />
+                                <span className="font-medium">Официальный список плагинов</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-3">
+                                Добавьте ваш плагин в официальный список BlockMine что бы он появился в магазине плагинов
+                            </p>
+                            <Button
+                                onClick={() => setShowOfficialListDialog(true)}
+                                variant="outline"
+                                className="w-full"
+                            >
+                                <List className="h-4 w-4 mr-2" />
+                                Подать в официальный список
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Release Dialog */}
@@ -559,6 +584,18 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                     version={`v${(pluginInfo?.version || '1.0.0').replace(/^v/, '')}`}
                     onConfirm={handleCreateRelease}
                     isLoading={isCreatingRelease}
+                />
+
+                {/* Official List Dialog */}
+                <SubmitToOfficialListDialog
+                    isOpen={showOfficialListDialog}
+                    onClose={() => setShowOfficialListDialog(false)}
+                    pluginInfo={pluginInfo}
+                    repoUrl={pluginInfo?.repository?.url}
+                    latestTag={latestTag}
+                    botId={botId}
+                    pluginName={pluginName}
+                    githubToken={githubToken}
                 />
             </div>
         );
