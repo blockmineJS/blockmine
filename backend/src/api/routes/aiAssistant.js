@@ -148,12 +148,41 @@ async function resolvePluginPath(req, res, next) {
 // Создаем tools для AI ассистента
 function createPluginTools(pluginPath, res, botId) {
     return [
-        // Tool 1: Получить полный контекст проекта
+        // Tool 1: Получить древовидную структуру проекта
+        {
+            type: 'function',
+            function: {
+                name: 'getProjectTree',
+                description: 'Получает древовидную структуру файлов и папок плагина. Используй это первым делом чтобы увидеть какие файлы есть в проекте.',
+                parameters: {
+                    type: 'object',
+                    properties: {},
+                    required: []
+                }
+            },
+            execute: async () => {
+                console.log('getProjectTree called for path:', pluginPath);
+                try {
+                    const tree = getTreeStructure(pluginPath, pluginPath, '', IGNORE_LIST);
+                    const allFiles = getAllFilesRecursive(pluginPath, pluginPath, [], IGNORE_LIST);
+                    console.log('Found files:', allFiles);
+
+                    let result = `Древовидная структура плагина:\n${tree}\n`;
+                    result += `\nВсего файлов: ${allFiles.length}`;
+
+                    return result;
+                } catch (error) {
+                    return `Ошибка при чтении структуры проекта: ${error.message}`;
+                }
+            }
+        },
+
+        // Tool 2: Получить полный контекст проекта
         {
             type: 'function',
             function: {
                 name: 'getFullProjectContext',
-                description: 'Получает полную структуру файлов плагина и содержимое всех файлов (кроме игнорируемых)',
+                description: 'Получает полную структуру файлов плагина и содержимое ВСЕХ файлов',
                 parameters: {
                     type: 'object',
                     properties: {},

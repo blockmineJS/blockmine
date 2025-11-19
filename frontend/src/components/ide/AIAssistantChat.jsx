@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bot, Send, Settings, Loader2, X, FileText, Edit3, FolderOpen, Check, Trash2, Terminal, FolderX, FileX } from 'lucide-react';
+import { Bot, Send, Settings, Loader2, X, FileText, Edit3, FolderOpen, FolderTree, Check, Trash2, Terminal, FolderX, FileX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -13,6 +13,7 @@ function ToolCallCard({ toolCall, onFileClick }) {
         switch (toolCall.toolName) {
             case 'readFile': return <FileText className="h-4 w-4" />;
             case 'updateFile': return <Edit3 className="h-4 w-4" />;
+            case 'getProjectTree': return <FolderTree className="h-4 w-4" />;
             case 'getFullProjectContext': return <FolderOpen className="h-4 w-4" />;
             case 'readBotLogs': return <Terminal className="h-4 w-4" />;
             case 'deleteFile': return <FileX className="h-4 w-4 text-red-400" />;
@@ -44,8 +45,10 @@ function ToolCallCard({ toolCall, onFileClick }) {
             }
             const lines = toolCall.args.content ? toolCall.args.content.split('\n').length : 0;
             return `Обновлен файл: ${toolCall.args.filePath} (${lines} строк)`;
+        } else if (toolCall.toolName === 'getProjectTree') {
+            return 'Получена структура папок';
         } else if (toolCall.toolName === 'getFullProjectContext') {
-            return 'Загружена структура проекта';
+            return 'Загружен полный контекст проекта';
         } else if (toolCall.toolName === 'readBotLogs') {
             const lines = toolCall.result ? toolCall.result.split('\n').length : 0;
             return `Прочитаны логи бота (${lines} записей)`;
