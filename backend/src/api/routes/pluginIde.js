@@ -86,6 +86,7 @@ router.post('/create', async (req, res) => {
             version,
             description,
             author,
+            keywords: ['blockmine', 'blockmine-plugin', 'minecraft', 'mineflayer'],
             botpanel: {
                 main: 'index.js',
                 settings: {
@@ -1157,24 +1158,60 @@ router.post('/:pluginName/github/create', resolvePluginPath, async (req, res) =>
 
         const octokit = new Octokit({ auth: token });
 
+        // Читаем package.json для получения description
+        const packageJsonPath = path.join(req.pluginPath, 'package.json');
+        let description = 'BlockMine plugin for Minecraft bots';
+        if (await fse.pathExists(packageJsonPath)) {
+            const packageJson = await fse.readJson(packageJsonPath);
+            if (packageJson.description) {
+                description = `${packageJson.description} | BlockMine plugin`;
+            }
+        }
+
         console.log(`[Plugin IDE] Creating GitHub repository: ${repoName}`);
         const { data: repo } = await octokit.repos.createForAuthenticatedUser({
             name: repoName,
+            description: description,
             private: isPrivate,
-            auto_init: false
+            auto_init: false,
+            homepage: 'https://github.com/blockmineJS'
         });
 
         console.log(`[Plugin IDE] Repository created: ${repo.html_url}`);
 
+        // Добавляем topics (теги) для поиска на GitHub
+        try {
+            await octokit.repos.replaceAllTopics({
+                owner: repo.owner.login,
+                repo: repo.name,
+                names: ['blockmine', 'blockmine-plugin', 'minecraft', 'mineflayer', 'minecraft-bot']
+            });
+            console.log(`[Plugin IDE] Topics added to repository`);
+        } catch (topicError) {
+            console.warn(`[Plugin IDE] Failed to add topics:`, topicError.message);
+        }
+
         await uploadFilesToGitHub(octokit, repo.owner.login, repo.name, req.pluginPath);
 
-        const packageJsonPath = path.join(req.pluginPath, 'package.json');
+        // Обновляем package.json с URL репозитория и keywords
         if (await fse.pathExists(packageJsonPath)) {
             const packageJson = await fse.readJson(packageJsonPath);
             packageJson.repository = {
                 type: 'git',
                 url: repo.html_url
             };
+
+            // Добавляем keywords для npm (если будет публиковаться)
+            if (!packageJson.keywords) {
+                packageJson.keywords = [];
+            }
+            const keywords = ['blockmine', 'blockmine-plugin', 'minecraft', 'mineflayer'];
+            keywords.forEach(kw => {
+                if (!packageJson.keywords.includes(kw)) {
+                    packageJson.keywords.push(kw);
+                }
+            });
+
             await fse.writeJson(packageJsonPath, packageJson, { spaces: 2 });
         }
 
