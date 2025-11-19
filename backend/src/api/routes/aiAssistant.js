@@ -3,6 +3,7 @@ const router = express.Router({ mergeParams: true });
 const path = require('path');
 const fse = require('fs-extra');
 const { OpenRouterClient, MemoryHistoryStorage } = require('openrouter-kit');
+const { GeminiClient } = require('google-ai-kit');
 const { PrismaClient } = require('@prisma/client');
 const Diff = require('diff');
 
@@ -11,6 +12,99 @@ const { botManager } = require('../../core/services');
 
 // Хранилище истории чатов в памяти: Map<"botId_pluginName", messages[]>
 const chatHistoryStore = new Map();
+
+/**
+ * Конвертирует JSON Schema параметры в формат Gemini
+ */
+function convertToGeminiParameters(jsonSchemaParams) {
+    if (!jsonSchemaParams || !jsonSchemaParams.properties) {
+        return {
+            type: 'OBJECT',
+            properties: {},
+            required: []
+        };
+    }
+
+    const convertType = (type) => {
+        const typeMap = {
+            'string': 'STRING',
+            'number': 'NUMBER',
+            'integer': 'INTEGER',
+            'boolean': 'BOOLEAN',
+            'object': 'OBJECT',
+            'array': 'ARRAY'
+        };
+        return typeMap[type] || 'STRING';
+    };
+
+    const convertedProperties = {};
+    for (const [key, value] of Object.entries(jsonSchemaParams.properties)) {
+        convertedProperties[key] = {
+            type: convertType(value.type),
+            description: value.description || ''
+        };
+
+        if (value.enum) {
+            convertedProperties[key].enum = value.enum;
+        }
+    }
+
+    return {
+        type: 'OBJECT',
+        properties: convertedProperties,
+        required: jsonSchemaParams.required || []
+    };
+}
+
+/**
+ * Парсит строку прокси формата "login:password@ip:port"
+ * Возвращает объект конфигурации прокси или null если строка пустая
+ */
+function parseProxyString(proxyString) {
+    if (!proxyString || proxyString.trim() === '') {
+        return null;
+    }
+
+    try {
+        // Формат: login:password@ip:port
+        const atIndex = proxyString.lastIndexOf('@');
+        if (atIndex === -1) {
+            console.warn('Invalid proxy format: missing @ separator');
+            return null;
+        }
+
+        const auth = proxyString.substring(0, atIndex);
+        const hostPort = proxyString.substring(atIndex + 1);
+
+        const colonAuthIndex = auth.indexOf(':');
+        if (colonAuthIndex === -1) {
+            console.warn('Invalid proxy format: missing : in auth');
+            return null;
+        }
+
+        const user = auth.substring(0, colonAuthIndex);
+        const pass = auth.substring(colonAuthIndex + 1);
+
+        const colonHostIndex = hostPort.lastIndexOf(':');
+        if (colonHostIndex === -1) {
+            console.warn('Invalid proxy format: missing : in host:port');
+            return null;
+        }
+
+        const host = hostPort.substring(0, colonHostIndex);
+        const port = hostPort.substring(colonHostIndex + 1);
+
+        return {
+            host: host,
+            port: parseInt(port),
+            user: user,
+            pass: pass
+        };
+    } catch (error) {
+        console.error('Error parsing proxy string:', error);
+        return null;
+    }
+}
 
 // Список игнорируемых файлов/папок для сканирования проекта
 const IGNORE_LIST = [
@@ -570,8 +664,12 @@ function createPluginTools(pluginPath, res, botId) {
 router.post('/chat', resolvePluginPath, async (req, res) => {
     console.log('Route hit! botId:', req.params.botId, 'pluginName:', req.params.pluginName);
     try {
-        const { message, apiKey, apiEndpoint, model, history, includeFiles } = req.body;
+        const { message, provider, apiKey, apiEndpoint, model, history, includeFiles, proxy } = req.body;
         const { botId, pluginName } = req.params;
+
+        const aiProvider = provider || 'openrouter';
+        console.log('AI Provider:', aiProvider);
+        console.log('Proxy config:', proxy);
 
         if (!message) {
             return res.status(400).json({ error: 'Message is required.' });
@@ -581,7 +679,6 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'API key is required.' });
         }
 
-        // Читаем системную инструкцию
         const systemPromptPath = path.join(__dirname, '../../ai/plugin-assistant-system-prompt.md');
         let systemPrompt = 'Ты - AI помощник для разработки плагинов в BlockMine IDE.';
 
@@ -589,10 +686,8 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             systemPrompt = await fse.readFile(systemPromptPath, 'utf8');
         }
 
-        // Собираем контекст плагина
         let context = '';
 
-        // Добавляем package.json
         const packageJsonPath = path.join(req.pluginPath, 'package.json');
         if (await fse.pathExists(packageJsonPath)) {
             const packageJson = await fse.readJson(packageJsonPath);
@@ -610,19 +705,46 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             }
         }
 
-        // Создаем клиент OpenRouter
-        const clientConfig = {
-            apiKey: apiKey,
-            defaultModel: model || 'openrouter/sherlock-think-alpha',
-            historyAdapter: new MemoryHistoryStorage(),
-        };
-
-        // Добавляем кастомный endpoint если указан
-        if (apiEndpoint && apiEndpoint !== 'https://openrouter.ai/api/v1') {
-            clientConfig.baseURL = apiEndpoint;
+        const proxyConfig = parseProxyString(proxy);
+        if (proxyConfig) {
+            console.log('Using proxy:', `${proxyConfig.user}:***@${proxyConfig.host}:${proxyConfig.port}`);
         }
 
-        const client = new OpenRouterClient(clientConfig);
+        let client;
+        if (aiProvider === 'google') {
+            const googleConfig = {
+                apiKeys: [apiKey],
+                defaultModel: model
+            };
+
+            if (proxyConfig) {
+                googleConfig.proxy = proxyConfig;
+            }
+
+            client = new GeminiClient(googleConfig);
+            console.log('Created Google Gemini client');
+        } else {
+            // OpenRouter
+            const clientConfig = {
+                apiKey: apiKey,
+                model: model,
+                historyAdapter: new MemoryHistoryStorage(),
+                debug: true
+            };
+
+            // Добавляем кастомный endpoint если указан
+            if (apiEndpoint && apiEndpoint !== 'https://openrouter.ai/api/v1') {
+                clientConfig.apiEndpoint = apiEndpoint;
+            }
+
+            // Добавляем прокси если указан
+            if (proxyConfig) {
+                clientConfig.proxy = proxyConfig;
+            }
+
+            client = new OpenRouterClient(clientConfig);
+            console.log('Created OpenRouter client');
+        }
 
         // Получаем или создаем историю для этого бота и плагина
         const chatKey = `${botId}_${pluginName}`;
@@ -652,19 +774,105 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
         // Сохраняем сообщение пользователя в историю
         storedHistory.push(userMessage);
 
-        // Создаем tools для этого плагина
+        // Создаем tools для этого плагина (только для OpenRouter пока)
         const pluginTools = createPluginTools(req.pluginPath, res, botId);
-
-        // Устанавливаем заголовки для SSE стриминга
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
 
         let fullResponse = '';
         let assistantMessage = { role: 'assistant', content: '' };
 
+        // Google Gemini использует другой API
+        if (aiProvider === 'google') {
+            // Устанавливаем SSE заголовки
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            try {
+                console.log('[Google] Converting history...');
+                // Конвертируем историю в формат Gemini
+                const geminiHistory = [];
+                storedHistory.forEach(msg => {
+                    if (msg.role === 'user') {
+                        geminiHistory.push({ role: 'user', parts: [{ text: msg.content }] });
+                    } else if (msg.role === 'assistant') {
+                        geminiHistory.push({ role: 'model', parts: [{ text: msg.content }] });
+                    }
+                });
+                console.log('[Google] History length:', geminiHistory.length);
+
+                // Конвертируем tools в формат Gemini с wrapper для SSE событий
+                console.log('[Google] Converting tools...');
+                const geminiTools = [{
+                    functionDeclarations: pluginTools.map(tool => ({
+                        name: tool.function.name,
+                        description: tool.function.description,
+                        parameters: convertToGeminiParameters(tool.function.parameters),
+                        execute: async (args) => {
+                            // Отправляем событие начала выполнения tool
+                            if (!res.writableEnded) {
+                                res.write(`data: ${JSON.stringify({
+                                    type: 'tool_call',
+                                    toolName: tool.function.name,
+                                    args
+                                })}\n\n`);
+                            }
+
+                            const result = await tool.execute(args);
+
+                            if (!res.writableEnded) {
+                                res.write(`data: ${JSON.stringify({
+                                    type: 'tool_result',
+                                    toolName: tool.function.name,
+                                    result
+                                })}\n\n`);
+                            }
+
+                            return result;
+                        }
+                    }))
+                }];
+                console.log('[Google] Converted', geminiTools[0].functionDeclarations.length, 'tools');
+
+                console.log('[Google] Creating chat...');
+                const chat = client.chats.create({
+                    systemInstruction: systemPrompt + context,
+                    history: geminiHistory,
+                    tools: geminiTools,
+                    maxToolCalls: 10
+                });
+
+                console.log('[Google] Sending message...');
+                const response = await chat.sendMessage(message);
+                const content = response.text();
+                console.log('[Google] Response received, length:', content.length);
+
+
+                if (!res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
+                    res.write(`data: ${JSON.stringify({ type: 'done', fullResponse: content })}\n\n`);
+                }
+
+                assistantMessage.content = content;
+                storedHistory.push(assistantMessage);
+
+                console.log('[Google] Closing SSE stream');
+                res.end();
+                return;
+            } catch (error) {
+                console.error('[Google AI Error]:', error);
+                if (!res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+                    res.end();
+                }
+                return;
+            }
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
         try {
-            // Используем chatStream для streaming
             await client.chatStream({
                 customMessages: customMessages,
                 temperature: 0.7,
@@ -678,8 +886,6 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                     },
                     onToolCallResult: (toolName, result) => {
                         console.log(`Tool result: ${toolName}`, typeof result === 'string' ? result.substring(0, 100) : result);
-
-                        // Отправляем tool_result для обновления UI карточки
                         res.write(`data: ${JSON.stringify({ type: 'tool_result', toolName, result })}\n\n`);
                     },
                     onContent: (content) => {
@@ -687,7 +893,6 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                         res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
                     },
                     onComplete: (fullContent, usage) => {
-                        // НЕ закрываем соединение здесь, т.к. могут быть еще tool calls
                         fullResponse = fullContent;
                         assistantMessage.content = fullContent;
                         res.write(`data: ${JSON.stringify({ type: 'done', fullResponse: fullContent })}\n\n`);
@@ -700,13 +905,11 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                 }
             });
 
-            // Сохраняем ответ ассистента в историю
             if (assistantMessage.content) {
                 storedHistory.push(assistantMessage);
                 console.log(`Saved to history. Total messages: ${storedHistory.length}`);
             }
 
-            // Закрываем соединение после полного завершения (включая все tool calls)
             console.log('Stream completed, closing connection');
             res.end();
 
@@ -714,7 +917,7 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             console.error('[AI Assistant Streaming Error]:', streamError);
             if (!res.headersSent) {
                 res.status(500).json({ error: streamError.message });
-            } else {
+            } else if (!res.writableEnded) {
                 res.write(`data: ${JSON.stringify({ type: 'error', error: streamError.message })}\n\n`);
                 res.end();
             }

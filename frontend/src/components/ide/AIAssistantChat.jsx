@@ -106,11 +106,23 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
     const [toolCalls, setToolCalls] = useState([]);
 
     // Настройки из localStorage
+    const [provider, setProvider] = useState(localStorage.getItem('ai_provider') || 'openrouter');
     const [apiKey, setApiKey] = useState(localStorage.getItem('ai_api_key') || '');
     const [apiEndpoint, setApiEndpoint] = useState(localStorage.getItem('ai_api_endpoint') || 'https://openrouter.ai/api/v1');
-    const [model, setModel] = useState(localStorage.getItem('ai_model') || 'openrouter/sherlock-think-alpha');
+
+    // Модели для разных провайдеров
+    const getDefaultModel = (prov) => {
+        return prov === 'google' ? 'gemini-flash-latest' : 'openrouter/sherlock-think-alpha';
+    };
+    const [model, setModel] = useState(() => {
+        const savedProvider = localStorage.getItem('ai_provider') || 'openrouter';
+        const storageKey = `ai_model_${savedProvider}`;
+        return localStorage.getItem(storageKey) || getDefaultModel(savedProvider);
+    });
+
     const [useCustomModel, setUseCustomModel] = useState(localStorage.getItem('ai_use_custom_model') === 'true');
     const [customModel, setCustomModel] = useState(localStorage.getItem('ai_custom_model') || '');
+    const [proxy, setProxy] = useState(localStorage.getItem('ai_proxy') || '');
 
     const messagesEndRef = useRef(null);
     const scrollToBottom = () => {
@@ -148,12 +160,24 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
     }, [messages]);
 
     const saveSettings = () => {
+        localStorage.setItem('ai_provider', provider);
         localStorage.setItem('ai_api_key', apiKey);
         localStorage.setItem('ai_api_endpoint', apiEndpoint);
-        localStorage.setItem('ai_model', model);
+        // Сохраняем модель отдельно для каждого провайдера
+        localStorage.setItem(`ai_model_${provider}`, model);
         localStorage.setItem('ai_use_custom_model', useCustomModel.toString());
         localStorage.setItem('ai_custom_model', customModel);
+        localStorage.setItem('ai_proxy', proxy);
         setShowSettings(false);
+    };
+
+    // Обновляем модель при смене провайдера
+    const handleProviderChange = (newProvider) => {
+        setProvider(newProvider);
+        // Загружаем сохраненную модель для этого провайдера
+        const storageKey = `ai_model_${newProvider}`;
+        const savedModel = localStorage.getItem(storageKey);
+        setModel(savedModel || getDefaultModel(newProvider));
     };
 
     const sendMessage = async () => {
@@ -190,9 +214,11 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                 headers: headers,
                 body: JSON.stringify({
                     message: input,
+                    provider: provider,
                     apiKey: apiKey,
                     apiEndpoint: apiEndpoint,
                     model: finalModel,
+                    proxy: proxy,
                     history: messages,
                     includeFiles: ['index.js', 'package.json']
                 })
@@ -202,6 +228,8 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                 throw new Error('Failed to get AI response');
             }
 
+            // Оба провайдера теперь используют SSE stream
+            console.log('[AI Chat] Handling SSE stream');
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
 
@@ -400,21 +428,43 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
             {showSettings && (
                 <div className="p-4 border-b bg-muted/30 space-y-3">
                     <div>
+                        <label className="text-sm font-medium mb-1 block">AI Провайдер</label>
+                        <select
+                            className="w-full p-2 rounded-md border bg-background"
+                            value={provider}
+                            onChange={(e) => handleProviderChange(e.target.value)}
+                        >
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="google">Google Gemini</option>
+                        </select>
+                    </div>
+                    <div>
                         <label className="text-sm font-medium mb-1 block">API Ключ</label>
                         <Input
                             type="password"
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="sk-or-v1-..."
+                            placeholder={provider === 'google' ? 'AIza...' : 'sk-or-v1-...'}
                         />
                     </div>
+                    {provider === 'openrouter' && (
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">API Endpoint</label>
+                            <Input
+                                type="text"
+                                value={apiEndpoint}
+                                onChange={(e) => setApiEndpoint(e.target.value)}
+                                placeholder="https://openrouter.ai/api/v1"
+                            />
+                        </div>
+                    )}
                     <div>
-                        <label className="text-sm font-medium mb-1 block">API Endpoint</label>
+                        <label className="text-sm font-medium mb-1 block">Прокси (опционально)</label>
                         <Input
                             type="text"
-                            value={apiEndpoint}
-                            onChange={(e) => setApiEndpoint(e.target.value)}
-                            placeholder="https://openrouter.ai/api/v1"
+                            value={proxy}
+                            onChange={(e) => setProxy(e.target.value)}
+                            placeholder="login:password@ip:port"
                         />
                     </div>
                     <div>
@@ -436,11 +486,21 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                                 value={model}
                                 onChange={(e) => setModel(e.target.value)}
                             >
-                                <option value="openrouter/sherlock-think-alpha">Sherlock Think Alpha</option>
-                                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                                <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
-                                <option value="openai/gpt-4">GPT-4</option>
-                                <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                {provider === 'openrouter' ? (
+                                    <>
+                                        <option value="openrouter/sherlock-think-alpha">Sherlock Think Alpha</option>
+                                        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                                        <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
+                                        <option value="openai/gpt-4">GPT-4</option>
+                                        <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                                    </>
+                                )}
                             </select>
                         ) : (
                             <Input
