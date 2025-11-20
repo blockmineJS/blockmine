@@ -100,6 +100,9 @@ class GraphExecutionEngine {
           }
 
           if (this.currentTraceId) {
+              // Перед завершением trace, захватываем outputs для всех data-нод
+              await this._captureAllDataNodeOutputs();
+
               const trace = await this.traceCollector.completeTrace(this.currentTraceId);
 
               // Если работаем в дочернем процессе (BotProcess), отправляем трассировку в главный процесс
@@ -136,6 +139,13 @@ class GraphExecutionEngine {
 
       } catch (error) {
           if (this.currentTraceId) {
+              // Даже при ошибке захватываем outputs для data-нод
+              try {
+                  await this._captureAllDataNodeOutputs();
+              } catch (captureError) {
+                  console.error(`[GraphExecutor] Error capturing outputs on failure:`, captureError);
+              }
+
               const trace = await this.traceCollector.failTrace(this.currentTraceId, error);
 
               // Если работаем в дочернем процессе (BotProcess), отправляем трассировку с ошибкой в главный процесс
@@ -622,6 +632,48 @@ class GraphExecutionEngine {
       return this.activeGraph.connections.some(conn =>
           conn.targetNodeId === node.id && conn.targetPinId === pinId
       );
+  }
+
+  /**
+   * Захватить outputs для всех data-нод в trace
+   * Вызывается перед завершением trace, чтобы гарантировать,
+   * что для всех data-нод записаны outputs (даже если их выходы не подключены)
+   */
+  async _captureAllDataNodeOutputs() {
+      if (!this.currentTraceId) return;
+
+      const trace = await this.traceCollector.getTrace(this.currentTraceId);
+      if (!trace || !trace.steps) return;
+
+      // Проходим по всем шагам и находим data-ноды
+      for (const step of trace.steps) {
+          if (step.type === 'traversal') continue;
+
+          // Проверяем, есть ли уже outputs
+          if (step.outputs && Object.keys(step.outputs).length > 0) continue;
+
+          // Находим ноду в графе
+          const node = this.activeGraph.nodes.find(n => n.id === step.nodeId);
+          if (!node) continue;
+
+          // Получаем конфигурацию ноды
+          const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+          if (!nodeConfig) continue;
+
+          // Проверяем, является ли это data-нодой (нет exec входов)
+          const isDataNode = !nodeConfig.pins.inputs.some(p => p.type === 'Exec');
+          if (!isDataNode) continue;
+
+          // Захватываем outputs
+          try {
+              const outputs = await this._captureNodeOutputs(node);
+              if (outputs && Object.keys(outputs).length > 0) {
+                  this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
+              }
+          } catch (error) {
+              console.error(`[GraphExecutor] Error capturing outputs for data node ${node.id}:`, error);
+          }
+      }
   }
 
   /**
