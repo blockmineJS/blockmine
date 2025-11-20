@@ -175,11 +175,17 @@ const Pin = React.memo(({
       ];
     }
 
+    // Определяем текущее значение селекта с правильной обработкой пустых строк
+    const currentValue = data[pin.id];
+    const selectValue = (currentValue !== undefined && currentValue !== null && currentValue !== '')
+      ? String(currentValue)
+      : String(pin.defaultValue ?? options[0]?.value ?? '');
+
     return (
       <div className="relative p-2 flex items-center w-full">
         {pinContent}
         <Select
-          value={String(data[pin.id] ?? pin.defaultValue ?? options[0]?.value)}
+          value={selectValue}
           onValueChange={(value) => {
             const parsedValue = pin.type === 'Boolean' ? value === 'true' : value;
             updateNodeData(nodeId, { [pin.id]: parsedValue });
