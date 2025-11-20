@@ -13,6 +13,7 @@ import { getConversionChain, createConverterNode } from '@/lib/typeConversionHel
 import { debounce } from '@/lib/debounce';
 import { io } from 'socket.io-client';
 import { useAppStore } from './appStore';
+import NodeRegistry from '@/components/visual-editor/nodes';
 
 enableMapSet();
 
@@ -161,7 +162,22 @@ export const useVisualEditorStore = create(
           targetHandle: conn.targetPinId,
         }));
 
+        let hasMigrations = false;
         let initialNodes = (graph.nodes || []).map(node => {
+          // Миграция: action:bot_set_variable variableName -> name
+          if (node.type === 'action:bot_set_variable' && node.data?.variableName && !node.data?.name) {
+            hasMigrations = true;
+            node = {
+              ...node,
+              data: {
+                ...node.data,
+                name: node.data.variableName,
+                variableName: undefined
+              }
+            };
+            delete node.data.variableName;
+          }
+
           if (type === 'event') {
             return { ...node, deletable: true };
           }
@@ -170,6 +186,14 @@ export const useVisualEditorStore = create(
           }
           return { ...node, deletable: true };
         });
+
+        // Если произошли миграции, автосохраняем граф
+        if (hasMigrations) {
+          setTimeout(() => {
+            const saveFunc = type === 'command' ? get().saveCommand : get().saveEventGraph;
+            saveFunc?.();
+          }, 500);
+        }
 
         if (type === 'command' && initialNodes.every(n => n.type !== 'event:command')) {
             initialNodes.unshift({
@@ -491,15 +515,17 @@ export const useVisualEditorStore = create(
     },
 
     addNode: (type, position, shouldUpdateState = true) => {
-      const defaultData = {};
+      const definition = NodeRegistry.get(type);
+      const defaultData = definition?.defaultData ? { ...definition.defaultData } : {};
+
       if (type === 'string:concat' || type === 'logic:operation' || type === 'flow:sequence') {
-          defaultData.pinCount = 2;
+          defaultData.pinCount = defaultData.pinCount ?? 2;
       }
       if (type === 'data:array_literal' || type === 'data:make_object') {
-          defaultData.pinCount = 0;
+          defaultData.pinCount = defaultData.pinCount ?? 0;
       }
       if (type === 'flow:switch') {
-          defaultData.caseCount = 0;
+          defaultData.caseCount = defaultData.caseCount ?? 0;
       }
 
       const newNode = {
