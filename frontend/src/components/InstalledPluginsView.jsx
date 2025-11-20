@@ -640,7 +640,8 @@ export default function InstalledPluginsView({
                                 columnWidth={columnWidth}
                                 rowCount={rowCount}
                                 rowHeight={rowHeight}
-                                overscanCount={1}
+                                overscanRowCount={1}
+                                overscanColumnCount={1}
                             >
                                 {Cell}
                             </FixedSizeGrid>

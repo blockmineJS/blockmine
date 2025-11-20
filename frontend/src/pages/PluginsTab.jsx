@@ -172,32 +172,18 @@ export default function PluginsTab() {
                         </Tooltip>
                         </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
-                            <TooltipProvider>
-                            <Tooltip>
-                            <TooltipTrigger asChild>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" disabled={!canInstall}>
-                                        <FolderPlus className="h-4 w-4" />
-                                    </Button>
-                                </DialogTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>Установить локально</TooltipContent>
-                            </Tooltip>
-                            </TooltipProvider>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <FolderPlus className="h-4 w-4" />
+                                    <span className="ml-2">Установить локально</span>
+                                </Button>
+                            </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
-                        <TooltipProvider>
-                        <Tooltip>
-                        <TooltipTrigger asChild>
-                        <span>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
+                            <span className="ml-2">Создать плагин</span>
                         </Button>
-                        </span>
-                        </TooltipTrigger>
-                        <TooltipContent>Создать плагин</TooltipContent>
-                        </Tooltip>
-                        </TooltipProvider>
                     </div>
                 </div>
             </div>

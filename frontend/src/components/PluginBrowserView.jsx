@@ -308,7 +308,8 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                             columnWidth={columnWidth}
                             rowCount={gridRowCount}
                             rowHeight={gridRowHeight}
-                            overscanCount={1}
+                            overscanRowCount={1}
+                            overscanColumnCount={1}
                         >
                             {Cell}
                         </FixedSizeGrid>
