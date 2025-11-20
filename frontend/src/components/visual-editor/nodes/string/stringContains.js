@@ -33,6 +33,11 @@ export const stringContainsDefinition = new NodeDefinition({
       type: 'Boolean',
       required: false,
       inlineField: true,
+      inlineFieldType: 'select',
+      inlineFieldOptions: [
+        { value: 'false', label: 'Нет' },
+        { value: 'true', label: 'Да' }
+      ],
       defaultValue: false
     },
   ],
