@@ -1585,11 +1585,28 @@ router.post('/:pluginName/git/reset', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'Files array is required.' });
         }
 
+        // Check if HEAD exists (repo has commits)
+        let hasCommits = true;
+        try {
+            execSync('git rev-parse --verify HEAD', {
+                cwd: req.pluginPath,
+                stdio: 'ignore'
+            });
+        } catch {
+            hasCommits = false;
+        }
+
         // Reset files
         for (const file of files) {
-            execSync(`git reset HEAD "${file}"`, {
-                cwd: req.pluginPath
-            });
+            if (hasCommits) {
+                execSync(`git reset HEAD "${file}"`, {
+                    cwd: req.pluginPath
+                });
+            } else {
+                execSync(`git rm --cached -f "${file}"`, {
+                    cwd: req.pluginPath
+                });
+            }
         }
 
         res.json({
