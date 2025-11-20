@@ -12,7 +12,7 @@ export const stringContainsDefinition = new NodeDefinition({
 
   computeInputs: (data) => [
     {
-      id: 'text',
+      id: 'haystack',
       name: 'Текст',
       type: 'String',
       required: false,
@@ -20,12 +20,20 @@ export const stringContainsDefinition = new NodeDefinition({
       placeholder: 'Введите текст...'
     },
     {
-      id: 'substring',
+      id: 'needle',
       name: 'Подстрока',
       type: 'String',
       required: false,
       inlineField: true,
       placeholder: 'Искать...'
+    },
+    {
+      id: 'case_sensitive',
+      name: 'Учет регистра',
+      type: 'Boolean',
+      required: false,
+      inlineField: true,
+      defaultValue: false
     },
   ],
 
@@ -34,8 +42,9 @@ export const stringContainsDefinition = new NodeDefinition({
   ],
 
   defaultData: {
-    text: '',
-    substring: '',
+    haystack: '',
+    needle: '',
+    case_sensitive: false,
   },
 
   theme: {
