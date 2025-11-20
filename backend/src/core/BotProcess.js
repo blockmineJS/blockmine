@@ -398,78 +398,74 @@ process.on('message', async (message) => {
                 installedPlugins: installedPluginNames,
                 registerCommand: async (command) => {
                     try {
-                        let permissionId = null;
-                        if (command.permissions) {
-                            let permission = await prisma.permission.findUnique({
-                                where: {
-                                    botId_name: {
-                                        botId: bot.config.id,
-                                        name: command.permissions,
-                                    },
-                                },
-                            });
-
-                            if (!permission) {
-                                // Автоматически создаем право, если оно не найдено
-                                permission = await prisma.permission.create({
-                                    data: {
-                                        botId: bot.config.id,
-                                        name: command.permissions,
-                                        description: `Автоматически создано для команды ${command.name}`,
-                                        owner: command.owner || 'system',
-                                    },
-                                });
-                                sendLog(`[API] Право \"${command.permissions}\" автоматически создано для команды \"${command.name}\".`);
-                            }
-                            permissionId = permission.id;
-                        }
-
-                        let pluginOwnerId = null;
-                        if (command.owner && command.owner.startsWith('plugin:')) {
-                            const pluginName = command.owner.replace('plugin:', '');
-                            const plugin = await prisma.installedPlugin.findFirst({
-                                where: {
-                                    botId: bot.config.id,
-                                    name: pluginName
-                                }
-                            });
-                            if (plugin) {
-                                pluginOwnerId = plugin.id;
-                            }
-                        }
-
-                        const commandData = {
-                            botId: bot.config.id,
-                            name: command.name,
-                            description: command.description || '',
-                            owner: command.owner || 'unknown',
-                            permissionId: permissionId,
-                            cooldown: command.cooldown || 0,
-                            isEnabled: command.isActive !== undefined ? command.isActive : true,
-                            aliases: JSON.stringify(command.aliases || []),
-                            allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
-                            argumentsJson: JSON.stringify(command.args || []),
-                            pluginOwnerId: pluginOwnerId,
-                        };
-
-                        await prisma.command.upsert({
+                        const existingCommand = await prisma.command.findUnique({
                             where: {
                                 botId_name: {
-                                    botId: commandData.botId,
-                                    name: commandData.name,
+                                    botId: bot.config.id,
+                                    name: command.name,
                                 }
-                            },
-                            update: {
-                                description: commandData.description,
-                                aliases: commandData.aliases,
-                                allowedChatTypes: commandData.allowedChatTypes,
-                                cooldown: commandData.cooldown,
-                                isEnabled: commandData.isEnabled,
-                                argumentsJson: commandData.argumentsJson,
-                                permissionId: commandData.permissionId,
-                            },
-                            create: commandData,
+                            }
                         });
+
+                        if (existingCommand) {
+                            // Команда уже существует, не меняем настройки
+                        } else {
+                            let permissionId = null;
+                            if (command.permissions) {
+                                let permission = await prisma.permission.findUnique({
+                                    where: {
+                                        botId_name: {
+                                            botId: bot.config.id,
+                                            name: command.permissions,
+                                        },
+                                    },
+                                });
+
+                                if (!permission) {
+                                    permission = await prisma.permission.create({
+                                        data: {
+                                            botId: bot.config.id,
+                                            name: command.permissions,
+                                            description: `Автоматически создано для команды ${command.name}`,
+                                            owner: command.owner || 'system',
+                                        },
+                                    });
+                                }
+                                permissionId = permission.id;
+                            }
+
+                            let pluginOwnerId = null;
+                            if (command.owner && command.owner.startsWith('plugin:')) {
+                                const pluginName = command.owner.replace('plugin:', '');
+                                const plugin = await prisma.installedPlugin.findFirst({
+                                    where: {
+                                        botId: bot.config.id,
+                                        name: pluginName
+                                    }
+                                });
+                                if (plugin) {
+                                    pluginOwnerId = plugin.id;
+                                }
+                            }
+
+                            const commandData = {
+                                botId: bot.config.id,
+                                name: command.name,
+                                description: command.description || '',
+                                owner: command.owner || 'unknown',
+                                permissionId: permissionId,
+                                cooldown: command.cooldown || 0,
+                                isEnabled: command.isActive !== undefined ? command.isActive : true,
+                                aliases: JSON.stringify(command.aliases || []),
+                                allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
+                                argumentsJson: JSON.stringify(command.args || []),
+                                pluginOwnerId: pluginOwnerId,
+                            };
+
+                            await prisma.command.create({
+                                data: commandData,
+                            });
+                        }
 
                         if (process.send) {
                             process.send({
@@ -485,7 +481,6 @@ process.on('message', async (message) => {
                                 }
                             });
                         }
-                        sendLog(`[API] Команда \"${command.name}\" от плагина \"${command.owner}\" зарегистрирована в процессе.`);
 
                         if (!bot.commands) bot.commands = new Map();
                         bot.commands.set(command.name, command);
