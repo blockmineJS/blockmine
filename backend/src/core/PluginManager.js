@@ -360,28 +360,34 @@ class PluginManager {
         }
 
         console.log(`[PluginManager] Начало обновления плагина ${plugin.name}${targetTag ? ` до версии ${targetTag}` : ''}...`);
-        
+
         const repoUrl = plugin.sourceUri;
         const botId = plugin.botId;
-        
-        // Сохраняем настройки и важные данные перед удалением
+        const oldVersion = plugin.version;
+
         const backupData = {
             name: plugin.name,
             settings: plugin.settings,
             isEnabled: plugin.isEnabled,
-            // PluginDataStore сохранятся автоматически (привязаны к pluginName + botId)
         };
         console.log(`[PluginManager] Настройки плагина ${plugin.name} сохранены для миграции.`);
-        
-        // Удаляем старую версию
+
         await this.deletePlugin(pluginId);
         console.log(`[PluginManager] Старая версия ${plugin.name} удалена, устанавливаем новую...`);
-        
-        // Устанавливаем новую версию с конкретным тегом (если указан)
+
         const newPlugin = await this.installFromGithub(botId, repoUrl, prisma, true, targetTag);
-        
-        // Восстанавливаем настройки
-        if (backupData.settings && newPlugin) {
+
+        const oldMajor = semver.major(semver.coerce(oldVersion) || '0.0.0');
+        const newMajor = semver.major(semver.coerce(newPlugin.version) || '0.0.0');
+        const isMajorUpdate = newMajor > oldMajor;
+
+        if (isMajorUpdate) {
+            console.log(`[PluginManager] Мажорное обновление ${oldVersion} → ${newPlugin.version}. Настройки сброшены к дефолтным.`);
+            await prisma.installedPlugin.update({
+                where: { id: newPlugin.id },
+                data: { isEnabled: backupData.isEnabled },
+            });
+        } else if (backupData.settings && newPlugin) {
             try {
                 await prisma.installedPlugin.update({
                     where: { id: newPlugin.id },
@@ -393,10 +399,9 @@ class PluginManager {
                 console.log(`[PluginManager] Настройки успешно восстановлены для ${plugin.name}`);
             } catch (settingsError) {
                 console.error(`[PluginManager] Не удалось восстановить настройки для ${plugin.name}:`, settingsError);
-                // Не бросаем ошибку, т.к. плагин уже установлен
             }
         }
-        
+
         return newPlugin;
     }
 
@@ -510,6 +515,62 @@ class PluginManager {
 
         console.log(`[PluginManager] Удалено ${count} записей из хранилища.`);
         return { count };
+    }
+
+    async reloadLocalPlugin(pluginId) {
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) {
+            throw new Error('Плагин не найден.');
+        }
+
+        if (plugin.sourceType !== 'LOCAL' && plugin.sourceType !== 'LOCAL_IDE') {
+            throw new Error('Перезагрузка доступна только для локальных плагинов.');
+        }
+
+        const pluginPath = plugin.path;
+        const packageJsonPath = path.join(pluginPath, 'package.json');
+
+        if (!await fse.pathExists(packageJsonPath)) {
+            throw new Error(`package.json не найден: ${packageJsonPath}`);
+        }
+
+        console.log(`[PluginManager] Перезагрузка локального плагина ${plugin.name} из ${pluginPath}`);
+
+        let packageJson;
+        try {
+            packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
+        } catch (e) {
+            throw new Error(`Не удалось прочитать package.json: ${e.message}`);
+        }
+
+        const manifest = packageJson.botpanel || {};
+        const defaultSettings = {};
+
+        if (manifest.settings) {
+            for (const [key, config] of Object.entries(manifest.settings)) {
+                if (config.default !== undefined) {
+                    defaultSettings[key] = config.default;
+                }
+            }
+        }
+
+        const updatedPlugin = await prisma.installedPlugin.update({
+            where: { id: pluginId },
+            data: {
+                version: packageJson.version,
+                description: packageJson.description || '',
+                manifest: JSON.stringify(manifest),
+                settings: JSON.stringify(defaultSettings),
+            },
+        });
+
+        console.log(`[PluginManager] Плагин ${plugin.name} перезагружен. Версия: ${packageJson.version}, настройки сброшены.`);
+
+        if (this.botManager) {
+            await this.botManager.reloadPlugins(plugin.botId);
+        }
+
+        return updatedPlugin;
     }
 }
 

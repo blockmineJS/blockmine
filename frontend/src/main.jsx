@@ -21,6 +21,7 @@ import EventGraphsPage from "./pages/Bot/EventGraphsPage";
 import PluginDetailPage from "./pages/PluginDetailPage";
 import PluginIdePage from "./pages/Bot/PluginIdePage";
 import ServersPage from "./pages/ServersPage";
+import ProxiesPage from "./pages/ProxiesPage";
 import TasksPage from "./pages/TasksPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -28,6 +29,7 @@ import PluginUIPage from "./pages/Bot/PluginUIPage";
 import GraphStorePage from "./pages/GraphStorePage";
 import ProxyConfigPage from "./pages/ProxyConfigPage";
 import WebSocketTab from "./pages/Bot/WebSocketTab";
+import PanelApiKeysPage from "./pages/PanelApiKeysPage";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -127,10 +129,12 @@ const router = createBrowserRouter([
               ]
             },
             { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },
+            { path: "proxies", element: <ProtectedRoute requiredPermission="proxy:list"><ProxiesPage /></ProtectedRoute> },
             { path: "tasks", element: <ProtectedRoute requiredPermission="task:list"><TasksPage /></ProtectedRoute> },
             { path: "admin", element: <ProtectedRoute requiredPermission="panel:user:list"><AdminPage /></ProtectedRoute> },
             { path: "graph-store", element: <GraphStorePage /> },
             { path: "proxy-config", element: <ProtectedRoute requiredPermission="bot:update"><ProxyConfigPage /></ProtectedRoute> },
+            { path: "api-keys", element: <PanelApiKeysPage /> },
         ]
       }
     ]

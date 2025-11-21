@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const UserService = require('../UserService');
 const { getRuntimeCommandRegistry } = require('../system/RuntimeCommandRegistry');
+const botHistoryStore = require('../BotHistoryStore');
 
 // Кулдауны и предупреждения - глобальные для всех инстансов
 const cooldowns = new Map();
@@ -228,10 +229,27 @@ class CommandExecutionService {
             this.processManager.addCommandRequest(requestId, {
                 resolve: (result) => {
                     clearTimeout(timeout);
+
+                    botHistoryStore.addCommandLog(botId, {
+                        username: user.username,
+                        command: commandName,
+                        args: args || {},
+                        success: true
+                    });
+
                     resolve(result);
                 },
                 reject: (error) => {
                     clearTimeout(timeout);
+
+                    botHistoryStore.addCommandLog(botId, {
+                        username: user.username,
+                        command: commandName,
+                        args: args || {},
+                        success: false,
+                        error: error.message || String(error)
+                    });
+
                     reject(error);
                 }
             });

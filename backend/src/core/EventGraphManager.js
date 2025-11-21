@@ -2,6 +2,7 @@ const prismaService = require('./PrismaService');
 const { safeJsonParse } = require('./utils/jsonParser');
 const { parseVariables } = require('./utils/variableParser');
 const validationService = require('./services/ValidationService');
+const botHistoryStore = require('./BotHistoryStore');
 
 const prisma = prismaService.getClient();
 
@@ -126,11 +127,19 @@ class EventGraphManager {
                 case 'private':
                 case 'global':
                 case 'clan':
-                    broadcastToApiClients(io, botId, 'chat:message', {
+                    const chatData = {
                         type: eventType,
                         username: args.username,
                         message: args.message,
                         raw_message: args.rawText || args.raw_message,
+                    };
+
+                    broadcastToApiClients(io, botId, 'chat:message', chatData);
+
+                    botHistoryStore.addChatMessage(botId, {
+                        type: eventType,
+                        username: args.username,
+                        message: args.message
                     });
                     break;
 

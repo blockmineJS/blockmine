@@ -412,25 +412,21 @@ process.on('message', async (message) => {
                         } else {
                             let permissionId = null;
                             if (command.permissions) {
-                                let permission = await prisma.permission.findUnique({
+                                const permission = await prisma.permission.upsert({
                                     where: {
                                         botId_name: {
                                             botId: bot.config.id,
                                             name: command.permissions,
                                         },
                                     },
+                                    update: {},
+                                    create: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                        description: `Автоматически создано для команды ${command.name}`,
+                                        owner: command.owner || 'system',
+                                    },
                                 });
-
-                                if (!permission) {
-                                    permission = await prisma.permission.create({
-                                        data: {
-                                            botId: bot.config.id,
-                                            name: command.permissions,
-                                            description: `Автоматически создано для команды ${command.name}`,
-                                            owner: command.owner || 'system',
-                                        },
-                                    });
-                                }
                                 permissionId = permission.id;
                             }
 

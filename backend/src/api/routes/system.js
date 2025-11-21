@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authenticateUniversal } = require('../middleware/auth');
 const os = require('os');
 const pidusage = require('pidusage');
 const rateLimit = require('express-rate-limit');
@@ -27,7 +27,7 @@ function getSystemCpuUsage() {
  * @desc Получить информацию о здоровье системы
  * @access Требуется авторизация
  */
-router.get('/health', authenticate, async (req, res) => {
+router.get('/health', authenticateUniversal, async (req, res) => {
     try {
         const uptime = process.uptime();
         const serverUptime = (Date.now() - serverStartTime) / 1000;
@@ -135,7 +135,7 @@ router.get('/health', authenticate, async (req, res) => {
  * @desc Получить статистику системы
  * @access Требуется авторизация
  */
-router.get('/stats', authenticate, async (req, res) => {
+router.get('/stats', authenticateUniversal, async (req, res) => {
     try {
         const prisma = req.app.get('prisma') || require('../../lib/prisma');
         

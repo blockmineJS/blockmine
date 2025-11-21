@@ -30,6 +30,7 @@ export const createCoreSlice = (set, get) => ({
     socket: null,
     bots: [],
     servers: [],
+    proxies: [],
     botStatuses: {},
     botLogs: {},
     resourceUsage: {},
@@ -89,9 +90,10 @@ export const createCoreSlice = (set, get) => ({
 
     fetchInitialData: async () => {
         try {
-            const [botsData, serversData, stateData, versionData] = await Promise.all([
+            const [botsData, serversData, proxiesData, stateData, versionData] = await Promise.all([
                 apiHelper('/api/bots'),
                 apiHelper('/api/servers'),
+                apiHelper('/api/proxies'),
                 apiHelper('/api/bots/state'),
                 apiHelper('/api/version')
             ]);
@@ -123,7 +125,8 @@ export const createCoreSlice = (set, get) => ({
                 return {
                     ...state,
                     bots: botsData || [],
-                    servers: serversData || [],
+                    servers: serversData?.items || [],
+                    proxies: proxiesData?.items || [],
                     botStatuses: stateData.statuses || {},
                     appVersion: currentVersion,
                     botLogs: newBotLogs

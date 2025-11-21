@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:C:\\Users\\user\\.blockmine\\blockmine.db"
 }
 
 model Server {
@@ -14,6 +14,22 @@ model Server {
   port    Int    @default(25565)
   version String
   bots    Bot[]
+}
+
+model Proxy {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  type     String @default("socks5") // "socks5" or "http"
+  host     String
+  port     Int
+  username String?
+  password String?
+  note     String?
+
+  bots     Bot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Bot {
@@ -27,6 +43,9 @@ model Bot {
 
   server   Server @relation(fields: [serverId], references: [id])
   serverId Int
+
+  proxy    Proxy? @relation(fields: [proxyId], references: [id])
+  proxyId  Int?
 
   proxyHost     String?
   proxyPort     Int?
@@ -203,7 +222,7 @@ model PanelUser {
   id           Int      @id @default(autoincrement())
   uuid         String   @unique @default(uuid())
   username     String   @unique
-  passwordHash String  
+  passwordHash String
   role         PanelRole @relation(fields: [roleId], references: [id])
   roleId       Int
   createdAt    DateTime @default(now())
@@ -211,6 +230,7 @@ model PanelUser {
   allBots      Boolean  @default(true)
 
   botAccess    PanelUserBotAccess[]
+  apiKeys      PanelApiKey[]
 }
 
 // Роли пользователей (Admin, Moderator, Viewer)
@@ -231,6 +251,31 @@ model PanelUserBotAccess {
   botId  Int
 
   @@id([userId, botId])
+}
+
+// API ключи для панели (для доступа к REST API и управления ботами)
+model PanelApiKey {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        PanelUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String    // "My Production Key", "Development Key"
+  keyHash     String    // bcrypt hash полного ключа
+  prefix      String    // "pk_abc123" для отображения в UI (первые 10 символов)
+
+  // Если NULL - наследует все права пользователя
+  // Если задано - ограниченный набор прав (JSON массив)
+  customScopes String?
+
+  lastUsedAt  DateTime?
+  expiresAt   DateTime? // Опционально: срок действия ключа
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([keyHash])
 }
 
 model PluginDataStore {

@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy, LayoutGrid, List, Package, Activity, GitBranch, CheckCircle2, AlertCircle, Clock, Gauge, Terminal } from 'lucide-react';
+import { Settings, Trash2, Loader2, ArrowUpCircle, Power, PowerOff, Sparkles, Code, Copy, LayoutGrid, List, Package, Activity, GitBranch, CheckCircle2, AlertCircle, Clock, Gauge, Terminal, RefreshCw } from 'lucide-react';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -31,7 +31,7 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
-function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork, viewMode = 'grid' }) {
+function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork, onReload, viewMode = 'grid' }) {
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(false);
     const hasSettings = plugin.manifest?.settings && Object.keys(plugin.manifest.settings).length > 0;
@@ -154,6 +154,16 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Редактировать код</TooltipContent>
+                            </Tooltip>
+                        )}
+                        {isEditable && onReload && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onReload(plugin)}>
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Перезагрузить из package.json</TooltipContent>
                             </Tooltip>
                         )}
                         {isForkable && onFork && (
@@ -368,6 +378,16 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <TooltipContent>Редактировать код</TooltipContent>
                         </Tooltip>
                     )}
+                    {isEditable && onReload && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={() => onReload(plugin)}>
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Перезагрузить</TooltipContent>
+                        </Tooltip>
+                    )}
                     {isForkable && onFork && (
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -404,16 +424,17 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
     );
 }
 
-export default function InstalledPluginsView({ 
-    bot, 
+export default function InstalledPluginsView({
+    bot,
     installedPlugins = [],
-    updates = {}, 
-    isUpdating, 
-    onTogglePlugin, 
-    onDeletePlugin, 
-    onUpdatePlugin, 
+    updates = {},
+    isUpdating,
+    onTogglePlugin,
+    onDeletePlugin,
+    onUpdatePlugin,
     onSaveSettings,
-    onForkPlugin
+    onForkPlugin,
+    onReloadPlugin
 }) {
     const [selectedPlugin, setSelectedPlugin] = useState(null);
     const [filter, setFilter] = useState('all');
@@ -516,6 +537,7 @@ export default function InstalledPluginsView({
                     onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
                     onOpenSettings={setSelectedPlugin}
                     onFork={onForkPlugin}
+                    onReload={onReloadPlugin}
                     viewMode="list"
                 />
             </div>
@@ -539,6 +561,7 @@ export default function InstalledPluginsView({
                     onUpdate={{ handle: onUpdatePlugin, isUpdating: isUpdating }}
                     onOpenSettings={setSelectedPlugin}
                     onFork={onForkPlugin}
+                    onReload={onReloadPlugin}
                     viewMode="grid"
                 />
             </div>

@@ -4,6 +4,7 @@ const config = require('../config');
 const { botManager } = require('../core/services');
 const presence = require('./presence');
 const { initializeBotApiNamespace } = require('./botApi');
+const { initializePanelNamespace, broadcastToPanelNamespace } = require('./panelNamespace');
 const { getTraceCollector } = require('../core/services/TraceCollectorService');
 const { initializeDebugManager, getGlobalDebugManager } = require('../core/services/DebugSessionManager');
 const { initializeCollaborationManager, getGlobalCollaborationManager } = require('../core/services/GraphCollaborationManager');
@@ -33,6 +34,8 @@ function initializeSocket(httpServer) {
     initializeDebugManager(io);
     initializeCollaborationManager(io);
 
+    // Инициализируем Panel WebSocket namespace
+    initializePanelNamespace(io);
 
     initializeBotApiNamespace(io);
 
@@ -424,4 +427,4 @@ function addPluginLogToBuffer(botId, pluginName, logEntry) {
     }
 }
 
-module.exports = { initializeSocket, getIO, getIOSafe, addPluginLogToBuffer };
+module.exports = { initializeSocket, getIO, getIOSafe, addPluginLogToBuffer, broadcastToPanelNamespace };

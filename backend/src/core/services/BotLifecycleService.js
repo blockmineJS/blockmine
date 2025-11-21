@@ -73,6 +73,14 @@ class BotLifecycleService {
         }
 
         const decryptedConfig = { ...botConfig };
+
+        if (decryptedConfig.proxy) {
+            decryptedConfig.proxyHost = decryptedConfig.proxy.host;
+            decryptedConfig.proxyPort = decryptedConfig.proxy.port;
+            decryptedConfig.proxyUsername = decryptedConfig.proxy.username;
+            decryptedConfig.proxyPassword = decryptedConfig.proxy.password;
+        }
+
         if (decryptedConfig.password) decryptedConfig.password = decrypt(decryptedConfig.password);
         if (decryptedConfig.proxyPassword) decryptedConfig.proxyPassword = decrypt(decryptedConfig.proxyPassword);
         if (decryptedConfig.proxyUsername) decryptedConfig.proxyUsername = decryptedConfig.proxyUsername.trim();
@@ -248,6 +256,16 @@ class BotLifecycleService {
                 });
             } catch (e) { /* Socket.IO может быть не инициализирован */ }
         }
+
+        try {
+            const { broadcastToPanelNamespace } = require('../../real-time/panelNamespace');
+            broadcastToPanelNamespace(botId, 'bot:event', {
+                botId,
+                eventType: message.eventType,
+                data: message.args || {},
+                timestamp: new Date().toISOString()
+            });
+        } catch (e) { /* Socket.IO может быть не инициализирован */ }
 
         if (this.eventGraphManager) {
             this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
@@ -534,9 +552,17 @@ class BotLifecycleService {
     }
 
     emitStatusUpdate(botId, status, message = null) {
-        const { getIOSafe } = require('../../real-time/socketHandler');
+        const { getIOSafe, broadcastToPanelNamespace } = require('../../real-time/socketHandler');
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
+
         getIOSafe().emit('bot:status', { botId, status, message });
+
+        broadcastToPanelNamespace(getIOSafe(), 'bots:status', {
+            botId,
+            status,
+            message,
+            timestamp: new Date().toISOString()
+        });
     }
 
     getFullState() {

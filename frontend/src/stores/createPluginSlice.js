@@ -264,5 +264,14 @@ export const createPluginSlice = (set, get) => {
                 `Плагин "${pluginName}" успешно превращен в локальный.`
             );
         },
+
+        reloadLocalPlugin: async (botId, pluginId) => {
+            await apiHelper(
+                `/api/plugins/${pluginId}/reload`,
+                { method: 'POST' },
+                'Плагин перезагружен, настройки сброшены.'
+            );
+            await get().fetchInstalledPlugins(botId);
+        },
     };
 };

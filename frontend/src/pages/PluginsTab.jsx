@@ -35,6 +35,7 @@ export default function PluginsTab() {
     const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
+    const reloadLocalPlugin = useAppStore(state => state.reloadLocalPlugin);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
@@ -190,8 +191,8 @@ export default function PluginsTab() {
             
             <TabsContent value="installed" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
                 <div className="flex-1 overflow-y-auto">
-                    <InstalledPluginsView 
-                        bot={bot} 
+                    <InstalledPluginsView
+                        bot={bot}
                         installedPlugins={installedPlugins}
                         isLoading={isLoading}
                         updates={updates}
@@ -201,6 +202,7 @@ export default function PluginsTab() {
                         onUpdatePlugin={canUpdate ? ((pluginId) => handleUpdatePlugin(pluginId)) : null}
                         onSaveSettings={handlePluginOperationSuccess}
                         onForkPlugin={canDevelop ? ((plugin) => handleForkPlugin(plugin)) : null}
+                        onReloadPlugin={canDevelop ? ((plugin) => reloadLocalPlugin(intBotId, plugin.id)) : null}
                     />
                 </div>
             </TabsContent>

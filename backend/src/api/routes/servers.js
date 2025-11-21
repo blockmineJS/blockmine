@@ -1,18 +1,35 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateUniversal, authorize } = require('../middleware/auth');
 const prisma = new PrismaClient();
 
-router.use(authenticate);
+router.use(authenticateUniversal);
 
 router.get('/', authorize('server:list'), async (req, res) => {
     try {
         const servers = await prisma.server.findMany({ orderBy: { name: 'asc' } });
-        res.json(servers);
+        res.json({
+            items: servers,
+            total: servers.length
+        });
     } catch (error) {
         console.error("[API /api/servers] Ошибка получения списка серверов:", error);
         res.status(500).json({ error: 'Не удалось получить список серверов' });
+    }
+});
+
+router.get('/:id', authorize('server:list'), async (req, res) => {
+    try {
+        const serverId = parseInt(req.params.id, 10);
+        const server = await prisma.server.findUnique({ where: { id: serverId } });
+        if (!server) {
+            return res.status(404).json({ error: 'Сервер не найден' });
+        }
+        res.json(server);
+    } catch (error) {
+        console.error("[API /api/servers/:id] Ошибка получения сервера:", error);
+        res.status(500).json({ error: 'Не удалось получить сервер' });
     }
 });
 

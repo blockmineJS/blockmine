@@ -12,8 +12,9 @@ import { apiHelper } from '@/lib/api';
 
 export default function ConfigurationPage() {
     const { botId } = useParams();
-    
+
     const servers = useAppStore((state) => state.servers);
+    const proxies = useAppStore((state) => state.proxies);
     const refreshBotList = useAppStore((state) => state.fetchInitialData);
     const hasPermission = useAppStore(state => state.hasPermission);
     
@@ -29,6 +30,7 @@ export default function ConfigurationPage() {
     const fetchAllSettings = useCallback(async () => {
         setIsLoading(true);
         try {
+            await refreshBotList();
             const data = await apiHelper(`/api/bots/${botId}/settings/all`);
             setAllSettings(data);
             setChanges({});
@@ -36,7 +38,7 @@ export default function ConfigurationPage() {
             toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
         }
         setIsLoading(false);
-    }, [botId, toast]);
+    }, [botId, toast, refreshBotList]);
 
     useEffect(() => {
         fetchAllSettings();
@@ -159,6 +161,7 @@ export default function ConfigurationPage() {
                         <BotForm
                             bot={allSettings.bot}
                             servers={servers}
+                            proxies={proxies}
                             onFormChange={handleBotFormChange}
                             showFooter={false}
                             errors={formErrors}

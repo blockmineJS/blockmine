@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs/promises');
 const path = require('path');
 const os = require('os');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authenticateUniversal, authorize } = require('../middleware/auth');
 const config = require('../../config');
 
 const router = express.Router();
@@ -15,7 +15,7 @@ const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
  * @desc    Получить текущие глобальные настройки
  * @access  Private (Admin only)
  */
-router.get('/settings', authenticate, authorize('panel:settings:view'), (req, res) => {
+router.get('/settings', authenticateUniversal, authorize('panel:settings:view'), (req, res) => {
     const { server, telemetry } = config;
     res.json({
         server: {
@@ -32,7 +32,7 @@ router.get('/settings', authenticate, authorize('panel:settings:view'), (req, re
  * @desc    Обновить глобальные настройки
  * @access  Private (Admin only)
  */
-router.put('/settings', authenticate, authorize('panel:settings:edit'), async (req, res) => {
+router.put('/settings', authenticateUniversal, authorize('panel:settings:edit'), async (req, res) => {
     const { allowExternalAccess, telemetryEnabled } = req.body;
     
     try {

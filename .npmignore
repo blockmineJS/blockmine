@@ -51,3 +51,6 @@ blockmine-proxy/
 /packages
 coverage/
 **/coverage/
+
+/blockmine-sdk
+/blockmine-sdk-test
