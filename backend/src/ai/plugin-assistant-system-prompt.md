@@ -350,6 +350,13 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
         "type": "json_file",
         "label": "Конфиг из файла",
         "defaultPath": "config/default.json"
+      },
+
+      "proxy": {
+        "type": "proxy",
+        "label": "Прокси для запросов",
+        "description": "Выберите прокси из списка или настройте вручную",
+        "default": { "enabled": false }
       }
     }
   }
@@ -367,6 +374,25 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 | `string[]` | Массив строк | `["a", "b"]` |
 | `json` | JSON объект | `{"key": "value"}` |
 | `json_file` | JSON из файла | Путь к файлу |
+| `proxy` | Выбор прокси (из списка или вручную) | `{ enabled: true, host: "...", port: 1080 }` |
+
+### Структура объекта proxy
+
+Когда пользователь настраивает прокси в UI, объект `settings.proxy` имеет следующую структуру:
+
+```javascript
+{
+    enabled: true,              // boolean - включен ли прокси
+    proxyId: 1,                 // number (опционально) - ID прокси из списка, если выбран готовый
+    host: "127.0.0.1",          // string - хост прокси
+    port: 1080,                 // number - порт прокси
+    type: "socks5",             // string - тип: "socks5", "socks4", "http"
+    username: "",               // string (опционально) - имя пользователя для авторизации
+    password: ""                // string (опционально) - пароль для авторизации
+}
+```
+
+Если прокси отключен: `{ enabled: false }`
 
 ### Доступ к настройкам
 
@@ -375,6 +401,17 @@ module.exports = (bot, { settings }) => {
     const token = settings.apiToken;     // Секрет
     const enabled = settings.enabled;    // boolean
     const items = settings.items;        // array
+
+    // Работа с прокси
+    const proxy = settings.proxy;
+    if (proxy?.enabled) {
+        console.log(`Прокси: ${proxy.type}://${proxy.host}:${proxy.port}`);
+
+        // Пример создания прокси агента для fetch/axios
+        const proxyUrl = proxy.username
+            ? `${proxy.type}://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`
+            : `${proxy.type}://${proxy.host}:${proxy.port}`;
+    }
 };
 ```
 

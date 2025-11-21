@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ import Editor from '@monaco-editor/react';
 import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAppStore } from '@/stores/appStore';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -56,6 +58,103 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
                 <Button onClick={handleSave}><Save className="mr-2"/>Применить</Button>
             </DialogFooter>
         </DialogContent>
+    );
+}
+
+function ProxySettingField({ settingKey, config, value, onChange, readOnly }) {
+    const proxies = useAppStore((state) => state.proxies);
+    const [isCustom, setIsCustom] = useState(() => {
+        return value?.enabled && !value?.proxyId && value?.host;
+    });
+
+    const proxyValue = value || { enabled: false };
+
+    const handleSelectChange = (selectValue) => {
+        if (readOnly) return;
+        if (selectValue === 'none') {
+            onChange(settingKey, { enabled: false });
+            setIsCustom(false);
+        } else if (selectValue === 'custom') {
+            onChange(settingKey, { enabled: true, host: '', port: '', type: 'socks5', username: '', password: '' });
+            setIsCustom(true);
+        } else {
+            const selectedProxy = proxies.find(p => p.id.toString() === selectValue);
+            if (selectedProxy) {
+                onChange(settingKey, {
+                    enabled: true,
+                    proxyId: selectedProxy.id,
+                    host: selectedProxy.host,
+                    port: selectedProxy.port,
+                    type: selectedProxy.type || 'socks5',
+                    username: selectedProxy.username || '',
+                    password: selectedProxy.password || ''
+                });
+            }
+            setIsCustom(false);
+        }
+    };
+
+    const handleFieldChange = (field, fieldValue) => {
+        if (readOnly) return;
+        onChange(settingKey, { ...proxyValue, [field]: fieldValue });
+    };
+
+    const currentSelectValue = !proxyValue.enabled ? 'none' : (isCustom ? 'custom' : (proxyValue.proxyId?.toString() || 'none'));
+
+    return (
+        <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-2">
+                <Label>{config.label}</Label>
+                {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
+            </div>
+
+            <Select value={currentSelectValue} onValueChange={handleSelectChange} disabled={readOnly}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Выберите прокси" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="none">Без прокси</SelectItem>
+                    <SelectItem value="custom">Настроить вручную</SelectItem>
+                    {proxies?.map(proxy => (
+                        <SelectItem key={proxy.id} value={proxy.id.toString()}>
+                            {proxy.name} ({proxy.host}:{proxy.port})
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            {proxyValue.enabled && isCustom && (
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-2">
+                        <Label>Хост</Label>
+                        <Input value={proxyValue.host || ''} onChange={(e) => handleFieldChange('host', e.target.value)} placeholder="127.0.0.1" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Порт</Label>
+                        <Input type="number" value={proxyValue.port || ''} onChange={(e) => handleFieldChange('port', e.target.value)} placeholder="1080" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Тип</Label>
+                        <Select value={proxyValue.type || 'socks5'} onValueChange={(v) => handleFieldChange('type', v)} disabled={readOnly}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="socks5">SOCKS5</SelectItem>
+                                <SelectItem value="socks4">SOCKS4</SelectItem>
+                                <SelectItem value="http">HTTP</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Имя пользователя</Label>
+                        <Input value={proxyValue.username || ''} onChange={(e) => handleFieldChange('username', e.target.value)} placeholder="Опционально" disabled={readOnly} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                        <Label>Пароль</Label>
+                        <Input type="password" value={proxyValue.password || ''} onChange={(e) => handleFieldChange('password', e.target.value)} placeholder="Опционально" disabled={readOnly} />
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -125,6 +224,8 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
                     </div>
                 </div>
             );
+        case 'proxy':
+            return <ProxySettingField settingKey={settingKey} config={config} value={value} onChange={onChange} readOnly={readOnly} />;
         default:
             return <p className="text-destructive">Неизвестный тип настройки: {config.type}</p>;
     }
