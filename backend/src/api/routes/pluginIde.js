@@ -1670,6 +1670,41 @@ router.post('/:pluginName/git/push', resolvePluginPath, async (req, res) => {
     }
 });
 
+router.post('/:pluginName/git/pull', resolvePluginPath, async (req, res) => {
+    try {
+        const { execSync } = require('child_process');
+
+        execSync('git fetch origin', { cwd: req.pluginPath });
+
+        let mainBranch = 'main';
+        try {
+            execSync('git show-ref --verify refs/remotes/origin/main', {
+                cwd: req.pluginPath,
+                stdio: 'ignore'
+            });
+        } catch {
+            mainBranch = 'master';
+        }
+
+        const output = execSync(`git pull origin ${mainBranch}`, {
+            cwd: req.pluginPath,
+            encoding: 'utf8'
+        });
+
+        res.json({
+            success: true,
+            message: `Pulled from GitHub (branch: ${mainBranch})`,
+            branch: mainBranch,
+            output
+        });
+    } catch (error) {
+        console.error(`[Plugin IDE Error] /git/pull:`, error);
+        res.status(500).json({
+            error: error.message || 'Failed to pull from GitHub.'
+        });
+    }
+});
+
 router.post('/:pluginName/git/sync', resolvePluginPath, async (req, res) => {
     try {
         const { execSync } = require('child_process');

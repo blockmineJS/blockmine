@@ -472,6 +472,65 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                         </div>
                     </div>
 
+                    {/* GitHub Token Setup */}
+                    {!tokenSaved ? (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <Key className="h-5 w-5 text-blue-500 mt-0.5" />
+                                <div className="flex-grow">
+                                    <h3 className="font-medium mb-2 text-sm">Настройте GitHub интеграцию</h3>
+
+                                    <Label htmlFor="github-token-repo" className="text-sm mb-2 block">
+                                        Personal Access Token
+                                    </Label>
+                                    <div className="flex gap-2 mb-2">
+                                        <Input
+                                            id="github-token-repo"
+                                            type={showToken ? "text" : "password"}
+                                            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                                            value={githubToken}
+                                            onChange={(e) => setGithubToken(e.target.value)}
+                                            className="font-mono text-sm"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setShowToken(!showToken)}
+                                        >
+                                            {showToken ? '🙈' : '👁️'}
+                                        </Button>
+                                    </div>
+
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        🔒 Токен сохранится локально в вашем браузере
+                                    </p>
+
+                                    <div className="bg-muted/50 rounded p-3 text-xs space-y-1 mb-3">
+                                        <p className="font-medium">Как создать токен:</p>
+                                        <p>1. Откройте <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">github.com/settings/tokens/new</a></p>
+                                        <p>2. Выберите scope: <code className="bg-muted px-1 rounded">repo</code></p>
+                                        <p>3. Скопируйте токен и вставьте выше</p>
+                                    </div>
+
+                                    <Button onClick={handleSaveToken} className="w-full">
+                                        <Github className="h-4 w-4 mr-2" />
+                                        Сохранить токен
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span className="text-sm">GitHub настроен (@{githubUsername})</span>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={handleRemoveToken}>
+                                Изменить
+                            </Button>
+                        </div>
+                    )}
+
                     {/* Version Management */}
                     {tokenSaved && (
                         <div className="bg-muted/30 border rounded-lg p-4">

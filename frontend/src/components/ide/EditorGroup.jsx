@@ -84,10 +84,11 @@ export default function EditorGroup({
     const handleEditorWillMount = (monaco) => {
 
         monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-            noSemanticValidation: false, 
+            noSemanticValidation: false,
             noSyntaxValidation: false,
             diagnosticCodesToIgnore: [
                 2304,  // Cannot find module (для плагинов с внешними зависимостями)
+                6133,  // Variable is declared but its value is never read
                 7006,  // Parameter implicitly has 'any' type
                 2550,  // Property doesn't exist on type
                 80001, // File is a CommonJS module (suggestion для конвертации в ES module)

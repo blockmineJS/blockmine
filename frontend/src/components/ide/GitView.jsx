@@ -4,6 +4,7 @@ import {
     RefreshCw,
     Check,
     Upload,
+    Download,
     Plus,
     Minus,
     FileText,
@@ -57,6 +58,7 @@ export default function GitView({ botId, pluginName, onRefresh }) {
     const [commitMessage, setCommitMessage] = useState('');
     const [committing, setCommitting] = useState(false);
     const [pushing, setPushing] = useState(false);
+    const [pulling, setPulling] = useState(false);
     const [commitHistory, setCommitHistory] = useState([]);
     const [showHistory, setShowHistory] = useState(false);
     const [syncing, setSyncing] = useState(false);
@@ -270,6 +272,36 @@ export default function GitView({ botId, pluginName, onRefresh }) {
         }
     };
 
+    // Pull изменения
+    const pullChanges = async () => {
+        setPulling(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/git/pull`, {
+                method: 'POST',
+                headers: getHeaders(true)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to pull changes');
+            }
+
+            await fetchGitStatus();
+            await fetchCommitHistory();
+
+            if (onRefresh) {
+                onRefresh();
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setPulling(false);
+        }
+    };
+
     // Синхронизация с GitHub
     const syncWithGitHub = async () => {
         if (!window.confirm('⚠️ Это заменит все локальные файлы версиями с GitHub.\n\nВсе несохранённые изменения будут ПОТЕРЯНЫ!\n\nПродолжить?')) {
@@ -445,11 +477,24 @@ export default function GitView({ botId, pluginName, onRefresh }) {
                                         <Check className="w-4 h-4 mr-1" />
                                         {committing ? 'Committing...' : 'Commit'}
                                     </Button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={pullChanges}
+                                        disabled={pulling}
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex-1"
+                                    >
+                                        <Download className="w-4 h-4 mr-1" />
+                                        {pulling ? 'Pulling...' : 'Pull'}
+                                    </Button>
                                     <Button
                                         onClick={pushChanges}
                                         disabled={pushing}
                                         variant="outline"
                                         size="sm"
+                                        className="flex-1"
                                     >
                                         <Upload className="w-4 h-4 mr-1" />
                                         {pushing ? 'Pushing...' : 'Push'}
