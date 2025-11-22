@@ -350,9 +350,15 @@ const MinecraftViewerTab = () => {
             Math.pow(serverPos.z - camera.position.z, 2)
         );
 
-        // Плавная коррекция если расхождение небольшое
-        if (distanceMoved > 0.5 && distanceMoved < 10) {
-            const lerpFactor = 0.1; // Интерполяция 10%
+        const isMoving = keysPressed.current['KeyW'] || keysPressed.current['KeyS'] ||
+                        keysPressed.current['KeyA'] || keysPressed.current['KeyD'];
+
+        // Плавная коррекция
+        if (distanceMoved > 1.5 && distanceMoved < 10) {
+            const baseLerp = isMoving ? 0.2 : 0.4; 
+            const distanceFactor = Math.min(distanceMoved / 5, 1);
+            const lerpFactor = baseLerp * (0.5 + 0.5 * distanceFactor);
+
             camera.position.x += (serverPos.x - camera.position.x) * lerpFactor;
             camera.position.y += (serverPos.y - camera.position.y) * lerpFactor;
             camera.position.z += (serverPos.z - camera.position.z) * lerpFactor;
