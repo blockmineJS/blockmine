@@ -118,6 +118,7 @@ class MinecraftViewerService {
         if (this.activeViewers.get(botId)?.size === 1) {
             let lastPosition = null;
             let lastSentPosition = null;
+            let lastSentPlayers = new Map(); // username -> {x, y, z, yaw, pitch}
             let tickCounter = 0;
 
             const interval = setInterval(() => {
@@ -136,8 +137,31 @@ class MinecraftViewerService {
                         resolve: (state) => {
                             const currentPos = state.position;
 
-                            // Отправляем только если позиция изменилась > 0.1 блока или пора отправлять блоки
-                            const shouldSend = shouldSendBlocks || !lastSentPosition ||
+                            // Проверяем изменения в nearbyPlayers
+                            let playersChanged = false;
+                            if (state.nearbyPlayers) {
+                                // Проверяем количество
+                                if (state.nearbyPlayers.length !== lastSentPlayers.size) {
+                                    playersChanged = true;
+                                } else {
+                                    // Проверяем каждого игрока
+                                    for (const player of state.nearbyPlayers) {
+                                        const last = lastSentPlayers.get(player.username);
+                                        if (!last ||
+                                            Math.abs(last.x - player.position.x) > 0.1 ||
+                                            Math.abs(last.y - player.position.y) > 0.1 ||
+                                            Math.abs(last.z - player.position.z) > 0.1 ||
+                                            Math.abs(last.yaw - player.yaw) > 0.05 ||
+                                            Math.abs(last.pitch - player.pitch) > 0.05) {
+                                            playersChanged = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Отправляем если позиция бота изменилась, игроки изменились, или пора отправлять блоки
+                            const shouldSend = shouldSendBlocks || playersChanged || !lastSentPosition ||
                                 Math.abs(currentPos?.x - lastSentPosition.x) > 0.1 ||
                                 Math.abs(currentPos?.y - lastSentPosition.y) > 0.1 ||
                                 Math.abs(currentPos?.z - lastSentPosition.z) > 0.1;
@@ -145,6 +169,20 @@ class MinecraftViewerService {
                             if (shouldSend) {
                                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:update', state);
                                 lastSentPosition = currentPos ? { ...currentPos } : null;
+
+                                // Обновляем кэш игроков
+                                lastSentPlayers.clear();
+                                if (state.nearbyPlayers) {
+                                    state.nearbyPlayers.forEach(player => {
+                                        lastSentPlayers.set(player.username, {
+                                            x: player.position.x,
+                                            y: player.position.y,
+                                            z: player.position.z,
+                                            yaw: player.yaw,
+                                            pitch: player.pitch
+                                        });
+                                    });
+                                }
                             }
 
                             // Обновляем lastPosition для блоков

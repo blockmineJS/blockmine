@@ -678,113 +678,112 @@ const MinecraftViewerTab = () => {
         if (!playersGroupRef.current) return;
 
         const playersGroup = playersGroupRef.current;
-        const newPlayersMap = new Map();
+        const currentPlayers = new Set(players.map(p => p.username));
+        const cachedPlayers = new Set(playersCacheRef.current.keys());
 
-        players.forEach(player => {
-            const key = player.username;
-            newPlayersMap.set(key, {
-                x: player.position.x,
-                y: player.position.y,
-                z: player.position.z,
-                yaw: player.yaw || 0,
-                pitch: player.pitch || 0
-            });
-        });
-
-        const currentCache = playersCacheRef.current;
-        let hasChanges = false;
-
-        if (newPlayersMap.size !== currentCache.size) {
-            hasChanges = true;
-        } else {
-            for (const [username, data] of newPlayersMap) {
-                const cached = currentCache.get(username);
-                if (!cached ||
-                    Math.abs(cached.x - data.x) > 0.1 ||
-                    Math.abs(cached.y - data.y) > 0.1 ||
-                    Math.abs(cached.z - data.z) > 0.1 ||
-                    Math.abs(cached.yaw - data.yaw) > 0.1 ||
-                    Math.abs(cached.pitch - data.pitch) > 0.1) {
-                    hasChanges = true;
-                    break;
+        // Удаляем игроков которых больше нет
+        for (const username of cachedPlayers) {
+            if (!currentPlayers.has(username)) {
+                const cached = playersCacheRef.current.get(username);
+                if (cached?.group) {
+                    cached.group.traverse(obj => {
+                        if (obj.geometry) obj.geometry.dispose();
+                        if (obj.material) obj.material.dispose();
+                    });
+                    playersGroup.remove(cached.group);
                 }
+                playersCacheRef.current.delete(username);
             }
         }
 
-        if (!hasChanges) {
-            return;
-        }
-
-        while (playersGroup.children.length > 0) {
-            const child = playersGroup.children[0];
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) child.material.dispose();
-            playersGroup.remove(child);
-        }
-
-        playersCacheRef.current.clear();
-
+        // Обновляем или создаём игроков
         players.forEach(player => {
-            const playerGroup = new THREE.Group();
+            const cached = playersCacheRef.current.get(player.username);
 
-            const bodyGeometry = new THREE.BoxGeometry(0.6, 1.4, 0.3);
-            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x00aaff });
-            const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            bodyMesh.position.y = 0.9;
-            playerGroup.add(bodyMesh);
+            if (!cached) {
+                // Создаём нового игрока
+                const playerGroup = new THREE.Group();
 
-            // Голова (отдельная группа для поворота по pitch)
-            const headGroup = new THREE.Group();
-            headGroup.position.y = 1.8;
+                const bodyGeometry = new THREE.BoxGeometry(0.6, 1.4, 0.3);
+                const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x00aaff });
+                const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                bodyMesh.position.y = 0.9;
+                playerGroup.add(bodyMesh);
 
-            const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
-            const headMesh = new THREE.Mesh(headGeometry, headMaterial);
-            headGroup.add(headMesh);
+                // Голова (отдельная группа для поворота по pitch)
+                const headGroup = new THREE.Group();
+                headGroup.position.y = 1.8;
 
-            const noseGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.2);
-            const noseMaterial = new THREE.MeshLambertMaterial({ color: 0xddaa77 });
-            const noseMesh = new THREE.Mesh(noseGeometry, noseMaterial);
-            noseMesh.position.z = 0.35;
-            headGroup.add(noseMesh);
+                const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
+                const headMesh = new THREE.Mesh(headGeometry, headMaterial);
+                headGroup.add(headMesh);
 
-            headGroup.rotation.x = -(player.pitch || 0);
-            playerGroup.add(headGroup);
+                const noseGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.2);
+                const noseMaterial = new THREE.MeshLambertMaterial({ color: 0xddaa77 });
+                const noseMesh = new THREE.Mesh(noseGeometry, noseMaterial);
+                noseMesh.position.z = 0.35;
+                headGroup.add(noseMesh);
 
-            // Имя игрока
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 64;
-            context.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            context.font = 'bold 32px Arial';
-            context.fillStyle = 'white';
-            context.textAlign = 'center';
-            context.fillText(player.username, canvas.width / 2, 42);
+                playerGroup.add(headGroup);
 
-            const texture = new THREE.CanvasTexture(canvas);
-            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-            const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.y = 2.5;
-            sprite.scale.set(2, 0.5, 1);
-            playerGroup.add(sprite);
+                // Имя игрока
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 64;
+                context.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.font = 'bold 32px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText(player.username, canvas.width / 2, 42);
 
-            // Позиция и поворот всего игрока по yaw
-            playerGroup.position.set(player.position.x, player.position.y, player.position.z);
-            playerGroup.rotation.y = (player.yaw || 0) + Math.PI; // +180° для правильного направления
-            playersGroup.add(playerGroup);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.y = 2.5;
+                sprite.scale.set(2, 0.5, 1);
+                playerGroup.add(sprite);
 
-            playersCacheRef.current.set(player.username, {
-                x: player.position.x,
-                y: player.position.y,
-                z: player.position.z,
-                yaw: player.yaw,
-                pitch: player.pitch
-            });
+                // Позиция и поворот всего игрока по yaw
+                playerGroup.position.set(player.position.x, player.position.y, player.position.z);
+                playerGroup.rotation.y = (player.yaw || 0) + Math.PI;
+                playersGroup.add(playerGroup);
+
+                // Сохраняем ссылки на объекты для обновления
+                playersCacheRef.current.set(player.username, {
+                    group: playerGroup,
+                    headGroup: headGroup,
+                    targetPos: { x: player.position.x, y: player.position.y, z: player.position.z },
+                    targetYaw: player.yaw || 0,
+                    targetPitch: player.pitch || 0
+                });
+            } else {
+                // Обновляем существующего игрока плавно
+                cached.targetPos.x = player.position.x;
+                cached.targetPos.y = player.position.y;
+                cached.targetPos.z = player.position.z;
+                cached.targetYaw = player.yaw || 0;
+                cached.targetPitch = player.pitch || 0;
+
+                // Плавная интерполяция
+                const lerpFactor = 0.3;
+                cached.group.position.x += (cached.targetPos.x - cached.group.position.x) * lerpFactor;
+                cached.group.position.y += (cached.targetPos.y - cached.group.position.y) * lerpFactor;
+                cached.group.position.z += (cached.targetPos.z - cached.group.position.z) * lerpFactor;
+
+                // Интерполяция углов
+                let yawDiff = cached.targetYaw - (cached.group.rotation.y - Math.PI);
+                // Нормализация угла (-PI, PI)
+                while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+                while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+                cached.group.rotation.y += yawDiff * lerpFactor;
+
+                let pitchDiff = cached.targetPitch - (-cached.headGroup.rotation.x);
+                cached.headGroup.rotation.x += -pitchDiff * lerpFactor;
+            }
         });
-
-        console.log(`[MinecraftViewer] Rendered ${players.length} players`);
     };
 
     useEffect(() => {
