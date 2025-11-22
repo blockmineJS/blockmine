@@ -122,7 +122,7 @@ class MinecraftViewerService {
             const interval = setInterval(() => {
                 if (this.activeViewers.get(botId)?.size > 0) {
                     tickCounter++;
-                    const shouldSendBlocks = tickCounter % 20 === 0;
+                    const shouldSendBlocks = tickCounter % 60 === 0;
 
                     const requestId = uuidv4();
                     this.processManager.sendMessage(botId, {
@@ -146,7 +146,7 @@ class MinecraftViewerService {
                 } else {
                     clearInterval(interval);
                 }
-            }, 50);
+            }, 100);
         }
     }
 

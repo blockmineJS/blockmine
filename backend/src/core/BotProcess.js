@@ -231,9 +231,9 @@ process.on('message', async (message) => {
             if (message.includeBlocks && bot.entity?.position) {
                 blocks = [];
                 const pos = bot.entity.position;
-                const horizontalRange = 32;
-                const verticalRangeDown = 15;
-                const verticalRangeUp = 32;
+                const horizontalRange = 24;
+                const verticalRangeDown = 12;
+                const verticalRangeUp = 24;
 
                 for (let x = Math.floor(pos.x - horizontalRange); x <= Math.floor(pos.x + horizontalRange); x++) {
                     for (let y = Math.floor(pos.y - verticalRangeDown); y <= Math.floor(pos.y + verticalRangeUp); y++) {
