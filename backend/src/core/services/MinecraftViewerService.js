@@ -117,6 +117,7 @@ class MinecraftViewerService {
     _startStateStream(botId) {
         if (this.activeViewers.get(botId)?.size === 1) {
             let lastPosition = null;
+            let lastSentPosition = null;
             let tickCounter = 0;
 
             const interval = setInterval(() => {
@@ -133,13 +134,26 @@ class MinecraftViewerService {
 
                     this.pendingRequests.set(requestId, {
                         resolve: (state) => {
-                            if (shouldSendBlocks || !lastPosition ||
-                                Math.abs(state.position?.x - lastPosition.x) > 8 ||
-                                Math.abs(state.position?.y - lastPosition.y) > 8 ||
-                                Math.abs(state.position?.z - lastPosition.z) > 8) {
-                                lastPosition = state.position ? { ...state.position } : null;
+                            const currentPos = state.position;
+
+                            // Отправляем только если позиция изменилась > 0.1 блока или пора отправлять блоки
+                            const shouldSend = shouldSendBlocks || !lastSentPosition ||
+                                Math.abs(currentPos?.x - lastSentPosition.x) > 0.1 ||
+                                Math.abs(currentPos?.y - lastSentPosition.y) > 0.1 ||
+                                Math.abs(currentPos?.z - lastSentPosition.z) > 0.1;
+
+                            if (shouldSend) {
+                                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:update', state);
+                                lastSentPosition = currentPos ? { ...currentPos } : null;
                             }
-                            this.viewerNamespace.to(`bot:${botId}`).emit('viewer:update', state);
+
+                            // Обновляем lastPosition для блоков
+                            if (shouldSendBlocks || !lastPosition ||
+                                Math.abs(currentPos?.x - lastPosition.x) > 8 ||
+                                Math.abs(currentPos?.y - lastPosition.y) > 8 ||
+                                Math.abs(currentPos?.z - lastPosition.z) > 8) {
+                                lastPosition = currentPos ? { ...currentPos } : null;
+                            }
                         },
                         reject: () => {}
                     });

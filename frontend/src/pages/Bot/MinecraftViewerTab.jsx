@@ -20,12 +20,35 @@ const MinecraftViewerTab = () => {
     const playersCacheRef = useRef(new Map());
     const raycasterRef = useRef(new THREE.Raycaster());
     const highlightRef = useRef(null);
+    const chunkCacheRef = useRef(new Map()); // Кэш чанков блоков
+    const frustumRef = useRef(new THREE.Frustum());
+    const blocksMapRef = useRef(new Map()); // Карта блоков для коллизий (x,y,z -> true)
 
     const [connected, setConnected] = useState(false);
     const [chatOpen, setChatOpen] = useState(false);
     const [chatMessages, setChatMessages] = useState([]);
     const [botState, setBotState] = useState(null);
     const [error, setError] = useState(null);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    const [settings, setSettings] = useState(() => {
+        const defaults = {
+            renderDistance: 24,
+            correctionSpeed: 1.0,
+            sensitivity: 1.0,
+            localMovement: true,
+            showDebug: false,
+        };
+        try {
+            const saved = localStorage.getItem('minecraftViewerSettings');
+            if (saved) {
+                return { ...defaults, ...JSON.parse(saved) };
+            }
+        } catch (e) {}
+        return defaults;
+    });
+
+    const settingsRef = useRef(settings);
 
     const keysPressed = useRef({});
     const localCameraRef = useRef({ yaw: 0, pitch: 0 });
@@ -34,6 +57,17 @@ const MinecraftViewerTab = () => {
     useEffect(() => {
         chatOpenRef.current = chatOpen;
     }, [chatOpen]);
+
+    useEffect(() => {
+        localStorage.setItem('minecraftViewerSettings', JSON.stringify(settings));
+        settingsRef.current = settings;
+
+        if (socketRef.current && connected) {
+            socketRef.current.emit('viewer:control', {
+                command: { type: 'set_render_distance', distance: settings.renderDistance }
+            });
+        }
+    }, [settings, connected]);
 
     useEffect(() => {
         connectToBot();
@@ -154,29 +188,61 @@ const MinecraftViewerTab = () => {
         const animate = () => {
             animationFrameRef.current = requestAnimationFrame(animate);
 
-            // Локальное движение камеры
-            if (camera && !chatOpenRef.current) {
-                const speed = 0.08; // ~4.3 блоков/сек (скорость ходьбы в Minecraft)
-                const direction = new THREE.Vector3();
-                const right = new THREE.Vector3();
+            if (camera) {
+                camera.updateMatrixWorld();
+                const frustum = frustumRef.current;
+                const projScreenMatrix = new THREE.Matrix4();
+                projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projScreenMatrix);
 
-                camera.getWorldDirection(direction);
-                direction.y = 0;
-                direction.normalize();
+                if (blocksGroupRef.current) {
+                    blocksGroupRef.current.children.forEach(mesh => {
+                        if (mesh.boundingSphere) {
+                            mesh.visible = frustum.intersectsSphere(mesh.boundingSphere);
+                        }
+                    });
+                }
+            }
 
-                right.crossVectors(camera.up, direction).normalize();
+            if (camera && !chatOpenRef.current && settingsRef.current.localMovement) {
+                const isMoving = keysPressed.current['KeyW'] || keysPressed.current['KeyS'] ||
+                                keysPressed.current['KeyA'] || keysPressed.current['KeyD'];
 
-                if (keysPressed.current['KeyW']) {
-                    camera.position.add(direction.multiplyScalar(speed));
-                }
-                if (keysPressed.current['KeyS']) {
-                    camera.position.sub(direction.multiplyScalar(speed));
-                }
-                if (keysPressed.current['KeyA']) {
-                    camera.position.add(right.multiplyScalar(speed));
-                }
-                if (keysPressed.current['KeyD']) {
-                    camera.position.sub(right.multiplyScalar(speed));
+                if (isMoving) {
+                    const speed = 0.08;
+                    const direction = new THREE.Vector3();
+                    const right = new THREE.Vector3();
+
+                    camera.getWorldDirection(direction);
+                    direction.y = 0;
+                    direction.normalize();
+
+                    right.crossVectors(camera.up, direction).normalize();
+
+                    const oldPos = camera.position.clone();
+
+                    if (keysPressed.current['KeyW']) {
+                        camera.position.add(direction.clone().multiplyScalar(speed));
+                    }
+                    if (keysPressed.current['KeyS']) {
+                        camera.position.sub(direction.clone().multiplyScalar(speed));
+                    }
+                    if (keysPressed.current['KeyA']) {
+                        camera.position.add(right.clone().multiplyScalar(speed));
+                    }
+                    if (keysPressed.current['KeyD']) {
+                        camera.position.sub(right.clone().multiplyScalar(speed));
+                    }
+
+                    const hasCollision = checkCollision(
+                        camera.position.x,
+                        camera.position.y - 1.6,
+                        camera.position.z
+                    );
+
+                    if (hasCollision) {
+                        camera.position.copy(oldPos);
+                    }
                 }
             }
 
@@ -337,36 +403,65 @@ const MinecraftViewerTab = () => {
     const updateCamera = (data) => {
         if (!cameraRef.current || !data.position) return;
 
-        const camera = cameraRef.current;
         const serverPos = {
             x: data.position.x,
             y: data.position.y + 1.6,
             z: data.position.z
         };
 
-        const distanceMoved = Math.sqrt(
+        const camera = cameraRef.current;
+        const correctionMultiplier = settingsRef.current.correctionSpeed;
+
+        const horizontalDist = Math.sqrt(
             Math.pow(serverPos.x - camera.position.x, 2) +
-            Math.pow(serverPos.y - camera.position.y, 2) +
             Math.pow(serverPos.z - camera.position.z, 2)
         );
 
-        const isMoving = keysPressed.current['KeyW'] || keysPressed.current['KeyS'] ||
-                        keysPressed.current['KeyA'] || keysPressed.current['KeyD'];
+        camera.position.y = serverPos.y;
 
-        // Плавная коррекция
-        if (distanceMoved > 1.5 && distanceMoved < 10) {
-            const baseLerp = isMoving ? 0.2 : 0.4; 
-            const distanceFactor = Math.min(distanceMoved / 5, 1);
-            const lerpFactor = baseLerp * (0.5 + 0.5 * distanceFactor);
-
-            camera.position.x += (serverPos.x - camera.position.x) * lerpFactor;
-            camera.position.y += (serverPos.y - camera.position.y) * lerpFactor;
-            camera.position.z += (serverPos.z - camera.position.z) * lerpFactor;
-        } else if (distanceMoved >= 10) {
-            // Телепорт - мгновенная синхронизация
-            camera.position.set(serverPos.x, serverPos.y, serverPos.z);
-            console.log('[MinecraftViewer] Teleport detected, syncing camera position');
+        if (horizontalDist >= 8) {
+            camera.position.x = serverPos.x;
+            camera.position.z = serverPos.z;
         }
+        else if (horizontalDist > 1.5) {
+            const speed = 0.3 * correctionMultiplier;
+            camera.position.x += (serverPos.x - camera.position.x) * speed;
+            camera.position.z += (serverPos.z - camera.position.z) * speed;
+        }
+        else if (horizontalDist > 0.5) {
+            const speed = 0.15 * correctionMultiplier;
+            camera.position.x += (serverPos.x - camera.position.x) * speed;
+            camera.position.z += (serverPos.z - camera.position.z) * speed;
+        }
+        else if (horizontalDist > 0.1) {
+            const speed = 0.05 * correctionMultiplier;
+            camera.position.x += (serverPos.x - camera.position.x) * speed;
+            camera.position.z += (serverPos.z - camera.position.z) * speed;
+        }
+    };
+
+    const getChunkKey = (x, y, z) => {
+        const chunkX = Math.floor(x / 16);
+        const chunkY = Math.floor(y / 16);
+        const chunkZ = Math.floor(z / 16);
+        return `${chunkX},${chunkY},${chunkZ}`;
+    };
+
+    const getBlockHash = (blocks) => {
+        return blocks.map(b => `${b.x},${b.y},${b.z},${b.name}`).sort().join('|');
+    };
+
+    const checkCollision = (x, y, z) => {
+        for (let dy = 0; dy < 2; dy++) {
+            const checkY = Math.floor(y + dy);
+            const checkX = Math.floor(x);
+            const checkZ = Math.floor(z);
+            const key = `${checkX},${checkY},${checkZ}`;
+            if (blocksMapRef.current.has(key)) {
+                return true; // Коллизия
+            }
+        }
+        return false; // Свободно
     };
 
     const getBlockColor = (blockName) => {
@@ -456,73 +551,127 @@ const MinecraftViewerTab = () => {
         if (!blocksGroupRef.current) return;
 
         const blocksGroup = blocksGroupRef.current;
-        const newBlocksSet = new Set();
-        const blocksByMaterial = {};
 
+        blocksMapRef.current.clear();
         blocks.forEach(block => {
-            const key = `${block.x},${block.y},${block.z}`;
-            newBlocksSet.add(key);
-
-            if (!blocksByMaterial[block.name]) {
-                blocksByMaterial[block.name] = [];
-            }
-            blocksByMaterial[block.name].push(block);
+            const key = `${Math.floor(block.x)},${Math.floor(block.y)},${Math.floor(block.z)}`;
+            blocksMapRef.current.set(key, true);
         });
 
-        const currentCache = blocksCacheRef.current;
+        const chunkBlocks = new Map();
+        blocks.forEach(block => {
+            const chunkKey = getChunkKey(block.x, block.y, block.z);
+            if (!chunkBlocks.has(chunkKey)) {
+                chunkBlocks.set(chunkKey, []);
+            }
+            chunkBlocks.get(chunkKey).push(block);
+        });
 
-        let addedBlocks = 0;
-        let removedBlocks = 0;
+        const currentChunkKeys = new Set(chunkBlocks.keys());
+        const cachedChunkKeys = new Set(chunkCacheRef.current.keys());
 
-        for (const key of newBlocksSet) {
-            if (!currentCache.has(key)) {
-                addedBlocks++;
+        let changedChunks = 0;
+        const chanksToUpdate = new Set();
+
+        for (const [chunkKey, chunkBlockList] of chunkBlocks.entries()) {
+            const blockHash = getBlockHash(chunkBlockList);
+            const cached = chunkCacheRef.current.get(chunkKey);
+
+            if (!cached || cached.hash !== blockHash) {
+                chanksToUpdate.add(chunkKey);
+                changedChunks++;
             }
         }
 
-        for (const key of currentCache.keys()) {
-            if (!newBlocksSet.has(key)) {
-                removedBlocks++;
+        for (const chunkKey of cachedChunkKeys) {
+            if (!currentChunkKeys.has(chunkKey)) {
+                chanksToUpdate.add(chunkKey);
+                changedChunks++;
             }
         }
 
-        const totalChanges = addedBlocks + removedBlocks;
-        const changePercentage = totalChanges / Math.max(blocks.length, 1);
-
-        if (changePercentage < 0.05) {
+        // Если изменений меньше 10%, пропускаем
+        const changePercentage = changedChunks / Math.max(chunkBlocks.size, 1);
+        if (changePercentage < 0.1 && changedChunks > 0 && changedChunks < 3) {
             return;
         }
 
-        while (blocksGroup.children.length > 0) {
-            const child = blocksGroup.children[0];
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) child.material.dispose();
-            blocksGroup.remove(child);
-        }
+        console.log(`[MinecraftViewer] Updating ${changedChunks} chunks out of ${chunkBlocks.size}`);
 
-        blocksCacheRef.current.clear();
-        blocks.forEach(block => {
-            const key = `${block.x},${block.y},${block.z}`;
-            blocksCacheRef.current.set(key, block);
+        chanksToUpdate.forEach(chunkKey => {
+            const cached = chunkCacheRef.current.get(chunkKey);
+            if (cached && cached.meshes) {
+                cached.meshes.forEach(mesh => {
+                    if (mesh.geometry) mesh.geometry.dispose();
+                    if (mesh.material) mesh.material.dispose();
+                    blocksGroup.remove(mesh);
+                });
+            }
+            chunkCacheRef.current.delete(chunkKey);
         });
 
         const geometry = new THREE.BoxGeometry(1, 1, 1);
 
-        Object.entries(blocksByMaterial).forEach(([blockName, blockList]) => {
-            const material = getBlockMaterial(blockName);
-            const instancedMesh = new THREE.InstancedMesh(geometry, material, blockList.length);
+        chanksToUpdate.forEach(chunkKey => {
+            const chunkBlockList = chunkBlocks.get(chunkKey);
+            if (!chunkBlockList || chunkBlockList.length === 0) return;
 
-            const matrix = new THREE.Matrix4();
-            blockList.forEach((block, i) => {
-                matrix.setPosition(block.x, block.y, block.z);
-                instancedMesh.setMatrixAt(i, matrix);
+            // Группируем блоки чанка по материалу
+            const blocksByMaterial = {};
+            chunkBlockList.forEach(block => {
+                if (!blocksByMaterial[block.name]) {
+                    blocksByMaterial[block.name] = [];
+                }
+                blocksByMaterial[block.name].push(block);
             });
 
-            instancedMesh.instanceMatrix.needsUpdate = true;
-            blocksGroup.add(instancedMesh);
+            const meshes = [];
+            Object.entries(blocksByMaterial).forEach(([blockName, blockList]) => {
+                const material = getBlockMaterial(blockName);
+                const instancedMesh = new THREE.InstancedMesh(geometry, material, blockList.length);
+
+                const matrix = new THREE.Matrix4();
+                blockList.forEach((block, i) => {
+                    matrix.setPosition(block.x, block.y, block.z);
+                    instancedMesh.setMatrixAt(i, matrix);
+                });
+
+                instancedMesh.instanceMatrix.needsUpdate = true;
+
+                if (!geometry.boundingSphere) {
+                    geometry.computeBoundingSphere();
+                }
+
+                // Создаём bounding sphere для всего чанка на основе блоков
+                const centerX = blockList.reduce((sum, b) => sum + b.x, 0) / blockList.length;
+                const centerY = blockList.reduce((sum, b) => sum + b.y, 0) / blockList.length;
+                const centerZ = blockList.reduce((sum, b) => sum + b.z, 0) / blockList.length;
+
+                const maxDist = Math.max(...blockList.map(b =>
+                    Math.sqrt(
+                        Math.pow(b.x - centerX, 2) +
+                        Math.pow(b.y - centerY, 2) +
+                        Math.pow(b.z - centerZ, 2)
+                    )
+                )) + 1; // +1 для размера блока
+
+                instancedMesh.boundingSphere = new THREE.Sphere(
+                    new THREE.Vector3(centerX, centerY, centerZ),
+                    maxDist
+                );
+
+                blocksGroup.add(instancedMesh);
+                meshes.push(instancedMesh);
+            });
+
+            // Кэшируем чанк
+            chunkCacheRef.current.set(chunkKey, {
+                hash: getBlockHash(chunkBlockList),
+                meshes: meshes
+            });
         });
 
-        console.log(`[MinecraftViewer] Rendered ${blocks.length} blocks (${totalChanges} changed, ${changePercentage.toFixed(2)}%)`);
+        console.log(`[MinecraftViewer] Total blocks: ${blocks.length}, Chunks: ${chunkBlocks.size}, Updated: ${changedChunks}`);
     };
 
     const renderPlayers = (players) => {
@@ -536,7 +685,9 @@ const MinecraftViewerTab = () => {
             newPlayersMap.set(key, {
                 x: player.position.x,
                 y: player.position.y,
-                z: player.position.z
+                z: player.position.z,
+                yaw: player.yaw || 0,
+                pitch: player.pitch || 0
             });
         });
 
@@ -546,12 +697,14 @@ const MinecraftViewerTab = () => {
         if (newPlayersMap.size !== currentCache.size) {
             hasChanges = true;
         } else {
-            for (const [username, pos] of newPlayersMap) {
+            for (const [username, data] of newPlayersMap) {
                 const cached = currentCache.get(username);
                 if (!cached ||
-                    Math.abs(cached.x - pos.x) > 0.1 ||
-                    Math.abs(cached.y - pos.y) > 0.1 ||
-                    Math.abs(cached.z - pos.z) > 0.1) {
+                    Math.abs(cached.x - data.x) > 0.1 ||
+                    Math.abs(cached.y - data.y) > 0.1 ||
+                    Math.abs(cached.z - data.z) > 0.1 ||
+                    Math.abs(cached.yaw - data.yaw) > 0.1 ||
+                    Math.abs(cached.pitch - data.pitch) > 0.1) {
                     hasChanges = true;
                     break;
                 }
@@ -574,18 +727,31 @@ const MinecraftViewerTab = () => {
         players.forEach(player => {
             const playerGroup = new THREE.Group();
 
-            const bodyGeometry = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+            const bodyGeometry = new THREE.BoxGeometry(0.6, 1.4, 0.3);
             const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x00aaff });
             const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
             bodyMesh.position.y = 0.9;
             playerGroup.add(bodyMesh);
 
-            const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            // Голова (отдельная группа для поворота по pitch)
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 1.8;
+
+            const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
             const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
             const headMesh = new THREE.Mesh(headGeometry, headMaterial);
-            headMesh.position.y = 2.2;
-            playerGroup.add(headMesh);
+            headGroup.add(headMesh);
 
+            const noseGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.2);
+            const noseMaterial = new THREE.MeshLambertMaterial({ color: 0xddaa77 });
+            const noseMesh = new THREE.Mesh(noseGeometry, noseMaterial);
+            noseMesh.position.z = 0.35;
+            headGroup.add(noseMesh);
+
+            headGroup.rotation.x = -(player.pitch || 0);
+            playerGroup.add(headGroup);
+
+            // Имя игрока
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.width = 256;
@@ -600,17 +766,21 @@ const MinecraftViewerTab = () => {
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
             const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.y = 3;
+            sprite.position.y = 2.5;
             sprite.scale.set(2, 0.5, 1);
             playerGroup.add(sprite);
 
+            // Позиция и поворот всего игрока по yaw
             playerGroup.position.set(player.position.x, player.position.y, player.position.z);
+            playerGroup.rotation.y = (player.yaw || 0) + Math.PI; // +180° для правильного направления
             playersGroup.add(playerGroup);
 
             playersCacheRef.current.set(player.username, {
                 x: player.position.x,
                 y: player.position.y,
-                z: player.position.z
+                z: player.position.z,
+                yaw: player.yaw,
+                pitch: player.pitch
             });
         });
 
@@ -670,13 +840,14 @@ const MinecraftViewerTab = () => {
                 socketRef.current?.emit('viewer:control', {
                     command: { type: 'move', direction: keyMap[e.code], active: false }
                 });
+
             }
         };
 
         const handleMouseMove = (e) => {
             if (document.pointerLockElement !== canvasRef.current) return;
 
-            const sensitivity = 0.03;
+            const sensitivity = 0.03 * settingsRef.current.sensitivity;
             const camera = cameraRef.current;
             if (!camera) return;
 
@@ -779,9 +950,122 @@ const MinecraftViewerTab = () => {
         );
     }
 
+    const updateSetting = (key, value) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
+    };
+
     return (
         <div className="relative w-full h-full overflow-hidden bg-black">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+
+            {/* Кнопка настроек */}
+            <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className="absolute top-4 left-4 bg-black bg-opacity-70 hover:bg-opacity-90 text-white p-2 rounded z-10"
+                title="Настройки (Esc)"
+            >
+                ⚙️
+            </button>
+
+            {/* Панель настроек */}
+            {settingsOpen && (
+                <div className="absolute top-14 left-4 bg-black bg-opacity-90 text-white p-4 rounded w-72 z-20">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold">Настройки</h3>
+                        <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-white">✕</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Радиус отображения */}
+                        <div>
+                            <label className="block text-sm mb-1">
+                                Радиус отображения: {settings.renderDistance} блоков
+                            </label>
+                            <input
+                                type="range"
+                                min="8"
+                                max="64"
+                                step="4"
+                                value={settings.renderDistance}
+                                onChange={(e) => updateSetting('renderDistance', parseInt(e.target.value))}
+                                className="w-full accent-blue-500"
+                            />
+                        </div>
+
+                        {/* Сила синхронизации */}
+                        <div>
+                            <label className="block text-sm mb-1">
+                                Сила синхронизации: {settings.correctionSpeed.toFixed(1)}x
+                            </label>
+                            <input
+                                type="range"
+                                min="0.2"
+                                max="3"
+                                step="0.1"
+                                value={settings.correctionSpeed}
+                                onChange={(e) => updateSetting('correctionSpeed', parseFloat(e.target.value))}
+                                className="w-full accent-blue-500"
+                            />
+                            <div className="text-xs text-gray-400 mt-1">
+                                Меньше = плавнее движение, Больше = точнее позиция
+                            </div>
+                        </div>
+
+                        {/* Чувствительность мыши */}
+                        <div>
+                            <label className="block text-sm mb-1">
+                                Чувствительность мыши: {settings.sensitivity.toFixed(1)}x
+                            </label>
+                            <input
+                                type="range"
+                                min="0.2"
+                                max="3"
+                                step="0.1"
+                                value={settings.sensitivity}
+                                onChange={(e) => updateSetting('sensitivity', parseFloat(e.target.value))}
+                                className="w-full accent-blue-500"
+                            />
+                        </div>
+
+                        {/* Чекбоксы */}
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.localMovement}
+                                    onChange={(e) => updateSetting('localMovement', e.target.checked)}
+                                    className="accent-blue-500"
+                                />
+                                <span className="text-sm">Предикты (локальное движение)</span>
+                            </label>
+
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.showDebug}
+                                    onChange={(e) => updateSetting('showDebug', e.target.checked)}
+                                    className="accent-blue-500"
+                                />
+                                <span className="text-sm">Показывать отладку</span>
+                            </label>
+                        </div>
+
+                        {/* Кнопка сброса */}
+                        <button
+                            onClick={() => setSettings({
+                                renderDistance: 24,
+                                correctionSpeed: 1.0,
+                                sensitivity: 1.0,
+                                localMovement: true,
+                                showDebug: false,
+                            })}
+                            className="w-full mt-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                        >
+                            Сбросить настройки
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {botState && (
                 <div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-4 rounded">
@@ -792,6 +1076,13 @@ const MinecraftViewerTab = () => {
                             X: {botState.position.x.toFixed(1)}{' '}
                             Y: {botState.position.y.toFixed(1)}{' '}
                             Z: {botState.position.z.toFixed(1)}
+                        </div>
+                    )}
+                    {settings.showDebug && cameraRef.current && (
+                        <div className="text-xs mt-2 text-gray-400 border-t border-gray-600 pt-2">
+                            <div>Camera: {cameraRef.current.position.x.toFixed(1)}, {cameraRef.current.position.y.toFixed(1)}, {cameraRef.current.position.z.toFixed(1)}</div>
+                            <div>Yaw: {(localCameraRef.current.yaw * 180 / Math.PI).toFixed(0)}°</div>
+                            <div>Chunks: {chunkCacheRef.current.size}</div>
                         </div>
                     )}
                 </div>

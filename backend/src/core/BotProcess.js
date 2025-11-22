@@ -25,6 +25,7 @@ const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
 let connectionTimeout = null;
 let botReadySent = false;
+let viewerRenderDistance = 24; // Динамический радиус отображения для viewer
 
 const originalJSONParse = JSON.parse
 JSON.parse = function (text, reviver) {
@@ -231,9 +232,9 @@ process.on('message', async (message) => {
             if (message.includeBlocks && bot.entity?.position) {
                 blocks = [];
                 const pos = bot.entity.position;
-                const horizontalRange = 24;
-                const verticalRangeDown = 12;
-                const verticalRangeUp = 24;
+                const horizontalRange = viewerRenderDistance;
+                const verticalRangeDown = Math.min(viewerRenderDistance / 2, 16);
+                const verticalRangeUp = viewerRenderDistance;
 
                 for (let x = Math.floor(pos.x - horizontalRange); x <= Math.floor(pos.x + horizontalRange); x++) {
                     for (let y = Math.floor(pos.y - verticalRangeDown); y <= Math.floor(pos.y + verticalRangeUp); y++) {
@@ -276,6 +277,8 @@ process.on('message', async (message) => {
                     .map(e => ({
                         username: e.username,
                         position: { x: e.position.x, y: e.position.y, z: e.position.z },
+                        yaw: e.yaw || 0,
+                        pitch: e.pitch || 0,
                         distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
                     })) : [],
                 nearbyMobs: bot.entities ? Object.values(bot.entities)
@@ -331,6 +334,21 @@ process.on('message', async (message) => {
                                     .catch(err => sendLog(`[Viewer] Place error: ${err.message}`));
                             }
                         }
+                    }
+                    break;
+
+                case 'sync_position':
+                    if (command.position && bot.entity) {
+                        bot.entity.position.x = command.position.x;
+                        bot.entity.position.y = command.position.y;
+                        bot.entity.position.z = command.position.z;
+                    }
+                    break;
+
+                case 'set_render_distance':
+                    if (command.distance && command.distance >= 8 && command.distance <= 64) {
+                        viewerRenderDistance = command.distance;
+                        sendLog(`[Viewer] Render distance set to ${viewerRenderDistance}`);
                     }
                     break;
             }
