@@ -28,6 +28,12 @@ const MinecraftViewerTab = () => {
     const [error, setError] = useState(null);
 
     const keysPressed = useRef({});
+    const localCameraRef = useRef({ yaw: 0, pitch: 0 });
+    const chatOpenRef = useRef(false);
+
+    useEffect(() => {
+        chatOpenRef.current = chatOpen;
+    }, [chatOpen]);
 
     useEffect(() => {
         connectToBot();
@@ -148,6 +154,32 @@ const MinecraftViewerTab = () => {
         const animate = () => {
             animationFrameRef.current = requestAnimationFrame(animate);
 
+            // Локальное движение камеры
+            if (camera && !chatOpenRef.current) {
+                const speed = 0.08; // ~4.3 блоков/сек (скорость ходьбы в Minecraft)
+                const direction = new THREE.Vector3();
+                const right = new THREE.Vector3();
+
+                camera.getWorldDirection(direction);
+                direction.y = 0;
+                direction.normalize();
+
+                right.crossVectors(camera.up, direction).normalize();
+
+                if (keysPressed.current['KeyW']) {
+                    camera.position.add(direction.multiplyScalar(speed));
+                }
+                if (keysPressed.current['KeyS']) {
+                    camera.position.sub(direction.multiplyScalar(speed));
+                }
+                if (keysPressed.current['KeyA']) {
+                    camera.position.add(right.multiplyScalar(speed));
+                }
+                if (keysPressed.current['KeyD']) {
+                    camera.position.sub(right.multiplyScalar(speed));
+                }
+            }
+
             if (document.pointerLockElement === canvas && blocksGroupRef.current && highlightRef.current) {
                 const raycaster = raycasterRef.current;
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -225,6 +257,22 @@ const MinecraftViewerTab = () => {
         socket.on('viewer:state', (state) => {
             console.log('[MinecraftViewer] Initial state:', state);
             setBotState(state);
+
+            if (state.yaw !== undefined && state.pitch !== undefined) {
+                localCameraRef.current.yaw = state.yaw;
+                localCameraRef.current.pitch = state.pitch;
+            }
+
+            if (state.position && cameraRef.current) {
+                cameraRef.current.position.set(
+                    state.position.x,
+                    state.position.y + 1.6,
+                    state.position.z
+                );
+                cameraRef.current.rotation.order = 'ZYX';
+                cameraRef.current.rotation.set(localCameraRef.current.pitch, localCameraRef.current.yaw, 0);
+            }
+
             if (state.blocks) {
                 renderBlocks(state.blocks);
             }
@@ -290,16 +338,29 @@ const MinecraftViewerTab = () => {
         if (!cameraRef.current || !data.position) return;
 
         const camera = cameraRef.current;
+        const serverPos = {
+            x: data.position.x,
+            y: data.position.y + 1.6,
+            z: data.position.z
+        };
 
-        camera.position.x = data.position.x;
-        camera.position.y = data.position.y + 1.6;
-        camera.position.z = data.position.z;
+        const distanceMoved = Math.sqrt(
+            Math.pow(serverPos.x - camera.position.x, 2) +
+            Math.pow(serverPos.y - camera.position.y, 2) +
+            Math.pow(serverPos.z - camera.position.z, 2)
+        );
 
-        const pitch = data.pitch || 0;
-        const yaw = data.yaw || 0;
-
-        camera.rotation.order = 'ZYX';
-        camera.rotation.set(pitch, yaw, 0);
+        // Плавная коррекция если расхождение небольшое
+        if (distanceMoved > 0.5 && distanceMoved < 10) {
+            const lerpFactor = 0.1; // Интерполяция 10%
+            camera.position.x += (serverPos.x - camera.position.x) * lerpFactor;
+            camera.position.y += (serverPos.y - camera.position.y) * lerpFactor;
+            camera.position.z += (serverPos.z - camera.position.z) * lerpFactor;
+        } else if (distanceMoved >= 10) {
+            // Телепорт - мгновенная синхронизация
+            camera.position.set(serverPos.x, serverPos.y, serverPos.z);
+            console.log('[MinecraftViewer] Teleport detected, syncing camera position');
+        }
     };
 
     const getBlockColor = (blockName) => {
@@ -610,12 +671,21 @@ const MinecraftViewerTab = () => {
             if (document.pointerLockElement !== canvasRef.current) return;
 
             const sensitivity = 0.03;
+            const camera = cameraRef.current;
+            if (!camera) return;
+
+            localCameraRef.current.yaw -= e.movementX * sensitivity;
+            localCameraRef.current.pitch -= e.movementY * sensitivity;
+            localCameraRef.current.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, localCameraRef.current.pitch));
+
+            camera.rotation.order = 'ZYX';
+            camera.rotation.set(localCameraRef.current.pitch, localCameraRef.current.yaw, 0);
 
             socketRef.current?.emit('viewer:control', {
                 command: {
                     type: 'look',
-                    yaw: (botState?.yaw || 0) - e.movementX * sensitivity,
-                    pitch: Math.max(-Math.PI / 2, Math.min(Math.PI / 2, (botState?.pitch || 0) - e.movementY * sensitivity))
+                    yaw: localCameraRef.current.yaw,
+                    pitch: localCameraRef.current.pitch
                 }
             });
         };
