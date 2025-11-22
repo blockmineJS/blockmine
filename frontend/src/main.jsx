@@ -30,6 +30,7 @@ import GraphStorePage from "./pages/GraphStorePage";
 import ProxyConfigPage from "./pages/ProxyConfigPage";
 import WebSocketTab from "./pages/Bot/WebSocketTab";
 import PanelApiKeysPage from "./pages/PanelApiKeysPage";
+import MinecraftViewerTab from "./pages/Bot/MinecraftViewerTab";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -125,7 +126,8 @@ const router = createBrowserRouter([
                   { path: "events", element: <ProtectedRoute requiredPermission="management:edit"><EventGraphsPage /></ProtectedRoute> },
                   { path: "plugins/ui/:pluginName/:pluginPath", element: <PluginUIPage /> },
                   { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
-                  { path: "websocket", element: <ProtectedRoute requiredPermission="bot:update"><WebSocketTab /></ProtectedRoute> }
+                  { path: "websocket", element: <ProtectedRoute requiredPermission="bot:update"><WebSocketTab /></ProtectedRoute> },
+                  { path: "minecraft-viewer", element: <MinecraftViewerTab /> }
               ]
             },
             { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },

@@ -8,8 +8,10 @@ const { initializePanelNamespace, broadcastToPanelNamespace } = require('./panel
 const { getTraceCollector } = require('../core/services/TraceCollectorService');
 const { initializeDebugManager, getGlobalDebugManager } = require('../core/services/DebugSessionManager');
 const { initializeCollaborationManager, getGlobalCollaborationManager } = require('../core/services/GraphCollaborationManager');
+const MinecraftViewerService = require('../core/services/MinecraftViewerService');
 
 let io;
+let minecraftViewerService;
 
 // Буфер логов для каждого плагина (последние 100 логов)
 const pluginLogsBuffer = new Map(); // key: 'botId:pluginName', value: array of logs
@@ -38,6 +40,20 @@ function initializeSocket(httpServer) {
     initializePanelNamespace(io);
 
     initializeBotApiNamespace(io);
+
+    // Инициализируем Minecraft Viewer Service
+    const logger = {
+        debug: (...args) => console.log('[DEBUG]', ...args),
+        info: (...args) => console.log('[INFO]', ...args),
+        warn: (...args) => console.warn('[WARN]', ...args),
+        error: (...args) => console.error('[ERROR]', ...args),
+    };
+
+    minecraftViewerService = new MinecraftViewerService({
+        io,
+        botProcessManager: botManager.processManager,
+        logger
+    });
 
     io.on('connection', (socket) => {
         // Сохраняем decoded информацию о пользователе из токена
@@ -83,17 +99,13 @@ function initializeSocket(httpServer) {
 
                 console.log(`[Debug] User ${username} joining debug session for graph ${graphId} (bot ${botId})`);
 
-                // Получаем или создаем debug state для этого графа
                 const debugState = debugManager.getOrCreate(botId, graphId);
 
-                // Добавляем пользователя к debug session
                 debugState.addUser(socket.id, { userId, username, socketId: socket.id });
 
-                // Присоединяем socket к комнате
                 const room = debugState.getRoomName();
                 socket.join(room);
 
-                // Отправляем текущее состояние новому пользователю
                 socket.emit('debug:state', {
                     breakpoints: Array.from(debugState.breakpoints.entries()).map(([nodeId, bp]) => ({
                         nodeId,
@@ -103,7 +115,7 @@ function initializeSocket(httpServer) {
                     connectedUsers: Array.from(debugState.connectedUsers.values())
                 });
 
-                // Уведомляем других пользователей о новом участнике
+                
                 socket.to(room).emit('debug:user-joined', {
                     username,
                     socketId: socket.id,

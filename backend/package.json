@@ -35,9 +35,13 @@
     "express-validator": "^7.2.1",
     "google-ai-kit": "^1.1.3",
     "lru-cache": "^10.4.3",
+    "mineflayer": "^4.33.0",
+    "mineflayer-pathfinder": "^2.4.5",
     "openrouter-kit": "^0.1.81",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
+    "prismarine-viewer": "^1.33.0",
+    "vec3": "^0.1.10",
     "zod": "^4.1.12"
   }
 }

@@ -224,6 +224,119 @@ process.on('message', async (message) => {
                 payload: { entities }
             });
         }
+    } else if (message.type === 'viewer:get_state') {
+        if (bot && process.send) {
+            let blocks = undefined;
+
+            if (message.includeBlocks && bot.entity?.position) {
+                blocks = [];
+                const pos = bot.entity.position;
+                const horizontalRange = 32;
+                const verticalRangeDown = 15;
+                const verticalRangeUp = 32;
+
+                for (let x = Math.floor(pos.x - horizontalRange); x <= Math.floor(pos.x + horizontalRange); x++) {
+                    for (let y = Math.floor(pos.y - verticalRangeDown); y <= Math.floor(pos.y + verticalRangeUp); y++) {
+                        for (let z = Math.floor(pos.z - horizontalRange); z <= Math.floor(pos.z + horizontalRange); z++) {
+                            const block = bot.blockAt(new Vec3(x, y, z));
+                            if (block && block.type !== 0) {
+                                blocks.push({
+                                    x, y, z,
+                                    type: block.type,
+                                    name: block.name
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            const state = {
+                status: bot._client ? 'online' : 'offline',
+                health: bot.health || 20,
+                food: bot.food || 20,
+                position: bot.entity?.position ? {
+                    x: bot.entity.position.x,
+                    y: bot.entity.position.y,
+                    z: bot.entity.position.z
+                } : null,
+                yaw: bot.entity?.yaw || 0,
+                pitch: bot.entity?.pitch || 0,
+                gameMode: bot.game?.gameMode,
+                dimension: bot.game?.dimension,
+                blocks,
+                inventory: bot.inventory ? bot.inventory.items().map(item => ({
+                    name: item.name,
+                    displayName: item.displayName,
+                    count: item.count,
+                    slot: item.slot
+                })) : [],
+                nearbyPlayers: bot.entities ? Object.values(bot.entities)
+                    .filter(e => e.type === 'player' && e.username !== bot.username)
+                    .map(e => ({
+                        username: e.username,
+                        position: { x: e.position.x, y: e.position.y, z: e.position.z },
+                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
+                    })) : [],
+                nearbyMobs: bot.entities ? Object.values(bot.entities)
+                    .filter(e => e.type === 'mob')
+                    .map(e => ({
+                        name: e.name || e.displayName,
+                        mobType: e.mobType,
+                        position: { x: e.position.x, y: e.position.y, z: e.position.z },
+                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
+                    })) : []
+            };
+
+            process.send({
+                type: 'viewer:state_response',
+                requestId: message.requestId,
+                payload: state
+            });
+        }
+    } else if (message.type === 'viewer:control') {
+        const { command } = message;
+        if (!bot) return;
+
+        try {
+            switch (command.type) {
+                case 'move':
+                    bot.setControlState(command.direction, command.active);
+                    break;
+
+                case 'look':
+                    if (command.yaw !== undefined) bot.entity.yaw = command.yaw;
+                    if (command.pitch !== undefined) bot.entity.pitch = command.pitch;
+                    break;
+
+                case 'chat':
+                    bot.chat(command.message);
+                    break;
+
+                case 'dig':
+                    if (command.position) {
+                        const block = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (block) bot.dig(block).catch(err => sendLog(`[Viewer] Dig error: ${err.message}`));
+                    }
+                    break;
+
+                case 'place':
+                    if (command.position && command.blockType) {
+                        const referenceBlock = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (referenceBlock) {
+                            const itemToPlace = bot.inventory.items().find(item => item.name === command.blockType);
+                            if (itemToPlace) {
+                                bot.equip(itemToPlace, 'hand')
+                                    .then(() => bot.placeBlock(referenceBlock, new Vec3(0, 1, 0)))
+                                    .catch(err => sendLog(`[Viewer] Place error: ${err.message}`));
+                            }
+                        }
+                    }
+                    break;
+            }
+        } catch (error) {
+            sendLog(`[Viewer] Control error: ${error.message}`);
+        }
     } else if (message.type === 'execute_event_graph') {
         // Выполнение event графа в child process
         const { botId, graph, eventType, eventArgs } = message;
@@ -773,6 +886,16 @@ process.on('message', async (message) => {
                     rawText: rawMessageText,
                     json: jsonMsg
                 });
+
+                if (process.send && rawMessageText.trim()) {
+                    process.send({
+                        type: 'viewer:chat',
+                        payload: {
+                            rawText: rawMessageText,
+                            timestamp: Date.now()
+                        }
+                    });
+                }
             });
 
             bot.events.on('chat:message', (data) => {
@@ -914,6 +1037,43 @@ process.on('message', async (message) => {
                 setTimeout(() => {
                     isReady = true;
                 }, 3000);
+
+                // Отправка события для viewer
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:spawn',
+                        payload: {
+                            position: bot.entity?.position,
+                            yaw: bot.entity?.yaw,
+                            pitch: bot.entity?.pitch
+                        }
+                    });
+                }
+            });
+
+            bot.on('health', () => {
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:health',
+                        payload: {
+                            health: bot.health,
+                            food: bot.food
+                        }
+                    });
+                }
+            });
+
+            bot.on('move', () => {
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:move',
+                        payload: {
+                            position: bot.entity?.position,
+                            yaw: bot.entity?.yaw,
+                            pitch: bot.entity?.pitch
+                        }
+                    });
+                }
             });
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
