@@ -206,7 +206,9 @@ const MinecraftViewerTab = () => {
     const connectToBot = () => {
         setError(null);
 
-        const socket = io('/minecraft-viewer', {
+        const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin;
+        const socket = io(`${SOCKET_URL}/minecraft-viewer`, {
+            path: '/socket.io/',
             transports: ['websocket', 'polling']
         });
 
