@@ -308,7 +308,6 @@ class CommandExecutionService {
             const updateData = {
                 description: commandConfig.description,
                 owner: commandConfig.owner,
-                permissionId: permissionId,
                 aliases: JSON.stringify(commandConfig.aliases || []),
                 allowedChatTypes: JSON.stringify(commandConfig.allowedChatTypes || []),
                 cooldown: commandConfig.cooldown || 0,
@@ -316,6 +315,10 @@ class CommandExecutionService {
 
             const existingCommand = await this.commandRepository.findByName(botId, commandConfig.name);
             if (existingCommand) {
+                // Обновляем permissionId только если он null (не был установлен пользователем)
+                if (existingCommand.permissionId === null && permissionId !== null) {
+                    updateData.permissionId = permissionId;
+                }
                 await this.commandRepository.update(existingCommand.id, updateData);
             } else {
                 await this.commandRepository.create(createData);

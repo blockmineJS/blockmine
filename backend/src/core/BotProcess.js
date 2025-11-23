@@ -539,7 +539,28 @@ process.on('message', async (message) => {
                         });
 
                         if (existingCommand) {
-                            // Команда уже существует, не меняем настройки
+                            if (existingCommand.permissionId === null && command.permissions) {
+                                const permission = await prisma.permission.upsert({
+                                    where: {
+                                        botId_name: {
+                                            botId: bot.config.id,
+                                            name: command.permissions,
+                                        },
+                                    },
+                                    update: {},
+                                    create: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                        description: `Автоматически создано для команды ${command.name}`,
+                                        owner: command.owner || 'system',
+                                    },
+                                });
+
+                                await prisma.command.update({
+                                    where: { id: existingCommand.id },
+                                    data: { permissionId: permission.id }
+                                });
+                            }
                         } else {
                             let permissionId = null;
                             if (command.permissions) {
