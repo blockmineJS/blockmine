@@ -134,15 +134,8 @@ function handleIncomingCommand(type, username, message) {
             }
 
             if (processedArgs[argDef.name] === undefined) {
-                if (argDef.required) {
-                    const usage = commandInstance.args.map(arg => {
-                        return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
-                    }).join(' ');
-
-                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`, username);
-                    bot.api.sendMessage(type, `Использование: ${bot.config.prefix}${commandInstance.name} ${usage}`, username);
-                    return;
-                }
+                // Не проверяем required здесь - это будет сделано в CommandExecutionService
+                // после проверки типа чата и прав владельца
                 if (argDef.default !== undefined) {
                     processedArgs[argDef.name] = argDef.default;
                 }
@@ -155,7 +148,8 @@ function handleIncomingCommand(type, username, message) {
                 commandName: commandInstance.name,
                 username,
                 args: processedArgs,
-                typeChat: type
+                typeChat: type,
+                commandArgs: argsDef // Передаем определение аргументов для валидации
             });
         }
     } catch (e) {
@@ -1343,6 +1337,11 @@ process.on('message', async (message) => {
             if (commandInstance.onBlacklisted !== Command.prototype.onBlacklisted) {
                 commandInstance.onBlacklisted(bot, typeChat, { username });
             }
+        }
+    } else if (message.type === 'send_message') {
+        const { typeChat, message: msg, username } = message;
+        if (bot && bot.api) {
+            bot.api.sendMessage(typeChat, msg, username);
         }
     } else if (message.type === 'action') {
         if (message.name === 'lookAt' && bot && message.payload.position) {

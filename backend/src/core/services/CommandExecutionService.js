@@ -77,14 +77,35 @@ class CommandExecutionService {
 
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') return;
-                child.send({
-                    type: 'handle_wrong_chat',
-                    commandName: dbCommand.name,
-                    username,
-                    typeChat
-                });
+                // Тип чата не разрешен для обычного пользователя - просто молча игнорируем
+                // Никаких сообщений об ошибке не отправляем
                 return;
+            }
+
+            // Проверяем required аргументы ПОСЛЕ проверки типа чата
+            // чтобы обычные пользователи не видели ошибки в неразрешенных чатах
+            if (message.commandArgs) {
+                for (const argDef of message.commandArgs) {
+                    if (argDef.required && (args[argDef.name] === undefined || args[argDef.name] === null)) {
+                        const usage = message.commandArgs.map(arg => {
+                            return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
+                        }).join(' ');
+
+                        child.send({
+                            type: 'send_message',
+                            typeChat,
+                            message: `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`,
+                            username
+                        });
+                        child.send({
+                            type: 'send_message',
+                            typeChat,
+                            message: `Использование: ${botConfig.prefix || '@'}${dbCommand.name} ${usage}`,
+                            username
+                        });
+                        return;
+                    }
+                }
             }
 
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
