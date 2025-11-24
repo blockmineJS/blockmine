@@ -6,3 +6,4 @@ export { arrayGetNextDefinition } from './arrayGetNext';
 export { arrayAddElementDefinition } from './arrayAddElement';
 export { arrayRemoveByIndexDefinition } from './arrayRemoveByIndex';
 export { arrayFindIndexDefinition } from './arrayFindIndex';
+export { arrayJoinDefinition } from './arrayJoin';

@@ -148,6 +148,40 @@ function registerNodes(registry) {
       ]
     }
   });
+
+  registry.registerNodeType({
+    type: 'string:to_upper',
+    label: '⬆️ В верхний регистр',
+    category: 'Строки',
+    description: 'Преобразует строку в верхний регистр (UPPERCASE).',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/strings/to_upper').evaluate,
+    pins: {
+      inputs: [
+        { id: 'text', name: 'Текст', type: 'String', required: false }
+      ],
+      outputs: [
+        { id: 'result', name: 'Result', type: 'String' }
+      ]
+    }
+  });
+
+  registry.registerNodeType({
+    type: 'string:to_lower',
+    label: '⬇️ В нижний регистр',
+    category: 'Строки',
+    description: 'Преобразует строку в нижний регистр (lowercase).',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/strings/to_lower').evaluate,
+    pins: {
+      inputs: [
+        { id: 'text', name: 'Текст', type: 'String', required: false }
+      ],
+      outputs: [
+        { id: 'result', name: 'Result', type: 'String' }
+      ]
+    }
+  });
 }
 
 module.exports = { registerNodes };
