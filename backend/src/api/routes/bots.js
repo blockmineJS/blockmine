@@ -438,8 +438,6 @@ router.put('/:id', authenticateUniversal, checkBotAccess, authorize('bot:update'
             proxyId, proxyHost, proxyPort, proxyUsername, proxyPassword
         } = req.body;
 
-        console.log(`[DEBUG] PUT /api/bots/${req.params.id} - owners field:`, owners, 'type:', typeof owners);
-
         let dataToUpdate = {
             username,
             prefix,
@@ -510,10 +508,12 @@ router.put('/:id', authenticateUniversal, checkBotAccess, authorize('bot:update'
             include: { server: true, proxy: true }
         });
 
-        console.log(`[DEBUG] Bot updated - ID: ${botId}, owners in DB:`, updatedBot.owners);
-
         botManager.reloadBotConfigInRealTime(botId);
-        botManager.invalidateAllUserCache(botId);
+
+        // Отложенная очистка кеша пользователей, чтобы BotProcess успел обновить config
+        setTimeout(() => {
+            botManager.invalidateAllUserCache(botId);
+        }, 500);
 
         res.json(updatedBot);
     } catch (error) {
