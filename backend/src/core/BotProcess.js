@@ -1123,7 +1123,9 @@ process.on('message', async (message) => {
         try {
             const newConfig = await fetchNewConfig(bot.config.id, prisma);
             if (newConfig) {
+                console.log(`[DEBUG BotProcess] Before reload - owners: "${bot.config.owners}"`);
                 bot.config = { ...bot.config, ...newConfig };
+                console.log(`[DEBUG BotProcess] After reload - owners: "${bot.config.owners}"`);
                 const newCommands = await loadCommands();
                 const newPlugins = bot.config.plugins;
                 bot.commands = newCommands;

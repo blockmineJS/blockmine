@@ -17,7 +17,11 @@ class User {
         const botOwners = (this.botConfig.owners || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
         const usernameLower = this.user.username.toLowerCase();
 
+        console.log(`[DEBUG UserService] Bot ${this.botConfig.id} - owners string: "${this.botConfig.owners}", parsed array:`, botOwners, `checking user: "${usernameLower}"`);
+
         this.isOwner = botOwners.includes(usernameLower) || (keksikServers.includes(this.botConfig.server?.host) && globalOwners.includes(usernameLower));
+
+        console.log(`[DEBUG UserService] User "${usernameLower}" isOwner: ${this.isOwner}`);
 
         this.permissionsSet = new Set();
         if (this.user.groups) {
