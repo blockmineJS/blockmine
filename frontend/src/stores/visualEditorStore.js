@@ -399,9 +399,19 @@ export const useVisualEditorStore = create(
           return;
         }
 
-        const typesMatch = sourcePin.type === targetPin.type ||
-                          sourcePin.type === 'Wildcard' ||
-                          targetPin.type === 'Wildcard';
+        // Exec-пины могут соединяться ТОЛЬКО с Exec-пинами
+        const isExecConnection = sourcePin.type === 'Exec' || targetPin.type === 'Exec';
+
+        let typesMatch;
+        if (isExecConnection) {
+          // Exec должен соединяться только с Exec
+          typesMatch = sourcePin.type === 'Exec' && targetPin.type === 'Exec';
+        } else {
+          // Для остальных типов - обычная логика с Wildcard
+          typesMatch = sourcePin.type === targetPin.type ||
+                       sourcePin.type === 'Wildcard' ||
+                       targetPin.type === 'Wildcard';
+        }
 
         if (typesMatch) {
           const newEdge = { ...connection, id: connection.id || `reactflow__edge-${connection.source}${connection.sourceHandle}-${connection.target}${connection.targetHandle}` };
@@ -410,6 +420,15 @@ export const useVisualEditorStore = create(
             state.connectingPin = null;
           });
           broadcastEdgeCreation(newEdge);
+          return;
+        }
+
+        // Для Exec-пинов не делаем конвертацию - просто блокируем соединение
+        if (isExecConnection) {
+          console.warn(`Невозможно соединить Exec-пин с пином типа ${sourcePin.type === 'Exec' ? targetPin.type : sourcePin.type}`);
+          set(state => {
+            state.connectingPin = null;
+          });
           return;
         }
 
