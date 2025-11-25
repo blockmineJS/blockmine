@@ -634,11 +634,20 @@ export const useVisualEditorStore = create(
 
     },
 
-    pasteNodes: () => {
+    pasteNodes: (cursorPosition = null) => {
       const { clipboard, nodes, socket, command } = get();
 
       if (clipboard.nodes.length === 0) {
         return;
+      }
+
+      let offsetX = 50;
+      let offsetY = 50;
+
+      if (cursorPosition && clipboard.nodes.length > 0) {
+        const firstNode = clipboard.nodes[0];
+        offsetX = cursorPosition.x - firstNode.position.x;
+        offsetY = cursorPosition.y - firstNode.position.y;
       }
 
       const idMap = new Map();
@@ -650,8 +659,8 @@ export const useVisualEditorStore = create(
           ...node,
           id: newId,
           position: {
-            x: node.position.x + 50,
-            y: node.position.y + 50,
+            x: node.position.x + offsetX,
+            y: node.position.y + offsetY,
           },
           selected: true,
         };
@@ -846,12 +855,29 @@ export const useVisualEditorStore = create(
 
     onConnectStart: (_, { handleType, nodeId, handleId }) => {
       const node = get().nodes.find(n => n.id === nodeId);
+
+      // Получаем тип пина из определения ноды
+      let pinType = null;
+      if (node) {
+        const definition = NodeRegistry.get(node.type);
+        if (definition) {
+          const { variables, commandArguments } = get();
+          const context = { variables, commandArguments };
+          const pins = handleType === 'source'
+            ? definition.getOutputs(node.data, context)
+            : definition.getInputs(node.data, context);
+          const pin = pins.find(p => p.id === handleId);
+          pinType = pin?.type || null;
+        }
+      }
+
       set({
         connectingPin: {
-          type: handleType,
+          handleType: handleType,
           nodeId: nodeId,
           pinId: handleId,
-          nodeType: node?.type
+          nodeType: node?.type,
+          pinType: pinType
         },
       });
     },

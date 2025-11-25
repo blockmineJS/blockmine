@@ -59,12 +59,50 @@ const Pin = React.memo(({
   nodeEdges = [],
   traceValue = undefined,
   onEditValue = null,
-  debugMode = null
+  debugMode = null,
+  connectingPin = null
 }) => {
   const position = isInput ? Position.Left : Position.Right;
+
+  let isCompatible = false;
+  let isIncompatible = false;
+
+  if (connectingPin) {
+    if (connectingPin.nodeId !== nodeId) {
+      const isValidDirection = (connectingPin.handleType === 'source' && isInput) ||
+                              (connectingPin.handleType === 'target' && !isInput);
+
+      if (isValidDirection) {
+        const sourceType = connectingPin.handleType === 'source' ? connectingPin.pinType : pin.type;
+        const targetType = connectingPin.handleType === 'source' ? pin.type : connectingPin.pinType;
+
+        const isExecConnection = sourceType === 'Exec' || targetType === 'Exec';
+
+        if (isExecConnection) {
+          isCompatible = sourceType === 'Exec' && targetType === 'Exec';
+        } else {
+          isCompatible = sourceType === targetType || sourceType === 'Wildcard' || targetType === 'Wildcard';
+        }
+
+        isIncompatible = !isCompatible;
+      }
+    }
+  }
+
+  const baseColor = pinColors[pin.type] || '#333';
   const style = {
-    background: pinColors[pin.type] || '#333',
+    background: baseColor,
+    width: isCompatible ? '20px' : '16px',
+    height: isCompatible ? '20px' : '16px',
+    boxShadow: isCompatible ? `0 0 12px 2px ${baseColor}, 0 0 20px 4px rgba(34, 197, 94, 0.6)` : 'none',
+    opacity: isIncompatible ? 0.3 : 1,
+    transition: 'all 0.2s ease',
+    border: isCompatible ? '2px solid rgba(34, 197, 94, 0.8)' : 'none',
   };
+
+  const handleClassName = cn(
+    isCompatible && "animate-[pulse_1.5s_ease-in-out_infinite]"
+  );
 
   // Проверяем есть ли подключение к этому пину
   const hasConnection = nodeEdges.some(edge =>
@@ -94,8 +132,8 @@ const Pin = React.memo(({
         type={isInput ? 'target' : 'source'}
         position={position}
         id={pin.id}
-        style={{ ...style, width: '16px', height: '16px' }}
-        className="w-4 h-4"
+        style={style}
+        className={handleClassName}
       />
       <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
       {/* Отображаем значение из трассировки, если есть */}
@@ -251,6 +289,7 @@ const BaseNode = ({
   const command = useVisualEditorStore(state => state.command);
   const addBreakpoint = useVisualEditorStore(state => state.addBreakpoint);
   const removeBreakpoint = useVisualEditorStore(state => state.removeBreakpoint);
+  const connectingPin = useVisualEditorStore(state => state.connectingPin);
 
   // Обработчик редактирования значения
   const handleEditValue = ({ nodeId, pinId, pinName, value, isInput }) => {
@@ -473,6 +512,7 @@ const BaseNode = ({
                   traceValue={traceInputs?.[pin.id]}
                   onEditValue={handleEditValue}
                   debugMode={debugMode}
+                  connectingPin={connectingPin}
                 />
               ))}
               {dataInputs.map(pin => (
@@ -488,6 +528,7 @@ const BaseNode = ({
                   traceValue={traceInputs?.[pin.id]}
                   onEditValue={handleEditValue}
                   debugMode={debugMode}
+                  connectingPin={connectingPin}
                 />
               ))}
             </div>
@@ -507,6 +548,7 @@ const BaseNode = ({
                   traceValue={traceOutputs?.[pin.id]}
                   onEditValue={handleEditValue}
                   debugMode={debugMode}
+                  connectingPin={connectingPin}
                 />
               ))}
               {dataOutputs.map(pin => (
@@ -522,6 +564,7 @@ const BaseNode = ({
                   traceValue={traceOutputs?.[pin.id]}
                   onEditValue={handleEditValue}
                   debugMode={debugMode}
+                  connectingPin={connectingPin}
                 />
               ))}
             </div>

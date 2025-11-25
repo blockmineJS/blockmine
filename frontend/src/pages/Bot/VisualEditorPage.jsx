@@ -103,6 +103,8 @@ function BotVisualEditorPage() {
     const [publishDialogOpen, setPublishDialogOpen] = useState(false);
     const [showEventTypeDialog, setShowEventTypeDialog] = useState(false);
     const [availableEventTypes, setAvailableEventTypes] = useState([]);
+    const [hoveredNodeId, setHoveredNodeId] = useState(null);
+    const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
     const [publishForm, setPublishForm] = useState({
         name: '',
         author: '',
@@ -151,9 +153,9 @@ function BotVisualEditorPage() {
         });
     }, [appSocket, command, botName, location.pathname]);
 
-    // Global mouse tracking для collaborative cursors
+    // Global mouse tracking для collaborative cursors и позиции курсора
     useEffect(() => {
-        if (!socket || !command || !reactFlowInstance) return;
+        if (!reactFlowInstance) return;
 
         const handleMouseMove = (event) => {
             const position = reactFlowInstance.screenToFlowPosition({
@@ -161,21 +163,27 @@ function BotVisualEditorPage() {
                 y: event.clientY,
             });
 
-            socket.emit('collab:cursor', {
-                botId: command.botId,
-                graphId: command.id,
-                x: position.x,
-                y: position.y,
-            });
+            // Сохраняем позицию курсора для Ctrl+V
+            setCursorPosition(position);
 
-            // Если сейчас создаем соединение, отправляем обновление
-            if (connectingPin) {
-                socket.emit('collab:connection-update', {
+            // Collaborative cursor
+            if (socket && command) {
+                socket.emit('collab:cursor', {
                     botId: command.botId,
                     graphId: command.id,
-                    toX: position.x,
-                    toY: position.y,
+                    x: position.x,
+                    y: position.y,
                 });
+
+                // Если сейчас создаем соединение, отправляем обновление
+                if (connectingPin) {
+                    socket.emit('collab:connection-update', {
+                        botId: command.botId,
+                        graphId: command.id,
+                        toX: position.x,
+                        toY: position.y,
+                    });
+                }
             }
         };
 
@@ -208,13 +216,45 @@ function BotVisualEditorPage() {
             if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'с')) {
                 console.log('[Copy] Triggered!');
                 event.preventDefault();
-                copyNodes();
+
+                // Если нет выделенных нод, но есть нода под курсором - выделяем её и копируем
+                const selectedNodes = nodes.filter(n => n.selected);
+                if (selectedNodes.length === 0 && hoveredNodeId) {
+                    console.log('[Copy] No selected nodes, copying hovered node:', hoveredNodeId);
+                    // Временно выделяем ноду под курсором
+                    useVisualEditorStore.setState(state => {
+                        const nodeIndex = state.nodes.findIndex(n => n.id === hoveredNodeId);
+                        if (nodeIndex !== -1) {
+                            state.nodes[nodeIndex].selected = true;
+                        }
+                    });
+                    copyNodes();
+                    // Снимаем выделение после копирования
+                    useVisualEditorStore.setState(state => {
+                        const nodeIndex = state.nodes.findIndex(n => n.id === hoveredNodeId);
+                        if (nodeIndex !== -1) {
+                            state.nodes[nodeIndex].selected = false;
+                        }
+                    });
+                } else {
+                    copyNodes();
+                }
             }
 
             if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'м')) {
                 console.log('[Paste] Triggered!');
                 event.preventDefault();
-                pasteNodes();
+                pasteNodes(cursorPosition);
+            }
+
+            // Delete или Backspace - удаляем ноду под курсором
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                if (hoveredNodeId) {
+                    console.log('[Delete] Triggered for node:', hoveredNodeId);
+                    event.preventDefault();
+                    // Используем onNodesChange для удаления ноды
+                    onNodesChange([{ type: 'remove', id: hoveredNodeId }]);
+                }
             }
         };
 
@@ -223,7 +263,7 @@ function BotVisualEditorPage() {
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [copyNodes, pasteNodes]);
+    }, [copyNodes, pasteNodes, hoveredNodeId, nodes, cursorPosition, onNodesChange]);
 
     const loadCategories = async () => {
         try {
@@ -653,15 +693,17 @@ function BotVisualEditorPage() {
                                 onInit={setReactFlowInstance}
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
+                                onNodeMouseEnter={(event, node) => setHoveredNodeId(node.id)}
+                                onNodeMouseLeave={() => setHoveredNodeId(null)}
                                 fitView
-                                deleteKeyCode={['Backspace', 'Delete']}
+                                deleteKeyCode={null}
                                 multiSelectionKeyCode="Shift"
-                                panOnDrag={[1, 2]}
+                                panOnDrag={[0, 1, 2]}
                                 selectionOnDrag
                                 elevateNodesOnSelect={false}
                                 autoPanOnNodeDrag={true}
                                 zoomOnDoubleClick={true}
-                                selectNodesOnDrag={true}
+                                selectNodesOnDrag={false}
                                 onMove={(event, viewport) => {
                                     setViewport(viewport);
                                 }}
