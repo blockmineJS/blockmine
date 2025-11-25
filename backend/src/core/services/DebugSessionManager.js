@@ -10,16 +10,12 @@ class GraphDebugState {
     this.graphId = graphId;
     this.io = io;
 
-    // Общие брейкпоинты (видят все пользователи)
     this.breakpoints = new Map(); // Map<nodeId, Breakpoint>
 
-    // Текущая активная сессия выполнения (если граф выполняется)
     this.activeExecution = null;
 
-    // Подключенные пользователи
     this.connectedUsers = new Map(); // Map<socketId, {userId, username}>
 
-    // Для управления паузой выполнения
     this.pausePromise = null;
     this.resumeCallback = null;
 
