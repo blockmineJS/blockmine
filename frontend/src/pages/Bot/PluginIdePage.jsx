@@ -1,43 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Save, Download, Copy } from 'lucide-react';
-import Editor from "@monaco-editor/react";
+import { useParams, useNavigate } from 'react-router-dom';
 import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
-import FileTree from '@/components/ide/FileTree';
 import { toast } from '@/hooks/use-toast';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
 import path from 'path-browserify';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Github } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { X } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
-import { copyToClipboard } from '@/lib/clipboard';
+import Workbench from '@/components/ide/Workbench';
 
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
+    const navigate = useNavigate();
     const [structure, setStructure] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [nodeToDelete, setNodeToDelete] = useState(null);
-    const [inlineAction, setInlineAction] = useState(null);
-    const [isPrDialogOpen, setIsPrDialogOpen] = useState(false);
-    const [prForm, setPrForm] = useState({ 
-        branch: `feature/local-changes-${new Date().toISOString().slice(0, 16).replace(/[:-]/g, '-')}`, 
-        commitMessage: 'Changes from local edit', 
-        originalRepo: '' 
-    });
-    const [isPrLoading, setIsPrLoading] = useState(false);
-    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-    const [exportedCode, setExportedCode] = useState('');
-
     const [openTabs, setOpenTabs] = useState([]);
     const [activeTab, setActiveTab] = useState(null);
+
+    // File Operations State
+    const [nodeToDelete, setNodeToDelete] = useState(null);
+    const [inlineAction, setInlineAction] = useState(null);
 
     const fetchStructure = useCallback(async () => {
         setIsLoading(true);
@@ -74,7 +53,7 @@ export default function PluginIdePage() {
             }
 
             const content = await response.text();
-            const newTab = { ...file, content, isDirty: false };
+            const newTab = { ...file, content, isDirty: false, originalContent: content };
             setOpenTabs(prev => [...prev, newTab]);
             setActiveTab(file.path);
         } catch (error) {
@@ -82,7 +61,111 @@ export default function PluginIdePage() {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить файл.' });
         }
     };
-    
+
+    const handleOpenFileAtLine = async (filePath, lineNumber) => {
+        const existingTab = openTabs.find(tab => tab.path === filePath);
+
+        if (existingTab) {
+            setActiveTab(filePath);
+            setTimeout(() => {
+                const event = new CustomEvent('revealLine', { detail: { line: lineNumber } });
+                window.dispatchEvent(event);
+            }, 100);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/file?path=${encodeURIComponent(filePath)}`, {
+                headers: {
+                    'Authorization': `Bearer ${useAppStore.getState().token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const content = await response.text();
+            const fileName = path.basename(filePath);
+            const newTab = {
+                path: filePath,
+                name: fileName,
+                type: 'file',
+                content,
+                isDirty: false,
+                originalContent: content
+            };
+            setOpenTabs(prev => [...prev, newTab]);
+            setActiveTab(filePath);
+
+            setTimeout(() => {
+                const event = new CustomEvent('revealLine', { detail: { line: lineNumber } });
+                window.dispatchEvent(event);
+            }, 200);
+        } catch (error) {
+            console.error('Failed to load file:', error);
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось открыть файл.' });
+        }
+    };
+
+    const handleCloseTab = (file) => {
+        const tabPath = file.path;
+        const tab = openTabs.find(t => t.path === tabPath);
+        if (tab.isDirty) {
+            if (!window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть вкладку?')) {
+                return;
+            }
+        }
+        const newTabs = openTabs.filter(t => t.path !== tabPath);
+        setOpenTabs(newTabs);
+        if (activeTab === tabPath) {
+            setActiveTab(newTabs.length > 0 ? newTabs[newTabs.length - 1].path : null);
+        }
+    };
+
+    const handleContentChange = (path, value) => {
+        setOpenTabs(prev => prev.map(tab =>
+            tab.path === path ? { ...tab, content: value, isDirty: true } : tab
+        ));
+    };
+
+    const handleSave = async (fileToSave) => {
+        const targetPath = fileToSave?.path || activeTab;
+        if (!targetPath) return;
+
+        const currentTab = openTabs.find(tab => tab.path === targetPath);
+        if (!currentTab || !currentTab.isDirty) return;
+
+        try {
+            const result = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/file`, {
+                method: 'POST',
+                body: JSON.stringify({ path: currentTab.path, content: currentTab.content }),
+            });
+
+            setOpenTabs(prev => prev.map(tab =>
+                tab.path === targetPath ? { ...tab, isDirty: false, originalContent: tab.content } : tab
+            ));
+
+            // Проверка на переименование плагина
+            if (result?.renamed && result?.newName) {
+                toast({
+                    title: 'Плагин переименован',
+                    description: `${result.oldName} → ${result.newName}. Перенаправление...`
+                });
+
+                // Перенаправить на новый URL через 1 секунду
+                setTimeout(() => {
+                    navigate(`/bots/${botId}/plugins/ide/${result.newName}`);
+                }, 1000);
+            } else {
+                toast({ title: 'Успех', description: `Файл ${currentTab.name} сохранен.` });
+            }
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить файл.' });
+        }
+    };
+
+    // File System Operations
     const handleFileOperation = async (operation, path, newPath = '') => {
         try {
             await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/fs`, {
@@ -90,13 +173,49 @@ export default function PluginIdePage() {
                 body: JSON.stringify({ operation, path, newPath }),
             });
             await fetchStructure();
-            toast({ title: 'Успех!', description: `Операция "${operation}" для "${path}" выполнена.` });
+            toast({ title: 'Успех!', description: `Операция "${operation}" выполнена.` });
             return true;
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось выполнить операцию: ${error.message}`});
+            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось выполнить операцию: ${error.message}` });
             return false;
         }
     };
+
+    // Handle delete confirmation
+    useEffect(() => {
+        if (!nodeToDelete) return;
+
+        const message = nodeToDelete.type === 'folder'
+            ? `Вы уверены, что хотите удалить папку "${nodeToDelete.name}" и всё её содержимое?`
+            : `Вы уверены, что хотите удалить файл "${nodeToDelete.name}"?`;
+
+        if (window.confirm(message)) {
+            (async () => {
+                const success = await handleFileOperation('delete', nodeToDelete.path);
+                if (success) {
+                    setOpenTabs(prev => prev.filter(tab => {
+                        if (nodeToDelete.type === 'folder') {
+                            return !tab.path.startsWith(nodeToDelete.path + '/') && tab.path !== nodeToDelete.path;
+                        }
+                        return tab.path !== nodeToDelete.path;
+                    }));
+
+                    setActiveTab(prev => {
+                        if (!prev) return null;
+                        if (nodeToDelete.type === 'folder' && (prev.startsWith(nodeToDelete.path + '/') || prev === nodeToDelete.path)) {
+                            return null;
+                        }
+                        if (prev === nodeToDelete.path) {
+                            return null;
+                        }
+                        return prev;
+                    });
+                }
+            })();
+        }
+        setNodeToDelete(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeToDelete]);
 
     const handleMoveFile = async (sourcePath, targetPath) => {
         try {
@@ -105,9 +224,9 @@ export default function PluginIdePage() {
                 body: JSON.stringify({ operation: 'move', path: sourcePath, newPath: targetPath }),
             });
             await fetchStructure();
-            
+
             const actualNewPath = response?.newPath || targetPath;
-            
+
             setOpenTabs(prev => prev.map(tab => {
                 if (tab.path === sourcePath) {
                     return { ...tab, path: actualNewPath, name: path.basename(actualNewPath) };
@@ -119,7 +238,7 @@ export default function PluginIdePage() {
                 }
                 return tab;
             }));
-            
+
             if (activeTab) {
                 if (activeTab === sourcePath) {
                     setActiveTab(actualNewPath);
@@ -129,35 +248,11 @@ export default function PluginIdePage() {
                     setActiveTab(newActivePath);
                 }
             }
-            
-            toast({ title: 'Успех!', description: `Файл перемещен в "${path.dirname(actualNewPath)}"` });
+
+            toast({ title: 'Успех!', description: `Файл перемещен.` });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось переместить файл: ${error.message}`});
-            throw error;
+            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось переместить файл: ${error.message}` });
         }
-    };
-
-    const handleDeleteNode = async () => {
-        if (!nodeToDelete) return;
-        await handleFileOperation('delete', nodeToDelete.path);
-        
-        const affectedTabs = openTabs.filter(tab => tab.path.startsWith(nodeToDelete.path));
-        if (affectedTabs.length > 0) {
-            const newTabs = openTabs.filter(tab => !tab.path.startsWith(nodeToDelete.path));
-            setOpenTabs(newTabs);
-            if (affectedTabs.some(tab => tab.path === activeTab)) {
-                setActiveTab(newTabs.length > 0 ? newTabs[newTabs.length - 1].path : null);
-            }
-        }
-        setNodeToDelete(null);
-    };
-
-    const handleStartInlineAction = (mode, node) => {
-        setInlineAction({ mode, node });
-    };
-
-    const handleCancelInline = () => {
-        setInlineAction(null);
     };
 
     const handleCommitInline = async (newName) => {
@@ -202,448 +297,32 @@ export default function PluginIdePage() {
         }
     };
 
-    const handleSave = async () => {
-        if (!activeTab) return;
-        const currentTab = openTabs.find(tab => tab.path === activeTab);
-        if (!currentTab || !currentTab.isDirty) return;
-        try {
-            await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/file`, {
-                method: 'POST',
-                body: JSON.stringify({ path: currentTab.path, content: currentTab.content }),
-            });
-            setOpenTabs(prev => prev.map(tab => 
-                tab.path === activeTab ? { ...tab, isDirty: false } : tab
-            ));
-            toast({ title: 'Успех', description: `Файл ${currentTab.name} сохранен.` });
-        } catch(e) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить файл.' });
-        }
-    };
-
-    const handleCloseTab = (tabPath, e) => {
-        e.stopPropagation();
-        const tab = openTabs.find(t => t.path === tabPath);
-        if (tab.isDirty) {
-            if (!window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть вкладку?')) {
-                return;
-            }
-        }
-        const newTabs = openTabs.filter(t => t.path !== tabPath);
-        setOpenTabs(newTabs);
-        if (activeTab === tabPath) {
-            setActiveTab(newTabs.length > 0 ? newTabs[newTabs.length - 1].path : null);
-        }
-    };
-
-    const handleEditorChange = (value) => {
-        setOpenTabs(prev => prev.map(tab => 
-            tab.path === activeTab ? { ...tab, content: value, isDirty: true } : tab
-        ));
-    };
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's' && activeTab && openTabs.length > 0) {
-                e.preventDefault();
-                e.stopPropagation();
-                handleSave();
-            }
-        };
-        document.addEventListener('keydown', handleKeyDown, true);
-        return () => document.removeEventListener('keydown', handleKeyDown, true);
-    }, [activeTab, openTabs]);
-
-    const getLanguage = (filename) => {
-        const extension = filename.split('.').pop();
-        switch (extension) {
-            case 'js': return 'javascript';
-            case 'json': return 'json';
-            case 'md': return 'markdown';
-            default: return 'plaintext';
-        }
-    };
-
-    const fetchManifest = useCallback(async () => {
-        try {
-            const data = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/manifest`);
-            return data;
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить manifest.' });
-            return null;
-        }
-    }, [botId, pluginName]);
-
-    const handleOpenPrDialog = async () => {
-        const manifest = await fetchManifest();
-        const repoUrl = manifest?.repository?.url || '';
-        
-        setPrForm(prev => ({ 
-            ...prev, 
-            originalRepo: repoUrl
-        }));
-        
-        setIsPrDialogOpen(true);
-    };
-
-    const handlePrFormChange = (e) => {
-        setPrForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
-
-    const handleCreatePr = async () => {
-        setIsPrLoading(true);
-        try {
-            const response = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/create-pr`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    branch: prForm.branch,
-                    commitMessage: prForm.commitMessage,
-                    repositoryUrl: prForm.originalRepo
-                }),
-            });
-            
-            console.log('PR Response:', response);
-            
-            if (response.success) {
-                console.log('Opening PR URL:', response.prUrl);
-                const opened = window.open(response.prUrl, '_blank');
-                
-                if (!opened) {
-                    console.warn('Popup blocked by browser');
-                    toast({ 
-                        title: 'PR создан', 
-                        description: `${response.message}. Откройте ссылку: ${response.prUrl}`,
-                        duration: 10000 
-                    });
-                } else {
-                    toast({ 
-                        title: 'Успех', 
-                        description: response.message || 'PR успешно создан и открыт.' 
-                    });
-                }
-                setIsPrDialogOpen(false);
-            } else {
-                toast({ variant: 'destructive', title: 'Ошибка', description: 'Неожиданный ответ от сервера' });
-            }
-        } catch (error) {
-            console.error('PR Error:', error);
-            toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
-        } finally {
-            setIsPrLoading(false);
-        }
-    };
-
-    const handleExportPlugin = async () => {
-        try {
-            console.log('Начинаем экспорт плагина:', pluginName);
-            
-            const shouldIgnore = (filePath) => {
-                const ignoreList = [
-                    'node_modules/',
-                    'package-lock.json',
-                    '.git/',
-                    '.vscode/',
-                    '.idea/',
-                    '*.log',
-                    '*.sql',
-                    '*.db',
-                    'sqlite.db',
-                    'local_modules',
-                    'miniapp',
-                    'drizzle',
-                    'dist/',
-                    '.env',
-                    '.gemini_histroy',
-                    '.gemini_tool_history_js',
-                    'com.txt',
-                    'image',
-                    'logo.png',
-                    'public/',
-                    'storage'
-                ];
-                
-                return ignoreList.some(pattern => {
-                    if (pattern.endsWith('/')) {
-                        const dirPattern = pattern.slice(0, -1);
-                        return filePath.includes(dirPattern) || filePath.startsWith(pattern);
-                    }
-                    if (pattern.startsWith('*.')) {
-                        const extension = pattern.substring(1);
-                        return filePath.endsWith(extension);
-                    }
-                    return filePath === pattern || filePath.includes(pattern);
-                });
-            };
-            
-            const structureData = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/structure`);
-            console.log('Структура получена:', structureData);
-            
-            const allFiles = [];
-            const collectFiles = (items, basePath = '') => {
-                items.forEach(item => {
-                    const fullPath = basePath ? `${basePath}/${item.name}` : item.name;
-                    
-                    if (shouldIgnore(fullPath)) {
-                        return;
-                    }
-                    
-                    if (item.type === 'file') {
-                        allFiles.push(fullPath);
-                    } else if (item.type === 'folder' && item.children) {
-                        collectFiles(item.children, fullPath);
-                    }
-                });
-            };
-            
-            collectFiles(structureData);
-            console.log('Найдено файлов:', allFiles);
-            
-            const fileContents = [];
-            for (const filePath of allFiles) {
-                try {
-                    const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/file?path=${encodeURIComponent(filePath)}`, {
-                        headers: {
-                            'Authorization': `Bearer ${useAppStore.getState().token}`
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const content = await response.text();
-                        fileContents.push({
-                            path: filePath,
-                            content: content
-                        });
-                        console.log(`Загружен файл: ${filePath}`);
-                    } else {
-                        console.error(`Ошибка HTTP ${response.status} для файла ${filePath}`);
-                    }
-                } catch (error) {
-                    console.error(`Ошибка загрузки файла ${filePath}:`, error);
-                }
-            }
-            
-            let combinedCode = `// Весь код плагина: ${pluginName}\n\n`;
-            
-            combinedCode += `// Структура файлов:\n`;
-            const addTreeStructure = (items, indent = '', basePath = '') => {
-                items.forEach(item => {
-                    const fullPath = basePath ? `${basePath}/${item.name}` : item.name;
-                    
-                    if (shouldIgnore(fullPath)) {
-                        return;
-                    }
-                    
-                    const prefix = item.type === 'folder' ? '📁' : '📄';
-                    combinedCode += `${indent}${prefix} ${item.name}\n`;
-                    if (item.type === 'folder' && item.children) {
-                        addTreeStructure(item.children, indent + '  ', fullPath);
-                    }
-                });
-            };
-            addTreeStructure(structureData);
-            combinedCode += '\n';
-            
-            combinedCode += `// Содержимое файлов:\n`;
-            combinedCode += `// ========================================\n\n`;
-            
-            fileContents.forEach((file, index) => {
-                combinedCode += `// Файл ${index + 1}: ${file.path}\n`;
-                combinedCode += `// ========================================\n`;
-                combinedCode += file.content;
-                combinedCode += `\n\n`;
-            });
-            
-            console.log('Код сформирован, размер:', combinedCode.length);
-            setExportedCode(combinedCode);
-            setIsExportDialogOpen(true);
-            
-        } catch (error) {
-            console.error('Ошибка экспорта плагина:', error);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось экспортировать плагин' });
-        }
-    };
-
-    const handleCopyToClipboard = async () => {
-        const success = await copyToClipboard(exportedCode);
-        if (success) {
-            toast({ title: 'Успех', description: 'Код скопирован в буфер обмена' });
-        } else {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось скопировать код. Попробуйте выделить и скопировать вручную.' });
-        }
-    };
-
-
-    
     return (
-        <div className="h-full w-full flex flex-col p-4 gap-4">
-             <header className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold">Редактор плагина: {pluginName}</h1>
-                    <p className="text-muted-foreground">Редактирование для бота #{botId}</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button onClick={handleExportPlugin} variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
-                        Полный код
-                    </Button>
-                    <Button onClick={handleOpenPrDialog}>
-                        <Github className="h-4 w-4 mr-2" />
-                        Создать PR
-                    </Button>
-                    <Button onClick={handleSave} disabled={!activeTab || !openTabs.find(tab => tab.path === activeTab)?.isDirty}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Сохранить
-                    </Button>
-                </div>
-            </header>
-            <ResizablePanelGroup direction="horizontal" className="flex-grow rounded-lg border">
-                <ResizablePanel defaultSize={20} minSize={10}>
-                    <Card className="h-full m-1 rounded-lg flex flex-col">
-                        <CardHeader className="p-2 border-b">
-                            <CardTitle className="text-base p-2">Файлы</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 flex-grow">
-                            {isLoading ? <p className="p-4 text-sm text-muted-foreground">Загрузка...</p> : 
-                                <FileTree 
-                                    structure={structure} 
-                                    onSelectFile={handleSelectFile} 
-                                    selectedFile={openTabs.find(tab => tab.path === activeTab)}
-                                    onDelete={setNodeToDelete}
-                                    onRename={(node) => handleStartInlineAction('rename', node)}
-                                    onCreateFile={(node) => handleStartInlineAction('createFile', node)}
-                                    onCreateFolder={(node) => handleStartInlineAction('createFolder', node)}
-                                    inlineAction={inlineAction}
-                                    onCommit={handleCommitInline}
-                                    onCancel={handleCancelInline}
-                                    onMoveFile={handleMoveFile}
-                                />}
-                        </CardContent>
-                    </Card>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={80} minSize={50}>
-                    {openTabs.length === 0 ? (
-                        <div className="h-full flex items-center justify-center text-muted-foreground">
-                            Выберите файл для редактирования
-                        </div>
-                    ) : (
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-                            <TabsList className="flex-shrink-0 justify-start overflow-x-auto">
-                                {openTabs.map(tab => (
-                                    <TabsTrigger key={tab.path} value={tab.path} className="group relative">
-                                        {tab.name}{tab.isDirty ? '*' : ''}
-                                        <X 
-                                            className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100" 
-                                            onClick={(e) => handleCloseTab(tab.path, e)} 
-                                        />
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                            {openTabs.map(tab => (
-                                <TabsContent key={tab.path} value={tab.path} className="flex-grow mt-0">
-                                    <Editor
-                                        height="100%"
-                                        language={getLanguage(tab.name)}
-                                        value={tab.content || ''}
-                                        onChange={handleEditorChange}
-                                        theme="vs-dark"
-                                        options={{ 
-                                            minimap: { enabled: false },
-                                            quickSuggestions: false,
-                                            suggestOnTriggerCharacters: false
-                                        }}
-                                        onMount={(editor) => {
-                                            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-                                                handleSave();
-                                            });
-                                        }}
-                                    />
-                                </TabsContent>
-                            ))}
-                        </Tabs>
-                    )}
-                </ResizablePanel>
-            </ResizablePanelGroup>
-
-            {nodeToDelete && (
-                <ConfirmationDialog
-                    open={!!nodeToDelete}
-                    onOpenChange={() => setNodeToDelete(null)}
-                    title={`Удалить ${nodeToDelete.type === 'folder' ? 'папку' : 'файл'} "${nodeToDelete.name}"?`}
-                    description="Это действие необратимо. Все содержимое будет удалено."
-                    onConfirm={handleDeleteNode}
-                    confirmText="Да, удалить"
-                />
-            )}
-
-            <Dialog open={isPrDialogOpen} onOpenChange={setIsPrDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Создать Pull Request</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="originalRepo">URL репозитория</Label>
-                            <Input 
-                                id="originalRepo" 
-                                name="originalRepo" 
-                                value={prForm.originalRepo} 
-                                onChange={handlePrFormChange} 
-                                placeholder="https://github.com/user/repo.git"
-                            />
-                            {prForm.originalRepo && (
-                                <div className="text-sm text-muted-foreground">
-                                    Изменения будут отправлены в новую ветку этого репозитория
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="branch">Название ветки</Label>
-                            <Input id="branch" name="branch" value={prForm.branch} onChange={handlePrFormChange} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="commitMessage">Сообщение коммита</Label>
-                            <Input id="commitMessage" name="commitMessage" value={prForm.commitMessage} onChange={handlePrFormChange} />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={handleCreatePr} disabled={isPrLoading || !prForm.branch || !prForm.originalRepo}>
-                            {isPrLoading ? 'Создание...' : 'Создать и открыть PR'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[80vh]">
-                    <DialogHeader>
-                        <DialogTitle>Весь код плагина: {pluginName}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Весь код плагина</Label>
-                            <div className="relative">
-                                <Textarea
-                                    value={exportedCode}
-                                    readOnly
-                                    className="min-h-[400px] font-mono text-sm"
-                                    placeholder="Код плагина будет загружен..."
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter className="flex justify-between">
-                        <div className="text-sm text-muted-foreground">
-                            Размер: {Math.round(exportedCode.length / 1024)} KB
-                        </div>
-                        <div className="flex gap-2">
-                            <Button onClick={handleCopyToClipboard} variant="outline">
-                                <Copy className="h-4 w-4 mr-2" />
-                                Копировать
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+        <div className="h-full w-full overflow-hidden">
+            <Workbench
+                botId={botId}
+                pluginName={pluginName}
+                files={openTabs}
+                activeFile={openTabs.find(t => t.path === activeTab)}
+                onSelectFile={handleSelectFile}
+                onCloseFile={handleCloseTab}
+                onSaveFile={handleSave}
+                fileStructure={structure}
+                unsavedFiles={new Set(openTabs.filter(t => t.isDirty).map(t => t.path))}
+                onContentChange={handleContentChange}
+                onOpenFileAtLine={handleOpenFileAtLine}
+                onFileOperation={{
+                    onDelete: setNodeToDelete,
+                    onRename: (node) => setInlineAction({ mode: 'rename', node }),
+                    onCreateFile: (node) => setInlineAction({ mode: 'createFile', node }),
+                    onCreateFolder: (node) => setInlineAction({ mode: 'createFolder', node }),
+                    inlineAction: inlineAction,
+                    onCommit: handleCommitInline,
+                    onCancel: () => setInlineAction(null),
+                    onMoveFile: handleMoveFile,
+                    onRefresh: fetchStructure
+                }}
+            />
         </div>
     );
-} 
+}

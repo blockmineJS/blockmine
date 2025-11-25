@@ -51,7 +51,7 @@ class TaskScheduler {
 
             for (const botId of botIds) {
                 try {
-                    const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+                    const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true, proxy: true } });
                     if (!botConfig) continue;
 
                     switch (task.action) {

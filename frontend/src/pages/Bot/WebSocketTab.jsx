@@ -390,7 +390,7 @@ const WebSocketTab = () => {
                             <Alert className="bg-green-500/10 border-green-500/20">
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                                 <AlertDescription>
-                                    <strong className="text-green-700 dark:text-green-400">Рекомендуется:</strong> Используйте высокоуровневый SDK <code>blockmine-api</code> для простого использования API
+                                    <strong className="text-green-700 dark:text-green-400">Рекомендуется:</strong> Используйте высокоуровневый SDK <code>blockmine-sdk</code> для простого использования API
                                 </AlertDescription>
                             </Alert>
 
@@ -404,9 +404,9 @@ const WebSocketTab = () => {
                                 </p>
                                 <pre className="bg-muted p-4 rounded text-xs overflow-x-auto">
 {`// Установка:
-// npm install blockmine-api
+// npm install blockmine-sdk
 
-const BlockMineBot = require('blockmine-api');
+const BlockMineBot = require('blockmine-sdk');
 
 const bot = new BlockMineBot({
     url: 'http://localhost:3001',

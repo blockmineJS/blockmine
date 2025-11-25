@@ -23,10 +23,6 @@ class Transport {
             if (this.bot && this.bot.api) {
                 this.bot.api.sendMessage(this.type, message, recipient);
             }
-        } else if (this.type === 'telegram') {
-            // Telegram - будущая интеграция
-            // TODO: Implement telegram sending
-            console.warn('[Transport] Telegram transport not implemented yet');
         }
     }
 

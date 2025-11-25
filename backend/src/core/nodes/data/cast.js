@@ -9,7 +9,8 @@
 async function evaluate(node, pinId, context, helpers) {
     const { resolvePinValue } = helpers;
 
-    if (pinId === 'value') {
+    // Поддерживаем оба варианта: 'result' (новая версия) и 'value' (старая версия для обратной совместимости)
+    if (pinId === 'result' || pinId === 'value') {
         const value = await resolvePinValue(node, 'value');
         const targetType = node.data?.targetType || 'String';
 

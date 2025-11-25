@@ -12,9 +12,11 @@ const { botManager, pluginManager } = require('./core/services');
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
 const serverRoutes = require('./api/routes/servers');
+const proxiesRoutes = require('./api/routes/proxies');
 const permissionsRoutes = require('./api/routes/permissions');
 const taskRoutes = require('./api/routes/tasks');
 const { router: authRoutes, ALL_PERMISSIONS, VIEWER_PERMISSIONS } = require('./api/routes/auth');
+const panelApiKeysRoutes = require('./api/routes/panelApiKeys');
 const searchRoutes = require('./api/routes/search');
 const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
@@ -22,6 +24,13 @@ const panelRoutes = require('./api/routes/panel');
 const changelogRoutes = require('./api/routes/changelog');
 const logsRoutes = require('./api/routes/logs');
 const systemRoutes = require('./api/routes/system');
+const tracesRoutes = require('./api/routes/traces');
+const botHistoryRoutes = require('./api/routes/botHistory');
+const botUsersRoutes = require('./api/routes/botUsers');
+const botCommandsRoutes = require('./api/routes/botCommands');
+const botGroupsRoutes = require('./api/routes/botGroups');
+const botPermissionsRoutes = require('./api/routes/botPermissions');
+const botStatusRoutes = require('./api/routes/botStatus');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +50,7 @@ const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 const rootPath = path.resolve(__dirname, '..', '..');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/panel/api-keys', panelApiKeysRoutes);
 
 app.use('/api/version', (req, res, next) => {
     async function getVersion() {
@@ -57,15 +67,23 @@ app.use('/api/version', (req, res, next) => {
     getVersion();
 });
 app.use('/api/tasks', taskRoutes);
+app.use('/api/bots', botUsersRoutes);
+app.use('/api/bots', botCommandsRoutes);
+app.use('/api/bots', botGroupsRoutes);
+app.use('/api/bots', botPermissionsRoutes);
+app.use('/api/bots', botStatusRoutes);
 app.use('/api/bots', botRoutes);
+app.use('/api/bot-history', botHistoryRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/servers', serverRoutes);
+app.use('/api/proxies', proxiesRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/panel', panelRoutes);
 app.use('/api/changelog', changelogRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/traces', tracesRoutes);
 
 app.use(express.static(frontendPath));
 

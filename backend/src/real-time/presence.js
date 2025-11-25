@@ -27,6 +27,7 @@ function broadcast(io) {
 		username: info.username,
 		path: info.path || '/',
 		lastSeen: info.lastSeen,
+		metadata: info.metadata || {},
 	}));
 	io.emit('presence:list', list);
 }
@@ -38,7 +39,9 @@ function handleConnection(io, socket) {
 		return socket.disconnect(true);
 	}
 	const { userId, username } = decoded;
-	presenceMap.set(userId, { username, socketId: socket.id, lastSeen: Date.now(), path: '/' });
+	const initialPath = socket.handshake?.query?.initialPath || '/';
+	console.log(`[Presence] User ${username} (${userId}) connected from ${initialPath}`);
+	presenceMap.set(userId, { username, socketId: socket.id, lastSeen: Date.now(), path: initialPath });
 	broadcast(io);
 
 	socket.on('presence:heartbeat', () => {
@@ -50,11 +53,13 @@ function handleConnection(io, socket) {
 		}
 	});
 
-	socket.on('presence:update', ({ path }) => {
+	socket.on('presence:update', ({ path, metadata }) => {
 		const info = presenceMap.get(userId) || { username, socketId: socket.id };
 		info.lastSeen = Date.now();
 		info.path = typeof path === 'string' ? path : '/';
+		info.metadata = metadata || {};
 		presenceMap.set(userId, info);
+		console.log(`[Presence] User ${username} updated location: ${info.path}`, metadata);
 		broadcast(io);
 	});
 

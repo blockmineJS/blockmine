@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi } from 'lucide-react';
+import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi, Gamepad2 } from 'lucide-react';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import ExportBotDialog from '@/components/ExportBotDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -112,19 +112,31 @@ export default function BotView() {
                     
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1 overflow-x-auto whitespace-nowrap -mx-2 px-2 md:mx-0 md:px-1">
-                            <NavLink 
-                                to="console" 
+                            <NavLink
+                                to="console"
                                 className={({isActive}) => cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
+                                    isActive
+                                        ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                 )}
                             >
                                 <Terminal className="h-4 w-4" />
                                 Консоль
                             </NavLink>
-                            <NavLink 
+                            <NavLink
+                                to="minecraft-viewer"
+                                className={({isActive}) => cn(
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
+                                    isActive
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <Gamepad2 className="h-4 w-4" />
+                                3D Управление
+                            </NavLink>
+                            <NavLink
                                 to="plugins" 
                                 className={({isActive}) => cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",

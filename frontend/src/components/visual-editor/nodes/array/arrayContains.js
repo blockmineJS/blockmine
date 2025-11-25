@@ -11,14 +11,19 @@ export const arrayContainsDefinition = new NodeDefinition({
   description: 'Проверяет, содержит ли массив указанный элемент',
 
   computeInputs: (data) => [
-    { id: 'array', name: 'Массив', type: 'Array', description: 'Входной массив', required: true },
-    { id: 'element', name: 'Элемент', type: 'Wildcard', description: 'Элемент для поиска', required: true },
+    { id: 'array', name: 'Массив', type: 'Array', description: 'Входной массив', required: false, inlineField: true, placeholder: '[]' },
+    { id: 'element', name: 'Элемент', type: 'Wildcard', description: 'Элемент для поиска', required: false, inlineField: true, placeholder: 'Значение...' },
   ],
 
   computeOutputs: (data) => [
     { id: 'result', name: 'Найден', type: 'Boolean', description: 'True если элемент найден' },
     { id: 'index', name: 'Индекс', type: 'Number', description: 'Индекс элемента (-1 если не найден)' },
   ],
+
+  defaultData: {
+    array: '',
+    element: '',
+  },
 
   theme: {
     headerColor: '#f59e0b',

@@ -9,6 +9,13 @@ function CustomNode({ data, type, id: nodeId }) {
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
   const edges = useVisualEditorStore(state => state.edges);
   const availableNodes = useVisualEditorStore(state => state.availableNodes);
+  const trace = useVisualEditorStore(state => state.trace);
+  const currentStepIndex = useVisualEditorStore(state => state.playbackState.currentStepIndex);
+  const highlightedNodeIds = useVisualEditorStore(state => state.highlightedNodeIds);
+  const currentActiveNodeId = useVisualEditorStore(state => state.currentActiveNodeId);
+  const isTraceViewerOpen = useVisualEditorStore(state => state.isTraceViewerOpen);
+  const breakpoints = useVisualEditorStore(state => state.breakpoints);
+  const debugSession = useVisualEditorStore(state => state.debugSession);
 
   const nodeEdges = useMemo(
     () => edges.filter(e => e.target === nodeId || e.source === nodeId),
@@ -37,7 +44,69 @@ function CustomNode({ data, type, id: nodeId }) {
     [definition, data, context]
   );
 
+  // Получаем inputs и outputs из trace для текущего шага, если воспроизводится трассировка
+  const traceData = useMemo(() => {
+    if (!trace || currentStepIndex < 0) return { inputs: null, outputs: null };
+
+    const executionSteps = trace.steps.filter(step => step.type !== 'traversal');
+    if (currentStepIndex >= executionSteps.length) return { inputs: null, outputs: null };
+
+    // Находим шаг для текущей ноды до или на текущем индексе
+    const stepsUpToCurrent = executionSteps.slice(0, currentStepIndex + 1);
+    const nodeStep = stepsUpToCurrent.reverse().find(step => step.nodeId === nodeId);
+
+    const inputs = nodeStep?.inputs || null;
+    const outputs = nodeStep?.outputs || null;
+
+    return { inputs, outputs };
+  }, [trace, currentStepIndex, nodeId, type]);
+
+  // Получаем данные из Live debug сессии (если на паузе на этой ноде)
+  const liveDebugData = useMemo(() => {
+    if (!debugSession || debugSession.status !== 'paused') {
+      return { inputs: null, outputs: null };
+    }
+
+    // Если это текущая нода на паузе - показываем её inputs
+    if (debugSession.nodeId === nodeId) {
+      return {
+        inputs: debugSession.inputs || null,
+        outputs: null // outputs будут после выполнения
+      };
+    }
+
+    // Если это не текущая нода, ищем её в executedSteps
+    if (debugSession.executedSteps?.steps) {
+      console.log(`[CustomNode] Looking for node ${nodeId} in executedSteps:`, debugSession.executedSteps.steps.length, 'steps');
+      const executionSteps = debugSession.executedSteps.steps.filter(step => step.type !== 'traversal');
+      console.log(`[CustomNode] After filtering traversals:`, executionSteps.length, 'steps');
+      const nodeStep = executionSteps.reverse().find(step => step.nodeId === nodeId);
+
+      if (nodeStep) {
+        console.log(`[CustomNode] Found step for node ${nodeId}:`, nodeStep);
+        return {
+          inputs: nodeStep.inputs || null,
+          outputs: nodeStep.outputs || null
+        };
+      } else {
+        console.log(`[CustomNode] No step found for node ${nodeId}`);
+      }
+    }
+
+    return { inputs: null, outputs: null };
+  }, [debugSession, nodeId]);
+
+  // Комбинируем данные: приоритет у Live debug, потом trace
+  const displayData = useMemo(() => {
+    if (liveDebugData.inputs || liveDebugData.outputs) {
+      return liveDebugData;
+    }
+    return traceData;
+  }, [liveDebugData, traceData]);
+
   if (definition) {
+    const breakpoint = breakpoints.get(nodeId);
+
     return (
       <BaseNode
         nodeId={nodeId}
@@ -52,6 +121,13 @@ function CustomNode({ data, type, id: nodeId }) {
         theme={definition.theme}
         context={context}
         nodeEdges={nodeEdges}
+        traceInputs={displayData.inputs}
+        traceOutputs={displayData.outputs}
+        isHighlighted={highlightedNodeIds.has(nodeId)}
+        isActiveNode={currentActiveNodeId === nodeId}
+        isTraceActive={isTraceViewerOpen}
+        breakpoint={breakpoint}
+        isPausedNode={debugSession?.status === 'paused' && debugSession?.nodeId === nodeId}
       />
     );
   }

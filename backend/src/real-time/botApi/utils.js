@@ -7,8 +7,19 @@
  */
 function broadcastToApiClients(io, botId, eventName, data) {
     try {
+        // Broadcast to bot-api namespace
         const apiNamespace = io.of('/bot-api');
         apiNamespace.to(`bot_${botId}`).emit(eventName, data);
+
+        // Also broadcast to Panel namespace subscribers
+        const panelNamespace = io.of('/panel');
+        const panelChannel = `bots:${botId}:events`;
+        panelNamespace.to(panelChannel).emit(panelChannel, {
+            botId,
+            eventType: eventName,
+            data,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         console.error('[Bot API] Ошибка broadcast:', error);
     }

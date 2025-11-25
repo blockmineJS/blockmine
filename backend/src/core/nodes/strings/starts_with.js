@@ -23,7 +23,7 @@ async function evaluate(node, pinId, context, helpers) {
     const { resolvePinValue } = helpers;
 
     if (pinId === 'result') {
-        const str = String(await resolvePinValue(node, 'string', ''));
+        const str = String(await resolvePinValue(node, 'text', ''));
         const prefix = String(await resolvePinValue(node, 'prefix', ''));
         const caseSensitive = await resolvePinValue(node, 'case_sensitive', false);
 

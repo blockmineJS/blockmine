@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const config = require('../../config');
 const { authenticate, authorize } = require('../middleware/auth');
+const { authenticatePanelApiKey } = require('../middleware/panelApiAuth');
 const path = require('path');
 const os = require('os');
 
@@ -15,6 +16,66 @@ const JWT_SECRET = config.security.jwtSecret;
 const JWT_EXPIRES_IN = '7d';
 
 const activeResetTokens = new Map();
+
+const ALL_PERMISSIONS = [
+    { id: '*', label: 'Все права (Администратор)' },
+    { id: 'bot:list', label: 'Просмотр ботов' },
+    { id: 'bot:create', label: 'Создание ботов' },
+    { id: 'bot:update', label: 'Редактирование ботов' },
+    { id: 'bot:delete', label: 'Удаление ботов' },
+    { id: 'bot:start_stop', label: 'Запуск/остановка ботов' },
+    { id: 'bot:interact', label: 'Взаимодействие с ботом (консоль)' },
+    { id: 'bot:export', label: 'Экспорт ботов' },
+    { id: 'bot:import', label: 'Импорт ботов' },
+    { id: 'bot:history:view', label: 'Просмотр истории чата и команд' },
+    { id: 'bot:history:manage', label: 'Управление историей (очистка)' },
+    { id: 'management:view', label: 'Просмотр вкладки "Управление" у бота' },
+    { id: 'management:edit', label: 'Редактирование на вкладке "Управление" у бота' },
+    { id: 'plugin:list', label: 'Просмотр плагинов' },
+    { id: 'plugin:install', label: 'Установка плагинов' },
+    { id: 'plugin:delete', label: 'Удаление плагинов' },
+    { id: 'plugin:update', label: 'Обновление плагинов' },
+    { id: 'plugin:settings:view', label: 'Просмотр настроек плагинов' },
+    { id: 'plugin:settings:edit', label: 'Редактирование настроек плагинов' },
+    { id: 'plugin:browse', label: 'Просмотр каталога плагинов' },
+    { id: 'plugin:develop', label: 'Разработка и редактирование плагинов (IDE)' },
+    { id: 'server:list', label: 'Просмотр серверов' },
+    { id: 'server:create', label: 'Создание серверов' },
+    { id: 'server:delete', label: 'Удаление серверов' },
+    { id: 'proxy:list', label: 'Просмотр прокси' },
+    { id: 'proxy:create', label: 'Создание и редактирование прокси' },
+    { id: 'proxy:delete', label: 'Удаление прокси' },
+    { id: 'task:list', label: 'Просмотр задач' },
+    { id: 'task:create', label: 'Создание задач' },
+    { id: 'task:edit', label: 'Редактирование задач' },
+    { id: 'task:delete', label: 'Удаление задач' },
+    { id: 'panel:user:list', label: 'Просмотр пользователей панели' },
+    { id: 'panel:user:create', label: 'Создание пользователей панели' },
+    { id: 'panel:user:edit', label: 'Редактирование пользователей панели' },
+    { id: 'panel:user:delete', label: 'Удаление пользователей панели' },
+    { id: 'panel:role:list', label: 'Просмотр ролей панели' },
+    { id: 'panel:role:create', label: 'Создание ролей панели' },
+    { id: 'panel:role:edit', label: 'Редактирование ролей панели' },
+    { id: 'panel:role:delete', label: 'Удаление ролей панели' },
+    { id: 'panel:settings:view', label: 'Просмотр глобальных настроек' },
+    { id: 'panel:settings:edit', label: 'Редактирование глобальных настроек' },
+    { id: 'graph:read', label: 'Просмотр магазина графов' },
+    { id: 'graph:download', label: 'Скачивание графов из магазина' },
+    { id: 'graph:like', label: 'Лайки графов в магазине' },
+    { id: 'graph:publish', label: 'Публикация графов в магазин' },
+];
+
+const VIEWER_PERMISSIONS = [
+    'bot:list',
+    'bot:history:view',
+    'plugin:list',
+    'plugin:settings:view',
+    'management:view',
+    'server:list',
+    'proxy:list',
+    'task:list',
+    'graph:read',
+];
 
 function ownerOnly(req, res, next) {
     if (req.user && req.user.userId === 1) return next();
@@ -271,7 +332,12 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Неверные учетные данные' });
         }
 
-        const permissions = JSON.parse(user.role.permissions || '[]');
+        let permissions = JSON.parse(user.role.permissions || '[]');
+
+        // Владелец (первый пользователь) всегда получает все актуальные права
+        if (user.id === 1) {
+            permissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
+        }
 
         const payload = {
             userId: user.id,
@@ -298,6 +364,28 @@ router.post('/login', async (req, res) => {
 
 
 /**
+ * @route   GET /api/auth/validate
+ * @desc    Validate Panel API key
+ * @access  Public (requires API key)
+ */
+router.get('/validate', authenticatePanelApiKey, async (req, res) => {
+    res.json({
+        valid: true,
+        user: {
+            id: req.user.id,
+            username: req.user.username,
+            role: req.user.roleName,
+            permissions: req.user.permissions
+        },
+        apiKey: {
+            id: req.apiKey.id,
+            name: req.apiKey.name,
+            prefix: req.apiKey.prefix
+        }
+    });
+});
+
+/**
  * @route   GET /api/auth/me
  * @desc    Получить данные текущего пользователя по токену
  * @access  Private
@@ -312,7 +400,7 @@ router.get('/me', authenticate, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: "Пользователь не найден." });
         }
-        
+
         res.json({
             id: user.id,
             username: user.username,
@@ -401,58 +489,6 @@ router.get('/roles', authenticate, authorize('panel:role:list'), async (req, res
     }
 });
 
-const ALL_PERMISSIONS = [
-    { id: '*', label: 'Все права (Администратор)' },
-    { id: 'bot:list', label: 'Просмотр ботов' },
-    { id: 'bot:create', label: 'Создание ботов' },
-    { id: 'bot:update', label: 'Редактирование ботов' },
-    { id: 'bot:delete', label: 'Удаление ботов' },
-    { id: 'bot:start_stop', label: 'Запуск/остановка ботов' },
-    { id: 'bot:interact', label: 'Взаимодействие с ботом (консоль)' },
-    { id: 'bot:export', label: 'Экспорт ботов' },
-    { id: 'bot:import', label: 'Импорт ботов' },
-    { id: 'management:view', label: 'Просмотр вкладки "Управление" у бота' },
-    { id: 'management:edit', label: 'Редактирование на вкладке "Управление" у бота' },
-    { id: 'plugin:list', label: 'Просмотр плагинов' },
-    { id: 'plugin:install', label: 'Установка плагинов' },
-    { id: 'plugin:delete', label: 'Удаление плагинов' },
-    { id: 'plugin:update', label: 'Обновление плагинов' },
-    { id: 'plugin:settings:view', label: 'Просмотр настроек плагинов' },
-    { id: 'plugin:settings:edit', label: 'Редактирование настроек плагинов' },
-    { id: 'plugin:browse', label: 'Просмотр каталога плагинов' },
-    { id: 'plugin:develop', label: 'Разработка и редактирование плагинов (IDE)' },
-    { id: 'server:list', label: 'Просмотр серверов' },
-    { id: 'server:create', label: 'Создание серверов' },
-    { id: 'server:delete', label: 'Удаление серверов' },
-    { id: 'task:list', label: 'Просмотр задач' },
-    { id: 'task:create', label: 'Создание задач' },
-    { id: 'task:edit', label: 'Редактирование задач' },
-    { id: 'task:delete', label: 'Удаление задач' },
-    { id: 'panel:user:list', label: 'Просмотр пользователей панели' },
-    { id: 'panel:user:create', label: 'Создание пользователей панели' },
-    { id: 'panel:user:edit', label: 'Редактирование пользователей панели' },
-    { id: 'panel:user:delete', label: 'Удаление пользователей панели' },
-    { id: 'panel:role:list', label: 'Просмотр ролей панели' },
-    { id: 'panel:role:create', label: 'Создание ролей панели' },
-    { id: 'panel:role:edit', label: 'Редактирование ролей панели' },
-    { id: 'panel:role:delete', label: 'Удаление ролей панели' },
-    { id: 'panel:settings:view', label: 'Просмотр глобальных настроек' },
-    { id: 'panel:settings:edit', label: 'Редактирование глобальных настроек' },
-    { id: 'graph:read', label: 'Просмотр магазина графов' },
-    { id: 'graph:download', label: 'Скачивание графов из магазина' },
-    { id: 'graph:like', label: 'Лайки графов в магазине' },
-    { id: 'graph:publish', label: 'Публикация графов в магазин' },
-];
-
-const VIEWER_PERMISSIONS = [
-    'bot:list',
-    'plugin:list',
-    'plugin:settings:view',
-    'management:view',
-    'server:list',
-    'task:list',
-    'graph:read',
-];
 
 /**
  * @route   GET /api/auth/permissions

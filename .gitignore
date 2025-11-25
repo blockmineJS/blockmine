@@ -67,3 +67,6 @@ blockmine-proxy/
 /packages
 
 .claude/
+
+/blockmine-sdk
+/blockmine-sdk-test

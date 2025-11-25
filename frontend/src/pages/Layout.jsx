@@ -4,20 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { 
-    LayoutDashboard, 
-    Clock, 
-    Github, 
-    PlusCircle, 
-    Upload, 
-    LogOut, 
-    Menu, 
-    ChevronsLeft, 
-    ChevronsRight, 
-    Server, 
+import {
+    LayoutDashboard,
+    Clock,
+    Github,
+    PlusCircle,
+    Upload,
+    LogOut,
+    Menu,
+    ChevronsLeft,
+    ChevronsRight,
+    Server,
     ShieldCheck,
     Store,
     Lightbulb,
+    Key,
     MessageSquarePlus,
     Globe
 } from 'lucide-react';
@@ -355,6 +356,10 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                 {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, "Магазин графов")}
             </NavLink>
 
+            <NavLink to="/api-keys" onClick={onLinkClick} className={navLinkClasses}>
+                {iconAndText(<Key className="h-4 w-4 flex-shrink-0" />, "API Ключи")}
+            </NavLink>
+
             {hasPermission('bot:update') && (
                 <NavLink to="/proxy-config" onClick={onLinkClick} className={navLinkClasses}>
                     {iconAndText(<Globe className="h-4 w-4 flex-shrink-0" />, "Прокси")}
@@ -463,6 +468,7 @@ export default function Layout() {
     const user = useAppStore(state => state.user);
     const appVersion = useAppStore(state => state.appVersion);
     const servers = useAppStore(state => state.servers);
+    const proxies = useAppStore(state => state.proxies);
     const logout = useAppStore(state => state.logout);
     const createBot = useAppStore(state => state.createBot);
     const fetchInitialData = useAppStore(state => state.fetchInitialData);
@@ -590,19 +596,36 @@ export default function Layout() {
                     </NavLink>
                 )}
                 {hasPermission('server:list') && (
-                    <NavLink 
-                        to="/servers" 
-                        onClick={() => setIsSheetOpen(false)} 
+                    <NavLink
+                        to="/servers"
+                        onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
                             "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
-                            isActive 
-                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
+                            isActive
+                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
                             isCollapsed && "justify-center"
                         )}
                     >
                         <Server className="h-4 w-4 flex-shrink-0" />
                         <span className={cn(isCollapsed && "hidden")}>Серверы</span>
+                    </NavLink>
+                )}
+
+                {hasPermission('proxy:list') && (
+                    <NavLink
+                        to="/proxies"
+                        onClick={() => setIsSheetOpen(false)}
+                        className={({ isActive }) => cn(
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+                            isActive
+                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                            isCollapsed && "justify-center"
+                        )}
+                    >
+                        <Globe className="h-4 w-4 flex-shrink-0" />
+                        <span className={cn(isCollapsed && "hidden")}>Прокси</span>
                     </NavLink>
                 )}
                 
@@ -625,7 +648,7 @@ export default function Layout() {
                                         Заполните информацию ниже, чтобы добавить нового бота в панель.
                                     </DialogDescription>
                                 </VisuallyHidden>
-                                <BotForm servers={servers} onFormSubmit={handleCreateBot} isSaving={isSaving} isCreation={true} />
+                                <BotForm servers={servers} proxies={proxies} onFormSubmit={handleCreateBot} isSaving={isSaving} isCreation={true} />
                             </DialogContent>
                         </Dialog>
                     )}

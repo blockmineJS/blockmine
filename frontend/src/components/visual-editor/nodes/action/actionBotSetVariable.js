@@ -57,9 +57,7 @@ export const actionBotSetVariableDefinition = new NodeDefinition({
   ],
 
   defaultData: {
-    name: '',
     value: '',
-    persist: false,
   },
 
   theme: {

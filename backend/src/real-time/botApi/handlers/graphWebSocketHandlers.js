@@ -96,7 +96,7 @@ async function handleCallGraph(socket, payload) {
         }, 30000);
 
         try {
-            await botManager.eventGraphManager.executeGraph(
+            await botManager.eventGraphManager.executeGraphInChildProcess(
                 socket.botId,
                 'websocket_call',
                 {

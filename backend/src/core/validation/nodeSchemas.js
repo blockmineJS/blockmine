@@ -18,11 +18,11 @@ const NodeConfigSchema = z.object({
     graphType: z.enum([GRAPH_TYPES.ALL, GRAPH_TYPES.COMMAND, GRAPH_TYPES.EVENT]).optional(),
     isEvent: z.boolean().optional(),
     dynamicPins: z.boolean().optional(),
-    inputs: z.array(PinSchema).optional().default([]),
-    outputs: z.array(PinSchema).optional().default([]),
+    inputs: z.array(PinSchema).default([]),
+    outputs: z.array(PinSchema).default([]),
     pins: z.object({
-        inputs: z.array(PinSchema).optional().default([]),
-        outputs: z.array(PinSchema).optional().default([]),
+        inputs: z.array(PinSchema).default([]),
+        outputs: z.array(PinSchema).default([]),
     }).optional(),
     executor: z.function().optional(),
     evaluator: z.function().optional(),
@@ -35,7 +35,7 @@ const NodeDataSchema = z.object({
         x: z.number(),
         y: z.number(),
     }),
-    data: z.any().optional().default({}),
+    data: z.any().default({}),
     deletable: z.boolean().optional(),
 });
 
@@ -55,7 +55,7 @@ const GraphSchema = z.object({
         name: z.string().min(1),
         type: z.enum(['string', 'number', 'boolean', 'array', 'object']),
         value: z.any(),
-    })).optional().default([]),
+    })).default([]),
 });
 
 function validateNodeConfig(nodeConfig) {

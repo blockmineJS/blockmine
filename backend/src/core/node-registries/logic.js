@@ -40,6 +40,23 @@ function registerNodes(registry) {
       ]
     }
   });
+
+  registry.registerNodeType({
+    type: 'logic:not',
+    label: '! НЕ',
+    category: 'Логика',
+    description: 'Инвертирует boolean значение (NOT).',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/logic/not').evaluate,
+    pins: {
+      inputs: [
+        { id: 'value', name: 'Значение', type: 'Boolean', required: false }
+      ],
+      outputs: [
+        { id: 'result', name: 'Результат', type: 'Boolean' }
+      ]
+    }
+  });
 }
 
 module.exports = { registerNodes };

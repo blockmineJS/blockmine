@@ -159,8 +159,11 @@ class BotManager {
     // === Resource monitoring ===
     async updateAllResourceUsage() {
         const usageData = await this.resourceMonitor.updateAllResourceUsage();
-        const { getIO } = require('../real-time/socketHandler');
-        getIO().emit('bots:usage', usageData);
+        const { getIOSafe } = require('../real-time/socketHandler');
+        const io = getIOSafe();
+        if (io) {
+            io.emit('bots:usage', usageData);
+        }
     }
 
     getBotIdByPid(pid) {
@@ -195,11 +198,14 @@ class BotManager {
 
     syncBotStatuses() {
         const processes = this.processManager.getAllProcesses();
-        const { getIO } = require('../real-time/socketHandler');
+        const { getIOSafe } = require('../real-time/socketHandler');
+        const io = getIOSafe();
+
+        if (!io) return;
 
         for (const [botId, child] of processes.entries()) {
             const actualStatus = child.killed ? 'stopped' : 'running';
-            getIO().emit('bot:status', { botId, status: actualStatus });
+            io.emit('bot:status', { botId, status: actualStatus });
         }
     }
 
@@ -207,6 +213,10 @@ class BotManager {
     setEventGraphManager(manager) {
         this.eventGraphManager = manager;
         this.lifecycleService.eventGraphManager = manager;
+    }
+
+    getChildProcess(botId) {
+        return this.lifecycleService.getChildProcess(botId);
     }
 
     // === Legacy async methods для migration ===

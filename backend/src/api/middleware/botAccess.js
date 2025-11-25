@@ -22,9 +22,13 @@ async function checkBotAccess(req, res, next) {
 		if (!user) return res.status(401).json({ error: 'Пользователь не найден' });
 
 		// Если поле allBots отсутствует (старый клиент) — считаем true
-		if (user.allBots !== false) return next();
+		if (user.allBots !== false) {
+			return next();
+		}
 		const allowed = user.botAccess.some((a) => a.botId === botId);
-		if (!allowed) return res.status(403).json({ error: 'Доступ к боту запрещен' });
+		if (!allowed) {
+			return res.status(403).json({ error: 'Доступ к боту запрещен' });
+		}
 		return next();
 	} catch (e) {
 		console.error('[checkBotAccess] error', e);
@@ -32,4 +36,4 @@ async function checkBotAccess(req, res, next) {
 	}
 }
 
-module.exports = { checkBotAccess }; 
+module.exports = { checkBotAccess };

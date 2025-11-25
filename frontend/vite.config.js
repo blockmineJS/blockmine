@@ -20,10 +20,27 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            const ignoredCodes = ['ECONNABORTED', 'ECONNREFUSED', 'EACCES'];
+            if (!ignoredCodes.includes(err.code)) {
+              console.log('[Vite] proxy error:', err);
+            }
+          });
+        },
       },
       '/socket.io': {
         target: 'http://localhost:3001',
         ws: true,
+        changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            const ignoredCodes = ['ECONNABORTED', 'ECONNREFUSED', 'EACCES'];
+            if (!ignoredCodes.includes(err.code)) {
+              console.log('[Vite] proxy error:', err);
+            }
+          });
+        },
       },
     },
   },

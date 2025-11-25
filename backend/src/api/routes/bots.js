@@ -7,7 +7,7 @@ const { botManager, pluginManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
 const NodeRegistry = require('../../core/NodeRegistry');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authenticateUniversal, authorize } = require('../middleware/auth');
 const { encrypt } = require('../../core/utils/crypto');
 const { randomUUID } = require('crypto');
 const eventGraphsRouter = require('./eventGraphs');
@@ -26,15 +26,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
-router.use('/:botId(\\d+)/*', authenticate, (req, res, next) => checkBotAccess(req, res, next));
-
 const conditionalRestartAuth = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
         console.log('[Debug] Роут перезапуска бота доступен без проверки прав');
         return next();
     }
-    
-    return authenticate(req, res, (err) => {
+
+    return authenticateUniversal(req, res, (err) => {
         if (err) return next(err);
         return authorize('bot:start_stop')(req, res, next);
     });
@@ -45,8 +43,8 @@ const conditionalChatAuth = (req, res, next) => {
         console.log('[Debug] Роут отправки сообщения боту доступен без проверки прав');
         return next();
     }
-    
-    return authenticate(req, res, (err) => {
+
+    return authenticateUniversal(req, res, (err) => {
         if (err) return next(err);
         return authorize('bot:interact')(req, res, next);
     });
@@ -57,29 +55,33 @@ const conditionalStartStopAuth = (req, res, next) => {
         console.log('[Debug] Роут запуска/остановки бота доступен без проверки прав');
         return next();
     }
-    
-    return authenticate(req, res, (err) => {
+
+    return authenticateUniversal(req, res, (err) => {
         if (err) return next(err);
         return authorize('bot:start_stop')(req, res, next);
     });
 };
 
 const conditionalListAuth = (req, res, next) => {
-    return authenticate(req, res, (err) => {
+    console.log('[conditionalListAuth] START, env:', process.env.NODE_ENV, 'debug:', process.env.DEBUG);
+    return authenticateUniversal(req, res, (err) => {
+        console.log('[conditionalListAuth] After auth, err:', err, 'user:', req.user?.username);
         if (err) return next(err);
         if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+            console.log('[conditionalListAuth] DEBUG mode, skipping authorize');
             return next();
         }
+        console.log('[conditionalListAuth] Calling authorize(bot:list)');
         return authorize('bot:list')(req, res, next);
     });
 };
 
-router.post('/:id/restart', conditionalRestartAuth, authenticate, checkBotAccess, async (req, res) => {
+router.post('/:id/restart', conditionalRestartAuth, authenticateUniversal, checkBotAccess, async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         botManager.stopBot(botId);
         setTimeout(async () => {
-            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true, proxy: true } });
             if (!botConfig) {
                 return res.status(404).json({ success: false, message: 'Бот не найден' });
             }
@@ -92,7 +94,7 @@ router.post('/:id/restart', conditionalRestartAuth, authenticate, checkBotAccess
     }
 });
 
-router.post('/:id/chat', conditionalChatAuth, authenticate, checkBotAccess, (req, res) => {
+router.post('/:id/chat', conditionalChatAuth, authenticateUniversal, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const { message } = req.body;
@@ -103,10 +105,10 @@ router.post('/:id/chat', conditionalChatAuth, authenticate, checkBotAccess, (req
     } catch (error) { res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message }); }
 });
 
-router.post('/:id/start', conditionalStartStopAuth, authenticate, checkBotAccess, async (req, res) => {
+router.post('/:id/start', conditionalStartStopAuth, authenticateUniversal, checkBotAccess, async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
-        const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true } });
+        const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true, proxy: true } });
         if (!botConfig) {
             return res.status(404).json({ success: false, message: 'Бот не найден' });
         }
@@ -118,7 +120,7 @@ router.post('/:id/start', conditionalStartStopAuth, authenticate, checkBotAccess
     }
 });
 
-router.post('/:id/stop', conditionalStartStopAuth, authenticate, checkBotAccess, (req, res) => {
+router.post('/:id/stop', conditionalStartStopAuth, authenticateUniversal, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         botManager.stopBot(botId);
@@ -129,7 +131,15 @@ router.post('/:id/stop', conditionalStartStopAuth, authenticate, checkBotAccess,
     }
 });
 
+router.get('/state', conditionalListAuth, (req, res) => {
+    try {
+        const state = botManager.getFullState();
+        res.json(state);
+    } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
+});
+
 router.get('/', conditionalListAuth, async (req, res) => {
+    console.log('[API /api/bots GET] Запрос получен, user:', req.user?.username, 'permissions:', req.user?.permissions?.slice(0, 3));
     try {
         const botsWithoutSortOrder = await prisma.bot.findMany({
             where: { sortOrder: null },
@@ -167,26 +177,40 @@ router.get('/', conditionalListAuth, async (req, res) => {
             }
         }
         
-        const bots = await prisma.bot.findMany({ 
+        const bots = await prisma.bot.findMany({
             where: whereFilter,
-            include: { server: true }, 
-            orderBy: { sortOrder: 'asc' } 
+            include: { server: true },
+            orderBy: { sortOrder: 'asc' }
         });
+        console.log(`[API /api/bots GET] Отправляем ${bots.length} ботов, status: 200`);
         res.json(bots);
-    } catch (error) { 
+    } catch (error) {
         console.error("[API /api/bots] Ошибка получения списка ботов:", error);
-        res.status(500).json({ error: 'Не удалось получить список ботов' }); 
+        res.status(500).json({ error: 'Не удалось получить список ботов' });
     }
 });
 
-router.get('/state', conditionalListAuth, (req, res) => {
+router.get('/:id', conditionalListAuth, async (req, res) => {
     try {
-        const state = botManager.getFullState();
-        res.json(state);
-    } catch (error) { res.status(500).json({ error: 'Не удалось получить состояние ботов' }); }
+        const botId = parseInt(req.params.id, 10);
+
+        const bot = await prisma.bot.findUnique({
+            where: { id: botId },
+            include: { server: true, proxy: true }
+        });
+
+        if (!bot) {
+            return res.status(404).json({ error: 'Бот не найден' });
+        }
+
+        res.json(bot);
+    } catch (error) {
+        console.error(`[API /api/bots/:id] Ошибка получения бота:`, error);
+        res.status(500).json({ error: 'Не удалось получить бота' });
+    }
 });
 
-router.put('/bulk-proxy-update', authenticate, authorize('bot:update'), async (req, res) => {
+router.put('/bulk-proxy-update', authenticateUniversal, authorize('bot:update'), async (req, res) => {
     try {
         const { botIds, proxySettings } = req.body;
         
@@ -298,7 +322,7 @@ router.put('/bulk-proxy-update', authenticate, authorize('bot:update'), async (r
     }
 });
 
-router.get('/:id/logs', conditionalListAuth, authenticate, checkBotAccess, (req, res) => {
+router.get('/:id/logs', conditionalListAuth, authenticateUniversal, checkBotAccess, (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         const { limit = 50, offset = 0 } = req.query;
@@ -372,26 +396,31 @@ async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
 
 router.post('/', authorize('bot:create'), async (req, res) => {
     try {
-        const { username, password, prefix, serverId, note } = req.body;
+        const { username, password, prefix, serverId, note, proxyId, proxyHost, proxyPort, proxyUsername, proxyPassword } = req.body;
         if (!username || !serverId) return res.status(400).json({ error: 'Имя и сервер обязательны' });
-        
+
         const maxSortOrder = await prisma.bot.aggregate({
             _max: { sortOrder: true }
         });
         const nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1;
-        
-        const data = { 
-            username, 
-            prefix, 
-            note, 
+
+        const data = {
+            username,
+            prefix,
+            note,
             serverId: parseInt(serverId, 10),
             password: password ? encrypt(password) : null,
+            proxyId: proxyId ? parseInt(proxyId, 10) : null,
+            proxyHost: proxyHost || null,
+            proxyPort: proxyPort ? parseInt(proxyPort, 10) : null,
+            proxyUsername: proxyUsername || null,
+            proxyPassword: proxyPassword ? encrypt(proxyPassword) : null,
             sortOrder: nextSortOrder
         };
 
         const newBot = await prisma.bot.create({
             data: data,
-            include: { server: true }
+            include: { server: true, proxy: true }
         });
         await setupDefaultPermissionsForBot(newBot.id);
         res.status(201).json(newBot);
@@ -402,11 +431,11 @@ router.post('/', authorize('bot:create'), async (req, res) => {
     }
 });
 
-router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
+router.put('/:id', authenticateUniversal, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
-        const { 
+        const {
             username, password, prefix, serverId, note, owners,
-            proxyHost, proxyPort, proxyUsername, proxyPassword 
+            proxyId, proxyHost, proxyPort, proxyUsername, proxyPassword
         } = req.body;
 
         let dataToUpdate = {
@@ -414,6 +443,7 @@ router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async 
             prefix,
             note,
             owners,
+            proxyId: proxyId ? parseInt(proxyId, 10) : null,
             proxyHost,
             proxyPort: proxyPort ? parseInt(proxyPort, 10) : null,
             proxyUsername,
@@ -441,7 +471,17 @@ router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async 
             delete dataToUpdate.serverId;
             dataToUpdate.server = { connect: { id: serverIdValue } };
         }
-        
+
+        if (dataToUpdate.proxyId !== undefined) {
+            const proxyIdValue = dataToUpdate.proxyId;
+            delete dataToUpdate.proxyId;
+            if (proxyIdValue) {
+                dataToUpdate.proxy = { connect: { id: proxyIdValue } };
+            } else {
+                dataToUpdate.proxy = { disconnect: true };
+            }
+        }
+
         const botId = parseInt(req.params.id, 10);
         if (isNaN(botId)) {
             return res.status(400).json({ message: 'Неверный ID бота.' });
@@ -465,8 +505,15 @@ router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async 
         const updatedBot = await prisma.bot.update({
             where: { id: botId },
             data: dataToUpdate,
-            include: { server: true }
+            include: { server: true, proxy: true }
         });
+
+        botManager.reloadBotConfigInRealTime(botId);
+
+        // Отложенная очистка кеша пользователей, чтобы BotProcess успел обновить config
+        setTimeout(() => {
+            botManager.invalidateAllUserCache(botId);
+        }, 500);
 
         res.json(updatedBot);
     } catch (error) {
@@ -475,7 +522,7 @@ router.put('/:id', authenticate, checkBotAccess, authorize('bot:update'), async 
     }
 });
 
-router.put('/:id/sort-order', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
+router.put('/:id/sort-order', authenticateUniversal, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
         const { newPosition, oldIndex, newIndex } = req.body;
         const botId = parseInt(req.params.id, 10);
@@ -534,7 +581,7 @@ router.put('/:id/sort-order', authenticate, checkBotAccess, authorize('bot:updat
     }
 });
 
-router.delete('/:id', authenticate, checkBotAccess, authorize('bot:delete'), async (req, res) => {
+router.delete('/:id', authenticateUniversal, checkBotAccess, authorize('bot:delete'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
         if (botManager.bots.has(botId)) return res.status(400).json({ error: 'Нельзя удалить запущенного бота' });
@@ -553,7 +600,7 @@ router.get('/servers', authorize('bot:list'), async (req, res) => {
     }
 });
 
-router.get('/:botId/plugins', authenticate, checkBotAccess, authorize('plugin:list'), async (req, res) => {
+router.get('/:botId/plugins', authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const plugins = await prisma.installedPlugin.findMany({ where: { botId } });
@@ -561,7 +608,7 @@ router.get('/:botId/plugins', authenticate, checkBotAccess, authorize('plugin:li
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
-router.post('/:botId/plugins/install/github', authenticate, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/github', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { repoUrl } = req.body;
     try {
@@ -572,7 +619,7 @@ router.post('/:botId/plugins/install/github', authenticate, checkBotAccess, auth
     }
 });
 
-router.post('/:botId/plugins/install/local', authenticate, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { path } = req.body;
     try {
@@ -583,7 +630,7 @@ router.post('/:botId/plugins/install/local', authenticate, checkBotAccess, autho
     }
 });
 
-router.delete('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize('plugin:delete'), async (req, res) => {
+router.delete('/:botId/plugins/:pluginId', authenticateUniversal, checkBotAccess, authorize('plugin:delete'), async (req, res) => {
     const { pluginId } = req.params;
     try {
         await pluginManager.deletePlugin(parseInt(pluginId));
@@ -593,7 +640,7 @@ router.delete('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authori
     }
 });
 
-router.get('/:botId/plugins/:pluginId/settings', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
+router.get('/:botId/plugins/:pluginId/settings', authenticateUniversal, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
 	try {
 		const pluginId = parseInt(req.params.pluginId);
 		const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
@@ -654,7 +701,7 @@ router.get('/:botId/plugins/:pluginId/settings', authenticate, checkBotAccess, a
 	}
 });
 
-router.get('/:botId/plugins/:pluginId/data', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
+router.get('/:botId/plugins/:pluginId/data', authenticateUniversal, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
@@ -674,7 +721,7 @@ router.get('/:botId/plugins/:pluginId/data', authenticate, checkBotAccess, autho
     } catch (error) { res.status(500).json({ error: 'Не удалось получить данные плагина' }); }
 });
 
-router.get('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
+router.get('/:botId/plugins/:pluginId/data/:key', authenticateUniversal, checkBotAccess, authorize('plugin:settings:view'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { key } = req.params;
@@ -696,7 +743,7 @@ router.get('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, 
     } catch (error) { res.status(500).json({ error: 'Не удалось получить значение по ключу' }); }
 });
 
-router.put('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+router.put('/:botId/plugins/:pluginId/data/:key', authenticateUniversal, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { key } = req.params;
@@ -721,7 +768,7 @@ router.put('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, 
     } catch (error) { res.status(500).json({ error: 'Не удалось сохранить значение' }); }
 });
 
-router.delete('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+router.delete('/:botId/plugins/:pluginId/data/:key', authenticateUniversal, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { key } = req.params;
@@ -741,7 +788,7 @@ router.delete('/:botId/plugins/:pluginId/data/:key', authenticate, checkBotAcces
     } catch (error) { res.status(500).json({ error: 'Не удалось удалить значение' }); }
 });
 
-router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
+router.put('/:botId/plugins/:pluginId', authenticateUniversal, checkBotAccess, authorize('plugin:settings:edit'), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { isEnabled, settings } = req.body;
@@ -782,7 +829,7 @@ router.put('/:botId/plugins/:pluginId', authenticate, checkBotAccess, authorize(
     }
 });
 
-router.get('/:botId/management-data', authenticate, checkBotAccess, authorize('management:view'), async (req, res) => {
+router.get('/:botId/management-data', authenticateUniversal, checkBotAccess, authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         if (isNaN(botId)) return res.status(400).json({ error: 'Неверный ID бота' });
@@ -1114,7 +1161,7 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
 router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на запуск всех ботов.');
-        const allBots = await prisma.bot.findMany({ include: { server: true } });
+        const allBots = await prisma.bot.findMany({ include: { server: true, proxy: true } });
         let startedCount = 0;
         for (const botConfig of allBots) {
             if (!botManager.bots.has(botConfig.id)) {
@@ -1145,7 +1192,7 @@ router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
     }
 });
 
-router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:update'), async (req, res) => {
+router.get('/:id/settings/all', authenticateUniversal, checkBotAccess, authorize('bot:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
 
@@ -1153,6 +1200,7 @@ router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:upd
             where: { id: botId },
             include: {
                 server: true,
+                proxy: true,
                 installedPlugins: {
                     orderBy: { name: 'asc' }
                 }
@@ -1171,6 +1219,7 @@ router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:upd
                 note: bot.note,
                 owners: bot.owners,
                 serverId: bot.serverId,
+                proxyId: bot.proxyId,
                 proxyHost: bot.proxyHost,
                 proxyPort: bot.proxyPort,
                 proxyUsername: bot.proxyUsername,
@@ -1232,7 +1281,7 @@ router.get('/:id/settings/all', authenticate, checkBotAccess, authorize('bot:upd
 
 const nodeRegistry = require('../../core/NodeRegistry'); 
 
-router.get('/:botId/visual-editor/nodes', authenticate, checkBotAccess, authorize('management:view'), (req, res) => {
+router.get('/:botId/visual-editor/nodes', authenticateUniversal, checkBotAccess, authorize('management:view'), (req, res) => {
     try {
         const { graphType } = req.query;
         const nodesByCategory = nodeRegistry.getNodesByCategory(graphType);
@@ -1243,7 +1292,7 @@ router.get('/:botId/visual-editor/nodes', authenticate, checkBotAccess, authoriz
     }
 });
 
-router.get('/:botId/visual-editor/node-config', authenticate, checkBotAccess, authorize('management:view'), (req, res) => {
+router.get('/:botId/visual-editor/node-config', authenticateUniversal, checkBotAccess, authorize('management:view'), (req, res) => {
     try {
         const { types } = req.query;
         if (!types) {
@@ -1258,7 +1307,7 @@ router.get('/:botId/visual-editor/node-config', authenticate, checkBotAccess, au
     }
 });
 
-router.get('/:botId/visual-editor/permissions', authenticate, checkBotAccess, authorize('management:view'), async (req, res) => {
+router.get('/:botId/visual-editor/permissions', authenticateUniversal, checkBotAccess, authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const permissions = await prisma.permission.findMany({ 
@@ -1879,7 +1928,7 @@ router.post('/:botId/plugins/:pluginName/action', authorize('plugin:list'), asyn
 });
 
 
-router.get('/:botId/export', authenticate, checkBotAccess, authorize('bot:export'), async (req, res) => {
+router.get('/:botId/export', authenticateUniversal, checkBotAccess, authorize('bot:export'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);
         const {

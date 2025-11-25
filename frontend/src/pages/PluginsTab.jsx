@@ -35,6 +35,7 @@ export default function PluginsTab() {
     const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
+    const reloadLocalPlugin = useAppStore(state => state.reloadLocalPlugin);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
@@ -91,9 +92,12 @@ export default function PluginsTab() {
     const handleForkPlugin = async (plugin) => {
         setIsForking(true);
         try {
-            const forkedPlugin = await forkPlugin(intBotId, plugin.name);
-            if (forkedPlugin) {
-                navigate(`/bots/${intBotId}/plugins/edit/${forkedPlugin.name}`);
+            const updatedPlugin = await forkPlugin(intBotId, plugin.name);
+            if (updatedPlugin) {
+                // Обновляем список плагинов чтобы отобразить изменение sourceType
+                await fetchInstalledPlugins(intBotId);
+                // Переходим в редактор (имя плагина не меняется)
+                navigate(`/bots/${intBotId}/plugins/edit/${updatedPlugin.name}`);
             }
         } finally {
             setIsForking(false);
@@ -169,40 +173,26 @@ export default function PluginsTab() {
                         </Tooltip>
                         </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
-                            <TooltipProvider>
-                            <Tooltip>
-                            <TooltipTrigger asChild>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" disabled={!canInstall}>
-                                        <FolderPlus className="h-4 w-4" />
-                                    </Button>
-                                </DialogTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>Установить локально</TooltipContent>
-                            </Tooltip>
-                            </TooltipProvider>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <FolderPlus className="h-4 w-4" />
+                                    <span className="ml-2">Установить локально</span>
+                                </Button>
+                            </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
-                        <TooltipProvider>
-                        <Tooltip>
-                        <TooltipTrigger asChild>
-                        <span>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
+                            <span className="ml-2">Создать плагин</span>
                         </Button>
-                        </span>
-                        </TooltipTrigger>
-                        <TooltipContent>Создать плагин</TooltipContent>
-                        </Tooltip>
-                        </TooltipProvider>
                     </div>
                 </div>
             </div>
             
             <TabsContent value="installed" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
                 <div className="flex-1 overflow-y-auto">
-                    <InstalledPluginsView 
-                        bot={bot} 
+                    <InstalledPluginsView
+                        bot={bot}
                         installedPlugins={installedPlugins}
                         isLoading={isLoading}
                         updates={updates}
@@ -212,6 +202,7 @@ export default function PluginsTab() {
                         onUpdatePlugin={canUpdate ? ((pluginId) => handleUpdatePlugin(pluginId)) : null}
                         onSaveSettings={handlePluginOperationSuccess}
                         onForkPlugin={canDevelop ? ((plugin) => handleForkPlugin(plugin)) : null}
+                        onReloadPlugin={canDevelop ? ((plugin) => reloadLocalPlugin(intBotId, plugin.id)) : null}
                     />
                 </div>
             </TabsContent>

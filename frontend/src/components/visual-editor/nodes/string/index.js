@@ -7,3 +7,5 @@ export { stringLengthDefinition } from './stringLength';
 export { stringEqualsDefinition } from './stringEquals';
 export { stringEndsWithDefinition } from './stringEndsWith';
 export { stringSplitDefinition } from './stringSplit';
+export { stringToUpperDefinition } from './stringToUpper';
+export { stringToLowerDefinition } from './stringToLower';

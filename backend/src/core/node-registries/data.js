@@ -139,7 +139,7 @@ function registerNodes(registry) {
         { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
       ],
       outputs: [
-        { id: 'value', name: 'Значение', type: 'Wildcard' }
+        { id: 'result', name: 'Результат', type: 'Wildcard' }
       ]
     }
   });

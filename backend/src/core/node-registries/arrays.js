@@ -132,6 +132,24 @@ function registerNodes(registry) {
       ]
     }
   });
+
+  registry.registerNodeType({
+    type: 'array:join',
+    label: '🔗 Объединить в строку',
+    category: 'Массив',
+    description: 'Объединяет элементы массива в строку с разделителем.',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../nodes/arrays/join').evaluate,
+    pins: {
+      inputs: [
+        { id: 'array', name: 'Массив', type: 'Array', required: false },
+        { id: 'separator', name: 'Разделитель', type: 'String', required: false }
+      ],
+      outputs: [
+        { id: 'result', name: 'Result', type: 'String' }
+      ]
+    }
+  });
 }
 
 module.exports = { registerNodes };

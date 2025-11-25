@@ -1,5 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const UserService = require('../UserService');
+const { getRuntimeCommandRegistry } = require('../system/RuntimeCommandRegistry');
+const botHistoryStore = require('../BotHistoryStore');
 
 // Кулдауны и предупреждения - глобальные для всех инстансов
 const cooldowns = new Map();
@@ -49,7 +51,25 @@ class CommandExecutionService {
             }
 
             const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
-            const dbCommand = botConfigCache.commands.get(mainCommandName);
+            let dbCommand = botConfigCache.commands.get(mainCommandName);
+
+            // Если команда не найдена в БД, проверяем runtime registry (временные команды)
+            if (!dbCommand) {
+                const runtimeRegistry = getRuntimeCommandRegistry();
+                const tempCommand = runtimeRegistry.get(botId, mainCommandName);
+
+                if (tempCommand) {
+                    // Преобразуем временную команду в формат dbCommand
+                    dbCommand = {
+                        name: tempCommand.name,
+                        isEnabled: true,
+                        allowedChatTypes: JSON.stringify(tempCommand.allowedChatTypes || ['chat', 'private']),
+                        permissionId: tempCommand.permissionId || null,
+                        cooldown: tempCommand.cooldown || 0,
+                        isTemporary: true
+                    };
+                }
+            }
 
             if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
                 return;
@@ -57,14 +77,35 @@ class CommandExecutionService {
 
             const allowedTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
             if (!allowedTypes.includes(typeChat) && !user.isOwner) {
-                if (typeChat === 'global') return;
-                child.send({
-                    type: 'handle_wrong_chat',
-                    commandName: dbCommand.name,
-                    username,
-                    typeChat
-                });
+                // Тип чата не разрешен для обычного пользователя - просто молча игнорируем
+                // Никаких сообщений об ошибке не отправляем
                 return;
+            }
+
+            // Проверяем required аргументы ПОСЛЕ проверки типа чата
+            // чтобы обычные пользователи не видели ошибки в неразрешенных чатах
+            if (message.commandArgs) {
+                for (const argDef of message.commandArgs) {
+                    if (argDef.required && (args[argDef.name] === undefined || args[argDef.name] === null)) {
+                        const usage = message.commandArgs.map(arg => {
+                            return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
+                        }).join(' ');
+
+                        child.send({
+                            type: 'send_message',
+                            typeChat,
+                            message: `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`,
+                            username
+                        });
+                        child.send({
+                            type: 'send_message',
+                            typeChat,
+                            message: `Использование: ${botConfig.prefix || '@'}${dbCommand.name} ${usage}`,
+                            username
+                        });
+                        return;
+                    }
+                }
             }
 
             const permission = dbCommand.permissionId ? botConfigCache.permissionsById.get(dbCommand.permissionId) : null;
@@ -137,7 +178,25 @@ class CommandExecutionService {
         }
 
         const mainCommandName = botConfigCache.commandAliases.get(commandName) || commandName;
-        const dbCommand = botConfigCache.commands.get(mainCommandName);
+        let dbCommand = botConfigCache.commands.get(mainCommandName);
+
+        // Если команда не найдена в БД, проверяем runtime registry (временные команды)
+        if (!dbCommand) {
+            const runtimeRegistry = getRuntimeCommandRegistry();
+            const tempCommand = runtimeRegistry.get(botId, mainCommandName);
+
+            if (tempCommand) {
+                // Преобразуем временную команду в формат dbCommand
+                dbCommand = {
+                    name: tempCommand.name,
+                    isEnabled: true,
+                    allowedChatTypes: JSON.stringify(tempCommand.allowedChatTypes || ['chat', 'private']),
+                    permissionId: tempCommand.permissionId || null,
+                    cooldown: tempCommand.cooldown || 0,
+                    isTemporary: true
+                };
+            }
+        }
 
         if (!dbCommand || (!dbCommand.isEnabled && !user.isOwner)) {
             throw new Error(`Command '${commandName}' not found or is disabled.`);
@@ -191,10 +250,27 @@ class CommandExecutionService {
             this.processManager.addCommandRequest(requestId, {
                 resolve: (result) => {
                     clearTimeout(timeout);
+
+                    botHistoryStore.addCommandLog(botId, {
+                        username: user.username,
+                        command: commandName,
+                        args: args || {},
+                        success: true
+                    });
+
                     resolve(result);
                 },
                 reject: (error) => {
                     clearTimeout(timeout);
+
+                    botHistoryStore.addCommandLog(botId, {
+                        username: user.username,
+                        command: commandName,
+                        args: args || {},
+                        success: false,
+                        error: error.message || String(error)
+                    });
+
                     reject(error);
                 }
             });
@@ -253,7 +329,6 @@ class CommandExecutionService {
             const updateData = {
                 description: commandConfig.description,
                 owner: commandConfig.owner,
-                permissionId: permissionId,
                 aliases: JSON.stringify(commandConfig.aliases || []),
                 allowedChatTypes: JSON.stringify(commandConfig.allowedChatTypes || []),
                 cooldown: commandConfig.cooldown || 0,
@@ -261,6 +336,10 @@ class CommandExecutionService {
 
             const existingCommand = await this.commandRepository.findByName(botId, commandConfig.name);
             if (existingCommand) {
+                // Обновляем permissionId только если он null (не был установлен пользователем)
+                if (existingCommand.permissionId === null && permissionId !== null) {
+                    updateData.permissionId = permissionId;
+                }
                 await this.commandRepository.update(existingCommand.id, updateData);
             } else {
                 await this.commandRepository.create(createData);

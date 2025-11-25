@@ -1,9 +1,14 @@
 const express = require('express');
+const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const PluginService = require('../../core/PluginService');
 
 const prisma = new PrismaClient();
+
+// Все роуты требуют аутентификации и прав администратора
+router.use(authenticate);
+router.use(authorize('system:settings'));
 
 router.get('/plugin-directories', async (req, res) => {
     try {

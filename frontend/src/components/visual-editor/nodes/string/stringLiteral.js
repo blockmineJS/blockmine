@@ -1,5 +1,4 @@
 import { NodeDefinition } from '../../core/registry';
-import StringLiteralSettings from './StringLiteralSettings';
 
 /**
  * Определение ноды data:string_literal
@@ -42,8 +41,6 @@ export const stringLiteralDefinition = new NodeDefinition({
   computeOutputs: (data) => [
     { id: 'value', name: 'Value', type: 'String', description: 'Итоговая строка' },
   ],
-
-  SettingsComponent: StringLiteralSettings,
 
   defaultData: {
     value: '',

@@ -10,9 +10,15 @@ import {
 import { shallow } from 'zustand/shallow';
 
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
+import { useAppStore } from '@/stores/appStore';
 import NodePanel from '@/components/visual-editor/NodePanel';
 import SettingsPanel from '@/components/visual-editor/SettingsPanel';
 import CustomNode from '@/components/visual-editor/CustomNode.new';
+import AnimatedEdge from '@/components/visual-editor/AnimatedEdge';
+import TraceViewer from '@/components/visual-editor/TraceViewer';
+import TraceStepInfo from '@/components/visual-editor/TraceStepInfo';
+import DebugPanel from '@/components/visual-editor/DebugPanel';
+import DebugControls from '@/components/visual-editor/DebugControls';
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import CommandMenu from "@/components/ui/CommandMenu";
@@ -21,10 +27,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Share2 } from 'lucide-react';
+import { Upload, Share2, Zap, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import { initializeVisualEditor } from '@/components/visual-editor/initVisualEditor';
 import NodeRegistry from '@/components/visual-editor/nodes';
+import { apiHelper } from '@/lib/api';
+import CollaborativeUsersHeader from '@/components/visual-editor/CollaborativeUsersHeader';
+import CollaborativeCursors from '@/components/visual-editor/CollaborativeCursors';
+import CollaborativeConnections from '@/components/visual-editor/CollaborativeConnections';
 
 initializeVisualEditor();
 
@@ -47,10 +57,18 @@ const nodeTypes = (() => {
     return Object.freeze(types);
 })();
 
+// Создаём типы для edges с анимацией
+const edgeTypes = {
+    default: AnimatedEdge,
+};
+
 function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
 
+    const [botName, setBotName] = useState(null);
+    const appSocket = useAppStore(state => state.socket);
+    const bots = useAppStore(state => state.bots);
     const init = useVisualEditorStore(state => state.init);
     const isLoading = useVisualEditorStore(state => state.isLoading);
     const isSaving = useVisualEditorStore(state => state.isSaving);
@@ -71,10 +89,22 @@ function BotVisualEditorPage() {
     const setConnectingPin = useVisualEditorStore(state => state.setConnectingPin);
     const onConnectStart = useVisualEditorStore(state => state.onConnectStart);
     const connectingPin = useVisualEditorStore(state => state.connectingPin);
+    const isTraceViewerOpen = useVisualEditorStore(state => state.isTraceViewerOpen);
+    const closeTraceViewer = useVisualEditorStore(state => state.closeTraceViewer);
+    const debugMode = useVisualEditorStore(state => state.debugMode);
+    const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
+    const socket = useVisualEditorStore(state => state.socket);
+    const setViewport = useVisualEditorStore(state => state.setViewport);
+    const copyNodes = useVisualEditorStore(state => state.copyNodes);
+    const pasteNodes = useVisualEditorStore(state => state.pasteNodes);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);
     const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+    const [showEventTypeDialog, setShowEventTypeDialog] = useState(false);
+    const [availableEventTypes, setAvailableEventTypes] = useState([]);
+    const [hoveredNodeId, setHoveredNodeId] = useState(null);
+    const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
     const [publishForm, setPublishForm] = useState({
         name: '',
         author: '',
@@ -92,12 +122,148 @@ function BotVisualEditorPage() {
 
         return () => {
             flushSaveGraph();
+            // Отключаемся от collaborative socket при уходе со страницы
+            const disconnectGraphSocket = useVisualEditorStore.getState().disconnectGraphSocket;
+            disconnectGraphSocket();
         };
     }, [botId, entityId, editorType, init, flushSaveGraph]);
+
+    // Загружаем информацию о боте из store
+    useEffect(() => {
+        if (!botId || !bots) return;
+
+        const bot = bots.find(b => b.id === parseInt(botId));
+        if (bot) {
+            setBotName(bot.username || bot.name || `Бот ${botId}`);
+        } else {
+            setBotName(`Бот ${botId}`);
+        }
+    }, [botId, bots]);
+
+    // Отправляем метаданные для presence (название графа и бота)
+    useEffect(() => {
+        if (!appSocket || !command || !botName) return;
+
+        appSocket.emit('presence:update', {
+            path: location.pathname,
+            metadata: {
+                graphName: command.name,
+                botName: botName
+            }
+        });
+    }, [appSocket, command, botName, location.pathname]);
+
+    // Global mouse tracking для collaborative cursors и позиции курсора
+    useEffect(() => {
+        if (!reactFlowInstance) return;
+
+        const handleMouseMove = (event) => {
+            const position = reactFlowInstance.screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+
+            // Сохраняем позицию курсора для Ctrl+V
+            setCursorPosition(position);
+
+            // Collaborative cursor
+            if (socket && command) {
+                socket.emit('collab:cursor', {
+                    botId: command.botId,
+                    graphId: command.id,
+                    x: position.x,
+                    y: position.y,
+                });
+
+                // Если сейчас создаем соединение, отправляем обновление
+                if (connectingPin) {
+                    socket.emit('collab:connection-update', {
+                        botId: command.botId,
+                        graphId: command.id,
+                        toX: position.x,
+                        toY: position.y,
+                    });
+                }
+            }
+        };
+
+        // Throttled version
+        let timeout = null;
+        const throttledHandleMouseMove = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => handleMouseMove(event), 10); // ~100fps
+        };
+
+        document.addEventListener('mousemove', throttledHandleMouseMove);
+
+        return () => {
+            document.removeEventListener('mousemove', throttledHandleMouseMove);
+            if (timeout) clearTimeout(timeout);
+        };
+    }, [socket, command, reactFlowInstance, connectingPin]);
 
     useEffect(() => {
         loadCategories();
     }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            console.log('[VisualEditorPage KeyDown]', event.key, 'Ctrl:', event.ctrlKey, 'Meta:', event.metaKey);
+
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'с')) {
+                console.log('[Copy] Triggered!');
+                event.preventDefault();
+
+                // Если нет выделенных нод, но есть нода под курсором - выделяем её и копируем
+                const selectedNodes = nodes.filter(n => n.selected);
+                if (selectedNodes.length === 0 && hoveredNodeId) {
+                    console.log('[Copy] No selected nodes, copying hovered node:', hoveredNodeId);
+                    // Временно выделяем ноду под курсором
+                    useVisualEditorStore.setState(state => {
+                        const nodeIndex = state.nodes.findIndex(n => n.id === hoveredNodeId);
+                        if (nodeIndex !== -1) {
+                            state.nodes[nodeIndex].selected = true;
+                        }
+                    });
+                    copyNodes();
+                    // Снимаем выделение после копирования
+                    useVisualEditorStore.setState(state => {
+                        const nodeIndex = state.nodes.findIndex(n => n.id === hoveredNodeId);
+                        if (nodeIndex !== -1) {
+                            state.nodes[nodeIndex].selected = false;
+                        }
+                    });
+                } else {
+                    copyNodes();
+                }
+            }
+
+            if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'м')) {
+                console.log('[Paste] Triggered!');
+                event.preventDefault();
+                pasteNodes(cursorPosition);
+            }
+
+            // Delete или Backspace - удаляем ноду под курсором
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                if (hoveredNodeId) {
+                    console.log('[Delete] Triggered for node:', hoveredNodeId);
+                    event.preventDefault();
+                    // Используем onNodesChange для удаления ноды
+                    onNodesChange([{ type: 'remove', id: hoveredNodeId }]);
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [copyNodes, pasteNodes, hoveredNodeId, nodes, cursorPosition, onNodesChange]);
 
     const loadCategories = async () => {
         try {
@@ -107,6 +273,82 @@ function BotVisualEditorPage() {
         } catch (error) {
             console.error('Ошибка загрузки категорий:', error);
         }
+    };
+
+    const handleToggleTraceViewer = async (selectedEventType = null) => {
+        // Если трассировка уже открыта - закрываем
+        if (isTraceViewerOpen) {
+            closeTraceViewer();
+            return;
+        }
+
+        // Открываем трассировку
+        try {
+            const graphId = entityId === 'new' ? null : parseInt(entityId);
+            if (!graphId) {
+                toast.error('Сохраните граф перед просмотром трассировок');
+                return;
+            }
+
+            // Если eventType не указан, проверяем сколько event нод в графе
+            if (!selectedEventType) {
+                const eventNodes = nodes.filter(n => n.type?.startsWith('event:'));
+
+                if (eventNodes.length === 0) {
+                    toast.error('В графе нет event нод');
+                    return;
+                }
+
+                // Если больше одной event ноды, открываем диалог выбора
+                if (eventNodes.length > 1) {
+                    const types = eventNodes.map(n => ({
+                        type: n.type.replace('event:', ''),
+                        label: NodeRegistry.get(n.type)?.label || n.type
+                    }));
+                    setAvailableEventTypes(types);
+                    setShowEventTypeDialog(true);
+                    return;
+                } else {
+                    // Если только одна event нода, используем её
+                    selectedEventType = eventNodes[0].type.replace('event:', '');
+                }
+            }
+
+            const url = selectedEventType
+                ? `/api/traces/${botId}/graph/${graphId}/last?eventType=${selectedEventType}`
+                : `/api/traces/${botId}/graph/${graphId}/last`;
+
+
+            const response = await apiHelper(url);
+            console.log('[VisualEditorPage] Trace API response:', {
+                success: response.success,
+                hasTrace: !!response.trace,
+                traceStepsCount: response.trace?.steps?.length,
+                traceData: response.trace
+            });
+
+            if (response.success && response.trace) {
+                if (debugMode === 'live') {
+                    setDebugMode('normal');
+                }
+                useVisualEditorStore.getState().openTraceViewer(response.trace);
+            } else {
+                toast.error('Трассировки не найдены для этого графа');
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки трассировки:', error);
+            toast.error('Не удалось загрузить трассировку');
+        }
+    };
+
+    const handleToggleDebugMode = () => {
+        const newMode = debugMode === 'live' ? 'normal' : 'live';
+
+        if (newMode === 'live' && isTraceViewerOpen) {
+            closeTraceViewer();
+        }
+
+        setDebugMode(newMode);
     };
 
     const handlePublish = async () => {
@@ -223,7 +465,7 @@ function BotVisualEditorPage() {
     }, [availableNodes, variables, commandArguments]);
 
     const handleMenuItemSelect = (item) => {
-        const { menuPosition, addNode, closeMenu } = useVisualEditorStore.getState();
+        const { menuPosition, addNode, closeMenu, socket, command } = useVisualEditorStore.getState();
         const newNode = addNode(item.type, menuPosition.flowPosition, false);
 
         // Если есть дополнительные данные (для переменных/аргументов), применяем их
@@ -235,6 +477,15 @@ function BotVisualEditorPage() {
         useVisualEditorStore.setState(state => {
             state.nodes.push(newNode);
         });
+
+        if (socket && command) {
+            socket.emit('collab:nodes', {
+                botId: command.botId,
+                graphId: command.id,
+                type: 'create',
+                data: { node: newNode }
+            });
+        }
 
         closeMenu();
     };
@@ -254,6 +505,28 @@ function BotVisualEditorPage() {
         handler(event.clientY, event.clientX, position);
     };
 
+    const handleConnectStart = (event, { nodeId, handleId, handleType }) => {
+        // Вызываем оригинальный onConnectStart из store
+        onConnectStart(event, { handleType, nodeId, handleId });
+
+        // Broadcast начало создания соединения
+        if (socket && command && reactFlowInstance) {
+            const position = reactFlowInstance.screenToFlowPosition({
+                x: event.clientX || 0,
+                y: event.clientY || 0,
+            });
+
+            socket.emit('collab:connection-start', {
+                botId: command.botId,
+                graphId: command.id,
+                fromX: position.x,
+                fromY: position.y,
+                fromNodeId: nodeId,
+                fromHandleId: handleId,
+            });
+        }
+    };
+
     const handleConnectEnd = (event) => {
         if (!connectingPin) return;
         const targetIsPane = event.target.classList.contains('react-flow__pane');
@@ -261,6 +534,14 @@ function BotVisualEditorPage() {
             handlePaneInteraction(event, openMenu);
         }
         setConnectingPin(null);
+
+        // Broadcast завершение создания соединения
+        if (socket && command) {
+            socket.emit('collab:connection-end', {
+                botId: command.botId,
+                graphId: command.id,
+            });
+        }
     };
 
     const onDragOver = (event) => {
@@ -285,10 +566,30 @@ function BotVisualEditorPage() {
 
     return (
         <ReactFlowProvider>
-            <div className="h-full w-full flex flex-col">
+            <div
+                className="h-full w-full flex flex-col"
+                onContextMenu={(e) => e.preventDefault()}
+            >
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">Редактор: {command?.name}</h1>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                        <CollaborativeUsersHeader />
+                        <Button
+                            variant={debugMode === 'live' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={handleToggleDebugMode}
+                        >
+                            <Bug className="w-4 h-4 mr-2" />
+                            {debugMode === 'live' ? 'Live Debug Вкл' : 'Live Debug'}
+                        </Button>
+                        <Button
+                            variant={isTraceViewerOpen ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => handleToggleTraceViewer()}
+                        >
+                            <Zap className="w-4 h-4 mr-2" />
+                            {isTraceViewerOpen ? 'Трассировка Вкл' : 'Просмотр трассировки'}
+                        </Button>
                         <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">
@@ -340,17 +641,44 @@ function BotVisualEditorPage() {
                                 </div>
                             </DialogContent>
                         </Dialog>
+                        <Dialog open={showEventTypeDialog} onOpenChange={setShowEventTypeDialog}>
+                            <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Выберите тип события для просмотра</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-3">
+                                    {availableEventTypes.map((eventType) => (
+                                        <Button
+                                            key={eventType.type}
+                                            variant="outline"
+                                            className="w-full justify-start"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowEventTypeDialog(false);
+                                                handleToggleTraceViewer(eventType.type);
+                                            }}
+                                        >
+                                            {eventType.label}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </DialogContent>
+                        </Dialog>
                         <Button onClick={handleSave} disabled={isSaving}>
                             {isSaving ? 'Сохранение...' : 'Сохранить'}
                         </Button>
                     </div>
                 </header>
                 <ResizablePanelGroup direction="horizontal" className="flex-grow">
-                    <ResizablePanel defaultSize={15}>
-                        <NodePanel />
-                    </ResizablePanel>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={65}>
+                    {!isTraceViewerOpen && debugMode !== 'live' && (
+                        <>
+                            <ResizablePanel defaultSize={15}>
+                                <NodePanel />
+                            </ResizablePanel>
+                            <ResizableHandle withHandle />
+                        </>
+                    )}
+                    <ResizablePanel defaultSize={isTraceViewerOpen ? 80 : 65}>
                         <div className="h-full" ref={reactFlowWrapper}>
                             <ReactFlow
                                 nodes={nodes}
@@ -358,18 +686,27 @@ function BotVisualEditorPage() {
                                 onNodesChange={onNodesChange}
                                 onEdgesChange={onEdgesChange}
                                 onConnect={onConnect}
-                                onConnectStart={onConnectStart}
+                                onConnectStart={handleConnectStart}
                                 onConnectEnd={handleConnectEnd}
                                 nodeTypes={nodeTypes}
+                                edgeTypes={edgeTypes}
                                 onInit={setReactFlowInstance}
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
+                                onNodeMouseEnter={(event, node) => setHoveredNodeId(node.id)}
+                                onNodeMouseLeave={() => setHoveredNodeId(null)}
                                 fitView
-                                deleteKeyCode={['Backspace', 'Delete']}
+                                deleteKeyCode={null}
+                                multiSelectionKeyCode="Shift"
+                                panOnDrag={[0, 1, 2]}
+                                selectionOnDrag
                                 elevateNodesOnSelect={false}
                                 autoPanOnNodeDrag={true}
                                 zoomOnDoubleClick={true}
-                                selectNodesOnDrag={true}
+                                selectNodesOnDrag={false}
+                                onMove={(event, viewport) => {
+                                    setViewport(viewport);
+                                }}
                                 onPaneContextMenu={(e) => {
                                     e.preventDefault();
                                     handlePaneInteraction(e, openMenu);
@@ -378,19 +715,35 @@ function BotVisualEditorPage() {
                                 <Controls />
                                 <Background />
                             </ReactFlow>
+
+                            {/* Collaborative overlays */}
+                            {reactFlowInstance && (
+                                <>
+                                    <CollaborativeCursors flowToScreenPosition={reactFlowInstance.flowToScreenPosition} />
+                                    <CollaborativeConnections flowToScreenPosition={reactFlowInstance.flowToScreenPosition} />
+                                </>
+                            )}
                         </div>
                     </ResizablePanel>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={20}>
-                        <SettingsPanel />
+                        {isTraceViewerOpen ? (
+                            <TraceStepInfo />
+                        ) : debugMode === 'live' ? (
+                            <DebugPanel />
+                        ) : (
+                            <SettingsPanel />
+                        )}
                     </ResizablePanel>
                 </ResizablePanelGroup>
-                {isMenuOpen && <CommandMenu 
+                {isMenuOpen && <CommandMenu
                     position={menuPosition}
                     onClose={closeMenu}
                     items={menuItems}
                     onSelect={handleMenuItemSelect}
                 />}
+                <TraceViewer />
+                <DebugControls />
             </div>
         </ReactFlowProvider>
     );

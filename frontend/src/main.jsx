@@ -21,6 +21,7 @@ import EventGraphsPage from "./pages/Bot/EventGraphsPage";
 import PluginDetailPage from "./pages/PluginDetailPage";
 import PluginIdePage from "./pages/Bot/PluginIdePage";
 import ServersPage from "./pages/ServersPage";
+import ProxiesPage from "./pages/ProxiesPage";
 import TasksPage from "./pages/TasksPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -28,6 +29,8 @@ import PluginUIPage from "./pages/Bot/PluginUIPage";
 import GraphStorePage from "./pages/GraphStorePage";
 import ProxyConfigPage from "./pages/ProxyConfigPage";
 import WebSocketTab from "./pages/Bot/WebSocketTab";
+import PanelApiKeysPage from "./pages/PanelApiKeysPage";
+import MinecraftViewerTab from "./pages/Bot/MinecraftViewerTab";
 
 function Root() {
   const authInitialized = useAppStore(state => state.authInitialized);
@@ -123,14 +126,17 @@ const router = createBrowserRouter([
                   { path: "events", element: <ProtectedRoute requiredPermission="management:edit"><EventGraphsPage /></ProtectedRoute> },
                   { path: "plugins/ui/:pluginName/:pluginPath", element: <PluginUIPage /> },
                   { path: "events/visual/:eventId", element: <ProtectedRoute requiredPermission="management:edit"><VisualEditorPage /></ProtectedRoute> },
-                  { path: "websocket", element: <ProtectedRoute requiredPermission="bot:update"><WebSocketTab /></ProtectedRoute> }
+                  { path: "websocket", element: <ProtectedRoute requiredPermission="bot:update"><WebSocketTab /></ProtectedRoute> },
+                  { path: "minecraft-viewer", element: <MinecraftViewerTab /> }
               ]
             },
             { path: "servers", element: <ProtectedRoute requiredPermission="server:list"><ServersPage /></ProtectedRoute> },
+            { path: "proxies", element: <ProtectedRoute requiredPermission="proxy:list"><ProxiesPage /></ProtectedRoute> },
             { path: "tasks", element: <ProtectedRoute requiredPermission="task:list"><TasksPage /></ProtectedRoute> },
             { path: "admin", element: <ProtectedRoute requiredPermission="panel:user:list"><AdminPage /></ProtectedRoute> },
             { path: "graph-store", element: <GraphStorePage /> },
             { path: "proxy-config", element: <ProtectedRoute requiredPermission="bot:update"><ProxyConfigPage /></ProtectedRoute> },
+            { path: "api-keys", element: <PanelApiKeysPage /> },
         ]
       }
     ]

@@ -44,6 +44,7 @@ import {
 import {
   logicOperationDefinition,
   logicCompareDefinition,
+  logicNotDefinition,
 } from './logic';
 
 // String nodes
@@ -57,6 +58,8 @@ import {
   stringEqualsDefinition,
   stringEndsWithDefinition,
   stringSplitDefinition,
+  stringToUpperDefinition,
+  stringToLowerDefinition,
 } from './string';
 
 // Array nodes
@@ -69,6 +72,7 @@ import {
   arrayAddElementDefinition,
   arrayRemoveByIndexDefinition,
   arrayFindIndexDefinition,
+  arrayJoinDefinition,
 } from './array';
 
 // Object nodes
@@ -88,6 +92,9 @@ import {
   actionSendWebsocketResponseDefinition,
   actionBotLookAtDefinition,
   actionBotSetVariableDefinition,
+  actionCreateCommandDefinition,
+  actionUpdateCommandDefinition,
+  actionDeleteCommandDefinition,
 } from './action';
 
 // Time nodes
@@ -107,6 +114,11 @@ import {
   userGetGroupsDefinition,
   userGetPermissionsDefinition,
 } from './user';
+
+// Type conversion nodes
+import {
+  typeToStringDefinition,
+} from './type';
 
 // Bot nodes
 import {
@@ -170,6 +182,7 @@ export function registerAllNodes() {
   // Logic category
   NodeRegistry.register(logicOperationDefinition);
   NodeRegistry.register(logicCompareDefinition);
+  NodeRegistry.register(logicNotDefinition);
 
   // String category
   NodeRegistry.register(stringConcatDefinition);
@@ -181,6 +194,8 @@ export function registerAllNodes() {
   NodeRegistry.register(stringEqualsDefinition);
   NodeRegistry.register(stringEndsWithDefinition);
   NodeRegistry.register(stringSplitDefinition);
+  NodeRegistry.register(stringToUpperDefinition);
+  NodeRegistry.register(stringToLowerDefinition);
 
   // Array category
   NodeRegistry.register(arrayLiteralDefinition);
@@ -191,6 +206,7 @@ export function registerAllNodes() {
   NodeRegistry.register(arrayAddElementDefinition);
   NodeRegistry.register(arrayRemoveByIndexDefinition);
   NodeRegistry.register(arrayFindIndexDefinition);
+  NodeRegistry.register(arrayJoinDefinition);
 
   // Object category
   NodeRegistry.register(objectCreateDefinition);
@@ -206,6 +222,9 @@ export function registerAllNodes() {
   NodeRegistry.register(actionSendWebsocketResponseDefinition);
   NodeRegistry.register(actionBotLookAtDefinition);
   NodeRegistry.register(actionBotSetVariableDefinition);
+  NodeRegistry.register(actionCreateCommandDefinition);
+  NodeRegistry.register(actionUpdateCommandDefinition);
+  NodeRegistry.register(actionDeleteCommandDefinition);
 
   // Time category
   NodeRegistry.register(timeDateTimeLiteralDefinition);
@@ -220,6 +239,9 @@ export function registerAllNodes() {
   NodeRegistry.register(userSetBlacklistDefinition);
   NodeRegistry.register(userGetGroupsDefinition);
   NodeRegistry.register(userGetPermissionsDefinition);
+
+  // Type conversion category
+  NodeRegistry.register(typeToStringDefinition);
 
   // Bot category
   NodeRegistry.register(botGetPositionDefinition);

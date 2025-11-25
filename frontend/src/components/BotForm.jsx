@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import DynamicInputList from './management/DynamicInputList';
 import { FileText } from "lucide-react";
 
-export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCreation = false, isSaving = false, errors = {}, importedData = null, disableScrollArea = false }) {
+export default function BotForm({ bot, servers, proxies, onFormChange, onFormSubmit, isCreation = false, isSaving = false, errors = {}, importedData = null, disableScrollArea = false }) {
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -18,13 +18,16 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
         note: '',
         serverId: '',
         owners: [],
+        proxyId: '',
         proxyHost: '',
         proxyPort: '',
         proxyUsername: '',
         proxyPassword: ''
     });
     const [usernameError, setUsernameError] = useState('');
+    const [isCustomProxy, setIsCustomProxy] = useState(false);
     const isInitialized = React.useRef(false);
+    const lastBotData = React.useRef(null);
 
     useEffect(() => {
         if (errors.username) {
@@ -35,18 +38,22 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
     useEffect(() => {
         if (bot) {
             isInitialized.current = false;
-            setFormData({
+            const newFormData = {
                 username: bot.username || '',
-                password: '', 
+                password: '',
                 prefix: bot.prefix || '@',
                 note: bot.note || '',
                 serverId: bot.serverId ? bot.serverId.toString() : '',
                 owners: bot.owners ? bot.owners.split(',').map(s => s.trim()).filter(Boolean) : [],
+                proxyId: bot.proxyId ? bot.proxyId.toString() : '',
                 proxyHost: bot.proxyHost || '',
                 proxyPort: bot.proxyPort || '',
                 proxyUsername: bot.proxyUsername || '',
                 proxyPassword: ''
-            });
+            };
+            setFormData(newFormData);
+            lastBotData.current = JSON.stringify(newFormData);
+            setIsCustomProxy(!bot.proxyId && !!bot.proxyHost);
         } else if (importedData && isCreation) {
             const importedServerName = importedData.bot?.server?.name;
             const matchingServer = servers?.find(s => s.name === importedServerName);
@@ -57,19 +64,24 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                 prefix: importedData.bot?.prefix || '@',
                 note: importedData.bot?.note || '',
                 serverId: matchingServer ? matchingServer.id.toString() : '',
-                owners: importedData.bot?.owners ? importedData.bot.owners.split(',').map(s => s.trim()).filter(Boolean) : [], // Авто-заполнение владельцев
+                owners: importedData.bot?.owners ? importedData.bot.owners.split(',').map(s => s.trim()).filter(Boolean) : [],
+                proxyId: '',
                 proxyHost: importedData.bot?.proxyHost || '',
                 proxyPort: importedData.bot?.proxyPort || '',
                 proxyUsername: importedData.bot?.proxyUsername || '',
                 proxyPassword: ''
             });
+            setIsCustomProxy(!!importedData.bot?.proxyHost);
         }
     }, [bot, importedData, isCreation, servers]);
 
     useEffect(() => {
         if (onFormChange) {
             if (isInitialized.current) {
-                onFormChange(formData);
+                const currentData = JSON.stringify(formData);
+                if (currentData !== lastBotData.current) {
+                    onFormChange(formData);
+                }
             } else {
                 isInitialized.current = true;
             }
@@ -87,6 +99,36 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
 
     const handleSelectChange = (value) => {
         setFormData(prev => ({ ...prev, serverId: value }));
+    };
+
+    const handleProxySelectChange = (value) => {
+        if (value === 'none') {
+            setIsCustomProxy(false);
+            setFormData(prev => ({
+                ...prev,
+                proxyId: '',
+                proxyHost: '',
+                proxyPort: '',
+                proxyUsername: '',
+                proxyPassword: ''
+            }));
+        } else if (value === 'custom') {
+            setIsCustomProxy(true);
+            setFormData(prev => ({
+                ...prev,
+                proxyId: ''
+            }));
+        } else {
+            setIsCustomProxy(false);
+            setFormData(prev => ({
+                ...prev,
+                proxyId: value,
+                proxyHost: '',
+                proxyPort: '',
+                proxyUsername: '',
+                proxyPassword: ''
+            }));
+        }
     };
 
     const handleOwnersChange = (newOwners) => {
@@ -167,7 +209,7 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                                 <SelectValue placeholder="Выберите сервер" />
                             </SelectTrigger>
                             <SelectContent>
-                                {servers.map(server => (
+                                {(servers || []).map(server => (
                                     <SelectItem key={server.id} value={server.id.toString()}>
                                         {server.name} ({server.host}:{server.port})
                                     </SelectItem>
@@ -193,16 +235,90 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                     <Separator className="my-6" />
 
                     <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Настройки прокси (SOCKS5)</h3>
-                        <p className="text-sm text-muted-foreground">Оставьте поля пустыми, если прокси не требуется.</p>
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                            <div className="space-y-1"><Label htmlFor="proxyHost">Хост</Label><Input id="proxyHost" name="proxyHost" value={formData.proxyHost || ''} onChange={handleChange} placeholder="123.45.67.89" /></div>
-                            <div className="space-y-1"><Label htmlFor="proxyPort">Порт</Label><Input id="proxyPort" name="proxyPort" type="number" value={formData.proxyPort || ''} onChange={handleChange} placeholder="1080" /></div>
+                        <h3 className="text-lg font-semibold">Настройки прокси</h3>
+                        <p className="text-sm text-muted-foreground">Выберите прокси из списка или настройте вручную.</p>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="proxySelect">Прокси</Label>
+                            <Select
+                                value={formData.proxyId ? formData.proxyId : (isCustomProxy || formData.proxyHost ? 'custom' : 'none')}
+                                onValueChange={handleProxySelectChange}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Без прокси" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Без прокси</SelectItem>
+                                    <SelectItem value="custom">Настроить вручную</SelectItem>
+                                    {proxies && proxies.length > 0 && (
+                                        <>
+                                            <Separator className="my-1" />
+                                            {(proxies || []).map(proxy => (
+                                                <SelectItem key={proxy.id} value={proxy.id.toString()}>
+                                                    {proxy.name} ({proxy.type?.toUpperCase()})
+                                                </SelectItem>
+                                            ))}
+                                        </>
+                                    )}
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="proxyUsername">Логин</Label><Input id="proxyUsername" name="proxyUsername" value={formData.proxyUsername || ''} onChange={handleChange} /></div>
-                            <div className="space-y-1"><Label htmlFor="proxyPassword">Пароль прокси (введите для изменения)</Label><Input id="proxyPassword" name="proxyPassword" type="password" value={formData.proxyPassword} onChange={handleChange} placeholder="••••••••" /></div>
-                        </div>
+
+                        {(formData.proxyId || formData.proxyHost || isCustomProxy) && (() => {
+                            const selectedProxy = formData.proxyId ? proxies?.find(p => p.id.toString() === formData.proxyId) : null;
+                            return (
+                            <>
+                                <div className="grid grid-cols-2 gap-4 pt-2">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="proxyHost">Хост</Label>
+                                        <Input
+                                            id="proxyHost"
+                                            name="proxyHost"
+                                            value={selectedProxy ? selectedProxy.host : (formData.proxyHost || '')}
+                                            onChange={handleChange}
+                                            placeholder="123.45.67.89"
+                                            disabled={!!formData.proxyId}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="proxyPort">Порт</Label>
+                                        <Input
+                                            id="proxyPort"
+                                            name="proxyPort"
+                                            type="number"
+                                            value={selectedProxy ? selectedProxy.port : (formData.proxyPort || '')}
+                                            onChange={handleChange}
+                                            placeholder="1080"
+                                            disabled={!!formData.proxyId}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="proxyUsername">Логин</Label>
+                                        <Input
+                                            id="proxyUsername"
+                                            name="proxyUsername"
+                                            value={selectedProxy ? (selectedProxy.username || '') : (formData.proxyUsername || '')}
+                                            onChange={handleChange}
+                                            disabled={!!formData.proxyId}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="proxyPassword">Пароль прокси</Label>
+                                        <Input
+                                            id="proxyPassword"
+                                            name="proxyPassword"
+                                            type="password"
+                                            value={formData.proxyPassword}
+                                            onChange={handleChange}
+                                            placeholder="••••••••"
+                                            disabled={!!formData.proxyId}
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        );})()}
                     </div>
                 </div>
             ) : (
@@ -241,7 +357,7 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                                     <SelectValue placeholder="Выберите сервер" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {servers.map(server => (
+                                    {(servers || []).map(server => (
                                         <SelectItem key={server.id} value={server.id.toString()}>
                                             {server.name} ({server.host}:{server.port})
                                         </SelectItem>
@@ -267,16 +383,90 @@ export default function BotForm({ bot, servers, onFormChange, onFormSubmit, isCr
                         <Separator className="my-6" />
 
                         <div className="space-y-2">
-                            <h3 className="text-lg font-semibold">Настройки прокси (SOCKS5)</h3>
-                            <p className="text-sm text-muted-foreground">Оставьте поля пустыми, если прокси не требуется.</p>
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <div className="space-y-1"><Label htmlFor="proxyHost">Хост</Label><Input id="proxyHost" name="proxyHost" value={formData.proxyHost || ''} onChange={handleChange} placeholder="123.45.67.89" /></div>
-                                <div className="space-y-1"><Label htmlFor="proxyPort">Порт</Label><Input id="proxyPort" name="proxyPort" type="number" value={formData.proxyPort || ''} onChange={handleChange} placeholder="1080" /></div>
+                            <h3 className="text-lg font-semibold">Настройки прокси</h3>
+                            <p className="text-sm text-muted-foreground">Выберите прокси из списка или настройте вручную.</p>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="proxySelect">Прокси</Label>
+                                <Select
+                                    value={formData.proxyId ? formData.proxyId : (isCustomProxy || formData.proxyHost ? 'custom' : 'none')}
+                                    onValueChange={handleProxySelectChange}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Без прокси" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Без прокси</SelectItem>
+                                        <SelectItem value="custom">Настроить вручную</SelectItem>
+                                        {proxies && proxies.length > 0 && (
+                                            <>
+                                                <Separator className="my-1" />
+                                                {(proxies || []).map(proxy => (
+                                                    <SelectItem key={proxy.id} value={proxy.id.toString()}>
+                                                        {proxy.name} ({proxy.type?.toUpperCase()})
+                                                    </SelectItem>
+                                                ))}
+                                            </>
+                                        )}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label htmlFor="proxyUsername">Логин</Label><Input id="proxyUsername" name="proxyUsername" value={formData.proxyUsername || ''} onChange={handleChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="proxyPassword">Пароль прокси (введите для изменения)</Label><Input id="proxyPassword" name="proxyPassword" type="password" value={formData.proxyPassword} onChange={handleChange} placeholder="••••••••" /></div>
-                            </div>
+
+                            {(formData.proxyId || formData.proxyHost || isCustomProxy) && (() => {
+                                const selectedProxy = formData.proxyId ? proxies?.find(p => p.id.toString() === formData.proxyId) : null;
+                                return (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="proxyHost">Хост</Label>
+                                            <Input
+                                                id="proxyHost"
+                                                name="proxyHost"
+                                                value={selectedProxy ? selectedProxy.host : (formData.proxyHost || '')}
+                                                onChange={handleChange}
+                                                placeholder="123.45.67.89"
+                                                disabled={!!formData.proxyId}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="proxyPort">Порт</Label>
+                                            <Input
+                                                id="proxyPort"
+                                                name="proxyPort"
+                                                type="number"
+                                                value={selectedProxy ? selectedProxy.port : (formData.proxyPort || '')}
+                                                onChange={handleChange}
+                                                placeholder="1080"
+                                                disabled={!!formData.proxyId}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="proxyUsername">Логин</Label>
+                                            <Input
+                                                id="proxyUsername"
+                                                name="proxyUsername"
+                                                value={selectedProxy ? (selectedProxy.username || '') : (formData.proxyUsername || '')}
+                                                onChange={handleChange}
+                                                disabled={!!formData.proxyId}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="proxyPassword">Пароль прокси</Label>
+                                            <Input
+                                                id="proxyPassword"
+                                                name="proxyPassword"
+                                                type="password"
+                                                value={formData.proxyPassword}
+                                                onChange={handleChange}
+                                                placeholder="••••••••"
+                                                disabled={!!formData.proxyId}
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            );})()}
                         </div>
                     </CardContent>
                 </ScrollArea>

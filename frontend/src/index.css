@@ -108,7 +108,7 @@
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
   stroke: #10b981 !important;
-  stroke-width: 2.5px !important;
+  stroke-width: 3.5px !important;
 }
 
 .react-flow__handle {
@@ -119,4 +119,28 @@
 .react-flow__node.dragging,
 .react-flow__node.dragging * {
   transition: none !important;
+}
+
+/* AI Code Highlights - Monaco Editor */
+.ai-changed-line {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  border-left: 3px solid rgba(34, 197, 94, 0.8);
+}
+
+.ai-changed-glyph {
+  background-color: rgba(34, 197, 94, 0.4);
+  width: 3px !important;
+  margin-left: 3px;
+}
+
+/* Connection Hints - Compatible Pin Pulse Animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }

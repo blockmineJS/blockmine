@@ -33,7 +33,7 @@ class WhoisCommand extends Command {
                 .join(', ') || 'Нет групп';
 
             // Статус
-            const status = targetUser.isBlacklisted ? '⛔ В черном списке' : '✅ Активен';
+            const status = targetUser.isBlacklisted ? '⛔ В черном списке' : '✅ Не в чс';
 
             // Форматируем вывод в зависимости от транспорта
             let message;

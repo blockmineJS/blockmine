@@ -1,11 +1,37 @@
 const jwt = require('jsonwebtoken');
 const config = require('../../config');
+const { authenticatePanelApiKey } = require('./panelApiAuth');
 
 const JWT_SECRET = config.security.jwtSecret;
 
 const tokenCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 
+/**
+ * Универсальный middleware аутентификации
+ * Поддерживает Panel API Keys и JWT токены
+ */
+function authenticateUniversal(req, res, next) {
+    const authHeader = req.header('Authorization');
+    if (!authHeader) {
+        return res.status(401).json({ error: 'Нет токена, доступ запрещен' });
+    }
+
+    const tokenParts = authHeader.split(' ');
+    if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
+        return res.status(401).json({ error: 'Неверный формат токена' });
+    }
+
+    const token = tokenParts[1];
+
+    // Если токен начинается с pk_ - это Panel API Key
+    if (token.startsWith('pk_')) {
+        return authenticatePanelApiKey(req, res, next);
+    }
+
+    // Иначе это JWT токен
+    return authenticate(req, res, next);
+}
 
 function authenticate(req, res, next) {
     const authHeader = req.header('Authorization');
@@ -63,5 +89,6 @@ function authorize(requiredPermission) {
 
 module.exports = {
     authenticate,
+    authenticateUniversal,
     authorize,
 };

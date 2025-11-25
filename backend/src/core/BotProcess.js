@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Vec3 } = require('vec3');
 const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
+const { getRuntimeCommandRegistry } = require('./system/RuntimeCommandRegistry');
 const { initializePlugins } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
 const Command = require('./system/Command');
@@ -23,16 +24,18 @@ const pluginUiState = new Map();
 const pendingRequests = new Map();
 const entityMoveThrottles = new Map();
 let connectionTimeout = null;
+let botReadySent = false;
+let viewerRenderDistance = 24; // Динамический радиус отображения для viewer
 
 const originalJSONParse = JSON.parse
-JSON.parse = function(text, reviver) {
-  if (typeof text !== 'string') return originalJSONParse(text, reviver)
-  try {
-    return originalJSONParse(text, reviver)
-  } catch (e) {
-    const fixed = text.replace(/([{,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
-    return originalJSONParse(fixed, reviver)
-  }
+JSON.parse = function (text, reviver) {
+    if (typeof text !== 'string') return originalJSONParse(text, reviver)
+    try {
+        return originalJSONParse(text, reviver)
+    } catch (e) {
+        const fixed = text.replace(/([{,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
+        return originalJSONParse(fixed, reviver)
+    }
 }
 
 function sendLog(content) {
@@ -90,10 +93,19 @@ function handleIncomingCommand(type, username, message) {
     const commandName = commandParts.shift().toLowerCase();
     const restOfMessage = commandParts.join(' ');
 
-    const commandInstance = bot.commands.get(commandName) ||
-    Array.from(bot.commands.values()).find(cmd => cmd.aliases.includes(commandName));
+    // Сначала проверяем стандартные команды
+    let commandInstance = bot.commands.get(commandName) ||
+        Array.from(bot.commands.values()).find(cmd => cmd.aliases.includes(commandName));
 
-    if (!commandInstance) return;
+    if (!commandInstance) {
+        // Если не найдена, проверяем временные команды из runtime registry
+        const runtimeRegistry = getRuntimeCommandRegistry();
+        commandInstance = runtimeRegistry.get(bot.config.id, commandName);
+    }
+
+    if (!commandInstance) {
+        return;
+    }
 
     try {
         const processedArgs = {};
@@ -122,15 +134,8 @@ function handleIncomingCommand(type, username, message) {
             }
 
             if (processedArgs[argDef.name] === undefined) {
-                if (argDef.required) {
-                    const usage = commandInstance.args.map(arg => {
-                        return arg.required ? `<${arg.description || arg.name}>` : `[${arg.description || arg.name}]`;
-                    }).join(' ');
-
-                    bot.api.sendMessage(type, `Ошибка: Необходимо указать: ${argDef.description || argDef.name}`, username);
-                    bot.api.sendMessage(type, `Использование: ${bot.config.prefix}${commandInstance.name} ${usage}`, username);
-                    return;
-                }
+                // Не проверяем required здесь - это будет сделано в CommandExecutionService
+                // после проверки типа чата и прав владельца
                 if (argDef.default !== undefined) {
                     processedArgs[argDef.name] = argDef.default;
                 }
@@ -143,7 +148,8 @@ function handleIncomingCommand(type, username, message) {
                 commandName: commandInstance.name,
                 username,
                 args: processedArgs,
-                typeChat: type
+                typeChat: type,
+                commandArgs: argsDef // Передаем определение аргументов для валидации
             });
         }
     } catch (e) {
@@ -152,17 +158,17 @@ function handleIncomingCommand(type, username, message) {
 }
 
 process.on('message', async (message) => {
-        if (message.type === 'plugin:ui:start-updates') {
-            const { pluginName } = message;
-            const state = pluginUiState.get(pluginName);
-            if (state && process.send) {
-                process.send({
-                    type: 'plugin:data',
-                    plugin: pluginName,
-                    payload: state
-                });
-            }
-        } else if (message.type === 'user_action_response') {
+    if (message.type === 'plugin:ui:start-updates') {
+        const { pluginName } = message;
+        const state = pluginUiState.get(pluginName);
+        if (state && process.send) {
+            process.send({
+                type: 'plugin:data',
+                plugin: pluginName,
+                payload: state
+            });
+        }
+    } else if (message.type === 'user_action_response') {
         if (pendingRequests.has(message.requestId)) {
             const { resolve, reject } = pendingRequests.get(message.requestId);
             if (message.error) {
@@ -205,13 +211,221 @@ process.on('message', async (message) => {
                 }
             }
         }
-        
+
         if (process.send) {
             process.send({
                 type: 'get_nearby_entities_response',
                 requestId: message.requestId,
                 payload: { entities }
             });
+        }
+    } else if (message.type === 'viewer:get_state') {
+        if (bot && process.send) {
+            let blocks = undefined;
+
+            if (message.includeBlocks && bot.entity?.position) {
+                blocks = [];
+                const pos = bot.entity.position;
+                const horizontalRange = viewerRenderDistance;
+                const verticalRangeDown = Math.min(viewerRenderDistance / 2, 16);
+                const verticalRangeUp = viewerRenderDistance;
+
+                for (let x = Math.floor(pos.x - horizontalRange); x <= Math.floor(pos.x + horizontalRange); x++) {
+                    for (let y = Math.floor(pos.y - verticalRangeDown); y <= Math.floor(pos.y + verticalRangeUp); y++) {
+                        for (let z = Math.floor(pos.z - horizontalRange); z <= Math.floor(pos.z + horizontalRange); z++) {
+                            const block = bot.blockAt(new Vec3(x, y, z));
+                            if (block && block.type !== 0) {
+                                blocks.push({
+                                    x, y, z,
+                                    type: block.type,
+                                    name: block.name
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            const state = {
+                status: bot._client ? 'online' : 'offline',
+                health: bot.health || 20,
+                food: bot.food || 20,
+                position: bot.entity?.position ? {
+                    x: bot.entity.position.x,
+                    y: bot.entity.position.y,
+                    z: bot.entity.position.z
+                } : null,
+                yaw: bot.entity?.yaw || 0,
+                pitch: bot.entity?.pitch || 0,
+                gameMode: bot.game?.gameMode,
+                dimension: bot.game?.dimension,
+                blocks,
+                inventory: bot.inventory ? bot.inventory.items().map(item => ({
+                    name: item.name,
+                    displayName: item.displayName,
+                    count: item.count,
+                    slot: item.slot
+                })) : [],
+                nearbyPlayers: bot.entities ? Object.values(bot.entities)
+                    .filter(e => e.type === 'player' && e.username !== bot.username)
+                    .map(e => ({
+                        username: e.username,
+                        position: { x: e.position.x, y: e.position.y, z: e.position.z },
+                        yaw: e.yaw || 0,
+                        pitch: e.pitch || 0,
+                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
+                    })) : [],
+                nearbyMobs: bot.entities ? Object.values(bot.entities)
+                    .filter(e => e.type === 'mob')
+                    .map(e => ({
+                        name: e.name || e.displayName,
+                        mobType: e.mobType,
+                        position: { x: e.position.x, y: e.position.y, z: e.position.z },
+                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
+                    })) : []
+            };
+
+            process.send({
+                type: 'viewer:state_response',
+                requestId: message.requestId,
+                payload: state
+            });
+        }
+    } else if (message.type === 'viewer:control') {
+        const { command } = message;
+        if (!bot) return;
+
+        try {
+            switch (command.type) {
+                case 'move':
+                    bot.setControlState(command.direction, command.active);
+                    break;
+
+                case 'look':
+                    if (command.yaw !== undefined) bot.entity.yaw = command.yaw;
+                    if (command.pitch !== undefined) bot.entity.pitch = command.pitch;
+                    break;
+
+                case 'chat':
+                    bot.chat(command.message);
+                    break;
+
+                case 'dig':
+                    if (command.position) {
+                        const block = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (block) bot.dig(block).catch(err => sendLog(`[Viewer] Dig error: ${err.message}`));
+                    }
+                    break;
+
+                case 'place':
+                    if (command.position && command.blockType) {
+                        const referenceBlock = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (referenceBlock) {
+                            const itemToPlace = bot.inventory.items().find(item => item.name === command.blockType);
+                            if (itemToPlace) {
+                                bot.equip(itemToPlace, 'hand')
+                                    .then(() => bot.placeBlock(referenceBlock, new Vec3(0, 1, 0)))
+                                    .catch(err => sendLog(`[Viewer] Place error: ${err.message}`));
+                            }
+                        }
+                    }
+                    break;
+
+                case 'sync_position':
+                    if (command.position && bot.entity) {
+                        bot.entity.position.x = command.position.x;
+                        bot.entity.position.y = command.position.y;
+                        bot.entity.position.z = command.position.z;
+                    }
+                    break;
+
+                case 'set_render_distance':
+                    if (command.distance && command.distance >= 8 && command.distance <= 64) {
+                        viewerRenderDistance = command.distance;
+                        sendLog(`[Viewer] Render distance set to ${viewerRenderDistance}`);
+                    }
+                    break;
+            }
+        } catch (error) {
+            sendLog(`[Viewer] Control error: ${error.message}`);
+        }
+    } else if (message.type === 'execute_event_graph') {
+        // Выполнение event графа в child process
+        const { botId, graph, eventType, eventArgs } = message;
+
+        try {
+
+            const playerList = bot ? Object.keys(bot.players) : [];
+            const botApi = {
+                sendMessage: (chatType, message, recipient) => {
+                    if (!bot || !bot.messageQueue) {
+                        sendLog('[EventGraph] Bot not ready');
+                        return;
+                    }
+
+                    bot.messageQueue.enqueue(chatType, message, recipient);
+                },
+                executeCommand: (command) => {
+                    if (!bot || !bot.messageQueue) {
+                        sendLog('[EventGraph] Bot not ready');
+                        return;
+                    }
+                    bot.messageQueue.enqueue('command', command);
+                },
+                lookAt: async (x, y, z) => {
+                    if (!bot) return;
+                    const target = new Vec3(x, y, z);
+                    await bot.lookAt(target);
+                },
+                navigate: async (x, y, z) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
+                    await bot.pathfinder.goto(goal);
+                },
+                attack: (entityId) => {
+                    if (!bot) return;
+                    const entity = bot.entities[entityId];
+                    if (entity) bot.attack(entity);
+                },
+                follow: (username) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const player = bot.players[username];
+                    if (player && player.entity) {
+                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
+                        bot.pathfinder.setGoal(goal, true);
+                    }
+                },
+                stopFollow: () => {
+                    if (bot && bot.pathfinder) {
+                        bot.pathfinder.setGoal(null);
+                    }
+                }
+            };
+
+            const context = {
+                bot: botApi,
+                eventArgs: eventArgs || {},
+                players: playerList,
+                botState: bot ? {
+                    health: bot.health,
+                    food: bot.food,
+                    position: bot.entity?.position,
+                    gameMode: bot.game?.gameMode
+                } : {},
+                botEntity: bot && bot.entity ? serializeEntity(bot.entity) : null,
+                botId: botId,
+                graphId: graph.id,
+                eventType: eventType,
+                eventArgs: eventArgs
+            };
+
+            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+            await engine.execute(graph, context, eventType);
+
+
+        } catch (error) {
+            sendLog(`[EventGraph] Error executing ${eventType} graph: ${error.message}`);
+            sendLog(`[EventGraph] Stack: ${error.stack}`);
         }
     } else if (message.type === 'start') {
         const config = message.config;
@@ -230,34 +444,34 @@ process.on('message', async (message) => {
 
             if (config.proxyHost && config.proxyPort) {
                 sendLog(`[System] Используется прокси: ${config.proxyHost}:${config.proxyPort}`);
-                
+
                 const cleanProxyUsername = config.proxyUsername ? config.proxyUsername.trim() : null;
                 const cleanProxyPassword = config.proxyPassword || null;
-                
+
                 botOptions.connect = (client) => {
-                   SocksClient.createConnection({
-                       proxy: {
-                           host: config.proxyHost,
-                           port: config.proxyPort,
-                           type: 5,
-                           userId: cleanProxyUsername,
-                           password: cleanProxyPassword
-                       },
-                       command: 'connect',
-                       destination: {
-                           host: config.server.host,
-                           port: config.server.port
-                       }
-                   }).then(info => {
-                       client.setSocket(info.socket);
-                       client.emit('connect');
-                   }).catch(err => {
-                       sendLog(`[Proxy Error] SOCKS connection failed: ${err.message}. Bot will attempt to restart.`);
-                       client.emit('error', err);
-                       process.exit(1);
-                   });
+                    SocksClient.createConnection({
+                        proxy: {
+                            host: config.proxyHost,
+                            port: config.proxyPort,
+                            type: 5,
+                            userId: cleanProxyUsername,
+                            password: cleanProxyPassword
+                        },
+                        command: 'connect',
+                        destination: {
+                            host: config.server.host,
+                            port: config.server.port
+                        }
+                    }).then(info => {
+                        client.setSocket(info.socket);
+                        client.emit('connect');
+                    }).catch(err => {
+                        sendLog(`[Proxy Error] SOCKS connection failed: ${err.message}. Bot will attempt to restart.`);
+                        client.emit('error', err);
+                        process.exit(1);
+                    });
                 }
-           } else {
+            } else {
                 sendLog(`[System] Прокси не настроен, используется прямое подключение.`);
             }
 
@@ -307,104 +521,116 @@ process.on('message', async (message) => {
                 registerGroup: (groupConfig) => PermissionManager.registerGroup(bot.config.id, groupConfig),
                 addPermissionsToGroup: (groupName, permissionNames) => PermissionManager.addPermissionsToGroup(bot.config.id, groupName, permissionNames),
                 installedPlugins: installedPluginNames,
-                registerCommand: async (command) => { 
+                registerCommand: async (command) => {
                     try {
-                        let permissionId = null;
-                        if (command.permissions) {
-                            let permission = await prisma.permission.findUnique({
-                                where: {
-                                    botId_name: {
-                                        botId: bot.config.id,
-                                        name: command.permissions,
-                                    },
-                                },
-                            });
+                        const existingCommand = await prisma.command.findUnique({
+                            where: {
+                                botId_name: {
+                                    botId: bot.config.id,
+                                    name: command.name,
+                                }
+                            }
+                        });
 
-                            if (!permission) {
-                                // Автоматически создаем право, если оно не найдено
-                                permission = await prisma.permission.create({
-                                    data: {
+                        if (existingCommand) {
+                            if (existingCommand.permissionId === null && command.permissions) {
+                                const permission = await prisma.permission.upsert({
+                                    where: {
+                                        botId_name: {
+                                            botId: bot.config.id,
+                                            name: command.permissions,
+                                        },
+                                    },
+                                    update: {},
+                                    create: {
                                         botId: bot.config.id,
                                         name: command.permissions,
                                         description: `Автоматически создано для команды ${command.name}`,
                                         owner: command.owner || 'system',
                                     },
                                 });
-                                sendLog(`[API] Право \"${command.permissions}\" автоматически создано для команды \"${command.name}\".`);
+
+                                await prisma.command.update({
+                                    where: { id: existingCommand.id },
+                                    data: { permissionId: permission.id }
+                                });
                             }
-                            permissionId = permission.id;
+                        } else {
+                            let permissionId = null;
+                            if (command.permissions) {
+                                const permission = await prisma.permission.upsert({
+                                    where: {
+                                        botId_name: {
+                                            botId: bot.config.id,
+                                            name: command.permissions,
+                                        },
+                                    },
+                                    update: {},
+                                    create: {
+                                        botId: bot.config.id,
+                                        name: command.permissions,
+                                        description: `Автоматически создано для команды ${command.name}`,
+                                        owner: command.owner || 'system',
+                                    },
+                                });
+                                permissionId = permission.id;
+                            }
+
+                            let pluginOwnerId = null;
+                            if (command.owner && command.owner.startsWith('plugin:')) {
+                                const pluginName = command.owner.replace('plugin:', '');
+                                const plugin = await prisma.installedPlugin.findFirst({
+                                    where: {
+                                        botId: bot.config.id,
+                                        name: pluginName
+                                    }
+                                });
+                                if (plugin) {
+                                    pluginOwnerId = plugin.id;
+                                }
+                            }
+
+                            const commandData = {
+                                botId: bot.config.id,
+                                name: command.name,
+                                description: command.description || '',
+                                owner: command.owner || 'unknown',
+                                permissionId: permissionId,
+                                cooldown: command.cooldown || 0,
+                                isEnabled: command.isActive !== undefined ? command.isActive : true,
+                                aliases: JSON.stringify(command.aliases || []),
+                                allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
+                                argumentsJson: JSON.stringify(command.args || []),
+                                pluginOwnerId: pluginOwnerId,
+                            };
+
+                            await prisma.command.create({
+                                data: commandData,
+                            });
                         }
 
-                        let pluginOwnerId = null;
-                        if (command.owner && command.owner.startsWith('plugin:')) {
-                            const pluginName = command.owner.replace('plugin:', '');
-                            const plugin = await prisma.installedPlugin.findFirst({
-                                where: {
-                                    botId: bot.config.id,
-                                    name: pluginName
+                        if (process.send) {
+                            process.send({
+                                type: 'register_command',
+                                commandConfig: {
+                                    name: command.name,
+                                    description: command.description,
+                                    aliases: command.aliases,
+                                    owner: command.owner,
+                                    permissions: command.permissions,
+                                    cooldown: command.cooldown,
+                                    allowedChatTypes: command.allowedChatTypes,
                                 }
                             });
-                            if (plugin) {
-                                pluginOwnerId = plugin.id;
-                            }
                         }
 
-                        const commandData = {
-                            botId: bot.config.id,
-                            name: command.name,
-                            description: command.description || '',
-                            owner: command.owner || 'unknown',
-                            permissionId: permissionId,
-                            cooldown: command.cooldown || 0,
-                            isEnabled: command.isActive !== undefined ? command.isActive : true,
-                            aliases: JSON.stringify(command.aliases || []),
-                            allowedChatTypes: JSON.stringify(command.allowedChatTypes || ['chat', 'private']),
-                            argumentsJson: JSON.stringify(command.args || []),
-                            pluginOwnerId: pluginOwnerId,
-                        };
-
-                        await prisma.command.upsert({
-                            where: {
-                                botId_name: {
-                                    botId: commandData.botId,
-                                    name: commandData.name,
-                                }
-                            },
-                            update: {
-                                description: commandData.description,
-                                aliases: commandData.aliases,
-                                allowedChatTypes: commandData.allowedChatTypes,
-                                cooldown: commandData.cooldown,
-                                isEnabled: commandData.isEnabled,
-                                argumentsJson: commandData.argumentsJson,
-                                permissionId: commandData.permissionId,
-                            },
-                            create: commandData,
-                        });
-
-                         if (process.send) {
-                             process.send({
-                                 type: 'register_command',
-                                 commandConfig: {
-                                     name: command.name,
-                                     description: command.description,
-                                     aliases: command.aliases,
-                                     owner: command.owner,
-                                     permissions: command.permissions,
-                                     cooldown: command.cooldown,
-                                     allowedChatTypes: command.allowedChatTypes,
-                                 }
-                             });
-                         }
-                         sendLog(`[API] Команда \"${command.name}\" от плагина \"${command.owner}\" зарегистрирована в процессе.`);
-
-                         if (!bot.commands) bot.commands = new Map();
-                         bot.commands.set(command.name, command);
-                         if (Array.isArray(command.aliases)) {
-                             for (const alias of command.aliases) {
-                                 bot.commands.set(alias, command);
-                             }
-                         }
+                        if (!bot.commands) bot.commands = new Map();
+                        bot.commands.set(command.name, command);
+                        if (Array.isArray(command.aliases)) {
+                            for (const alias of command.aliases) {
+                                bot.commands.set(alias, command);
+                            }
+                        }
                     } catch (error) {
                         sendLog(`[API] Ошибка при регистрации команды: ${error.message}`);
                     }
@@ -413,7 +639,7 @@ process.on('message', async (message) => {
                     return new Promise((resolve, reject) => {
                         const requestId = uuidv4();
                         pendingRequests.set(requestId, { resolve, reject });
-        
+
                         if (process.send) {
                             process.send({
                                 type: 'request_user_action',
@@ -427,7 +653,7 @@ process.on('message', async (message) => {
                         } else {
                             reject(new Error('IPC channel is not available.'));
                         }
-        
+
                         setTimeout(() => {
                             if (pendingRequests.has(requestId)) {
                                 reject(new Error('Request to main process timed out.'));
@@ -501,7 +727,9 @@ process.on('message', async (message) => {
                 },
                 executeCommand: (command) => {
                     sendLog(`[Graph] Выполнение серверной команды: ${command}`);
-                    bot.chat(command);
+                    if (bot && bot.messageQueue) {
+                        bot.messageQueue.enqueue('command', command);
+                    }
                 },
                 lookAt: (position) => {
                     if (bot && position) {
@@ -512,7 +740,7 @@ process.on('message', async (message) => {
                     const entities = [];
                     if (bot && bot.entities) {
                         const centerPos = position || bot.entity?.position;
-                        
+
                         if (centerPos) {
                             for (const entity of Object.values(bot.entities)) {
                                 if (entity && entity.position && entity.isValid) {
@@ -520,7 +748,7 @@ process.on('message', async (message) => {
                                     const dy = entity.position.y - centerPos.y;
                                     const dz = entity.position.z - centerPos.z;
                                     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                                    
+
                                     if (distance <= radius) {
                                         entities.push(serializeEntity(entity));
                                     }
@@ -537,7 +765,7 @@ process.on('message', async (message) => {
                     const currentState = pluginUiState.get(pluginName) || {};
                     const newState = { ...currentState, ...stateUpdate };
                     pluginUiState.set(pluginName, newState);
-                    
+
 
                     if (process.send) {
                         process.send({
@@ -553,7 +781,7 @@ process.on('message', async (message) => {
             bot.sendMessage = (type, message, username) => {
                 bot.api.sendMessage(type, message, username);
             };
-            
+
             // Добавляем bot.sendLog для команд
             bot.sendLog = (message) => sendLog(message);
 
@@ -584,7 +812,7 @@ process.on('message', async (message) => {
                     existingCommand.aliases = JSON.parse(dbCommand.aliases || '[]');
                     existingCommand.permissionId = dbCommand.permissionId;
                     existingCommand.allowedChatTypes = JSON.parse(dbCommand.allowedChatTypes || '[]');
-                    
+
                     // Добавляем алиасы в bot.commands для быстрого доступа
                     const aliases = JSON.parse(dbCommand.aliases || '[]');
                     for (const alias of aliases) {
@@ -604,26 +832,37 @@ process.on('message', async (message) => {
                     visualCommand.graphJson = dbCommand.graphJson;
                     visualCommand.owner = 'visual_editor';
                     visualCommand.handler = (botInstance, typeChat, user, args) => {
-                        const playerList = bot ? Object.keys(bot.players) : [];
-                        const botState = bot ? { yaw: bot.entity.yaw, pitch: bot.entity.pitch } : {};
-                        const botEntity = bot && bot.entity ? {
-                            position: bot.entity.position,
-                            yaw: bot.entity.yaw,
-                            pitch: bot.entity.pitch
+                        const playerList = botInstance ? Object.keys(botInstance.players) : [];
+                        const botState = botInstance ? { yaw: botInstance.entity.yaw, pitch: botInstance.entity.pitch } : {};
+                        const botEntity = botInstance && botInstance.entity ? {
+                            position: botInstance.entity.position,
+                            yaw: botInstance.entity.yaw,
+                            pitch: botInstance.entity.pitch
                         } : null;
-                        const context = { 
-                            bot: botInstance.api, 
-                            user, 
-                            args, 
-                            typeChat, 
-                            players: playerList, 
+
+                        const context = {
+                            bot: botInstance.api,
+                            user,
+                            args,
+                            typeChat,
+                            players: playerList,
                             botState,
-                            botEntity
+                            botEntity,
+                            botId: botInstance.config.id,
+                            graphId: dbCommand.id,
+                            eventType: 'command',
+                            eventArgs: {
+                                commandName: dbCommand.name,
+                                user: { username: user?.username },
+                                args,
+                                typeChat
+                            }
                         };
-                        return bot.graphExecutionEngine.execute(visualCommand.graphJson, context);
+
+                        return botInstance.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
                     bot.commands.set(visualCommand.name, visualCommand);
-                    
+
                     // Добавляем алиасы визуальных команд
                     const visualAliases = JSON.parse(dbCommand.aliases || '[]');
                     for (const alias of visualAliases) {
@@ -631,7 +870,7 @@ process.on('message', async (message) => {
                     }
                 }
             }
-            
+
             // Добавляем алиасы для всех загруженных команд (системных и плагинов)
             for (const cmd of bot.commands.values()) {
                 if (cmd.aliases && Array.isArray(cmd.aliases)) {
@@ -648,7 +887,7 @@ process.on('message', async (message) => {
                     process.send({
                         type: 'register_command',
                         commandConfig: {
-                             name: cmd.name,
+                            name: cmd.name,
                             description: cmd.description,
                             aliases: cmd.aliases,
                             owner: cmd.owner,
@@ -659,7 +898,7 @@ process.on('message', async (message) => {
                     });
                 }
             }
-            
+
             await initializePlugins(bot, config.plugins, prisma);
             sendLog('[System] Все системы инициализированы.');
 
@@ -680,6 +919,16 @@ process.on('message', async (message) => {
                     rawText: rawMessageText,
                     json: jsonMsg
                 });
+
+                if (process.send && rawMessageText.trim()) {
+                    process.send({
+                        type: 'viewer:chat',
+                        payload: {
+                            rawText: rawMessageText,
+                            timestamp: Date.now()
+                        }
+                    });
+                }
             });
 
             bot.events.on('chat:message', (data) => {
@@ -723,16 +972,17 @@ process.on('message', async (message) => {
                     sendLog(`Ошибка при обработке userAction: ${error.message}`);
                 }
             });
-            
+
             bot.on('login', () => {
                 if (connectionTimeout) {
                     clearTimeout(connectionTimeout);
                     connectionTimeout = null;
                 }
                 sendLog('[Event: login] Успешно залогинился!');
-                if (process.send) {
+                if (process.send && !botReadySent) {
                     process.send({ type: 'bot_ready' });
                     process.send({ type: 'status', status: 'running' });
+                    botReadySent = true;
                 }
             });
 
@@ -762,7 +1012,7 @@ process.on('message', async (message) => {
                 }
                 sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`);
             });
-            
+
             bot.on('end', (reason) => {
                 if (connectionTimeout) {
                     clearTimeout(connectionTimeout);
@@ -809,17 +1059,54 @@ process.on('message', async (message) => {
 
             bot.on('spawn', () => {
                 try {
-                        if (bot._client && bot._client.options) {
-                            bot._client.options.chat = 'enabled';
-                        }
-                        if (bot.chatEnabled !== undefined) {
-                            bot.chatEnabled = true;
-                        }
+                    if (bot._client && bot._client.options) {
+                        bot._client.options.chat = 'enabled';
+                    }
+                    if (bot.chatEnabled !== undefined) {
+                        bot.chatEnabled = true;
+                    }
                 } catch (err) {
                 }
                 setTimeout(() => {
                     isReady = true;
                 }, 3000);
+
+                // Отправка события для viewer
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:spawn',
+                        payload: {
+                            position: bot.entity?.position,
+                            yaw: bot.entity?.yaw,
+                            pitch: bot.entity?.pitch
+                        }
+                    });
+                }
+            });
+
+            bot.on('health', () => {
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:health',
+                        payload: {
+                            health: bot.health,
+                            food: bot.food
+                        }
+                    });
+                }
+            });
+
+            bot.on('move', () => {
+                if (process.send) {
+                    process.send({
+                        type: 'viewer:move',
+                        payload: {
+                            position: bot.entity?.position,
+                            yaw: bot.entity?.yaw,
+                            pitch: bot.entity?.pitch
+                        }
+                    });
+                }
             });
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
@@ -847,6 +1134,7 @@ process.on('message', async (message) => {
             clearTimeout(connectionTimeout);
             connectionTimeout = null;
         }
+        botReadySent = false;
         if (bot) bot.quit();
         else process.exit(0);
     } else if (message.type === 'chat') {
@@ -854,25 +1142,71 @@ process.on('message', async (message) => {
             const { message: msg, chatType, username } = message.payload;
             bot.messageQueue.enqueue(chatType, msg, username);
         }
+    } else if (message.type === 'register_temp_command') {
+        // Регистрация временной команды из главного процесса
+        const { commandData } = message;
+
+        try {
+            const tempCommand = new Command({
+                name: commandData.name,
+                description: commandData.description || '',
+                aliases: commandData.aliases || [],
+                cooldown: commandData.cooldown || 0,
+                allowedChatTypes: commandData.allowedChatTypes || ['chat', 'private'],
+                args: [],
+                owner: 'runtime',
+            });
+
+            tempCommand.permissionId = commandData.permissionId || null;
+            tempCommand.isTemporary = true;
+            tempCommand.tempId = commandData.tempId;
+            tempCommand.isVisual = false;
+            tempCommand.handler = () => { };
+
+            // Регистрируем команду в bot.commands
+            bot.commands.set(commandData.name, tempCommand);
+
+            if (Array.isArray(commandData.aliases)) {
+                for (const alias of commandData.aliases) {
+                    bot.commands.set(alias, tempCommand);
+                }
+            }
+        } catch (error) {
+            sendLog(`[BotProcess] Ошибка регистрации временной команды: ${error.message}`);
+        }
+    } else if (message.type === 'unregister_temp_command') {
+        const { commandName, aliases } = message;
+
+        try {
+            if (bot.commands.has(commandName)) {
+                bot.commands.delete(commandName);
+            }
+
+            if (Array.isArray(aliases)) {
+                for (const alias of aliases) {
+                    if (bot.commands.has(alias)) {
+                        bot.commands.delete(alias);
+                    }
+                }
+            }
+        } catch (error) {
+            sendLog(`[BotProcess] Ошибка удаления временной команды: ${error.message}`);
+        }
     } else if (message.type === 'execute_handler') {
         const { commandName, username, args, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
             (async () => {
                 try {
-                    // Получаем полный объект User из базы данных
                     const user = await UserService.getUser(username, bot.config.id, bot.config);
-                    
-                    // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
+
                     const handlerParamCount = commandInstance.handler.length;
 
                     if (handlerParamCount === 1) {
-                        // Новая сигнатура: handler(context)
                         const transport = new Transport(typeChat, bot);
                         const context = new CommandContext(bot, user, args, transport);
                         await commandInstance.handler(context);
                     } else {
-                        // Старая сигнатура: handler(bot, typeChat, user, args)
                         await commandInstance.handler(bot, typeChat, user, args);
                     }
                 } catch (e) {
@@ -882,80 +1216,77 @@ process.on('message', async (message) => {
             })();
         }
     } else if (message.type === 'execute_command_request') {
-                const { requestId, payload } = message;
-                const { commandName, args, username, typeChat } = payload;
+        const { requestId, payload } = message;
+        const { commandName, args, username, typeChat } = payload;
 
-                (async () => {
-                    try {
-                        const commandInstance = bot.commands.get(commandName);
-                        if (!commandInstance) {
-                            throw new Error(`Command '${commandName}' not found.`);
-                        }
+        (async () => {
+            try {
+                const commandInstance = bot.commands.get(commandName);
+                if (!commandInstance) {
+                    throw new Error(`Command '${commandName}' not found.`);
+                }
 
-                        // Восстанавливаем полный User объект из username
-                        const user = await UserService.getUser(username, bot.config.id, bot.config);
+                const user = await UserService.getUser(username, bot.config.id, bot.config);
 
-                        let result;
+                let result;
 
-                        // Проверяем сигнатуру handler - старая (4 аргумента) или новая (1 аргумент context)
-                        const handlerParamCount = commandInstance.handler.length;
+                const handlerParamCount = commandInstance.handler.length;
 
-                        if (handlerParamCount === 1) {
-                            // Новая сигнатура: handler(context)
-                            const transport = new Transport(typeChat, bot);
-                            const context = new CommandContext(bot, user, args, transport);
+                if (handlerParamCount === 1) {
+                    const transport = new Transport(typeChat, bot);
+                    const context = new CommandContext(bot, user, args, transport);
 
-                            if (typeChat === 'websocket') {
-                                result = await commandInstance.handler(context);
-                                if (process.send) {
-                                    process.send({ type: 'execute_command_response', requestId, result });
-                                }
-                            } else {
-                                commandInstance.handler(context).catch(e => {
-                                     sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
-                                });
-                            }
-                        } else {
-                            // Старая сигнатура: handler(bot, typeChat, user, args)
-                            if (typeChat === 'websocket') {
-                                // Для websocket перехватываем bot.sendMessage
-                                const originalSendMessage = bot.sendMessage;
-                                let resultFromSendMessage = null;
-                                let sendMessageCalled = false;
-
-                                bot.sendMessage = (type, message, username) => {
-                                    if (type === 'websocket') {
-                                        resultFromSendMessage = message;
-                                        sendMessageCalled = true;
-                                    } else {
-                                        originalSendMessage.call(bot, type, message, username);
-                                    }
-                                };
-
-                                try {
-                                    const returnValue = await commandInstance.handler(bot, typeChat, user, args);
-                                    result = sendMessageCalled ? resultFromSendMessage : returnValue;
-
-                                    if (process.send) {
-                                        process.send({ type: 'execute_command_response', requestId, result });
-                                    }
-                                } finally {
-                                    bot.sendMessage = originalSendMessage;
-                                }
-                            } else {
-                                // Для игровых команд просто выполняем
-                                commandInstance.handler(bot, typeChat, user, args).catch(e => {
-                                     sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
-                                });
-                            }
-                        }
-
-                    } catch (error) {
+                    if (typeChat === 'websocket') {
+                        result = await commandInstance.handler(context);
                         if (process.send) {
-                            process.send({ type: 'execute_command_response', requestId, error: error.message });
+                            process.send({ type: 'execute_command_response', requestId, result });
                         }
+                    } else {
+                        commandInstance.handler(context).catch(e => {
+                            sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
+                        });
                     }
-                })();
+                } else {
+                    // Старая сигнатура: handler(bot, typeChat, user, args)
+                    if (typeChat === 'websocket') {
+                        // Для websocket перехватываем bot.sendMessage
+                        const originalSendMessage = bot.sendMessage;
+                        let resultFromSendMessage = null;
+                        let sendMessageCalled = false;
+
+                        bot.sendMessage = (type, message, username) => {
+                            if (type === 'websocket') {
+                                resultFromSendMessage = message;
+                                sendMessageCalled = true;
+                            } else {
+                                originalSendMessage.call(bot, type, message, username);
+                            }
+                        };
+
+                        try {
+                            const returnValue = await commandInstance.handler(bot, typeChat, user, args);
+                            result = sendMessageCalled ? resultFromSendMessage : returnValue;
+
+                            if (process.send) {
+                                process.send({ type: 'execute_command_response', requestId, result });
+                            }
+                        } finally {
+                            bot.sendMessage = originalSendMessage;
+                        }
+                    } else {
+                        // Для игровых команд просто выполняем
+                        commandInstance.handler(bot, typeChat, user, args).catch(e => {
+                            sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
+                        });
+                    }
+                }
+
+            } catch (error) {
+                if (process.send) {
+                    process.send({ type: 'execute_command_response', requestId, error: error.message });
+                }
+            }
+        })();
     } else if (message.type === 'invalidate_user_cache') {
         if (message.username && bot && bot.config) {
             UserService.clearCache(message.username, bot.config.id);
@@ -1007,6 +1338,11 @@ process.on('message', async (message) => {
                 commandInstance.onBlacklisted(bot, typeChat, { username });
             }
         }
+    } else if (message.type === 'send_message') {
+        const { typeChat, message: msg, username } = message;
+        if (bot && bot.api) {
+            bot.api.sendMessage(typeChat, msg, username);
+        }
     } else if (message.type === 'action') {
         if (message.name === 'lookAt' && bot && message.payload.position) {
             const { x, y, z } = message.payload.position;
@@ -1018,19 +1354,108 @@ process.on('message', async (message) => {
         }
     } else if (message.type === 'plugins:reload') {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
-            const newConfig = await fetchNewConfig(bot.config.id, prisma);
-            if (newConfig) {
-                bot.config.plugins = newConfig.installedPlugins;
-                bot.commands.clear();
-                await loadCommands(bot, newConfig.commands);
-                await initializePlugins(bot, newConfig.installedPlugins, prisma);
-                sendLog('[System] Плагины успешно перезагружены.');
-            } else {
+        const newConfig = await fetchNewConfig(bot.config.id, prisma);
+        if (newConfig) {
+            bot.config.plugins = newConfig.installedPlugins;
+            bot.commands.clear();
+            await loadCommands(bot, newConfig.commands);
+            await initializePlugins(bot, newConfig.installedPlugins, prisma);
+            sendLog('[System] Плагины успешно перезагружены.');
+        } else {
             sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
         }
     } else if (message.type === 'server_command') {
-        if (bot && message.payload && message.payload.command) {
-            bot.chat(message.payload.command);
+        if (bot && bot.messageQueue && message.payload && message.payload.command) {
+            bot.messageQueue.enqueue('command', message.payload.command);
+        }
+    } else if (message.type === 'execute_event_graph') {
+        // Выполнение event графа в child process
+        const { graph, eventType, eventArgs } = message;
+
+        try {
+            if (!graph || !graph.nodes || graph.nodes.length === 0) {
+                return;
+            }
+
+            const config = bot?.config || bot?.botConfig || message.botConfig;
+
+            if (!config) {
+                sendLog('[ERROR] Bot config not available for event graph execution');
+                return;
+            }
+
+            const botApi = {
+                sendMessage: (chatType, messageText, recipient) => {
+                    if (!bot || !bot.messageQueue) return;
+                    bot.messageQueue.enqueue(chatType, messageText, recipient);
+                },
+                executeCommand: (command) => {
+                    if (!bot || !bot.messageQueue) return;
+                    bot.messageQueue.enqueue('command', command);
+                },
+                lookAt: async (x, y, z) => {
+                    if (!bot) return;
+                    const target = new Vec3(x, y, z);
+                    await bot.lookAt(target);
+                },
+                navigate: async (x, y, z) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
+                    await bot.pathfinder.goto(goal);
+                },
+                attack: (entityId) => {
+                    if (!bot) return;
+                    const entity = bot.entities[entityId];
+                    if (entity) bot.attack(entity);
+                },
+                follow: (username) => {
+                    if (!bot || !bot.pathfinder) return;
+                    const player = bot.players[username];
+                    if (player && player.entity) {
+                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
+                        bot.pathfinder.setGoal(goal, true);
+                    }
+                },
+                stopFollow: () => {
+                    if (bot && bot.pathfinder) {
+                        bot.pathfinder.setGoal(null);
+                    }
+                }
+            };
+
+            const players = bot ? Object.keys(bot.players) : [];
+
+            const context = {
+                bot: botApi,
+                players,
+                botState: {
+                    health: bot?.health,
+                    food: bot?.food,
+                    position: bot?.entity?.position
+                },
+                botEntity: bot && bot.entity ? {
+                    position: bot.entity.position,
+                    velocity: bot.entity.velocity,
+                    yaw: bot.entity.yaw,
+                    pitch: bot.entity.pitch,
+                    onGround: bot.entity.onGround,
+                    height: bot.entity.height,
+                    width: bot.entity.width
+                } : null,
+                eventArgs,
+                botId: config.id,
+                graphId: graph.id,
+                eventType: eventType,
+                eventArgs: eventArgs
+            };
+
+            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+
+            await engine.execute(graph, context, eventType);
+
+        } catch (error) {
+            sendLog(`[ERROR] Error executing event graph for '${eventType}': ${error.message}`);
+            console.error(error);
         }
     }
 });
@@ -1075,18 +1500,18 @@ process.on('SIGINT', () => {
 function serializeEntity(entity) {
     if (!entity) return null;
     return {
-      id: entity.id,
-      type: entity.type,
-      username: entity.username,
-      displayName: entity.displayName,
-      position: entity.position,
-      yaw: entity.yaw,
-      pitch: entity.pitch,
-      onGround: entity.onGround,
-      isValid: entity.isValid,
-      heldItem: entity.heldItem,
-      equipment: entity.equipment,
-      metadata: entity.metadata
+        id: entity.id,
+        type: entity.type,
+        username: entity.username,
+        displayName: entity.displayName,
+        position: entity.position,
+        yaw: entity.yaw,
+        pitch: entity.pitch,
+        onGround: entity.onGround,
+        isValid: entity.isValid,
+        heldItem: entity.heldItem,
+        equipment: entity.equipment,
+        metadata: entity.metadata
     };
 }
 
