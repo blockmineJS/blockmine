@@ -187,8 +187,9 @@ class MinecraftBotManager {
                     break;
 
                 case 'look':
-                    if (command.yaw !== undefined) bot.entity.yaw = command.yaw;
-                    if (command.pitch !== undefined) bot.entity.pitch = command.pitch;
+                    const yaw = command.yaw !== undefined ? command.yaw : bot.entity.yaw;
+                    const pitch = command.pitch !== undefined ? command.pitch : bot.entity.pitch;
+                    await bot.look(yaw, pitch, true);
                     break;
 
                 case 'chat':

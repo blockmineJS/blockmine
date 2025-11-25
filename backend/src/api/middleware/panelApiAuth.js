@@ -67,10 +67,15 @@ async function authenticatePanelApiKey(req, res, next) {
         });
 
         let permissions;
-        if (matchedKey.customScopes) {
-            permissions = JSON.parse(matchedKey.customScopes);
-        } else {
-            permissions = JSON.parse(matchedKey.user.role.permissions);
+        try {
+            if (matchedKey.customScopes) {
+                permissions = JSON.parse(matchedKey.customScopes);
+            } else {
+                permissions = JSON.parse(matchedKey.user.role.permissions);
+            }
+        } catch (parseError) {
+            console.error('Ошибка парсинга прав доступа:', parseError);
+            return res.status(500).json({ error: 'Ошибка обработки прав доступа' });
         }
 
         console.log(`[Panel API Key] User: ${matchedKey.user.username}, Key: ${matchedKey.name}, Permissions:`, permissions);

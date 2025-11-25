@@ -53,10 +53,15 @@ async function authenticateSocket(socket, next) {
         });
 
         let permissions;
-        if (matchedKey.customScopes) {
-            permissions = JSON.parse(matchedKey.customScopes);
-        } else {
-            permissions = JSON.parse(matchedKey.user.role.permissions);
+        try {
+            if (matchedKey.customScopes) {
+                permissions = JSON.parse(matchedKey.customScopes);
+            } else {
+                permissions = JSON.parse(matchedKey.user.role.permissions);
+            }
+        } catch (parseError) {
+            console.error('Ошибка парсинга прав доступа:', parseError);
+            return next(new Error('Ошибка обработки прав доступа'));
         }
 
         let availableBots;

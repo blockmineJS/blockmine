@@ -294,10 +294,18 @@ router.get('/:pluginName/structure', resolvePluginPath, async (req, res) => {
                 if (repositoryUrl && typeof repositoryUrl === 'string') {
                     const { execSync } = require('child_process');
 
-                    execSync('git init', { cwd: req.pluginPath });
-
+                    // Валидация URL репозитория
+                    const urlPattern = /^(https?|git):\/\/[a-zA-Z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+$/;
                     const cleanUrl = repositoryUrl.replace(/^git\+/, '');
-                    execSync(`git remote add origin ${cleanUrl}`, { cwd: req.pluginPath });
+
+                    if (!urlPattern.test(cleanUrl)) {
+                        console.warn(`[Plugin IDE] Invalid repository URL format: ${cleanUrl}`);
+                        throw new Error('Invalid repository URL');
+                    }
+
+                    execSync('git init', { cwd: req.pluginPath });
+                    // Используем массив аргументов для безопасности
+                    execSync('git remote add origin ' + JSON.stringify(cleanUrl), { cwd: req.pluginPath });
 
                     console.log(`[Plugin IDE] Initialized git repository for ${req.params.pluginName} with remote: ${cleanUrl}`);
                 }

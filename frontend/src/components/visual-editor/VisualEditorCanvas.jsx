@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from 'react';
-import ReactFlow, { Background, Controls, useReactFlow } from 'reactflow';
+import ReactFlow, { Background, Controls, useReactFlow, useKeyPress } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
   Command,

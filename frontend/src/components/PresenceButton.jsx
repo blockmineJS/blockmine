@@ -104,26 +104,19 @@ export default function PresenceButton() {
 		const interval = setInterval(() => setTick((v) => v + 1), 1000);
 		return () => clearInterval(interval);
 	}, []);
-
-	// Обогащаем список пользователей именами ботов
 	useEffect(() => {
 		const enrichedUsers = list.map((user) => {
-			// Извлекаем botId из пути
 			const match = user.path.match(/^\/bots\/(\d+)/);
-			if (match && !user.metadata?.botName) {
+			if (match) {
 				const botId = parseInt(match[1]);
-
-				// Ищем бота в списке
 				const bot = bots.find(b => b.id === botId);
 
-				if (bot) {
-					const botName = bot.username || bot.name || `Бот ${botId}`;
-
+				if (!user.metadata?.botName && bot) {
 					return {
 						...user,
 						metadata: {
 							...user.metadata,
-							botName
+							botName: bot.username || bot.name || `Бот ${botId}`
 						}
 					};
 				}

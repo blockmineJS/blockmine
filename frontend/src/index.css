@@ -108,7 +108,7 @@
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
   stroke: #10b981 !important;
-  stroke-width: 2.5px !important;
+  stroke-width: 3.5px !important;
 }
 
 .react-flow__handle {

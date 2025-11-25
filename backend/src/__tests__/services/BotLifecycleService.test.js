@@ -10,11 +10,16 @@ jest.mock('../../core/utils/crypto', () => ({
 }));
 
 // Mock Socket.IO
+const mockIO = {
+    emit: jest.fn(),
+    to: jest.fn().mockReturnValue({ emit: jest.fn() })
+};
+
 jest.mock('../../real-time/socketHandler', () => ({
-    getIO: jest.fn().mockReturnValue({
-        emit: jest.fn(),
-        to: jest.fn().mockReturnValue({ emit: jest.fn() })
-    })
+    getIO: jest.fn(() => mockIO),
+    getIOSafe: jest.fn(() => mockIO),
+    addPluginLogToBuffer: jest.fn(),
+    broadcastToPanelNamespace: jest.fn()
 }));
 
 jest.mock('../../real-time/botApi', () => ({

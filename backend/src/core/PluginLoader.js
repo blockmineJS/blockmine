@@ -142,9 +142,6 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                     // Добавляем кастомный console в bot объект для использования плагинами
                     bot.console = pluginConsole;
 
-                    // Подменяем глобальный console (не восстанавливаем чтобы перехватывать все логи)
-                    global.console = pluginConsole;
-
                     // Опции плагина с кастомным console
                     const pluginOptions = {
                         settings: finalSettings,

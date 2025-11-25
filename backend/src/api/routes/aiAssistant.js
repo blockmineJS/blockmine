@@ -330,7 +330,8 @@ function createPluginTools(pluginPath, res, botId) {
                     const safePath = path.resolve(pluginPath, args.filePath);
 
                     // Проверка безопасности - файл должен быть внутри pluginPath
-                    if (!safePath.startsWith(pluginPath)) {
+                    const normalizedPluginPath = pluginPath.endsWith(path.sep) ? pluginPath : pluginPath + path.sep;
+                    if (!safePath.startsWith(normalizedPluginPath) && safePath !== pluginPath) {
                         return `Ошибка: Доступ запрещен. Файл находится за пределами плагина.`;
                     }
 
@@ -373,7 +374,8 @@ function createPluginTools(pluginPath, res, botId) {
                     const safePath = path.resolve(pluginPath, args.filePath);
 
                     // Проверка безопасности - файл должен быть внутри pluginPath
-                    if (!safePath.startsWith(pluginPath)) {
+                    const normalizedPluginPath = pluginPath.endsWith(path.sep) ? pluginPath : pluginPath + path.sep;
+                    if (!safePath.startsWith(normalizedPluginPath) && safePath !== pluginPath) {
                         return `Ошибка: Доступ запрещен. Файл находится за пределами плагина.`;
                     }
 
@@ -557,7 +559,8 @@ function createPluginTools(pluginPath, res, botId) {
                     const safePath = path.resolve(pluginPath, args.filePath);
 
                     // Проверка безопасности - файл должен быть внутри pluginPath
-                    if (!safePath.startsWith(pluginPath)) {
+                    const normalizedPluginPath = pluginPath.endsWith(path.sep) ? pluginPath : pluginPath + path.sep;
+                    if (!safePath.startsWith(normalizedPluginPath) && safePath !== pluginPath) {
                         return `Ошибка: Доступ запрещен. Файл находится за пределами плагина.`;
                     }
 
@@ -613,7 +616,8 @@ function createPluginTools(pluginPath, res, botId) {
                     const safePath = path.resolve(pluginPath, args.folderPath);
 
                     // Проверка безопасности - папка должна быть внутри pluginPath
-                    if (!safePath.startsWith(pluginPath)) {
+                    const normalizedPluginPath = pluginPath.endsWith(path.sep) ? pluginPath : pluginPath + path.sep;
+                    if (!safePath.startsWith(normalizedPluginPath) && safePath !== pluginPath) {
                         return `Ошибка: Доступ запрещен. Папка находится за пределами плагина.`;
                     }
 

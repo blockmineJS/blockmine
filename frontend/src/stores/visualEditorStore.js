@@ -68,6 +68,9 @@ export const useVisualEditorStore = create(
     // Viewport state (для правильного отображения collaborative курсоров)
     viewport: { x: 0, y: 0, zoom: 1 },
 
+    // Clipboard state (для копирования и вставки нод)
+    clipboard: { nodes: [], edges: [] },
+
     init: async (botId, id, type) => {
       set({ isLoading: true, editorType: type, variables: [], commandArguments: [] });
       try {
@@ -599,6 +602,94 @@ export const useVisualEditorStore = create(
           graphId: command.id,
           type: 'create',
           data: { node: newNode }
+        });
+      }
+    },
+
+    copyNodes: () => {
+      const { nodes, edges } = get();
+      const selectedNodes = nodes.filter(n => n.selected && n.type !== 'event:command');
+
+
+      if (selectedNodes.length === 0) {
+        return;
+      }
+
+      const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
+
+      // Копируем связи между выбранными нодами
+      const selectedEdges = edges.filter(e =>
+        selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target)
+      );
+
+      set({
+        clipboard: {
+          nodes: selectedNodes.map(n => ({
+            ...n,
+            data: { ...n.data }
+          })),
+          edges: selectedEdges
+        }
+      });
+
+    },
+
+    pasteNodes: () => {
+      const { clipboard, nodes, socket, command } = get();
+
+      if (clipboard.nodes.length === 0) {
+        return;
+      }
+
+      const idMap = new Map();
+      const newNodes = clipboard.nodes.map(node => {
+        const newId = `${node.type}-${randomUUID()}`;
+        idMap.set(node.id, newId);
+
+        return {
+          ...node,
+          id: newId,
+          position: {
+            x: node.position.x + 50,
+            y: node.position.y + 50,
+          },
+          selected: true,
+        };
+      });
+
+      const newEdges = clipboard.edges.map(edge => ({
+        ...edge,
+        id: `reactflow__edge-${idMap.get(edge.source)}${edge.sourceHandle}-${idMap.get(edge.target)}${edge.targetHandle}`,
+        source: idMap.get(edge.source),
+        target: idMap.get(edge.target),
+      }));
+
+      set(state => {
+        state.nodes.forEach(n => n.selected = false);
+
+        state.nodes.push(...newNodes);
+        state.edges.push(...newEdges);
+      });
+
+
+      // Broadcast создания нод и связей
+      if (socket && command) {
+        newNodes.forEach(node => {
+          socket.emit('collab:nodes', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'create',
+            data: { node }
+          });
+        });
+
+        newEdges.forEach(edge => {
+          socket.emit('collab:edges', {
+            botId: command.botId,
+            graphId: command.id,
+            type: 'create',
+            data: { edge }
+          });
         });
       }
     },

@@ -57,9 +57,9 @@ export default function AnimatedEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          stroke: isActive ? '#4ade80' : isExecuted ? '#22c55e' : '#64748b',
-          strokeWidth: isActive ? 3 : isExecuted ? 2 : 1,
-          opacity: isExecuted || isActive ? 1 : 0.3,
+          stroke: isActive ? '#4ade80' : isExecuted ? '#22c55e' : '#94a3b8',
+          strokeWidth: isActive ? 4 : isExecuted ? 3 : 2,
+          opacity: isExecuted || isActive ? 1 : 0.7,
           transition: 'all 0.3s ease',
         }}
       />

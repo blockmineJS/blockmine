@@ -90,10 +90,13 @@ function BotVisualEditorPage() {
     const onConnectStart = useVisualEditorStore(state => state.onConnectStart);
     const connectingPin = useVisualEditorStore(state => state.connectingPin);
     const isTraceViewerOpen = useVisualEditorStore(state => state.isTraceViewerOpen);
+    const closeTraceViewer = useVisualEditorStore(state => state.closeTraceViewer);
     const debugMode = useVisualEditorStore(state => state.debugMode);
     const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
     const socket = useVisualEditorStore(state => state.socket);
     const setViewport = useVisualEditorStore(state => state.setViewport);
+    const copyNodes = useVisualEditorStore(state => state.copyNodes);
+    const pasteNodes = useVisualEditorStore(state => state.pasteNodes);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const reactFlowWrapper = useRef(null);
@@ -195,6 +198,33 @@ function BotVisualEditorPage() {
         loadCategories();
     }, []);
 
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            console.log('[VisualEditorPage KeyDown]', event.key, 'Ctrl:', event.ctrlKey, 'Meta:', event.metaKey);
+
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'с')) {
+                console.log('[Copy] Triggered!');
+                event.preventDefault();
+                copyNodes();
+            }
+
+            if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'м')) {
+                console.log('[Paste] Triggered!');
+                event.preventDefault();
+                pasteNodes();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [copyNodes, pasteNodes]);
+
     const loadCategories = async () => {
         try {
             const response = await fetch(`${STATS_SERVER_URL}/api/graphs/categories`);
@@ -205,10 +235,15 @@ function BotVisualEditorPage() {
         }
     };
 
-    const handleViewLastTrace = async (selectedEventType = null) => {
-        try {
-            console.log('[handleViewLastTrace] Called with:', { selectedEventType, type: typeof selectedEventType });
+    const handleToggleTraceViewer = async (selectedEventType = null) => {
+        // Если трассировка уже открыта - закрываем
+        if (isTraceViewerOpen) {
+            closeTraceViewer();
+            return;
+        }
 
+        // Открываем трассировку
+        try {
             const graphId = entityId === 'new' ? null : parseInt(entityId);
             if (!graphId) {
                 toast.error('Сохраните граф перед просмотром трассировок');
@@ -226,12 +261,10 @@ function BotVisualEditorPage() {
 
                 // Если больше одной event ноды, открываем диалог выбора
                 if (eventNodes.length > 1) {
-                    // Сохраняем event ноды для диалога
                     const types = eventNodes.map(n => ({
                         type: n.type.replace('event:', ''),
                         label: NodeRegistry.get(n.type)?.label || n.type
                     }));
-                    console.log('[handleViewLastTrace] Setting availableEventTypes:', types);
                     setAvailableEventTypes(types);
                     setShowEventTypeDialog(true);
                     return;
@@ -241,13 +274,10 @@ function BotVisualEditorPage() {
                 }
             }
 
-            console.log('[handleViewLastTrace] Making API call with eventType:', selectedEventType);
-
             const url = selectedEventType
                 ? `/api/traces/${botId}/graph/${graphId}/last?eventType=${selectedEventType}`
                 : `/api/traces/${botId}/graph/${graphId}/last`;
 
-            console.log('[handleViewLastTrace] URL:', url);
 
             const response = await apiHelper(url);
             console.log('[VisualEditorPage] Trace API response:', {
@@ -258,6 +288,9 @@ function BotVisualEditorPage() {
             });
 
             if (response.success && response.trace) {
+                if (debugMode === 'live') {
+                    setDebugMode('normal');
+                }
                 useVisualEditorStore.getState().openTraceViewer(response.trace);
             } else {
                 toast.error('Трассировки не найдены для этого графа');
@@ -266,6 +299,16 @@ function BotVisualEditorPage() {
             console.error('Ошибка загрузки трассировки:', error);
             toast.error('Не удалось загрузить трассировку');
         }
+    };
+
+    const handleToggleDebugMode = () => {
+        const newMode = debugMode === 'live' ? 'normal' : 'live';
+
+        if (newMode === 'live' && isTraceViewerOpen) {
+            closeTraceViewer();
+        }
+
+        setDebugMode(newMode);
     };
 
     const handlePublish = async () => {
@@ -483,7 +526,10 @@ function BotVisualEditorPage() {
 
     return (
         <ReactFlowProvider>
-            <div className="h-full w-full flex flex-col">
+            <div
+                className="h-full w-full flex flex-col"
+                onContextMenu={(e) => e.preventDefault()}
+            >
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">Редактор: {command?.name}</h1>
                     <div className="flex gap-2 items-center">
@@ -491,14 +537,18 @@ function BotVisualEditorPage() {
                         <Button
                             variant={debugMode === 'live' ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setDebugMode(debugMode === 'live' ? 'normal' : 'live')}
+                            onClick={handleToggleDebugMode}
                         >
                             <Bug className="w-4 h-4 mr-2" />
                             {debugMode === 'live' ? 'Live Debug Вкл' : 'Live Debug'}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleViewLastTrace()}>
+                        <Button
+                            variant={isTraceViewerOpen ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => handleToggleTraceViewer()}
+                        >
                             <Zap className="w-4 h-4 mr-2" />
-                            Просмотр трассировки
+                            {isTraceViewerOpen ? 'Трассировка Вкл' : 'Просмотр трассировки'}
                         </Button>
                         <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                             <DialogTrigger asChild>
@@ -565,7 +615,7 @@ function BotVisualEditorPage() {
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 setShowEventTypeDialog(false);
-                                                handleViewLastTrace(eventType.type);
+                                                handleToggleTraceViewer(eventType.type);
                                             }}
                                         >
                                             {eventType.label}
@@ -605,6 +655,9 @@ function BotVisualEditorPage() {
                                 onDragOver={onDragOver}
                                 fitView
                                 deleteKeyCode={['Backspace', 'Delete']}
+                                multiSelectionKeyCode="Shift"
+                                panOnDrag={[1, 2]}
+                                selectionOnDrag
                                 elevateNodesOnSelect={false}
                                 autoPanOnNodeDrag={true}
                                 zoomOnDoubleClick={true}
