@@ -9,16 +9,35 @@
 async function execute(node, context, helpers) {
     const { resolvePinValue, traverse, memo } = helpers;
 
-    const url = await resolvePinValue(node, 'url', '');
+    let url = await resolvePinValue(node, 'url', '');
     const method = await resolvePinValue(node, 'method', node.data?.method || 'GET');
-    const headersStr = await resolvePinValue(node, 'headers', '');
+    const headersInput = await resolvePinValue(node, 'headers', null);
+    const queryParamsInput = await resolvePinValue(node, 'queryParams', null);
     const body = await resolvePinValue(node, 'body', '');
     const timeout = await resolvePinValue(node, 'timeout', 5000);
 
-    let headers = {};
-    if (headersStr) {
+    if (queryParamsInput) {
         try {
-            headers = JSON.parse(headersStr);
+            const params = typeof queryParamsInput === 'string'
+                ? JSON.parse(queryParamsInput)
+                : queryParamsInput;
+
+            const urlObj = new URL(url);
+            Object.entries(params).forEach(([key, value]) => {
+                urlObj.searchParams.append(key, value);
+            });
+            url = urlObj.toString();
+        } catch (e) {
+            console.error('[HTTP Request] Ошибка обработки query params:', e);
+        }
+    }
+
+    let headers = {};
+    if (headersInput) {
+        try {
+            headers = typeof headersInput === 'string'
+                ? JSON.parse(headersInput)
+                : headersInput;
         } catch (e) {
             console.error('[HTTP Request] Ошибка парсинга headers:', e);
             headers = {};

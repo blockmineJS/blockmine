@@ -208,17 +208,19 @@ function BotVisualEditorPage() {
 
     useEffect(() => {
         const handleKeyDown = (event) => {
-            console.log('[VisualEditorPage KeyDown]', event.key, 'Ctrl:', event.ctrlKey, 'Meta:', event.metaKey);
-
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
                 return;
             }
+
+            // Получаем актуальное состояние из store, а не из closure
+            const currentNodes = useVisualEditorStore.getState().nodes;
+            const currentEdges = useVisualEditorStore.getState().edges;
+
             if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'с')) {
-                console.log('[Copy] Triggered!');
                 event.preventDefault();
 
                 // Если нет выделенных нод, но есть нода под курсором - выделяем её и копируем
-                const selectedNodes = nodes.filter(n => n.selected);
+                const selectedNodes = currentNodes.filter(n => n.selected);
                 if (selectedNodes.length === 0 && hoveredNodeId) {
                     console.log('[Copy] No selected nodes, copying hovered node:', hoveredNodeId);
                     // Временно выделяем ноду под курсором
@@ -247,13 +249,25 @@ function BotVisualEditorPage() {
                 pasteNodes(cursorPosition);
             }
 
-            // Delete или Backspace - удаляем ноду под курсором
+            // Delete или Backspace - удаляем выбранные элементы
             if (event.key === 'Delete' || event.key === 'Backspace') {
-                if (hoveredNodeId) {
-                    console.log('[Delete] Triggered for node:', hoveredNodeId);
-                    event.preventDefault();
-                    // Используем onNodesChange для удаления ноды
+                event.preventDefault();
+
+                const selectedNodes = currentNodes.filter(n => n.selected);
+                const selectedEdges = currentEdges.filter(e => e.selected);
+
+                // Удаляем выбранные ноды
+                if (selectedNodes.length > 0) {
+                    onNodesChange(selectedNodes.map(n => ({ type: 'remove', id: n.id })));
+                }
+                // Если нет выбранных нод, но есть hovered нода - удаляем её
+                else if (hoveredNodeId) {
                     onNodesChange([{ type: 'remove', id: hoveredNodeId }]);
+                }
+
+                // Удаляем выбранные edges (связи)
+                if (selectedEdges.length > 0) {
+                    onEdgesChange(selectedEdges.map(e => ({ type: 'remove', id: e.id })));
                 }
             }
         };

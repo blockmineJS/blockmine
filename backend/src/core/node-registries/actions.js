@@ -10,7 +10,6 @@ function registerNodes(registry) {
     category: 'Действия',
     description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
     graphType: GRAPH_TYPES.ALL,
-    dynamicPins: true,
     executor: require('../nodes/actions/send_message').execute,
     pins: {
       inputs: [
@@ -112,7 +111,8 @@ function registerNodes(registry) {
         { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
         { id: 'url', name: 'URL', type: 'String', required: true },
         { id: 'method', name: 'Метод', type: 'String', required: false },
-        { id: 'headers', name: 'Заголовки (JSON)', type: 'String', required: false },
+        { id: 'queryParams', name: 'Query Params', type: 'Object', required: false },
+        { id: 'headers', name: 'Headers', type: 'Object', required: false },
         { id: 'body', name: 'Тело (JSON)', type: 'Wildcard', required: false },
         { id: 'timeout', name: 'Таймаут (мс)', type: 'Number', required: false }
       ],

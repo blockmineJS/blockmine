@@ -1,6 +1,30 @@
 # История версий
 
 
+## [1.23.0](https://github.com/blockmineJS/blockmine/compare/v1.22.0...v1.23.0) (2025-11-25)
+
+
+### 🐛 Исправления
+
+* нода установить переменную. селект Хранить в бд ничего не отображал ([adf4a85](https://github.com/blockmineJS/blockmine/commit/adf4a85929b47d3cb0d0771d7ae205ac5650809f))
+* теперь для изменения владельца в боте, не надо перезапускать бэкенд ([0c0d675](https://github.com/blockmineJS/blockmine/commit/0c0d675cfa67db6af752726c5fc23d3e26cffcb5))
+* cmd. Первая проверка тип чата, а потом аргументы ([2acdff1](https://github.com/blockmineJS/blockmine/commit/2acdff1db27ad1675cb9168748ff0d8a65271fe9))
+* exec пины теперь коннектятся только к exec ([a57f643](https://github.com/blockmineJS/blockmine/commit/a57f643e104bd94c23046493444709bb8de6ed13))
+
+
+### ✨ Новые возможности
+
+* дебаг режим для графов ([ffc910b](https://github.com/blockmineJS/blockmine/commit/ffc910b772bccf9b64ca828eb55debddb11715d7))
+* добавлен ai помощник в blockmine ide ([d7c5f7e](https://github.com/blockmineJS/blockmine/commit/d7c5f7e555beacf614b6cdc94706339880aac55c))
+* добавлен diff для просмотра изменений кода от ии ([d0159f0](https://github.com/blockmineJS/blockmine/commit/d0159f0884863ec10136f4bf32ea7daf0702d476))
+* новая вкладка - прокси ([3094b8b](https://github.com/blockmineJS/blockmine/commit/3094b8b5f1b9a59dd6494ff54c721f1e720b28f6))
+* новая ивент нода - При запуске бота ([5189a02](https://github.com/blockmineJS/blockmine/commit/5189a024c5e57fe8cb28f557b946247644367491))
+* новые ноды ([610b501](https://github.com/blockmineJS/blockmine/commit/610b501d89cb744ca9ea7a9e35adc7ae1ec3766b))
+* новый ide редактор ([2d7b302](https://github.com/blockmineJS/blockmine/commit/2d7b3026882b56a226760ba38c52cba0815a0720))
+* подсветки при соединении нод ([dd06cdd](https://github.com/blockmineJS/blockmine/commit/dd06cdd4fca871713688382c9b73d0eaa4d1b8bd))
+* теперь за бота можно ходить прямо в браузере! ([42f9257](https://github.com/blockmineJS/blockmine/commit/42f9257ee3ce166fda648e9a2ca6947c630a21e2))
+* фиксы и для нод копирование вставка графов ([aa1308d](https://github.com/blockmineJS/blockmine/commit/aa1308d19122ebc762ec1ebd3f523e12c2fb5aa2))
+
 ## [1.22.0](https://github.com/blockmineJS/blockmine/compare/v1.21.0...v1.22.0) (2025-11-16)
 
 
