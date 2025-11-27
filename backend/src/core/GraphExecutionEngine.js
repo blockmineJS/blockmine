@@ -462,7 +462,34 @@ class GraphExecutionEngine {
           const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
           return await this.evaluateOutputPin(sourceNode, connection.sourcePinId, defaultValue);
       }
-      return node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
+
+      let value = node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
+
+      // Автоматически заменяем переменные {varName} в строковых значениях
+      if (typeof value === 'string' && value.includes('{')) {
+          value = await this._replaceVariablesInString(value, node);
+      }
+
+      return value;
+  }
+
+  /**
+   * Заменяет переменные {varName} на значения из пинов
+   * @private
+   */
+  async _replaceVariablesInString(text, node) {
+      const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+      const matches = [...text.matchAll(variablePattern)];
+
+      let result = text;
+
+      for (const match of matches) {
+          const varName = match[1];
+          const varValue = await this.resolvePinValue(node, `var_${varName}`, '');
+          result = result.replace(match[0], String(varValue));
+      }
+
+      return result;
   }
 
   async evaluateOutputPin(node, pinId, defaultValue = null) {

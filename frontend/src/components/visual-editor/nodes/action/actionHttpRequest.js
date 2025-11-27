@@ -9,7 +9,7 @@ export const actionHttpRequestDefinition = new NodeDefinition({
   type: 'action:http_request',
   category: 'action',
   label: 'HTTP Запрос',
-  description: 'Выполняет HTTP запрос',
+  description: 'Выполняет HTTP запрос. Поддерживает переменные: {varName}',
 
   computeInputs: (data) => {
     const inputs = [
@@ -21,7 +21,7 @@ export const actionHttpRequestDefinition = new NodeDefinition({
         description: 'URL для запроса',
         required: false,
         inlineField: true,
-        placeholder: 'https://...'
+        placeholder: 'https://api.com/{userId}'
       },
       {
         id: 'method',
@@ -31,6 +31,24 @@ export const actionHttpRequestDefinition = new NodeDefinition({
         required: false,
         inlineField: true,
         placeholder: 'GET'
+      },
+      {
+        id: 'queryParams',
+        name: 'Query Params',
+        type: 'Object',
+        description: 'Параметры URL (?key=value)',
+        required: false,
+        inlineField: true,
+        placeholder: '{"key": "value"}'
+      },
+      {
+        id: 'headers',
+        name: 'Headers',
+        type: 'Object',
+        description: 'HTTP заголовки',
+        required: false,
+        inlineField: true,
+        placeholder: '{"Authorization": "Bearer ..."}'
       },
     ];
 

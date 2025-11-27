@@ -10,33 +10,16 @@ export const stringLiteralDefinition = new NodeDefinition({
   label: 'Строка',
   description: 'Строка с поддержкой переменных {name}',
 
-  computeInputs: (data) => {
-    const inputs = [
-      {
-        id: 'value',
-        name: 'Текст',
-        type: 'String',
-        required: false,
-        inlineField: true,
-        placeholder: 'Введите текст...'
-      }
-    ];
-
-    const text = data.value || '';
-    const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
-    const matches = [...text.matchAll(variablePattern)];
-    const uniqueVars = [...new Set(matches.map(m => m[1]))];
-
-    uniqueVars.forEach(varName => {
-      inputs.push({
-        id: `var_${varName}`,
-        name: varName,
-        type: 'Wildcard',
-      });
-    });
-
-    return inputs;
-  },
+  computeInputs: (data) => [
+    {
+      id: 'value',
+      name: 'Текст',
+      type: 'String',
+      required: false,
+      inlineField: true,
+      placeholder: 'Введите текст с {переменными}...'
+    }
+  ],
 
   computeOutputs: (data) => [
     { id: 'value', name: 'Value', type: 'String', description: 'Итоговая строка' },

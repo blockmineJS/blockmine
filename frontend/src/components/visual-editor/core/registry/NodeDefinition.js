@@ -1,4 +1,14 @@
 /**
+ * Извлекает переменные из строки в формате {varName}
+ */
+function extractVariables(text) {
+  if (!text || typeof text !== 'string') return [];
+  const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+  const matches = [...text.matchAll(variablePattern)];
+  return [...new Set(matches.map(m => m[1]))];
+}
+
+/**
  * NodeDefinition - определение типа ноды
  *
  * Описывает структуру и поведение конкретного типа ноды.
@@ -46,10 +56,35 @@ export class NodeDefinition {
    * @returns {Array} массив пинов
    */
   getInputs(data, context = {}) {
+    let inputs = [];
+
     if (this.computeInputs) {
-      return this.computeInputs(data, context);
+      inputs = this.computeInputs(data, context);
     }
-    return [];
+
+    const allVars = new Set();
+
+    for (const [key, value] of Object.entries(data || {})) {
+      if (typeof value === 'string') {
+        const vars = extractVariables(value);
+        vars.forEach(v => allVars.add(v));
+      }
+    }
+
+    allVars.forEach(varName => {
+      const pinId = `var_${varName}`;
+      if (!inputs.find(input => input.id === pinId)) {
+        inputs.push({
+          id: pinId,
+          name: varName,
+          type: 'Wildcard',
+          required: false,
+          description: `Значение для {${varName}}`
+        });
+      }
+    });
+
+    return inputs;
   }
 
   /**

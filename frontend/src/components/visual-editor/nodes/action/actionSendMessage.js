@@ -10,55 +10,33 @@ export const actionSendMessageDefinition = new NodeDefinition({
   label: '🗣️ Отправить сообщение',
   description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
 
-  computeInputs: (data) => {
-    const baseInputs = [
-      { id: 'exec', name: 'Выполнить', type: 'Exec' },
-      {
-        id: 'chat_type',
-        name: 'Тип чата',
-        type: 'String',
-        required: false,
-        inlineField: true,
-        placeholder: 'chat, whisper...'
-      },
-      {
-        id: 'message',
-        name: 'Сообщение',
-        type: 'String',
-        required: false,
-        inlineField: true,
-        placeholder: 'Текст сообщения'
-      },
-      {
-        id: 'recipient',
-        name: 'Адресат',
-        type: 'String',
-        required: false,
-        inlineField: true,
-        placeholder: 'Имя игрока'
-      },
-    ];
-
-    // Динамические входы для переменных в тексте сообщения
-    const message = data.message || '';
-    const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
-    const matches = [...message.matchAll(variablePattern)];
-    const uniqueVars = [...new Set(matches.map(m => m[1]))];
-
-    // Добавляем динамические входы для каждой уникальной переменной
-    uniqueVars.forEach(varName => {
-      if (!baseInputs.find(input => input.id === `var_${varName}`)) {
-        baseInputs.push({
-          id: `var_${varName}`,
-          name: varName,
-          type: 'Wildcard',
-          required: false,
-        });
-      }
-    });
-
-    return baseInputs;
-  },
+  computeInputs: (data) => [
+    { id: 'exec', name: 'Выполнить', type: 'Exec' },
+    {
+      id: 'chat_type',
+      name: 'Тип чата',
+      type: 'String',
+      required: false,
+      inlineField: true,
+      placeholder: 'chat, whisper...'
+    },
+    {
+      id: 'message',
+      name: 'Сообщение',
+      type: 'String',
+      required: false,
+      inlineField: true,
+      placeholder: 'Текст сообщения с {переменными}'
+    },
+    {
+      id: 'recipient',
+      name: 'Адресат',
+      type: 'String',
+      required: false,
+      inlineField: true,
+      placeholder: 'Имя игрока'
+    },
+  ],
 
   computeOutputs: (data) => [
     { id: 'exec', name: 'Выполнено', type: 'Exec' },
