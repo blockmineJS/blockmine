@@ -67,7 +67,8 @@
     "socket.io": "^4.7.5",
     "socks": "^2.8.5",
     "sonner": "^2.0.5",
-    "systeminformation": "^5.27.7"
+    "systeminformation": "^5.27.7",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
