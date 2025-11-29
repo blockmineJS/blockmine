@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.23.1](https://github.com/blockmineJS/blockmine/compare/v1.23.0...v1.23.1) (2025-11-29)
+
+
+### 🐛 Исправления
+
+* визуальный редактор. фикс удаления связей ([bf9e5f7](https://github.com/blockmineJS/blockmine/commit/bf9e5f7eef56aa4986e15e5421e46d4c3bfff1b2))
+
 ## [1.23.0](https://github.com/blockmineJS/blockmine/compare/v1.22.0...v1.23.0) (2025-11-25)
 
 
