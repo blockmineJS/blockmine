@@ -89,17 +89,37 @@ router.put('/:botId/users/:username', authenticateUniversal, authorize('manageme
             updateData.isBlacklisted = isBlacklisted;
         }
 
-        if (Array.isArray(groupIds)) {
-            await prisma.userGroup.deleteMany({ where: { userId: user.id } });
-            updateData.groups = {
-                create: groupIds.map(gid => ({ groupId: gid }))
-            };
-        }
+        // Используем транзакцию для атомарного обновления групп
+        const updatedUser = await prisma.$transaction(async (tx) => {
+            // Обновляем основные данные пользователя
+            if (Object.keys(updateData).length > 0) {
+                await tx.user.update({
+                    where: { id: user.id },
+                    data: updateData
+                });
+            }
 
-        const updatedUser = await prisma.user.update({
-            where: { id: user.id },
-            data: updateData,
-            include: { groups: { include: { group: true } } }
+            // Обновляем группы если переданы
+            if (Array.isArray(groupIds)) {
+                // Удаляем старые связи
+                await tx.userGroup.deleteMany({ where: { userId: user.id } });
+
+                // Создаём новые связи
+                if (groupIds.length > 0) {
+                    await tx.userGroup.createMany({
+                        data: groupIds.map(groupId => ({
+                            userId: user.id,
+                            groupId
+                        }))
+                    });
+                }
+            }
+
+            // Возвращаем обновлённого пользователя с группами
+            return tx.user.findUnique({
+                where: { id: user.id },
+                include: { groups: { include: { group: true } } }
+            });
         });
 
         botManager.invalidateUserCache(botId, username);

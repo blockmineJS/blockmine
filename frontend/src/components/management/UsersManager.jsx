@@ -74,7 +74,7 @@ export default function UsersManager({
         if (!editingUser) return;
         setIsSaving(true);
         try {
-            await apiHelper(`/api/bots/${botId}/users/${editingUser.id}`, {
+            await apiHelper(`/api/bots/${botId}/users/${editingUser.username}`, {
                 method: 'PUT',
                 body: JSON.stringify(userData),
             }, `Данные пользователя ${editingUser.username} обновлены.`);
