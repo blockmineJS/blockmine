@@ -23,8 +23,9 @@ export default function ManagementPage() {
     const [managementData, setManagementData] = useState({ users: { items: [], total: 0 }, groups: [], permissions: [], commands: [] });
     const [isLoading, setIsLoading] = useState(true);
     const [userPage, setUserPage] = useState(1);
-    const [userPageSize, setUserPageSize] = useState(20); 
+    const [userPageSize, setUserPageSize] = useState(20);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'username', direction: 'ascending' });
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -45,11 +46,12 @@ export default function ManagementPage() {
     }
   };
 
-    const fetchData = useCallback(async (page = 1, pageSize = userPageSize, search = searchQuery) => {
+    const fetchData = useCallback(async (page = 1, pageSize = userPageSize, search = searchQuery, sort = sortConfig) => {
         if (!bot) return;
         setIsLoading(true);
         try {
-            const data = await apiHelper(`/api/bots/${bot.id}/management-data?page=${page}&pageSize=${pageSize}&search=${search}`);
+            const sortDir = sort.direction === 'ascending' ? 'asc' : 'desc';
+            const data = await apiHelper(`/api/bots/${bot.id}/management-data?page=${page}&pageSize=${pageSize}&search=${search}&sortBy=${sort.key}&sortDir=${sortDir}`);
             setManagementData(prevData => ({ ...prevData, ...data }));
             setUserPage(data.users.page);
             setUserPageSize(data.users.pageSize);
@@ -57,13 +59,17 @@ export default function ManagementPage() {
             toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить данные управления.' });
         }
         setIsLoading(false);
-    }, [bot, toast, userPageSize]);
+    }, [bot, toast, userPageSize, sortConfig]);
 
     useEffect(() => {
         if (bot) {
-            fetchData(1, userPageSize, debouncedSearchQuery);
+            fetchData(1, userPageSize, debouncedSearchQuery, sortConfig);
         }
-    }, [bot, fetchData, debouncedSearchQuery]);
+    }, [bot, debouncedSearchQuery, sortConfig]);
+
+    const handleSortChange = (newSortConfig) => {
+        setSortConfig(newSortConfig);
+    };
     
     const motionVariants = {
         initial: { opacity: 0 },
@@ -73,21 +79,23 @@ export default function ManagementPage() {
     
     const tabContent = {
         users: (
-                    <UsersManager 
-                        users={managementData.users.items} 
-                        pagination={{ 
-                            page: managementData.users.page, 
+                    <UsersManager
+                        users={managementData.users.items}
+                        pagination={{
+                            page: managementData.users.page,
                             pageSize: managementData.users.pageSize,
                             total: managementData.users.total,
                             totalPages: managementData.users.totalPages,
                         }}
-                onPageChange={(newPage) => fetchData(newPage, userPageSize, debouncedSearchQuery)}
+                onPageChange={(newPage) => fetchData(newPage, userPageSize, debouncedSearchQuery, sortConfig)}
                         groups={managementData.groups}
                         botId={bot?.id}
                         isLoading={isLoading}
-                onDataChange={() => fetchData(userPage, userPageSize, debouncedSearchQuery)}
+                onDataChange={() => fetchData(userPage, userPageSize, debouncedSearchQuery, sortConfig)}
                 searchQuery={searchQuery}
                 onSearchQueryChange={setSearchQuery}
+                sortConfig={sortConfig}
+                onSortChange={handleSortChange}
                     />
         ),
         groups: (

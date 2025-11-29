@@ -837,6 +837,8 @@ router.get('/:botId/management-data', authenticateUniversal, checkBotAccess, aut
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 100;
         const searchQuery = req.query.search || '';
+        const sortBy = req.query.sortBy || 'username';
+        const sortDir = req.query.sortDir === 'desc' ? 'desc' : 'asc';
 
         const userSkip = (page - 1) * pageSize;
 
@@ -850,21 +852,47 @@ router.get('/:botId/management-data', authenticateUniversal, checkBotAccess, aut
             };
         }
 
+        // Определяем сортировку (для groups сортируем после получения данных)
+        let orderBy = { username: sortDir };
+        if (sortBy === 'isBlacklisted') {
+            orderBy = { isBlacklisted: sortDir };
+        }
+        const sortByGroups = sortBy === 'groups';
+
         const [groups, allPermissions] = await Promise.all([
             prisma.group.findMany({ where: { botId }, include: { permissions: { include: { permission: true } } }, orderBy: { name: 'asc' } }),
             prisma.permission.findMany({ where: { botId }, orderBy: { name: 'asc' } })
         ]);
 
-        const [users, usersCount] = await Promise.all([
-            prisma.user.findMany({
+        let users;
+        let usersCount;
+
+        if (sortByGroups) {
+            // Для сортировки по группам получаем всех пользователей, сортируем, потом пагинируем
+            const allUsers = await prisma.user.findMany({
                 where: whereClause,
                 include: { groups: { include: { group: true } } },
-                orderBy: { username: 'asc' },
-                take: pageSize,
-                skip: userSkip,
-            }),
-            prisma.user.count({ where: whereClause })
-        ]);
+            });
+
+            allUsers.sort((a, b) => {
+                const diff = a.groups.length - b.groups.length;
+                return sortDir === 'asc' ? diff : -diff;
+            });
+
+            usersCount = allUsers.length;
+            users = allUsers.slice(userSkip, userSkip + pageSize);
+        } else {
+            [users, usersCount] = await Promise.all([
+                prisma.user.findMany({
+                    where: whereClause,
+                    include: { groups: { include: { group: true } } },
+                    orderBy,
+                    take: pageSize,
+                    skip: userSkip,
+                }),
+                prisma.user.count({ where: whereClause })
+            ]);
+        }
 
         const templatesMap = new Map(commandManager.getCommandTemplates().map(t => [t.name, t]));
         let dbCommandsFromDb = await prisma.command.findMany({ 

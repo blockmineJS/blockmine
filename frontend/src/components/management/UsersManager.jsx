@@ -1,63 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Dialog } from "@/components/ui/dialog";
-import { useToast } from '@/hooks/use-toast';
 import { Edit, ArrowUpDown, Search } from 'lucide-react';
 import UserEditDialog from './UserEditDialog';
 import { apiHelper } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 
-export default function UsersManager({ 
-    users, 
-    pagination, 
-    onPageChange, 
-    groups, 
-    botId, 
-    isLoading, 
+export default function UsersManager({
+    users,
+    pagination,
+    onPageChange,
+    groups,
+    botId,
+    isLoading,
     onDataChange,
     searchQuery,
-    onSearchQueryChange 
+    onSearchQueryChange,
+    sortConfig,
+    onSortChange
 }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
-    const { toast } = useToast();
-
-    const [sortConfig, setSortConfig] = useState({ key: 'username', direction: 'ascending' });
-
-    const sortedUsers = useMemo(() => {
-        let sortableUsers = [...(users || [])];
-        if (sortConfig.key) {
-            sortableUsers.sort((a, b) => {
-                let aValue = a[sortConfig.key];
-                let bValue = b[sortConfig.key];
-
-                if (sortConfig.key === 'groups') {
-                    aValue = a.groups.length;
-                    bValue = b.groups.length;
-                }
-
-                if (aValue < bValue) {
-                    return sortConfig.direction === 'ascending' ? -1 : 1;
-                }
-                if (aValue > bValue) {
-                    return sortConfig.direction === 'ascending' ? 1 : -1;
-                }
-                return 0;
-            });
-        }
-        return sortableUsers;
-    }, [users, sortConfig]);
 
     const requestSort = (key) => {
         let direction = 'ascending';
         if (sortConfig.key === key && sortConfig.direction === 'ascending') {
             direction = 'descending';
         }
-        setSortConfig({ key, direction });
+        onSortChange({ key, direction });
     };
 
     const handleOpenModal = (user) => {
@@ -134,7 +108,7 @@ export default function UsersManager({
                         {isLoading ? (
                             <TableRow><TableCell colSpan={4} className="text-center">Загрузка...</TableCell></TableRow>
                         ) : (
-                            sortedUsers.map(user => (
+                            (users || []).map(user => (
                                 <TableRow key={user.id}>
                                     <TableCell className="font-medium">{user.username}</TableCell>
                                     <TableCell>
