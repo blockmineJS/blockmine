@@ -1,6 +1,13 @@
 # История версий
 
 
+### [1.23.3](https://github.com/blockmineJS/blockmine/compare/v1.23.2...v1.23.3) (2025-11-29)
+
+
+### 🐛 Исправления
+
+* фикс запуска через npx №2 ([ae02238](https://github.com/blockmineJS/blockmine/commit/ae02238f7289dec25d18e9a8ff928b12023cc19b))
+
 ### [1.23.2](https://github.com/blockmineJS/blockmine/compare/v1.23.0...v1.23.2) (2025-11-29)
 
 
