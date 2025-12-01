@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,10 @@ export default function SetupPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const isSubmittingRef = useRef(false);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && !isSubmittingRef.current) {
             navigate('/', { replace: true });
         }
     }, [isAuthenticated, navigate]);
@@ -42,14 +43,18 @@ export default function SetupPage() {
 
         setIsLoading(true);
         setError('');
-        
+        isSubmittingRef.current = true;
+
         try {
             await setupAdmin(username, password);
-            
+
             toast({ title: "Добро пожаловать!", description: "Вы успешно вошли в систему." });
+
+            navigate('/', { replace: true });
 
         } catch (err) {
             setError(err.message || 'Не удалось создать аккаунт.');
+            isSubmittingRef.current = false;
         } finally {
             setIsLoading(false);
         }
