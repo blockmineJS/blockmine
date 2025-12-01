@@ -11,7 +11,6 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function SetupPage() {
-    const setupAdmin = useAppStore((state) => state.setupAdmin);
     const isAuthenticated = useAppStore((state) => state.isAuthenticated);
 
     const navigate = useNavigate();
@@ -46,7 +45,7 @@ export default function SetupPage() {
         isSubmittingRef.current = true;
 
         try {
-            await setupAdmin(username, password);
+            await useAppStore.getState().setupAdmin(username, password);
 
             toast({ title: "Добро пожаловать!", description: "Вы успешно вошли в систему." });
 
