@@ -179,7 +179,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         {hasSettings && onOpenSettings && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenSettings(plugin)}>
                                         <Settings className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
@@ -401,7 +401,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {hasSettings && onOpenSettings && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={!plugin.isEnabled} onClick={() => onOpenSettings(plugin)}>
+                                <Button variant="outline" size="sm" onClick={() => onOpenSettings(plugin)}>
                                     <Settings className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
