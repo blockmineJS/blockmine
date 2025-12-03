@@ -68,6 +68,7 @@ async function fetchNewConfig(botId, prisma) {
             where: { id: botId },
             include: {
                 server: true,
+                proxy: true,
                 installedPlugins: {
                     where: { isEnabled: true }
                 },
@@ -1356,6 +1357,8 @@ process.on('message', async (message) => {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
         const newConfig = await fetchNewConfig(bot.config.id, prisma);
         if (newConfig) {
+            // Обновляем конфигурацию бота, сохраняя все поля включая прокси
+            bot.config = { ...bot.config, ...newConfig };
             bot.config.plugins = newConfig.installedPlugins;
             bot.commands.clear();
             await loadCommands(bot, newConfig.commands);
