@@ -1189,7 +1189,24 @@ router.put('/:botId/users/:userId', authorize('management:edit'), async (req, re
 router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на запуск всех ботов.');
-        const allBots = await prisma.bot.findMany({ include: { server: true, proxy: true } });
+
+        // Определяем фильтр доступа по ботам для пользователя
+        let whereFilter = {};
+        if (req.user && typeof req.user.userId === 'number') {
+            const panelUser = await prisma.panelUser.findUnique({
+                where: { id: req.user.userId },
+                include: { botAccess: { select: { botId: true } } }
+            });
+            if (panelUser && panelUser.allBots === false) {
+                const allowedIds = panelUser.botAccess.map(a => a.botId);
+                whereFilter = { id: { in: allowedIds.length ? allowedIds : [-1] } };
+            }
+        }
+
+        const allBots = await prisma.bot.findMany({
+            where: whereFilter,
+            include: { server: true, proxy: true }
+        });
         let startedCount = 0;
         for (const botConfig of allBots) {
             if (!botManager.bots.has(botConfig.id)) {
@@ -1204,12 +1221,29 @@ router.post('/start-all', authorize('bot:start_stop'), async (req, res) => {
     }
 });
 
-router.post('/stop-all', authorize('bot:start_stop'), (req, res) => {
+router.post('/stop-all', authorize('bot:start_stop'), async (req, res) => {
     try {
         console.log('[API] Получен запрос на остановку всех ботов.');
+
+        // Определяем фильтр доступа по ботам для пользователя
+        let allowedBotIds = null;
+        if (req.user && typeof req.user.userId === 'number') {
+            const panelUser = await prisma.panelUser.findUnique({
+                where: { id: req.user.userId },
+                include: { botAccess: { select: { botId: true } } }
+            });
+            if (panelUser && panelUser.allBots === false) {
+                allowedBotIds = new Set(panelUser.botAccess.map(a => a.botId));
+            }
+        }
+
         const botIds = Array.from(botManager.bots.keys());
         let stoppedCount = 0;
         for (const botId of botIds) {
+            // Если у пользователя есть ограничения, проверяем доступ
+            if (allowedBotIds !== null && !allowedBotIds.has(botId)) {
+                continue;
+            }
             botManager.stopBot(botId);
             stoppedCount++;
         }
