@@ -8,6 +8,7 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
+import { BotViewHeaderSkeleton } from '@/components/BotSkeletons';
 
 const EMPTY_EXTENSIONS = [];
 
@@ -62,9 +63,16 @@ export default function BotView() {
 
     if (!bot) {
         return (
-            <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Загрузка данных бота...
+            <div className="flex flex-col h-full w-full overflow-hidden">
+                <header className="shrink-0 p-6 border-b">
+                    <BotViewHeaderSkeleton />
+                </header>
+                <main className="flex-grow min-h-0 flex items-center justify-center">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Загрузка данных бота...</span>
+                    </div>
+                </main>
             </div>
         );
     }

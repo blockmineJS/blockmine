@@ -8,6 +8,7 @@ const prisma = require('./lib/prisma');
 const config = require('./config');
 const { initializeSocket } = require('./real-time/socketHandler');
 const { botManager, pluginManager } = require('./core/services');
+const { ensureStarterBotExists } = require('./core/firstRunSetup');
 
 const botRoutes = require('./api/routes/bots');
 const pluginRoutes = require('./api/routes/plugins');
@@ -18,6 +19,7 @@ const taskRoutes = require('./api/routes/tasks');
 const { router: authRoutes, ALL_PERMISSIONS, VIEWER_PERMISSIONS } = require('./api/routes/auth');
 const panelApiKeysRoutes = require('./api/routes/panelApiKeys');
 const searchRoutes = require('./api/routes/search');
+const chatRoutes = require('./api/routes/chat');
 const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
@@ -51,6 +53,7 @@ const rootPath = path.resolve(__dirname, '..', '..');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/panel/api-keys', panelApiKeysRoutes);
+app.use('/api/chat', chatRoutes);
 
 app.use('/api/version', (req, res, next) => {
     async function getVersion() {
@@ -144,6 +147,7 @@ async function runStartupMigrations() {
 
 async function startServer() {
     await runStartupMigrations();
+    await ensureStarterBotExists();
     return new Promise((resolve) => {
         server.listen(PORT, HOST, async () => {
             console.log(`\nBackend сервер успешно запущен на http://${HOST}:${PORT}`);

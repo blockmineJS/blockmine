@@ -329,6 +329,19 @@ router.post('/login', async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
+            // Логируем неудачную попытку входа
+            try {
+                await prisma.panelUserLoginLog.create({
+                    data: {
+                        userId: user.id,
+                        ipAddress: req.ip || req.connection.remoteAddress,
+                        userAgent: req.get('user-agent'),
+                        success: false
+                    }
+                });
+            } catch (logError) {
+                console.error('[Login Log Error]', logError);
+            }
             return res.status(401).json({ error: 'Неверные учетные данные' });
         }
 
@@ -337,6 +350,27 @@ router.post('/login', async (req, res) => {
         // Владелец (первый пользователь) всегда получает все актуальные права
         if (user.id === 1) {
             permissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
+        }
+
+        // Обновляем lastLoginAt и создаем запись в логах
+        try {
+            await prisma.$transaction([
+                prisma.panelUser.update({
+                    where: { id: user.id },
+                    data: { lastLoginAt: new Date() }
+                }),
+                prisma.panelUserLoginLog.create({
+                    data: {
+                        userId: user.id,
+                        ipAddress: req.ip || req.connection.remoteAddress,
+                        userAgent: req.get('user-agent'),
+                        success: true
+                    }
+                })
+            ]);
+        } catch (logError) {
+            console.error('[Login Log Error]', logError);
+            // Не прерываем вход при ошибке логирования
         }
 
         const payload = {

@@ -144,3 +144,23 @@
     opacity: 0.8;
   }
 }
+
+/* Shake Animation for Chat Drag Mode */
+@keyframes shake {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  25% {
+    transform: translate3d(-2px, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(2px, 0, 0) scale(1.05);
+  }
+  75% {
+    transform: translate3d(-2px, 0, 0) scale(1.05);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}

@@ -389,6 +389,31 @@ function initializeSocket(httpServer) {
             pluginLogsBuffer.delete(bufferKey);
         });
 
+        // ========== PANEL CHAT EVENTS ==========
+
+        // Подписка на чат панели
+        socket.on('chat:join', () => {
+            socket.join('panel-chat');
+            console.log(`[Chat] User ${socket.decoded?.username || 'Anonymous'} joined panel chat`);
+        });
+
+        // Отписка от чата панели
+        socket.on('chat:leave', () => {
+            socket.leave('panel-chat');
+        });
+
+        // Индикатор набора текста
+        socket.on('chat:typing', ({ isTyping }) => {
+            // Валидация
+            if (typeof isTyping !== 'boolean') {
+                return;
+            }
+
+            const username = socket.decoded?.username || 'Anonymous';
+            // Транслируем состояние набора текста всем, кроме отправителя
+            socket.to('panel-chat').emit('chat:user-typing', { username, isTyping });
+        });
+
         // При отключении удаляем пользователя из всех комнат
         socket.on('disconnect', () => {
             try {

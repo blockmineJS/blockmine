@@ -13,6 +13,7 @@ import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FixedSizeList, FixedSizeGrid } from 'react-window';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { PluginSkeletonGrid } from '@/components/PluginSkeletons';
 
 const CATEGORIES = {
     "Все плагины": { icon: Icons.LayoutGrid, color: "from-blue-500 to-purple-500" },
@@ -295,10 +296,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
 
             <div className="flex-1 overflow-hidden" ref={containerRef}>
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                        <Icons.Loader2 className="h-12 w-12 animate-spin mb-4" />
-                        <p className="text-lg">Загрузка каталога плагинов...</p>
-                    </div>
+                    <PluginSkeletonGrid count={12} viewMode={viewMode} type="store" />
                 ) : filteredAndSortedCatalog.length > 0 && size.width > 0 ? (
                     viewMode === 'grid' ? (
                         <FixedSizeGrid

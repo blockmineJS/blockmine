@@ -15,6 +15,26 @@ import * as Icons from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { FixedSizeList, FixedSizeGrid } from 'react-window';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { PluginSkeletonGrid } from '@/components/PluginSkeletons';
+
+// Helper function to get display name from plugin
+const getPluginDisplayName = (plugin) => {
+    try {
+        if (plugin.manifest) {
+            const manifest = typeof plugin.manifest === 'string' ? JSON.parse(plugin.manifest) : plugin.manifest;
+            if (manifest.displayName) {
+                return manifest.displayName;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to parse plugin manifest:', e);
+    }
+    // Fallback: convert kebab-case to Title Case
+    return plugin.name
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
 
 const cardStyles = {
     card: "relative overflow-hidden transition-all duration-300 group h-full flex flex-col",
@@ -89,7 +109,15 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
 
                 <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg truncate">{plugin.name}</h3>
+                        <h3
+                            className="font-semibold text-lg truncate cursor-pointer hover:text-primary transition-colors"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/bots/${botId}/plugins/view/${plugin.name}`);
+                            }}
+                        >
+                            {getPluginDisplayName(plugin)}
+                        </h3>
                         {isNew && (
                             <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
                                 <Sparkles className="h-3 w-3 mr-1" />
@@ -256,8 +284,14 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             )}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <CardTitle className="text-lg truncate">
-                                {plugin.name}
+                            <CardTitle
+                                className="text-lg truncate cursor-pointer hover:text-primary transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/bots/${botId}/plugins/view/${plugin.name}`);
+                                }}
+                            >
+                                {getPluginDisplayName(plugin)}
                             </CardTitle>
                             <CardDescription className="text-sm truncate">
                                 от {plugin.author || 'Неизвестный автор'}
@@ -301,14 +335,46 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                 </span>
                                 <div className="flex flex-wrap gap-1">
                                     {plugin.commands.slice(0, 3).map(cmd => (
-                                        <Badge key={cmd.id} variant="outline" className="text-xs">
+                                        <Badge
+                                            key={cmd.id}
+                                            variant="outline"
+                                            className="text-xs cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/bots/${botId}/plugins/edit/${plugin.name}#commands`);
+                                            }}
+                                        >
                                             {cmd.name}
                                         </Badge>
                                     ))}
                                     {plugin.commands.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{plugin.commands.length - 3}
-                                        </Badge>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-xs cursor-help">
+                                                    +{plugin.commands.length - 3}
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-xs">
+                                                <div className="space-y-1">
+                                                    <p className="font-semibold text-xs">Остальные команды:</p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {plugin.commands.slice(3).map(cmd => (
+                                                            <Badge
+                                                                key={cmd.id}
+                                                                variant="secondary"
+                                                                className="text-xs cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/bots/${botId}/plugins/edit/${plugin.name}#commands`);
+                                                                }}
+                                                            >
+                                                                {cmd.name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     )}
                                 </div>
                             </div>
@@ -427,6 +493,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
 export default function InstalledPluginsView({
     bot,
     installedPlugins = [],
+    isLoading = false,
     updates = {},
     isUpdating,
     onTogglePlugin,
@@ -654,7 +721,9 @@ export default function InstalledPluginsView({
                 </div>
                 
                 <div className="flex-1 overflow-hidden" ref={containerRef}>
-                    {sortedAndFilteredPlugins.length > 0 && size.width > 0 ? (
+                    {isLoading ? (
+                        <PluginSkeletonGrid count={8} viewMode={viewMode} type="installed" />
+                    ) : sortedAndFilteredPlugins.length > 0 && size.width > 0 ? (
                         viewMode === 'grid' ? (
                             <FixedSizeGrid
                                 height={size.height}
@@ -710,7 +779,7 @@ export default function InstalledPluginsView({
                 <ConfirmationDialog
                     open={!!pluginToDelete}
                     onOpenChange={() => setPluginToDelete(null)}
-                    title={`Удалить плагин "${pluginToDelete.name}"?`}
+                    title={`Удалить плагин "${getPluginDisplayName(pluginToDelete)}"?`}
                     description="Это действие необратимо. Все файлы и настройки плагина будут удалены для этого бота."
                     onConfirm={() => onDeletePlugin(pluginToDelete)}
                     confirmText="Да, удалить плагин"

@@ -28,6 +28,8 @@ const normalizeAndIdempotentLog = (log, index = 0) => {
 
 export const createCoreSlice = (set, get) => ({
     socket: null,
+    chatUnreadCount: 0,
+    setChatUnreadCount: (count) => set({ chatUnreadCount: count }),
     bots: [],
     servers: [],
     proxies: [],
