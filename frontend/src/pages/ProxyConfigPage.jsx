@@ -8,30 +8,51 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
-import { Globe, Search, X, Loader2, TestTube, Check } from 'lucide-react';
+import { Globe, Search, X, Loader2, TestTube, Check, Plus, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiHelper } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 export default function ProxyConfigPage() {
     const { toast } = useToast();
+    const navigate = useNavigate();
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const applyProxyToBots = useAppStore(state => state.applyProxyToBots);
-    
-    const [proxySettings, setProxySettings] = useState({
-        host: '',
-        port: '',
-        username: '',
-        password: ''
-    });
-    
+
+    const [proxies, setProxies] = useState([]);
+    const [isLoadingProxies, setIsLoadingProxies] = useState(true);
+    const [selectedProxyId, setSelectedProxyId] = useState('');
+
     const [selectedBots, setSelectedBots] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    
+
     const [isApplying, setIsApplying] = useState(false);
-    const [isTesting, setIsTesting] = useState(false);
-    const [errors, setErrors] = useState({});
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+    useEffect(() => {
+        fetchProxies();
+    }, []);
+
+    const fetchProxies = async () => {
+        setIsLoadingProxies(true);
+        try {
+            const data = await apiHelper('/api/proxies');
+            setProxies(data.items || []);
+        } catch (error) {
+            console.error('Ошибка загрузки прокси:', error);
+            toast({
+                title: "Ошибка",
+                description: "Не удалось загрузить список прокси",
+                variant: "destructive",
+            });
+        }
+        setIsLoadingProxies(false);
+    };
+
+    const selectedProxy = proxies.find(p => p.id === parseInt(selectedProxyId));
 
     const filteredBots = useMemo(() => {
         return bots.filter(bot => 
@@ -47,44 +68,6 @@ export default function ProxyConfigPage() {
         return { running, stopped };
     }, [filteredBots, botStatuses]);
 
-    const validateProxySettings = (settings) => {
-        const newErrors = {};
-        
-        if (!settings.host.trim()) {
-            newErrors.host = 'IP адрес обязателен';
-        } else if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(settings.host.trim())) {
-            newErrors.host = 'Неверный формат IP адреса';
-        }
-        
-        if (!settings.port.trim()) {
-            newErrors.port = 'Порт обязателен';
-        } else {
-            const port = parseInt(settings.port);
-            if (isNaN(port) || port < 1 || port > 65535) {
-                newErrors.port = 'Порт должен быть между 1 и 65535';
-            }
-        }
-        
-        if (settings.username && settings.username.length < 3) {
-            newErrors.username = 'Имя пользователя должно содержать минимум 3 символа';
-        }
-        
-        return newErrors;
-    };
-
-    const handleSettingsChange = (field, value) => {
-        setProxySettings(prev => ({
-            ...prev,
-            [field]: value
-        }));
-        
-        if (errors[field]) {
-            setErrors(prev => ({
-                ...prev,
-                [field]: undefined
-            }));
-        }
-    };
 
     const handleBotSelection = (botId, checked) => {
         setSelectedBots(prev => 
@@ -98,35 +81,13 @@ export default function ProxyConfigPage() {
         setSelectedBots(checked ? filteredBots.map(bot => bot.id) : []);
     };
 
-    const handleTestConnection = async () => {
-        const validationErrors = validateProxySettings(proxySettings);
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-            return;
-        }
-
-        setIsTesting(true);
-        try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+    const handleApplyProxy = async () => {
+        if (!selectedProxyId) {
             toast({
-                title: "Тест соединения",
-                description: "Подключение к проксе успешно!",
-            });
-        } catch (error) {
-            toast({
-                title: "Ошибка теста",
-                description: "Не удалось подключиться к прокси серверу",
+                title: "Ошибка",
+                description: "Выберите прокси из списка",
                 variant: "destructive",
             });
-        } finally {
-            setIsTesting(false);
-        }
-    };
-
-    const handleApplyProxy = async () => {
-        const validationErrors = validateProxySettings(proxySettings);
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
             return;
         }
 
@@ -145,24 +106,17 @@ export default function ProxyConfigPage() {
     const confirmApplyProxy = async () => {
         setIsApplying(true);
         setShowConfirmDialog(false);
-        
-        try {
-            const proxyData = {
-                proxyHost: proxySettings.host.trim(),
-                proxyPort: parseInt(proxySettings.port),
-                proxyUsername: proxySettings.username.trim() || null,
-                proxyPassword: proxySettings.password || null
-            };
 
-            const result = await applyProxyToBots(selectedBots, proxyData);
-            
+        try {
+            const result = await applyProxyToBots(selectedBots, { proxyId: parseInt(selectedProxyId) });
+
             if (result.success) {
                 toast({
                     title: "Успех!",
                     description: `Настройки прокси применены к ${selectedBots.length} бот(ам)`,
                 });
-                
-                setProxySettings({ host: '', port: '', username: '', password: '' });
+
+                setSelectedProxyId('');
                 setSelectedBots([]);
             } else {
                 throw new Error(result.error || 'Неизвестная ошибка');
@@ -180,9 +134,8 @@ export default function ProxyConfigPage() {
     };
 
     const handleClearForm = () => {
-        setProxySettings({ host: '', port: '', username: '', password: '' });
+        setSelectedProxyId('');
         setSelectedBots([]);
-        setErrors({});
         setSearchTerm('');
     };
 
@@ -205,83 +158,79 @@ export default function ProxyConfigPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Globe className="h-5 w-5" />
-                            Настройки прокси
+                            Выбор прокси
                         </CardTitle>
                         <CardDescription>
-                            Введите параметры SOCKS5 прокси сервера
+                            Выберите прокси из списка для применения к ботам
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="host">IP адрес *</Label>
-                                <Input
-                                    id="host"
-                                    placeholder="127.0.0.1"
-                                    value={proxySettings.host}
-                                    onChange={(e) => handleSettingsChange('host', e.target.value)}
-                                    className={cn(errors.host && "border-red-500")}
-                                />
-                                {errors.host && (
-                                    <p className="text-sm text-red-500">{errors.host}</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="port">Порт *</Label>
-                                <Input
-                                    id="port"
-                                    type="number"
-                                    placeholder="1080"
-                                    min="1"
-                                    max="65535"
-                                    value={proxySettings.port}
-                                    onChange={(e) => handleSettingsChange('port', e.target.value)}
-                                    className={cn(errors.port && "border-red-500")}
-                                />
-                                {errors.port && (
-                                    <p className="text-sm text-red-500">{errors.port}</p>
-                                )}
-                            </div>
-                        </div>
-                        
                         <div className="space-y-2">
-                            <Label htmlFor="username">Имя пользователя</Label>
-                            <Input
-                                id="username"
-                                placeholder="Оставьте пустым если не требуется"
-                                value={proxySettings.username}
-                                onChange={(e) => handleSettingsChange('username', e.target.value)}
-                                className={cn(errors.username && "border-red-500")}
-                            />
-                            {errors.username && (
-                                <p className="text-sm text-red-500">{errors.username}</p>
-                            )}
+                            <Label>Прокси сервер</Label>
+                            <Select value={selectedProxyId} onValueChange={setSelectedProxyId} disabled={isLoadingProxies}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={isLoadingProxies ? "Загрузка..." : "Выберите прокси"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {proxies.length === 0 ? (
+                                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                            Нет доступных прокси
+                                        </div>
+                                    ) : (
+                                        proxies.map(proxy => (
+                                            <SelectItem key={proxy.id} value={proxy.id.toString()}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{proxy.name}</span>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {proxy.type?.toUpperCase()}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {proxy.host}:{proxy.port}
+                                                    </span>
+                                                </div>
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
                         </div>
-                        
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Пароль</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="Оставьте пустым если не требуется"
-                                value={proxySettings.password}
-                                onChange={(e) => handleSettingsChange('password', e.target.value)}
-                            />
-                        </div>
+
+                        {selectedProxy && (
+                            <div className="p-3 bg-muted rounded-lg space-y-2">
+                                <p className="text-sm font-medium">Информация о прокси:</p>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <span className="text-muted-foreground">Адрес:</span>
+                                        <p className="font-medium">{selectedProxy.host}:{selectedProxy.port}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">Тип:</span>
+                                        <p className="font-medium">{selectedProxy.type?.toUpperCase()}</p>
+                                    </div>
+                                    {selectedProxy.username && (
+                                        <div className="col-span-2">
+                                            <span className="text-muted-foreground">Авторизация:</span>
+                                            <p className="font-medium">Да ({selectedProxy.username})</p>
+                                        </div>
+                                    )}
+                                    {selectedProxy.note && (
+                                        <div className="col-span-2">
+                                            <span className="text-muted-foreground">Заметка:</span>
+                                            <p className="font-medium">{selectedProxy.note}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex gap-2 pt-2">
                             <Button
                                 variant="outline"
-                                onClick={handleTestConnection}
-                                disabled={isTesting || !proxySettings.host || !proxySettings.port}
+                                onClick={() => navigate('/proxies')}
                                 className="flex-1"
                             >
-                                {isTesting ? (
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                    <TestTube className="h-4 w-4 mr-2" />
-                                )}
-                                Тест соединения
+                                <Plus className="h-4 w-4 mr-2" />
+                                Управление прокси
                             </Button>
                             <Button
                                 variant="outline"
@@ -411,7 +360,7 @@ export default function ProxyConfigPage() {
                         <div className="pt-4 border-t">
                             <Button
                                 onClick={handleApplyProxy}
-                                disabled={isApplying || selectedBotsCount === 0 || !proxySettings.host || !proxySettings.port}
+                                disabled={isApplying || selectedBotsCount === 0 || !selectedProxyId}
                                 className="w-full"
                                 size="lg"
                             >
@@ -436,15 +385,19 @@ export default function ProxyConfigPage() {
                             Это действие обновит конфигурацию ботов.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <div className="space-y-2 text-sm">
-                            <p><strong>Прокси сервер:</strong> {proxySettings.host}:{proxySettings.port}</p>
-                            {proxySettings.username && (
-                                <p><strong>Пользователь:</strong> {proxySettings.username}</p>
-                            )}
-                            <p><strong>Количество ботов:</strong> {selectedBotsCount}</p>
+                    {selectedProxy && (
+                        <div className="py-4">
+                            <div className="space-y-2 text-sm">
+                                <p><strong>Прокси:</strong> {selectedProxy.name}</p>
+                                <p><strong>Адрес:</strong> {selectedProxy.host}:{selectedProxy.port}</p>
+                                <p><strong>Тип:</strong> {selectedProxy.type?.toUpperCase()}</p>
+                                {selectedProxy.username && (
+                                    <p><strong>Авторизация:</strong> Да ({selectedProxy.username})</p>
+                                )}
+                                <p><strong>Количество ботов:</strong> {selectedBotsCount}</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
                             Отмена

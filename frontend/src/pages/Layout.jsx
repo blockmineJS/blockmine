@@ -31,6 +31,7 @@ import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
 import ChangelogDialog from '@/components/ChangelogDialog';
 import PresenceButton from '@/components/PresenceButton';
+import PanelChat from '@/components/PanelChat';
 import { apiHelper } from '@/lib/api';
 import {
     DndContext,
@@ -52,6 +53,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import ContributeDialog from '@/components/ContributeDialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { BotSidebarListSkeleton } from '@/components/BotSkeletons';
 
 const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDragging: globalIsDragging }) => {
     const {
@@ -175,6 +177,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [randomFeature, setRandomFeature] = useState({ text: 'Улучшить BlockMine', icon: <Lightbulb className="h-4 w-4 flex-shrink-0" /> });
     const [isContributeModalOpen, setIsContributeModalOpen] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     useEffect(() => {
         const texts = ["Предложить улучшение", "Предложить изменение", "Задать вопрос", "Улучшить BlockMine"];
@@ -186,6 +189,18 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
         const randomIcon = icons[Math.floor(Math.random() * icons.length)];
         setRandomFeature({ text: randomText, icon: randomIcon });
     }, []);
+
+    useEffect(() => {
+        // Сбрасываем isInitialLoad когда есть боты или через 2 секунды после маунта
+        if (bots.length > 0) {
+            setIsInitialLoad(false);
+        } else {
+            const timer = setTimeout(() => {
+                setIsInitialLoad(false);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [bots]);
 
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
 
@@ -415,7 +430,9 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                     bots.length >= 6 && "md:max-h-[35vh]"
                 )}
             >
-                {isSheetOpen ? (
+                {isInitialLoad && bots.length === 0 ? (
+                    <BotSidebarListSkeleton count={3} isCollapsed={isCollapsed} />
+                ) : isSheetOpen ? (
                     <div className="space-y-0.5">
                         {bots.map((bot) => (
                             <BotItem key={bot.id} bot={bot} isCollapsed={isCollapsed} botStatuses={botStatuses} onLinkClick={onLinkClick} />
@@ -473,9 +490,10 @@ export default function Layout() {
     const createBot = useAppStore(state => state.createBot);
     const fetchInitialData = useAppStore(state => state.fetchInitialData);
     const hasPermission = useAppStore(state => state.hasPermission);
+    const chatUnreadCount = useAppStore(state => state.chatUnreadCount);
     const theme = useAppStore(state => state.theme);
     const setTheme = useAppStore(state => state.setTheme);
-    
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -722,6 +740,16 @@ export default function Layout() {
         )}>
             <div className="fixed z-40 flex items-center gap-2" style={{ top: 'max(8px, env(safe-area-inset-top))', right: 'max(8px, env(safe-area-inset-right))' }}>
             <GlobalSearch />
+                {chatUnreadCount > 0 && (
+                    <div className="relative animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center justify-center h-9 w-9 rounded-md bg-background/80 backdrop-blur border hover:bg-accent transition-colors cursor-default">
+                            <MessageSquarePlus className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full border-2 border-background">
+                            {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                        </span>
+                    </div>
+                )}
                 <PresenceButton />
             </div>
             <div className="md:hidden fixed z-50 top-[max(0.5rem,env(safe-area-inset-top))] left-[max(0.5rem,env(safe-area-inset-left))]">
@@ -749,8 +777,9 @@ export default function Layout() {
             <main className="overflow-y-auto">
                 <Outlet />
             </main>
-            
+
             <ChangelogDialog />
+            <PanelChat />
         </div>
     );
 }

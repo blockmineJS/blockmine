@@ -226,11 +226,14 @@ model PanelUser {
   role         PanelRole @relation(fields: [roleId], references: [id])
   roleId       Int
   createdAt    DateTime @default(now())
+  lastLoginAt  DateTime?
 
   allBots      Boolean  @default(true)
 
   botAccess    PanelUserBotAccess[]
   apiKeys      PanelApiKey[]
+  loginLogs    PanelUserLoginLog[]
+  chatMessages PanelChatMessage[]
 }
 
 // Роли пользователей (Admin, Moderator, Viewer)
@@ -343,4 +346,35 @@ model ExecutionTrace {
   @@index([botId, graphId])
   @@index([createdAt])
   @@map("execution_traces")
+}
+
+model PanelUserLoginLog {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        PanelUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ipAddress   String?   // IP адрес пользователя
+  userAgent   String?   // User-Agent браузера
+  success     Boolean   @default(true) // Успешный вход или нет
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+model PanelChatMessage {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      PanelUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message   String    // Текст сообщения
+  isEdited  Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([userId])
 }

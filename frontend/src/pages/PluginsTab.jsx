@@ -4,14 +4,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap, Github } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
+import GithubInstallDialog from '@/components/GithubInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 export default function PluginsTab() {
     const { botId } = useParams();
@@ -32,6 +34,7 @@ export default function PluginsTab() {
     const deletePlugin = useAppStore(state => state.deletePlugin);
     const updatePlugin = useAppStore(state => state.updatePlugin);
     const installPluginFromPath = useAppStore(state => state.installPluginFromPath);
+    const installPluginFromRepo = useAppStore(state => state.installPluginFromRepo);
     const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
@@ -42,6 +45,8 @@ export default function PluginsTab() {
     const [isUpdating, setIsUpdating] = useState(null);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
+    const [isGithubInstallOpen, setIsGithubInstallOpen] = useState(false);
+    const [isGithubInstalling, setIsGithubInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isForking, setIsForking] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
@@ -119,7 +124,24 @@ export default function PluginsTab() {
             setIsLocalInstalling(false);
         }
     };
-    
+
+    const handleGithubInstall = async (repoUrl) => {
+        setIsGithubInstalling(true);
+        try {
+            await installPluginFromRepo(intBotId, repoUrl);
+            setIsGithubInstallOpen(false);
+            await fetchInstalledPlugins(intBotId);
+        } catch (error) {
+            console.error('[GitHub Install Error]', error);
+            // Показываем пользователю сообщение об ошибке
+            const errorMessage = error.response?.data?.error || error.message || 'Не удалось установить плагин';
+            toast.error(`Ошибка установки: ${errorMessage}`);
+            // Диалог остаётся открытым чтобы пользователь мог попробовать снова
+        } finally {
+            setIsGithubInstalling(false);
+        }
+    };
+
     const handlePluginOperationSuccess = () => {
         fetchInstalledPlugins(intBotId);
     };
@@ -172,18 +194,27 @@ export default function PluginsTab() {
                         <TooltipContent>Проверить обновления</TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
+                        <Dialog open={isGithubInstallOpen} onOpenChange={setIsGithubInstallOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <Github className="h-4 w-4" />
+                                    <span className="ml-2">Из GitHub</span>
+                                </Button>
+                            </DialogTrigger>
+                            <GithubInstallDialog onInstall={handleGithubInstall} onCancel={() => setIsGithubInstallOpen(false)} isInstalling={isGithubInstalling} />
+                        </Dialog>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" disabled={!canInstall}>
                                     <FolderPlus className="h-4 w-4" />
-                                    <span className="ml-2">Установить локально</span>
+                                    <span className="ml-2">Локально</span>
                                 </Button>
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
-                            <span className="ml-2">Создать плагин</span>
+                            <span className="ml-2">Создать</span>
                         </Button>
                     </div>
                 </div>

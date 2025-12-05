@@ -9,6 +9,7 @@ import ProxyForm from '@/components/ProxyForm';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { apiHelper } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ProxiesPage() {
     const [proxies, setProxies] = useState([]);
@@ -105,14 +106,21 @@ export default function ProxiesPage() {
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center h-24">
-                                            <div className="flex justify-center items-center">
-                                                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                                                Загрузка прокси...
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
+                                    Array.from({ length: 3 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-8 rounded-full" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-full max-w-xs" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <Skeleton className="h-8 w-8" />
+                                                    <Skeleton className="h-8 w-8" />
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                                 ) : proxies.length > 0 ? (
                                     proxies.map(proxy => (
                                         <TableRow key={proxy.id}>
