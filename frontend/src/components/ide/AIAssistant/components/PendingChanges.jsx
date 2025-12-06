@@ -92,7 +92,7 @@ function PendingChangeItem({ change, onApply, onReject, onViewDiff }) {
 
                 {/* Actions */}
                 {change.status === 'pending' && (
-                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1" role="presentation" onClick={e => e.stopPropagation()}>
                         <Button
                             variant="ghost"
                             size="sm"

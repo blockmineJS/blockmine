@@ -178,18 +178,24 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                 console.log('[AI Chat] Accept diff event:', filePath);
                 const change = pendingChangesRef.current.find(c => c.filePath === filePath);
                 if (change) {
-                    console.log('[AI Chat] Found change, updating status to applied');
-                    updateToolCallWithDiffRef.current(filePath, {
-                        ...change,
-                        isPending: false,
-                        isApplied: true
-                    });
+                    console.log('[AI Chat] Found change, applying...');
 
-                    await applyChangeRef.current(change.id, () => {
-                        if (onFileUpdatedRef.current) {
-                            onFileUpdatedRef.current(filePath, newContent, change.oldContent, change.changedLineRanges);
-                        }
-                    });
+                    try {
+                        await applyChangeRef.current(change.id, () => {
+                            if (onFileUpdatedRef.current) {
+                                onFileUpdatedRef.current(filePath, newContent, change.oldContent, change.changedLineRanges);
+                            }
+                        });
+
+                        console.log('[AI Chat] Change applied successfully, updating status to applied');
+                        updateToolCallWithDiffRef.current(filePath, {
+                            ...change,
+                            isPending: false,
+                            isApplied: true
+                        });
+                    } catch (error) {
+                        console.error('[AI Chat] Failed to apply change:', error);
+                    }
                 } else {
                     console.log('[AI Chat] Change not found in pendingChanges for:', filePath);
                 }
@@ -230,57 +236,52 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
         clearToolCalls();
 
         try {
-            // Передаём applyMode в зависимости от previewMode
             const applyMode = previewMode ? APPLY_MODES.PREVIEW : APPLY_MODES.IMMEDIATE;
 
-            // Включаем прикреплённые файлы
             const includeFiles = getAttachmentPaths();
 
-            // Передаём autoFormat из настроек
             await sendMessage(messageText, settings, processStream, applyMode, includeFiles, settings.autoFormat);
 
-            // Очищаем attachments после отправки
             clearAttachments();
         } catch (error) {
             console.error('Error sending message:', error);
         }
     };
 
-    // Обработчик применения одного изменения (из PendingChanges panel)
     const handleApplyChange = async (changeId) => {
-        // Находим change до применения чтобы обновить статус tool call
         const change = pendingChangesRef.current.find(c => c.id === changeId);
-        if (change) {
-            // Обновляем статус tool call - помечаем как применённый
-            updateToolCallWithDiff(change.filePath, {
-                ...change,
-                isPending: false,
-                isApplied: true
-            });
-        }
 
-        await applyChange(changeId, async (appliedChange) => {
-            if (onFileUpdated) {
-                onFileUpdated(appliedChange.filePath, appliedChange.newContent, appliedChange.oldContent, appliedChange.changedLineRanges);
+        try {
+            await applyChange(changeId, async (appliedChange) => {
+                if (onFileUpdated) {
+                    onFileUpdated(appliedChange.filePath, appliedChange.newContent, appliedChange.oldContent, appliedChange.changedLineRanges);
+                }
+            });
+
+            if (change) {
+                updateToolCallWithDiff(change.filePath, {
+                    ...change,
+                    isPending: false,
+                    isApplied: true
+                });
             }
-        });
+        } catch (error) {
+            console.error('[AI Chat] Failed to apply change:', error);
+        }
     };
 
     // Обработчик применения всех изменений
     const handleApplyAllChanges = async () => {
-        // Обновляем статусы всех tool calls перед применением
-        pendingChangesRef.current.forEach(change => {
+        await applyAllChanges(async (change) => {
+            if (onFileUpdated) {
+                onFileUpdated(change.filePath, change.newContent, change.oldContent, change.changedLineRanges);
+            }
+
             updateToolCallWithDiff(change.filePath, {
                 ...change,
                 isPending: false,
                 isApplied: true
             });
-        });
-
-        await applyAllChanges(async (change) => {
-            if (onFileUpdated) {
-                onFileUpdated(change.filePath, change.newContent, change.oldContent, change.changedLineRanges);
-            }
         });
     };
 

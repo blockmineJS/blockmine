@@ -974,6 +974,10 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'API key is required.' });
         }
 
+        if (effectiveTemperature < 0 || effectiveTemperature > 2) {
+            return res.status(400).json({ error: 'Temperature must be between 0 and 2.' });
+        }
+
         const systemPromptPath = path.join(__dirname, '../../ai/plugin-assistant-system-prompt.md');
         let systemPrompt = 'Ты - AI помощник для разработки плагинов в BlockMine IDE.';
 
@@ -1279,7 +1283,7 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
         const aiProvider = provider || 'openrouter';
         const proxyConfig = parseProxyString(proxy);
 
-        const effectiveTemperature = temperature !== undefined ? temperature : 0.7;
+        const effectiveTemperature = temperature !== undefined ? Math.max(0, Math.min(2, temperature)) : 0.7;
         const effectiveMaxTokens = maxTokens !== undefined ? Math.min(maxTokens, 2048) : 2048;
 
         let client;

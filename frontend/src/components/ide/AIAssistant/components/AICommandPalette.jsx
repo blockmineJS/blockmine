@@ -98,8 +98,12 @@ export function AICommandPalette({
 
     const handleSubmit = async () => {
         if (!input.trim() || isLoading) return;
-        await onSendRequest(input);
-        setInput('');
+        try {
+            await onSendRequest(input);
+            setInput('');
+        } catch (err) {
+            console.error('Ошибка отправки запроса:', err);
+        }
     };
 
     const handleQuickAction = async (actionId) => {

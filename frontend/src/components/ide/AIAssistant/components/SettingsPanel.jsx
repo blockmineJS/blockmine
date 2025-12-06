@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { PROVIDERS, OPENROUTER_MODELS, GOOGLE_MODELS, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from '../utils/constants';
-import { cn } from '@/lib/utils';
 
 export function SettingsPanel({ settings, onSave }) {
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -189,7 +188,7 @@ export function SettingsPanel({ settings, onSave }) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium block">Автоматические действия</label>
+                        <span className="text-sm font-medium block">Автоматические действия</span>
 
                         <div className="flex items-center gap-2">
                             <input
