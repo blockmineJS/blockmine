@@ -3,31 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     Sparkles,
-    MessageSquare,
-    RefreshCw,
-    Bug,
-    Code,
-    FileText,
-    TestTube,
     X,
     Loader2,
     Copy,
     Check,
     ArrowRight
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-/**
- * Быстрые действия для inline AI
- */
-const QUICK_ACTIONS = [
-    { id: 'explain', label: 'Объяснить', icon: MessageSquare, shortcut: 'E' },
-    { id: 'refactor', label: 'Улучшить', icon: RefreshCw, shortcut: 'R' },
-    { id: 'fix', label: 'Исправить', icon: Bug, shortcut: 'F' },
-    { id: 'complete', label: 'Продолжить', icon: Code, shortcut: 'C' },
-    { id: 'comment', label: 'Комментарии', icon: FileText, shortcut: 'M' },
-    { id: 'test', label: 'Тесты', icon: TestTube, shortcut: 'T' }
-];
 
 /**
  * Компонент командной палитры AI
@@ -41,8 +22,7 @@ export function AICommandPalette({
     error,
     onClose,
     onSendRequest,
-    onApplyResult,
-    actions
+    onApplyResult
 }) {
     const [input, setInput] = useState('');
     const [copied, setCopied] = useState(false);
@@ -111,17 +91,6 @@ export function AICommandPalette({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen, onClose]);
 
-    const handleQuickAction = async (actionId) => {
-        if (isLoading) return;
-        if (actions && actions[actionId]) {
-            try {
-                await actions[actionId]();
-            } catch (err) {
-                console.error('Ошибка выполнения действия:', err);
-            }
-        }
-    };
-
     const handleCopyResult = () => {
         if (result) {
             navigator.clipboard.writeText(result)
@@ -178,28 +147,6 @@ export function AICommandPalette({
                     <X className="h-4 w-4" />
                 </Button>
             </div>
-
-            {/* Quick Actions */}
-            {!showResult && (
-                <div className="flex flex-wrap gap-1 p-2 border-b">
-                    {QUICK_ACTIONS.map(action => (
-                        <Button
-                            key={action.id}
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                                "h-7 gap-1 text-xs",
-                                isLoading && "opacity-50 pointer-events-none"
-                            )}
-                            onClick={() => handleQuickAction(action.id)}
-                            disabled={isLoading}
-                        >
-                            <action.icon className="h-3 w-3" />
-                            {action.label}
-                        </Button>
-                    ))}
-                </div>
-            )}
 
             {/* Input */}
             {!showResult && (
