@@ -173,6 +173,19 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
         setMessagesRef.current = setMessages;
     }, [applyChange, rejectChange, onFileUpdated, updateToolCallWithDiff, setMessages]);
 
+    const handleRejectChangeLogic = useCallback((change, updateFn, setMessagesFn) => {
+        updateFn(change.filePath, {
+            ...change,
+            isPending: false,
+            isRejected: true
+        });
+
+        setMessagesFn(prev => [...prev, {
+            role: 'user',
+            content: `[Изменения в файле ${change.filePath} были отклонены пользователем]`
+        }]);
+    }, []);
+
     useEffect(() => {
         const unsubscribe = subscribeToDiffEvents({
             onAcceptDiff: async ({ filePath, newContent, changeId }) => {
@@ -206,20 +219,8 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                 const change = pendingChangesRef.current.find(c => c.filePath === filePath);
                 if (change) {
                     console.log('[AI Chat] Found change, updating status to rejected');
-                    // Обновляем статус tool call - помечаем как отклонённый
-                    updateToolCallWithDiffRef.current(filePath, {
-                        ...change,
-                        isPending: false,
-                        isRejected: true
-                    });
-
+                    handleRejectChangeLogic(change, updateToolCallWithDiffRef.current, setMessagesRef.current);
                     rejectChangeRef.current(change.id);
-
-                    // Добавляем сообщение в чат чтобы AI знал об отмене
-                    setMessagesRef.current(prev => [...prev, {
-                        role: 'user',
-                        content: `[Изменения в файле ${filePath} были отклонены пользователем]`
-                    }]);
                 } else {
                     console.log('[AI Chat] Change not found in pendingChanges for:', filePath);
                 }
@@ -295,18 +296,7 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
     const handleRejectChange = (changeId) => {
         const change = pendingChangesRef.current.find(c => c.id === changeId);
         if (change) {
-            // Обновляем статус tool call - помечаем как отклонённый
-            updateToolCallWithDiff(change.filePath, {
-                ...change,
-                isPending: false,
-                isRejected: true
-            });
-
-            // Добавляем сообщение в чат чтобы AI знал об отмене
-            setMessages(prev => [...prev, {
-                role: 'user',
-                content: `[Изменения в файле ${change.filePath} были отклонены пользователем]`
-            }]);
+            handleRejectChangeLogic(change, updateToolCallWithDiff, setMessages);
         }
         rejectChange(changeId);
     };
@@ -314,7 +304,8 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
     const handleRejectAllChanges = async () => {
         setIsBulkLoading(true);
         try {
-            pendingChangesRef.current.forEach(change => {
+            const changesToReject = [...pendingChangesRef.current];
+            changesToReject.forEach(change => {
                 updateToolCallWithDiff(change.filePath, {
                     ...change,
                     isPending: false,
@@ -322,7 +313,7 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                 });
             });
 
-            const files = pendingChangesRef.current.map(c => c.filePath).join(', ');
+            const files = changesToReject.map(c => c.filePath).join(', ');
             setMessages(prev => [...prev, {
                 role: 'user',
                 content: `[Все изменения были отклонены пользователем: ${files}]`

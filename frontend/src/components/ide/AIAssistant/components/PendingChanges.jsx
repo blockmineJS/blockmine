@@ -33,7 +33,7 @@ function PendingChangeItem({ change, onApply, onReject, onViewDiff }) {
         }
     };
 
-    const fileName = change.filePath.split('/').pop();
+    const fileName = change.filePath?.split('/').pop() || change.filePath || 'Unnamed file';
 
     return (
         <div className={cn(
@@ -48,6 +48,7 @@ function PendingChangeItem({ change, onApply, onReject, onViewDiff }) {
                 className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/30"
                 role="button"
                 tabIndex={0}
+                aria-expanded={isExpanded}
                 onClick={() => setIsExpanded(!isExpanded)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {

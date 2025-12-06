@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -57,14 +57,21 @@ export function AICommandPalette({
         }
     }, [isOpen]);
 
-    // Показываем результат когда он появляется
     useEffect(() => {
         if (result) {
             setShowResult(true);
+        } else {
+            setShowResult(false);
         }
     }, [result]);
 
-    // Обработка клавиш
+    useEffect(() => {
+        if (!isOpen) {
+            setShowResult(false);
+        }
+    }, [isOpen]);
+
+
     useEffect(() => {
         if (!isOpen) return;
 
@@ -80,9 +87,8 @@ export function AICommandPalette({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, input, onClose]);
+    }, [isOpen, input, onClose, handleSubmit]);
 
-    // Клик вне компонента закрывает его
     useEffect(() => {
         if (!isOpen) return;
 
@@ -96,7 +102,7 @@ export function AICommandPalette({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen, onClose]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
         if (!input.trim() || isLoading) return;
         try {
             await onSendRequest(input);
@@ -104,7 +110,7 @@ export function AICommandPalette({
         } catch (err) {
             console.error('Ошибка отправки запроса:', err);
         }
-    };
+    }, [input, isLoading, onSendRequest]);
 
     const handleQuickAction = async (actionId) => {
         if (isLoading) return;
@@ -140,10 +146,12 @@ export function AICommandPalette({
     if (!isOpen) return null;
 
     // Вычисляем позицию с учётом границ экрана
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
     const style = {
         position: 'fixed',
-        left: Math.min(position.x, window.innerWidth - 400),
-        top: Math.min(position.y, window.innerHeight - 300),
+        left: Math.max(0, Math.min(position.x, viewportWidth - 400)),
+        top: Math.max(0, Math.min(position.y, viewportHeight - 300)),
         zIndex: 9999
     };
 

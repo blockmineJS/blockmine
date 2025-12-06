@@ -92,17 +92,12 @@ function simpleFormatCode(content, filePath) {
     }
 
     let formatted = content;
-
-    // Нормализуем line endings
     formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // Убираем trailing whitespace с каждой строки
     formatted = formatted.split('\n').map(line => line.trimEnd()).join('\n');
 
-    // Убираем множественные пустые строки (оставляем максимум 2 подряд)
     formatted = formatted.replace(/\n{4,}/g, '\n\n\n');
 
-    // Обеспечиваем newline в конце файла
     if (!formatted.endsWith('\n')) {
         formatted += '\n';
     }
@@ -798,9 +793,11 @@ function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', auto
 
                     let filesToSearch = allFiles;
                     if (filePattern !== '*') {
-                        const patternRegex = new RegExp(
-                            '^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$'
-                        );
+                        // Полное экранирование спецсимволов regex, затем конвертация glob '*' в '.*'
+                        const escaped = filePattern
+                            .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+                            .replace(/\*/g, '.*');
+                        const patternRegex = new RegExp('^' + escaped + '$');
                         filesToSearch = allFiles.filter(f => patternRegex.test(path.basename(f)));
                     }
 
@@ -1139,7 +1136,7 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                 }];
                 console.log('[Google] Converted', geminiTools[0].functionDeclarations.length, 'tools');
 
-                const maxToolIterations = 20;
+                const maxToolIterations = 30;
                 console.log('[Google] Creating chat... maxToolCalls:', maxToolIterations);
                 const chat = client.chats.create({
                     systemInstruction: systemPrompt + context,
@@ -1183,10 +1180,11 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
 
         try {
-            console.log(`Using temperature: ${effectiveTemperature}`);
+            console.log(`Using temperature: ${effectiveTemperature}, maxTokens: ${effectiveMaxTokens}`);
             await client.chatStream({
                 customMessages: customMessages,
                 temperature: effectiveTemperature,
+                maxTokens: effectiveMaxTokens,
                 tools: pluginTools,
                 includeToolResultInReport: true,
                 streamCallbacks: {
@@ -1218,7 +1216,6 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
             if (assistantMessage.content) {
                 storedHistory.push(assistantMessage);
 
-                // Ограничиваем размер истории (защита от memory leak)
                 trimHistory(storedHistory, chatKey);
 
                 console.log(`Saved to history. Total messages: ${storedHistory.length}`);
@@ -1260,8 +1257,6 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
         const { prompt, systemInstruction, action, context, provider, apiKey, apiEndpoint, model, proxy, temperature, maxTokens } = req.body;
         const { botId, pluginName } = req.params;
 
-        // Проверка rate limit (защита от злоупотребления)
-        // Используем отдельный лимит для inline запросов с префиксом
         const rateLimitKey = `${botId}_${pluginName}_inline`;
         if (!checkRateLimit(rateLimitKey)) {
             const resetTime = getRateLimitResetTime(rateLimitKey);
@@ -1284,7 +1279,7 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
         const proxyConfig = parseProxyString(proxy);
 
         const effectiveTemperature = temperature !== undefined ? temperature : 0.7;
-        const effectiveMaxTokens = maxTokens !== undefined ? maxTokens : 2048;
+        const effectiveMaxTokens = maxTokens !== undefined ? Math.min(maxTokens, 4096) : 2048;
 
         if (effectiveTemperature < 0 || effectiveTemperature > 2) {
             return res.status(400).json({ error: 'Temperature must be between 0 and 2.' });
