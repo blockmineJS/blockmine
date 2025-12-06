@@ -1,0 +1,275 @@
+/* Inline Diff Styles for Monaco Editor */
+
+/* Preview Widget - главный контейнер */
+.diff-preview-widget {
+    z-index: 100;
+    position: relative;
+}
+
+.diff-preview-container {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1);
+    overflow: hidden;
+    min-width: 320px;
+    max-width: 500px;
+    margin: 8px;
+    animation: diffWidgetAppear 0.25s ease-out;
+}
+
+.diff-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(99, 102, 241, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.diff-preview-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.diff-preview-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.diff-preview-stats .stat-add {
+    color: #4ade80;
+}
+
+.diff-preview-stats .stat-remove {
+    color: #f87171;
+}
+
+.diff-preview-content {
+    padding: 8px 12px;
+    font-family: 'Consolas', 'Monaco', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.diff-preview-content .diff-line-add {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.1);
+    padding: 1px 4px;
+    border-radius: 2px;
+    white-space: pre;
+}
+
+.diff-preview-content .diff-line-remove {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.1);
+    padding: 1px 4px;
+    border-radius: 2px;
+    white-space: pre;
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+.diff-preview-more {
+    color: #888;
+    font-style: italic;
+    padding-top: 4px;
+}
+
+.diff-preview-actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Добавленные строки - зелёный фон */
+.diff-line-added {
+    background-color: rgba(40, 167, 69, 0.2) !important;
+    border-left: 3px solid #28a745 !important;
+}
+
+/* Glyph для добавленных строк */
+.diff-glyph-added {
+    background-color: #28a745;
+    width: 4px !important;
+    margin-left: 3px;
+}
+
+/* Виджет с удалёнными строками */
+.diff-removed-widget {
+    background-color: rgba(220, 53, 69, 0.15);
+    border-left: 3px solid #dc3545;
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: 2px 8px;
+    font-family: var(--monaco-monospace-font, 'Consolas', 'Monaco', monospace);
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.diff-removed-line {
+    color: #dc3545;
+    white-space: pre;
+    opacity: 0.8;
+}
+
+.diff-accept-btn,
+.diff-reject-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.diff-accept-btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.diff-accept-btn:hover {
+    background: linear-gradient(135deg, #34d058 0%, #38d9a9 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+}
+
+.diff-accept-btn:active {
+    transform: translateY(0);
+}
+
+.diff-reject-btn {
+    background: rgba(220, 53, 69, 0.2);
+    color: #ff6b7a;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.diff-reject-btn:hover {
+    background: rgba(220, 53, 69, 0.3);
+    border-color: rgba(220, 53, 69, 0.5);
+}
+
+.diff-reject-btn:active {
+    background: rgba(220, 53, 69, 0.4);
+}
+
+/* Иконки в кнопках */
+.diff-accept-btn svg,
+.diff-reject-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Анимация появления */
+.diff-action-widget {
+    animation: diffWidgetAppear 0.2s ease-out;
+}
+
+@keyframes diffWidgetAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Подсветка для модифицированных строк */
+.diff-line-modified {
+    background-color: rgba(255, 193, 7, 0.15) !important;
+    border-left: 3px solid #ffc107 !important;
+}
+
+/* Overview ruler colors */
+.diff-overview-added {
+    background-color: #28a745 !important;
+}
+
+.diff-overview-removed {
+    background-color: #dc3545 !important;
+}
+
+/* Hover эффект на строках с diff */
+.diff-line-added:hover,
+.diff-line-modified:hover {
+    filter: brightness(1.1);
+}
+
+/* Стиль для inline удалённого текста */
+.diff-inline-removed {
+    background-color: rgba(220, 53, 69, 0.3);
+    text-decoration: line-through;
+    color: #ff6b7a;
+}
+
+/* Стиль для inline добавленного текста */
+.diff-inline-added {
+    background-color: rgba(40, 167, 69, 0.3);
+    color: #7ee787;
+}
+
+/* Tooltip для diff info */
+.diff-tooltip {
+    position: absolute;
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #e0e0e0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* Pending indicator */
+.diff-pending-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(255, 193, 7, 0.2);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 12px;
+    font-size: 11px;
+    color: #ffc107;
+}
+
+.diff-pending-indicator::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: #ffc107;
+    border-radius: 50%;
+    animation: pendingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pendingPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+}

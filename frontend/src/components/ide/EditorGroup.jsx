@@ -1,8 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FileIcon from './FileIcon';
+import { AICommandPalette } from './AIAssistant/components/AICommandPalette';
+import { useInlineAI } from './AIAssistant/hooks/useInlineAI';
+import { useAISettings } from './AIAssistant/hooks/useAISettings';
+import { useInlineDiff } from './AIAssistant/hooks/useInlineDiff';
+import { subscribeToDiffEvents, emitAcceptDiff, emitRejectDiff } from './AIAssistant/utils/diffEvents';
+import './AIAssistant/styles/inline-diff.css';
 
 const Tab = ({ file, isActive, onClick, onClose, isDirty }) => (
     <div
@@ -47,11 +53,21 @@ export default function EditorGroup({
     unsavedFiles,
     onContentChange,
     onProblemsChange,
-    onHighlightLines
+    onHighlightLines,
+    botId,
+    pluginName
 }) {
     const monaco = useMonaco();
     const editorRef = useRef(null);
     const decorationsRef = useRef([]);
+
+    // AI Settings и Inline AI
+    const settings = useAISettings();
+    const inlineAI = useInlineAI({ botId, pluginName, settings });
+
+    // Inline Diff для preview mode
+    const inlineDiff = useInlineDiff();
+    const [pendingDiffForFile, setPendingDiffForFile] = useState(null);
 
     const getLanguage = (filename) => {
         if (!filename) return 'plaintext';
@@ -136,9 +152,40 @@ export default function EditorGroup({
                 onSaveFile(activeFileRef.current);
             }
         });
+
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
+            const position = editor.getPosition();
+            const selection = editor.getSelection();
+            const model = editor.getModel();
+
+            if (!position || !model) return;
+
+            const coords = editor.getScrolledVisiblePosition(position);
+            const editorDom = editor.getDomNode();
+            const editorRect = editorDom?.getBoundingClientRect();
+
+            let selectedText = '';
+            if (selection && !selection.isEmpty()) {
+                selectedText = model.getValueInRange(selection);
+            }
+
+            const currentLine = model.getLineContent(position.lineNumber);
+
+            const fileContent = model.getValue();
+
+            inlineAI.open({
+                x: (editorRect?.left || 0) + (coords?.left || 0),
+                y: (editorRect?.top || 0) + (coords?.top || 0) + 20,
+                lineNumber: position.lineNumber,
+                column: position.column,
+                selectedText,
+                currentLine,
+                fileContent,
+                filePath: activeFileRef.current?.path || ''
+            });
+        });
     };
 
-    // Global keyboard handler for Russian layout (Ctrl+Ы)
     useEffect(() => {
         const handleKeyDown = (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'ы') {
@@ -173,7 +220,76 @@ export default function EditorGroup({
         };
     }, []);
 
-    // Expose highlightLines function via ref
+    // Ref для pendingDiffForFile чтобы избежать переподписок (исправляет event listener leak)
+    const pendingDiffForFileRef = useRef(pendingDiffForFile);
+    useEffect(() => {
+        pendingDiffForFileRef.current = pendingDiffForFile;
+    }, [pendingDiffForFile]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToDiffEvents({
+            onShowDiff: ({ filePath, oldContent, newContent, changeId }) => {
+                console.log('[EditorGroup] Show diff event for:', filePath);
+                setPendingDiffForFile({
+                    filePath,
+                    oldContent,
+                    newContent,
+                    changeId
+                });
+            },
+            onClearDiff: ({ filePath }) => {
+                // Используем ref вместо прямого доступа к state
+                if (pendingDiffForFileRef.current?.filePath === filePath) {
+                    setPendingDiffForFile(null);
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, []); // Убрали зависимость - подписываемся только при mount
+
+    const shownDiffRef = useRef(null);
+
+    useEffect(() => {
+        if (!editorRef.current || !monaco || !pendingDiffForFile) return;
+
+        const currentFilePath = activeFile?.path || '';
+
+        if (!currentFilePath.endsWith(pendingDiffForFile.filePath) &&
+            pendingDiffForFile.filePath !== currentFilePath) {
+            return;
+        }
+
+        if (shownDiffRef.current === pendingDiffForFile.changeId) {
+            return;
+        }
+
+        console.log('[EditorGroup] Showing inline diff for:', pendingDiffForFile.filePath);
+        shownDiffRef.current = pendingDiffForFile.changeId;
+
+        inlineDiff.showDiff(
+            editorRef.current,
+            monaco,
+            pendingDiffForFile.filePath,
+            pendingDiffForFile.oldContent,
+            pendingDiffForFile.newContent,
+            // onAccept
+            (filePath, newContent) => {
+                console.log('[EditorGroup] Diff accepted:', filePath);
+                shownDiffRef.current = null;
+                emitAcceptDiff(filePath, newContent, pendingDiffForFile.changeId);
+                setPendingDiffForFile(null);
+            },
+            // onReject
+            (filePath) => {
+                console.log('[EditorGroup] Diff rejected:', filePath);
+                shownDiffRef.current = null;
+                emitRejectDiff(filePath, pendingDiffForFile.changeId);
+                setPendingDiffForFile(null);
+            }
+        );
+    }, [pendingDiffForFile, activeFile, monaco]);
+
     const highlightLines = useRef((lineRanges) => {
         if (!editorRef.current || !lineRanges || lineRanges.length === 0) {
             console.log('[EditorGroup] Cannot highlight - no editor or empty ranges');
@@ -182,10 +298,8 @@ export default function EditorGroup({
 
         console.log('[EditorGroup] Highlighting lines:', lineRanges);
 
-        // Очищаем предыдущие decorations
         decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
 
-        // Создаём новые decorations для каждого диапазона
         const newDecorations = lineRanges.map(range => ({
             range: {
                 startLineNumber: range.start,
@@ -211,7 +325,6 @@ export default function EditorGroup({
         decorationsRef.current = editorRef.current.deltaDecorations([], newDecorations);
         console.log('[EditorGroup] Decorations applied:', decorationsRef.current);
 
-        // Автоматически убираем подсветку через 5 секунд
         setTimeout(() => {
             if (editorRef.current) {
                 decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
@@ -267,6 +380,35 @@ export default function EditorGroup({
         };
     }, [monaco, onProblemsChange]);
 
+    const handleApplyAIResult = (result) => {
+        if (!editorRef.current) return;
+
+        const editor = editorRef.current;
+        const selection = editor.getSelection();
+
+        if (selection && !selection.isEmpty()) {
+            editor.executeEdits('ai-inline', [{
+                range: selection,
+                text: result,
+                forceMoveMarkers: true
+            }]);
+        } else {
+            const position = editor.getPosition();
+            if (position) {
+                editor.executeEdits('ai-inline', [{
+                    range: {
+                        startLineNumber: position.lineNumber,
+                        startColumn: position.column,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    },
+                    text: result,
+                    forceMoveMarkers: true
+                }]);
+            }
+        }
+    };
+
     return (
         <div className="h-full flex flex-col bg-[#1e1e1e]">
             {/* Tabs Header */}
@@ -289,7 +431,10 @@ export default function EditorGroup({
                     <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                         <div className="text-center">
                             <div className="text-2xl font-semibold mb-2">BlockMine Studio</div>
-                            <div className="text-sm">Выберите файл для редактированиЯ</div>
+                            <div className="text-sm">Выберите файл для редактирования</div>
+                            <div className="text-xs mt-2 text-muted-foreground/60">
+                                Нажмите <kbd className="px-1.5 py-0.5 rounded bg-muted">Ctrl+K</kbd> для вызова AI
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -319,6 +464,19 @@ export default function EditorGroup({
                     )
                 )}
             </div>
+
+            <AICommandPalette
+                isOpen={inlineAI.isOpen}
+                position={inlineAI.position}
+                context={inlineAI.context}
+                isLoading={inlineAI.isLoading}
+                result={inlineAI.result}
+                error={inlineAI.error}
+                onClose={inlineAI.close}
+                onSendRequest={inlineAI.sendRequest}
+                onApplyResult={handleApplyAIResult}
+                actions={inlineAI.actions}
+            />
         </div>
     );
 }

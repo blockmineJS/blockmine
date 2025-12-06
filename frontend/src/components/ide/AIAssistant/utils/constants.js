@@ -24,8 +24,16 @@ export const STORAGE_KEYS = {
     MODEL_PREFIX: 'ai_model_',
     USE_CUSTOM_MODEL: 'ai_use_custom_model',
     CUSTOM_MODEL: 'ai_custom_model',
-    PROXY: 'ai_proxy'
+    PROXY: 'ai_proxy',
+    TEMPERATURE: 'ai_temperature',
+    MAX_TOKENS: 'ai_max_tokens',
+    SYSTEM_PROMPT: 'ai_system_prompt',
+    AUTO_FORMAT: 'ai_auto_format',
+    AUTO_CREATE_FOLDERS: 'ai_auto_create_folders'
 };
+
+export const DEFAULT_TEMPERATURE = 0.7;
+export const DEFAULT_MAX_TOKENS = 4096;
 
 export const DEFAULT_API_ENDPOINT = 'https://openrouter.ai/api/v1';
 
@@ -37,7 +45,16 @@ export const SSE_EVENT_TYPES = {
     TOOL_RESULT: 'tool_result',
     FILE_UPDATED: 'file_updated',
     FILE_DELETED: 'file_deleted',
-    FOLDER_DELETED: 'folder_deleted'
+    FOLDER_DELETED: 'folder_deleted',
+
+    FILE_PREVIEW: 'file_preview',
+    FILE_PREVIEW_APPLIED: 'file_preview_applied'
+};
+
+// Режимы применения изменений
+export const APPLY_MODES = {
+    IMMEDIATE: 'immediate',  // Применять сразу (текущее поведение)
+    PREVIEW: 'preview'       // Показывать preview перед применением
 };
 
 export const TOOL_NAMES = {
@@ -47,5 +64,6 @@ export const TOOL_NAMES = {
     GET_FULL_PROJECT_CONTEXT: 'getFullProjectContext',
     READ_BOT_LOGS: 'readBotLogs',
     DELETE_FILE: 'deleteFile',
-    DELETE_FOLDER: 'deleteFolder'
+    DELETE_FOLDER: 'deleteFolder',
+    SEARCH_CODE: 'searchCode'
 };
