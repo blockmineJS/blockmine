@@ -79,6 +79,30 @@ function getRateLimitResetTime(key) {
 }
 
 /**
+ * Валидация и нормализация AI параметров (temperature, maxTokens)
+ */
+function validateAIParams(temperature, maxTokens, maxTokenLimit = 4096) {
+    let effectiveTemperature = 0.7;
+    if (temperature !== undefined) {
+        const temp = Number(temperature);
+        if (!isFinite(temp) || temp < 0 || temp > 2) {
+            return { error: 'Temperature must be a number between 0 and 2.' };
+        }
+        effectiveTemperature = temp;
+    }
+    let effectiveMaxTokens = 4096;
+    if (maxTokens !== undefined) {
+        const tokens = Number(maxTokens);
+        if (!isFinite(tokens) || tokens < 256) {
+            return { error: 'maxTokens must be a number >= 256.' };
+        }
+        effectiveMaxTokens = Math.min(tokens, maxTokenLimit);
+    }
+
+    return { effectiveTemperature, effectiveMaxTokens };
+}
+
+/**
  * Простое форматирование JS кода
  * - Нормализует line endings (CRLF -> LF)
  * - Убирает trailing whitespace
@@ -955,8 +979,12 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
 
         const effectiveAutoFormat = autoFormat === true;
 
-        const effectiveTemperature = temperature !== undefined ? temperature : 0.7;
-        const effectiveMaxTokens = maxTokens !== undefined ? maxTokens : 4096;
+        const validation = validateAIParams(temperature, maxTokens, 4096);
+        if (validation.error) {
+            return res.status(400).json({ error: validation.error });
+        }
+        const { effectiveTemperature, effectiveMaxTokens } = validation;
+
         console.log('Apply mode:', effectiveApplyMode);
 
         const aiProvider = provider || 'openrouter';
@@ -969,10 +997,6 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
 
         if (!apiKey) {
             return res.status(400).json({ error: 'API key is required.' });
-        }
-
-        if (effectiveTemperature < 0 || effectiveTemperature > 2) {
-            return res.status(400).json({ error: 'Temperature must be between 0 and 2.' });
         }
 
         const systemPromptPath = path.join(__dirname, '../../ai/plugin-assistant-system-prompt.md');
@@ -1278,12 +1302,11 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
         const aiProvider = provider || 'openrouter';
         const proxyConfig = parseProxyString(proxy);
 
-        const effectiveTemperature = temperature !== undefined ? temperature : 0.7;
-        const effectiveMaxTokens = maxTokens !== undefined ? Math.min(maxTokens, 4096) : 2048;
-
-        if (effectiveTemperature < 0 || effectiveTemperature > 2) {
-            return res.status(400).json({ error: 'Temperature must be between 0 and 2.' });
+        const validation = validateAIParams(temperature, maxTokens, 4096);
+        if (validation.error) {
+            return res.status(400).json({ error: validation.error });
         }
+        const { effectiveTemperature, effectiveMaxTokens } = validation;
 
         let client;
         if (aiProvider === 'google') {

@@ -71,6 +71,15 @@ export function AICommandPalette({
         }
     }, [isOpen]);
 
+    const handleSubmit = useCallback(async () => {
+        if (!input.trim() || isLoading) return;
+        try {
+            await onSendRequest(input);
+            setInput('');
+        } catch (err) {
+            console.error('Ошибка отправки запроса:', err);
+        }
+    }, [input, isLoading, onSendRequest]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -101,16 +110,6 @@ export function AICommandPalette({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen, onClose]);
-
-    const handleSubmit = useCallback(async () => {
-        if (!input.trim() || isLoading) return;
-        try {
-            await onSendRequest(input);
-            setInput('');
-        } catch (err) {
-            console.error('Ошибка отправки запроса:', err);
-        }
-    }, [input, isLoading, onSendRequest]);
 
     const handleQuickAction = async (actionId) => {
         if (isLoading) return;
