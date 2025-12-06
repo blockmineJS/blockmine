@@ -759,9 +759,10 @@ function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', auto
 
                     let filesToSearch = allFiles;
                     if (filePattern !== '*') {
-                        const patternRegex = new RegExp(
-                            '^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$'
-                        );
+                        // Escape all regex metacharacters, then replace escaped asterisks with '.*' for wildcard support.
+                        const escapedPattern = filePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const finalPattern = escapedPattern.replace(/\\\*/g, '.*');
+                        const patternRegex = new RegExp('^' + finalPattern + '$');
                         filesToSearch = allFiles.filter(f => patternRegex.test(path.basename(f)));
                     }
 
