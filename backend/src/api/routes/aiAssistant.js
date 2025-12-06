@@ -798,12 +798,9 @@ function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', auto
 
                     let filesToSearch = allFiles;
                     if (filePattern !== '*') {
-                        // Правильное экранирование для regex (включая backslash)
-                        const escapedPattern = filePattern
-                            .replace(/\\/g, '\\\\')  // Экранируем backslash первым
-                            .replace(/\./g, '\\.')   // Экранируем точки
-                            .replace(/\*/g, '.*');   // Заменяем * на .*
-                        const patternRegex = new RegExp('^' + escapedPattern + '$');
+                        const patternRegex = new RegExp(
+                            '^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$'
+                        );
                         filesToSearch = allFiles.filter(f => patternRegex.test(path.basename(f)));
                     }
 
