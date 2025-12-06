@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { PROVIDERS, DEFAULT_MODELS, STORAGE_KEYS, DEFAULT_API_ENDPOINT } from '../utils/constants';
+import { PROVIDERS, DEFAULT_MODELS, STORAGE_KEYS, DEFAULT_API_ENDPOINT, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from '../utils/constants';
 
 export function useAISettings() {
     const getDefaultModel = (prov) => DEFAULT_MODELS[prov] || DEFAULT_MODELS[PROVIDERS.OPENROUTER];
@@ -34,6 +34,28 @@ export function useAISettings() {
         localStorage.getItem(STORAGE_KEYS.PROXY) || ''
     );
 
+    const [temperature, setTemperature] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.TEMPERATURE);
+        return saved ? parseFloat(saved) : DEFAULT_TEMPERATURE;
+    });
+
+    const [maxTokens, setMaxTokens] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEYS.MAX_TOKENS);
+        return saved ? parseInt(saved) : DEFAULT_MAX_TOKENS;
+    });
+
+    const [systemPrompt, setSystemPrompt] = useState(
+        localStorage.getItem(STORAGE_KEYS.SYSTEM_PROMPT) || ''
+    );
+
+    const [autoFormat, setAutoFormat] = useState(
+        localStorage.getItem(STORAGE_KEYS.AUTO_FORMAT) === 'true'
+    );
+
+    const [autoCreateFolders, setAutoCreateFolders] = useState(
+        localStorage.getItem(STORAGE_KEYS.AUTO_CREATE_FOLDERS) !== 'false' // По умолчанию true
+    );
+
     const setProvider = useCallback((newProvider) => {
         setProviderState(newProvider);
         const storageKey = `${STORAGE_KEYS.MODEL_PREFIX}${newProvider}`;
@@ -49,7 +71,12 @@ export function useAISettings() {
         localStorage.setItem(STORAGE_KEYS.USE_CUSTOM_MODEL, useCustomModel.toString());
         localStorage.setItem(STORAGE_KEYS.CUSTOM_MODEL, customModel);
         localStorage.setItem(STORAGE_KEYS.PROXY, proxy);
-    }, [provider, apiKey, apiEndpoint, model, useCustomModel, customModel, proxy]);
+        localStorage.setItem(STORAGE_KEYS.TEMPERATURE, temperature.toString());
+        localStorage.setItem(STORAGE_KEYS.MAX_TOKENS, maxTokens.toString());
+        localStorage.setItem(STORAGE_KEYS.SYSTEM_PROMPT, systemPrompt);
+        localStorage.setItem(STORAGE_KEYS.AUTO_FORMAT, autoFormat.toString());
+        localStorage.setItem(STORAGE_KEYS.AUTO_CREATE_FOLDERS, autoCreateFolders.toString());
+    }, [provider, apiKey, apiEndpoint, model, useCustomModel, customModel, proxy, temperature, maxTokens, systemPrompt, autoFormat, autoCreateFolders]);
 
     const getEffectiveModel = useCallback(() => {
         return useCustomModel && customModel ? customModel : model;
@@ -70,6 +97,16 @@ export function useAISettings() {
         setCustomModel,
         proxy,
         setProxy,
+        temperature,
+        setTemperature,
+        maxTokens,
+        setMaxTokens,
+        systemPrompt,
+        setSystemPrompt,
+        autoFormat,
+        setAutoFormat,
+        autoCreateFolders,
+        setAutoCreateFolders,
         saveSettings,
         getEffectiveModel
     };

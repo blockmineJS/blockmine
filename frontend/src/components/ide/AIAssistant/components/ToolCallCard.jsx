@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Check, FileText, Edit3, FolderTree, FolderOpen, Terminal, FileX, FolderX, Eye } from 'lucide-react';
+import { Loader2, Check, FileText, Edit3, FolderTree, FolderOpen, Terminal, FileX, FolderX, Eye, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TOOL_NAMES } from '../utils/constants';
 
@@ -13,6 +13,7 @@ export function ToolCallCard({ toolCall, onFileClick, onViewDiff }) {
             case TOOL_NAMES.READ_BOT_LOGS: return <Terminal className="h-4 w-4" />;
             case TOOL_NAMES.DELETE_FILE: return <FileX className="h-4 w-4 text-red-400" />;
             case TOOL_NAMES.DELETE_FOLDER: return <FolderX className="h-4 w-4 text-red-400" />;
+            case TOOL_NAMES.SEARCH_CODE: return <Search className="h-4 w-4 text-blue-400" />;
             default: return <FileText className="h-4 w-4" />;
         }
     };
@@ -23,16 +24,36 @@ export function ToolCallCard({ toolCall, onFileClick, onViewDiff }) {
             return `Прочитан файл: ${toolCall.args.filePath} (${lines} строк)`;
         } else if (toolCall.toolName === TOOL_NAMES.UPDATE_FILE) {
             if (toolCall.diffData) {
-                const { linesAdded, linesRemoved, isNewFile } = toolCall.diffData;
+                const { linesAdded, linesRemoved, isNewFile, isPending, isApplied, isRejected } = toolCall.diffData;
+
+                let prefix, color;
+                if (isRejected) {
+                    prefix = 'Отклонено';
+                    color = 'text-red-400 line-through opacity-60';
+                } else if (isPending) {
+                    prefix = 'Ожидает';
+                    color = 'text-yellow-400';
+                } else if (isApplied) {
+                    prefix = isNewFile ? 'Создан' : 'Обновлен';
+                    color = 'text-green-400';
+                } else {
+                    prefix = isNewFile ? 'Создан' : 'Обновлен';
+                    color = '';
+                }
+
                 if (isNewFile) {
-                    return `Создан файл: ${toolCall.args.filePath} (+${linesAdded} строк)`;
+                    return (
+                        <span className={color}>
+                            {prefix} файл: {toolCall.args.filePath} (+{linesAdded} строк)
+                        </span>
+                    );
                 } else if (linesAdded > 0 || linesRemoved > 0) {
                     return (
-                        <span>
-                            Обновлен файл: {toolCall.args.filePath}{' '}
-                            <span className="text-green-400">+{linesAdded}</span>
+                        <span className={color}>
+                            {prefix}: {toolCall.args.filePath}{' '}
+                            <span className={isRejected ? '' : 'text-green-400'}>+{linesAdded}</span>
                             {' '}
-                            <span className="text-red-400">-{linesRemoved}</span>
+                            <span className={isRejected ? '' : 'text-red-400'}>-{linesRemoved}</span>
                         </span>
                     );
                 }
@@ -56,6 +77,14 @@ export function ToolCallCard({ toolCall, onFileClick, onViewDiff }) {
             return (
                 <span className="text-red-400">
                     Удалена папка: {toolCall.args.folderPath}
+                </span>
+            );
+        } else if (toolCall.toolName === TOOL_NAMES.SEARCH_CODE) {
+            const query = toolCall.args.query || '';
+            const type = toolCall.args.type || 'text';
+            return (
+                <span className="text-blue-400">
+                    Поиск: "{query}" ({type})
                 </span>
             );
         }

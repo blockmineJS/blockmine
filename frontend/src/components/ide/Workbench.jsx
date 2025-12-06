@@ -77,7 +77,6 @@ export default function Workbench({
         } else if (file) {
             onContentChange(file.path, newContent);
 
-            // Подсвечиваем изменения если есть старое содержимое
             if (oldContent !== undefined && oldContent !== newContent && changedLineRanges) {
                 if (highlightLinesCallbackRef.current) {
                     setTimeout(() => {
@@ -88,7 +87,6 @@ export default function Workbench({
 
         } else {
 
-            // Извлекаем имя файла из пути
             const fileName = filePath.split('/').pop();
 
             onSelectFile({
@@ -143,10 +141,8 @@ export default function Workbench({
 
     return (
         <div className="flex h-full w-full bg-background text-foreground overflow-hidden">
-            {/* Activity Bar (Leftmost) */}
             <ActivityBar activeView={activeView} onViewChange={setActiveView} />
 
-            {/* Quick Open Dialog */}
             <QuickOpen
                 isOpen={quickOpenVisible}
                 onClose={() => setQuickOpenVisible(false)}
@@ -201,10 +197,10 @@ export default function Workbench({
                                     onProblemsChange={setProblems}
                                     onHighlightLines={(fn) => { highlightLinesCallbackRef.current = fn; }}
                                     botId={botId}
+                                    pluginName={pluginName}
                                 />
                             </ResizablePanel>
 
-                            {/* Bottom Panel (Terminal, etc.) */}
                             {showPanel && (
                                 <>
                                     <ResizableHandle />

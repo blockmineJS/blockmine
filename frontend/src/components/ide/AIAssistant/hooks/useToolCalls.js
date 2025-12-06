@@ -1,15 +1,32 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export function useToolCalls() {
     const [toolCalls, setToolCalls] = useState([]);
+    const toolCallIdCounter = useRef(0);
 
     const addToolCall = useCallback((toolName, args) => {
-        setToolCalls(prev => [...prev, {
-            id: Date.now(),
-            toolName,
-            args,
-            status: 'executing'
-        }]);
+        // Генерируем уникальный ID
+        const id = `${toolName}_${++toolCallIdCounter.current}`;
+
+        setToolCalls(prev => {
+            if (toolName === 'updateFile' && args.filePath) {
+                const existing = prev.find(tc =>
+                    tc.toolName === 'updateFile' &&
+                    tc.args.filePath === args.filePath &&
+                    (tc.status === 'executing' || tc.diffData?.isPending)
+                );
+                if (existing) {
+                    return prev;
+                }
+            }
+
+            return [...prev, {
+                id,
+                toolName,
+                args,
+                status: 'executing'
+            }];
+        });
     }, []);
 
     const updateToolCall = useCallback((toolName, updates) => {
@@ -21,11 +38,17 @@ export function useToolCalls() {
     }, []);
 
     const updateToolCallWithDiff = useCallback((filePath, diffData) => {
-        setToolCalls(prev => prev.map(tc =>
-            tc.toolName === 'updateFile' && tc.args.filePath === filePath
-                ? { ...tc, diffData }
-                : tc
-        ));
+        setToolCalls(prev => {
+            const lastIndex = prev.findLastIndex(tc =>
+                tc.toolName === 'updateFile' && tc.args.filePath === filePath
+            );
+
+            if (lastIndex === -1) return prev;
+
+            return prev.map((tc, index) =>
+                index === lastIndex ? { ...tc, diffData } : tc
+            );
+        });
     }, []);
 
     const clearToolCalls = useCallback(() => {

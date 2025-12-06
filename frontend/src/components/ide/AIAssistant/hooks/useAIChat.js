@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/appStore';
 
 export function useAIChat({ botId, pluginName }) {
@@ -6,6 +6,15 @@ export function useAIChat({ botId, pluginName }) {
     const [isLoading, setIsLoading] = useState(false);
     const [activity, setActivity] = useState('idle');
     const [currentFile, setCurrentFile] = useState(null);
+
+    // Ref для AbortController чтобы отменить запрос при unmount
+    const abortControllerRef = useRef(null);
+
+    // Ref для актуального состояния messages (исправляет stale closure)
+    const messagesRef = useRef(messages);
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     useEffect(() => {
         const loadHistory = async () => {
@@ -32,7 +41,16 @@ export function useAIChat({ botId, pluginName }) {
         loadHistory();
     }, [botId, pluginName]);
 
-    const sendMessage = useCallback(async (messageText, settings, processStream) => {
+    // Cleanup при unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const sendMessage = useCallback(async (messageText, settings, processStream, applyMode = 'immediate', includeFiles = [], autoFormat = false) => {
         const token = useAppStore.getState().token;
 
         if (!messageText.trim() || isLoading) return;
@@ -41,6 +59,9 @@ export function useAIChat({ botId, pluginName }) {
             alert('Пожалуйста, укажите API ключ в настройках');
             throw new Error('API key required');
         }
+
+        // Создаем новый AbortController для этого запроса
+        abortControllerRef.current = new AbortController();
 
         const userMessage = { role: 'user', content: messageText };
         setMessages(prev => [...prev, userMessage]);
@@ -60,6 +81,7 @@ export function useAIChat({ botId, pluginName }) {
             const response = await fetch(`/api/bots/${botId}/plugins/ide/${pluginName}/ai/chat`, {
                 method: 'POST',
                 headers: headers,
+                signal: abortControllerRef.current.signal,
                 body: JSON.stringify({
                     message: messageText,
                     provider: settings.provider,
@@ -67,8 +89,13 @@ export function useAIChat({ botId, pluginName }) {
                     apiEndpoint: settings.apiEndpoint,
                     model: finalModel,
                     proxy: settings.proxy,
-                    history: messages,
-                    includeFiles: ['index.js', 'package.json']
+                    history: messagesRef.current,
+                    includeFiles: includeFiles.length > 0 ? includeFiles : ['index.js', 'package.json'],
+                    applyMode: applyMode,
+                    autoFormat: autoFormat,
+                    temperature: settings.temperature,
+                    maxTokens: settings.maxTokens,
+                    customSystemPrompt: settings.systemPrompt
                 })
             });
 
@@ -81,9 +108,14 @@ export function useAIChat({ botId, pluginName }) {
             setMessages(prev => [...prev, assistantMessage]);
             setActivity('streaming');
 
-            await processStream(response, assistantMessage);
+            await processStream(response, assistantMessage, abortControllerRef.current.signal);
 
         } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('[AI Chat] Request aborted');
+                return;
+            }
+
             console.error('[AI Chat] Error:', error);
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -93,8 +125,9 @@ export function useAIChat({ botId, pluginName }) {
             setIsLoading(false);
             setActivity('idle');
             setCurrentFile(null);
+            abortControllerRef.current = null;
         }
-    }, [botId, pluginName, messages, isLoading]);
+    }, [botId, pluginName, isLoading]);
 
     const clearHistory = useCallback(async () => {
         const token = useAppStore.getState().token;
