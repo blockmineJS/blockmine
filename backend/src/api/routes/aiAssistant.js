@@ -1283,8 +1283,12 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
         const aiProvider = provider || 'openrouter';
         const proxyConfig = parseProxyString(proxy);
 
-        const effectiveTemperature = temperature !== undefined ? Math.max(0, Math.min(2, temperature)) : 0.7;
-        const effectiveMaxTokens = maxTokens !== undefined ? Math.min(maxTokens, 2048) : 2048;
+        const effectiveTemperature = temperature !== undefined ? temperature : 0.7;
+        const effectiveMaxTokens = maxTokens !== undefined ? maxTokens : 2048;
+
+        if (effectiveTemperature < 0 || effectiveTemperature > 2) {
+            return res.status(400).json({ error: 'Temperature must be between 0 and 2.' });
+        }
 
         let client;
         if (aiProvider === 'google') {

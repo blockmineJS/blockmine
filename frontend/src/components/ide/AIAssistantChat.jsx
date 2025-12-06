@@ -22,6 +22,7 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
     const [showSettings, setShowSettings] = useState(false);
     const [diffViewerData, setDiffViewerData] = useState(null);
     const [previewMode, setPreviewMode] = useState(true); // Preview mode включен по умолчанию
+    const [isBulkLoading, setIsBulkLoading] = useState(false);
     const messagesEndRef = useRef(null);
     const pendingChangesRef = useRef([]);
 
@@ -272,17 +273,22 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
 
     // Обработчик применения всех изменений
     const handleApplyAllChanges = async () => {
-        await applyAllChanges(async (change) => {
-            if (onFileUpdated) {
-                onFileUpdated(change.filePath, change.newContent, change.oldContent, change.changedLineRanges);
-            }
+        setIsBulkLoading(true);
+        try {
+            await applyAllChanges(async (change) => {
+                if (onFileUpdated) {
+                    onFileUpdated(change.filePath, change.newContent, change.oldContent, change.changedLineRanges);
+                }
 
-            updateToolCallWithDiff(change.filePath, {
-                ...change,
-                isPending: false,
-                isApplied: true
+                updateToolCallWithDiff(change.filePath, {
+                    ...change,
+                    isPending: false,
+                    isApplied: true
+                });
             });
-        });
+        } finally {
+            setIsBulkLoading(false);
+        }
     };
 
     // Обработчик отклонения одного изменения (из PendingChanges panel)
@@ -305,22 +311,27 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
         rejectChange(changeId);
     };
 
-    const handleRejectAllChanges = () => {
-        pendingChangesRef.current.forEach(change => {
-            updateToolCallWithDiff(change.filePath, {
-                ...change,
-                isPending: false,
-                isRejected: true
+    const handleRejectAllChanges = async () => {
+        setIsBulkLoading(true);
+        try {
+            pendingChangesRef.current.forEach(change => {
+                updateToolCallWithDiff(change.filePath, {
+                    ...change,
+                    isPending: false,
+                    isRejected: true
+                });
             });
-        });
 
-        const files = pendingChangesRef.current.map(c => c.filePath).join(', ');
-        setMessages(prev => [...prev, {
-            role: 'user',
-            content: `[Все изменения были отклонены пользователем: ${files}]`
-        }]);
+            const files = pendingChangesRef.current.map(c => c.filePath).join(', ');
+            setMessages(prev => [...prev, {
+                role: 'user',
+                content: `[Все изменения были отклонены пользователем: ${files}]`
+            }]);
 
-        rejectAllChanges();
+            await rejectAllChanges();
+        } finally {
+            setIsBulkLoading(false);
+        }
     };
 
     const handleViewPendingDiff = (change) => {
@@ -429,6 +440,7 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                     onApplyAll={handleApplyAllChanges}
                     onRejectAll={handleRejectAllChanges}
                     onViewDiff={handleViewPendingDiff}
+                    isBulkLoading={isBulkLoading}
                 />
             )}
 

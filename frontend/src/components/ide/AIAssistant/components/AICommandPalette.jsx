@@ -109,7 +109,11 @@ export function AICommandPalette({
     const handleQuickAction = async (actionId) => {
         if (isLoading) return;
         if (actions && actions[actionId]) {
-            await actions[actionId]();
+            try {
+                await actions[actionId]();
+            } catch (err) {
+                console.error('Ошибка выполнения действия:', err);
+            }
         }
     };
 

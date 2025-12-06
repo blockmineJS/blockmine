@@ -175,7 +175,8 @@ export function PendingChanges({
     onReject,
     onApplyAll,
     onRejectAll,
-    onViewDiff
+    onViewDiff,
+    isBulkLoading = false
 }) {
     if (pendingChanges.length === 0) {
         return null;
@@ -201,8 +202,13 @@ export function PendingChanges({
                         size="sm"
                         className="h-7 gap-1 text-green-500 hover:text-green-600 hover:bg-green-500/10"
                         onClick={onApplyAll}
+                        disabled={isBulkLoading}
                     >
-                        <CheckCheck className="h-4 w-4" />
+                        {isBulkLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <CheckCheck className="h-4 w-4" />
+                        )}
                         <span className="text-xs">Применить все</span>
                     </Button>
                     <Button
@@ -210,8 +216,13 @@ export function PendingChanges({
                         size="sm"
                         className="h-7 gap-1 text-red-500 hover:text-red-600 hover:bg-red-500/10"
                         onClick={onRejectAll}
+                        disabled={isBulkLoading}
                     >
-                        <XCircle className="h-4 w-4" />
+                        {isBulkLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <XCircle className="h-4 w-4" />
+                        )}
                         <span className="text-xs">Отклонить все</span>
                     </Button>
                 </div>
