@@ -14,7 +14,7 @@ export function useAttachments() {
      */
     const addAttachment = useCallback((file) => {
         const newAttachment = {
-            id: `attachment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: `attachment_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
             name: file.name,
             path: file.path || file.name,
             content: file.content || '',
@@ -116,14 +116,18 @@ export function useAttachments() {
                 const fileData = JSON.parse(customData);
                 if (fileData.path && fileData.name) {
                     if (onGetFileContent) {
-                        onGetFileContent(fileData.path).then(content => {
-                            addAttachment({
-                                name: fileData.name,
-                                path: fileData.path,
-                                content: content || '',
-                                type: 'file'
+                        onGetFileContent(fileData.path)
+                            .then(content => {
+                                addAttachment({
+                                    name: fileData.name,
+                                    path: fileData.path,
+                                    content: content || '',
+                                    type: 'file'
+                                });
+                            })
+                            .catch(err => {
+                                console.error('Error getting file content:', err);
                             });
-                        });
                     } else {
                         addAttachment({
                             name: fileData.name,

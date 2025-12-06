@@ -137,10 +137,11 @@ export function SettingsPanel({ settings, onSave }) {
                 <div className="space-y-3 pt-2 border-t">
                     <div>
                         <div className="flex justify-between items-center mb-1">
-                            <label className="text-sm font-medium">Температура</label>
+                            <label htmlFor="temperature" className="text-sm font-medium">Температура</label>
                             <span className="text-sm text-muted-foreground">{temperature}</span>
                         </div>
                         <input
+                            id="temperature"
                             type="range"
                             min="0"
                             max="2"
@@ -156,14 +157,15 @@ export function SettingsPanel({ settings, onSave }) {
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium mb-1 block">Макс. токенов</label>
+                        <label htmlFor="maxTokens" className="text-sm font-medium mb-1 block">Макс. токенов</label>
                         <Input
+                            id="maxTokens"
                             type="number"
                             min="256"
                             max="32768"
                             step="256"
                             value={maxTokens}
-                            onChange={(e) => setMaxTokens(parseInt(e.target.value) || DEFAULT_MAX_TOKENS)}
+                            onChange={(e) => setMaxTokens(parseInt(e.target.value, 10) || DEFAULT_MAX_TOKENS)}
                             placeholder={DEFAULT_MAX_TOKENS.toString()}
                         />
                         <p className="text-xs text-muted-foreground mt-1">
@@ -172,8 +174,9 @@ export function SettingsPanel({ settings, onSave }) {
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium mb-1 block">Системный промпт</label>
+                        <label htmlFor="systemPrompt" className="text-sm font-medium mb-1 block">Системный промпт</label>
                         <textarea
+                            id="systemPrompt"
                             value={systemPrompt}
                             onChange={(e) => setSystemPrompt(e.target.value)}
                             placeholder="Дополнительные инструкции для AI..."

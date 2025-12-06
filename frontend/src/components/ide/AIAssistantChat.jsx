@@ -462,7 +462,7 @@ export default function AIAssistantChat({ botId, pluginName, onClose, onFileUpda
                     <Input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                         placeholder={attachments.length > 0 ? `Задайте вопрос (${attachments.length} файлов)...` : "Задайте вопрос о плагине..."}
                         disabled={isLoading}
                         className="flex-1"

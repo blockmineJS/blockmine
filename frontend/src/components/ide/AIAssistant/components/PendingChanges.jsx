@@ -46,16 +46,24 @@ function PendingChangeItem({ change, onApply, onReject, onViewDiff }) {
             {/* Header */}
             <div
                 className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/30"
+                role="button"
+                tabIndex={0}
                 onClick={() => setIsExpanded(!isExpanded)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setIsExpanded(!isExpanded);
+                    }
+                }}
             >
                 {/* Expand/Collapse */}
-                <button className="p-0.5">
+                <span className="p-0.5" aria-hidden="true">
                     {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
-                </button>
+                </span>
 
                 {/* File Icon */}
                 {change.isNewFile ? (
@@ -125,27 +133,32 @@ function PendingChangeItem({ change, onApply, onReject, onViewDiff }) {
                     </div>
 
                     {/* Mini Diff Preview */}
-                    <div className="max-h-32 overflow-auto rounded border bg-background text-xs font-mono">
-                        {change.newContent.split('\n').slice(0, 10).map((line, i) => (
-                            <div
-                                key={i}
-                                className={cn(
-                                    "px-2 py-0.5",
-                                    change.isNewFile ? "bg-green-500/10" : ""
+                    {(() => {
+                        const lines = change.newContent.split('\n');
+                        return (
+                            <div className="max-h-32 overflow-auto rounded border bg-background text-xs font-mono">
+                                {lines.slice(0, 10).map((line, i) => (
+                                    <div
+                                        key={i}
+                                        className={cn(
+                                            "px-2 py-0.5",
+                                            change.isNewFile ? "bg-green-500/10" : ""
+                                        )}
+                                    >
+                                        <span className="text-muted-foreground mr-2 select-none">
+                                            {String(i + 1).padStart(3)}
+                                        </span>
+                                        {line || ' '}
+                                    </div>
+                                ))}
+                                {lines.length > 10 && (
+                                    <div className="px-2 py-1 text-muted-foreground italic">
+                                        ... ещё {lines.length - 10} строк
+                                    </div>
                                 )}
-                            >
-                                <span className="text-muted-foreground mr-2 select-none">
-                                    {String(i + 1).padStart(3)}
-                                </span>
-                                {line || ' '}
                             </div>
-                        ))}
-                        {change.newContent.split('\n').length > 10 && (
-                            <div className="px-2 py-1 text-muted-foreground italic">
-                                ... ещё {change.newContent.split('\n').length - 10} строк
-                            </div>
-                        )}
-                    </div>
+                        );
+                    })()}
                 </div>
             )}
         </div>

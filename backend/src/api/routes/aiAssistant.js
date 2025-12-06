@@ -15,10 +15,31 @@ const chatHistoryStore = new Map();
 
 const MAX_HISTORY_MESSAGES = 300;
 
+/**
+ * Обрезает историю сообщений до MAX_HISTORY_MESSAGES (защита от memory leak)
+ * @param {Array} history - Массив сообщений
+ * @param {string} chatKey - Ключ чата для логирования
+ */
+function trimHistory(history, chatKey) {
+    if (history.length > MAX_HISTORY_MESSAGES) {
+        history.splice(0, history.length - MAX_HISTORY_MESSAGES);
+        console.log(`[AI Chat] History trimmed to ${MAX_HISTORY_MESSAGES} messages for ${chatKey}`);
+    }
+}
 
 const rateLimitStore = new Map();
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+// Очистка устаревших записей каждые 5 минут (защита от утечки памяти)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of rateLimitStore.entries()) {
+        if (now > record.resetTime) {
+            rateLimitStore.delete(key);
+        }
+    }
+}, 5 * 60 * 1000);
 
 /**
  * Проверка rate limit для AI запросов
@@ -172,7 +193,7 @@ function parseProxyString(proxyString) {
 
         return {
             host: host,
-            port: parseInt(port),
+            port: parseInt(port, 10),
             user: user,
             pass: pass
         };
@@ -355,7 +376,7 @@ async function resolvePluginPath(req, res, next) {
     }
 }
 
-function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', autoFormat = false, apiProvider, apiKey, apiEndpoint, model, proxyConfig, effectiveTemperature, effectiveMaxTokens) {
+function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', autoFormat = false) {
     const baseTools = [
         {
             type: 'function',
@@ -407,9 +428,27 @@ function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', auto
                     result += `Всего файлов: ${allFiles.length}\n\n`;
                     result += `Содержимое файлов:\n\n`;
 
+                    // Ограничения для защиты от переполнения памяти
+                    const MAX_FILE_SIZE = 100 * 1024; // 100KB на файл
+                    const MAX_TOTAL_SIZE = 1024 * 1024; // 1MB общий размер
+                    let totalSize = 0;
+
                     for (const file of allFiles) {
                         const fullPath = path.join(pluginPath, file);
+
+                        const stats = await fse.stat(fullPath);
+                        if (stats.size > MAX_FILE_SIZE) {
+                            result += `=== Файл: ${file} === (пропущен: размер ${stats.size} байт превышает лимит ${MAX_FILE_SIZE})\n\n`;
+                            continue;
+                        }
+
+                        if (totalSize + stats.size > MAX_TOTAL_SIZE) {
+                            result += `\n(достигнут лимит размера ответа ${MAX_TOTAL_SIZE} байт, остальные файлы пропущены)\n`;
+                            break;
+                        }
+
                         const fileContent = await fse.readFile(fullPath, 'utf8');
+                        totalSize += fileContent.length;
                         result += `=== Файл: ${file} ===\n${fileContent}\n\n`;
                     }
 
@@ -759,15 +798,23 @@ function createPluginTools(pluginPath, res, botId, applyMode = 'immediate', auto
 
                     let filesToSearch = allFiles;
                     if (filePattern !== '*') {
-                        const patternRegex = new RegExp(
-                            '^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$'
-                        );
+                        // Правильное экранирование для regex (включая backslash)
+                        const escapedPattern = filePattern
+                            .replace(/\\/g, '\\\\')  // Экранируем backslash первым
+                            .replace(/\./g, '\\.')   // Экранируем точки
+                            .replace(/\*/g, '.*');   // Заменяем * на .*
+                        const patternRegex = new RegExp('^' + escapedPattern + '$');
                         filesToSearch = allFiles.filter(f => patternRegex.test(path.basename(f)));
                     }
 
                     let searchRegex;
                     try {
+                        // Защита от ReDoS: ограничение длины regex паттерна
+                        const MAX_REGEX_LENGTH = 100;
                         if (searchType === 'regex') {
+                            if (args.query.length > MAX_REGEX_LENGTH) {
+                                return `Ошибка: регулярное выражение слишком длинное (максимум ${MAX_REGEX_LENGTH} символов)`;
+                            }
                             searchRegex = new RegExp(args.query, 'gi');
                         } else {
                             const escaped = args.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -951,9 +998,13 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
 
         if (includeFiles && Array.isArray(includeFiles)) {
             for (const fileName of includeFiles) {
-                const filePath = path.join(req.pluginPath, fileName);
-                if (await fse.pathExists(filePath)) {
-                    const fileContent = await fse.readFile(filePath, 'utf8');
+                const safePath = validateSafePath(req.pluginPath, fileName);
+                if (!safePath) {
+                    console.warn(`[AI Chat] Skipping unsafe path: ${fileName}`);
+                    continue;
+                }
+                if (await fse.pathExists(safePath)) {
+                    const fileContent = await fse.readFile(safePath, 'utf8');
                     context += `\n\n## Файл ${fileName}:\n\`\`\`javascript\n${fileContent}\n\`\`\`\n`;
                 }
             }
@@ -1025,25 +1076,14 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
         storedHistory.push(userMessage);
 
         // Ограничиваем размер истории (защита от memory leak)
-        if (storedHistory.length > MAX_HISTORY_MESSAGES) {
-            // Удаляем старые сообщения, оставляя только последние MAX_HISTORY_MESSAGES
-            storedHistory.splice(0, storedHistory.length - MAX_HISTORY_MESSAGES);
-            console.log(`[AI Chat] History trimmed to ${MAX_HISTORY_MESSAGES} messages for ${chatKey}`);
-        }
+        trimHistory(storedHistory, chatKey);
 
         const pluginTools = createPluginTools(
             req.pluginPath,
             res,
             botId,
             effectiveApplyMode,
-            effectiveAutoFormat,
-            aiProvider,
-            apiKey,
-            apiEndpoint,
-            model,
-            proxyConfig,
-            effectiveTemperature,
-            effectiveMaxTokens
+            effectiveAutoFormat
         );
         console.log('AutoFormat:', effectiveAutoFormat, 'Tools count:', pluginTools.length);
 
@@ -1122,10 +1162,7 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                 storedHistory.push(assistantMessage);
 
                 // Ограничиваем размер истории (защита от memory leak)
-                if (storedHistory.length > MAX_HISTORY_MESSAGES) {
-                    storedHistory.splice(0, storedHistory.length - MAX_HISTORY_MESSAGES);
-                    console.log(`[AI Chat] History trimmed to ${MAX_HISTORY_MESSAGES} messages for ${chatKey}`);
-                }
+                trimHistory(storedHistory, chatKey);
 
                 console.log('[Google] Closing SSE stream');
                 res.end();
@@ -1181,10 +1218,7 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
                 storedHistory.push(assistantMessage);
 
                 // Ограничиваем размер истории (защита от memory leak)
-                if (storedHistory.length > MAX_HISTORY_MESSAGES) {
-                    storedHistory.splice(0, storedHistory.length - MAX_HISTORY_MESSAGES);
-                    console.log(`[AI Chat] History trimmed to ${MAX_HISTORY_MESSAGES} messages for ${chatKey}`);
-                }
+                trimHistory(storedHistory, chatKey);
 
                 console.log(`Saved to history. Total messages: ${storedHistory.length}`);
             }
@@ -1312,6 +1346,17 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
 router.post('/apply-change', resolvePluginPath, async (req, res) => {
     try {
         const { filePath, content } = req.body;
+        const { botId, pluginName } = req.params;
+
+        const rateLimitKey = `${botId}_${pluginName}_apply`;
+        if (!checkRateLimit(rateLimitKey)) {
+            const resetTime = getRateLimitResetTime(rateLimitKey);
+            console.warn(`[AI Apply] Rate limit exceeded for ${rateLimitKey}. Reset in ${resetTime}s`);
+            return res.status(429).json({
+                error: 'Превышен лимит запросов к AI. Попробуйте позже.',
+                retryAfter: resetTime
+            });
+        }
 
         if (!filePath || content === undefined) {
             return res.status(400).json({ error: 'filePath and content are required' });

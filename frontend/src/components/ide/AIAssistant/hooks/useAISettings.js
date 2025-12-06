@@ -41,7 +41,7 @@ export function useAISettings() {
 
     const [maxTokens, setMaxTokens] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEYS.MAX_TOKENS);
-        return saved ? parseInt(saved) : DEFAULT_MAX_TOKENS;
+        return saved ? parseInt(saved, 10) : DEFAULT_MAX_TOKENS;
     });
 
     const [systemPrompt, setSystemPrompt] = useState(

@@ -111,9 +111,14 @@ export function AICommandPalette({
 
     const handleCopyResult = () => {
         if (result) {
-            navigator.clipboard.writeText(result);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            navigator.clipboard.writeText(result)
+                .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                })
+                .catch(err => {
+                    console.error('Не удалось скопировать:', err);
+                });
         }
     };
 
