@@ -318,6 +318,13 @@ process.on('message', async (message) => {
                     }
                     break;
 
+                case 'hotbar_slot':
+                    if (command.slot !== undefined && command.slot >= 0 && command.slot <= 8) {
+                        bot.setQuickBarSlot(command.slot);
+                        sendLog(`[Viewer] Hotbar slot changed to ${command.slot}`);
+                    }
+                    break;
+
                 case 'place':
                     if (command.position && command.blockType) {
                         const referenceBlock = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
@@ -1105,6 +1112,29 @@ process.on('message', async (message) => {
                             position: bot.entity?.position,
                             yaw: bot.entity?.yaw,
                             pitch: bot.entity?.pitch
+                        }
+                    });
+                }
+            });
+
+            bot.on('blockUpdate', (oldBlock, newBlock) => {
+                if (process.send && oldBlock && newBlock) {
+                    process.send({
+                        type: 'viewer:blockUpdate',
+                        payload: {
+                            position: {
+                                x: newBlock.position.x,
+                                y: newBlock.position.y,
+                                z: newBlock.position.z
+                            },
+                            oldBlock: {
+                                type: oldBlock.type,
+                                name: oldBlock.name
+                            },
+                            newBlock: {
+                                type: newBlock.type,
+                                name: newBlock.name
+                            }
                         }
                     });
                 }

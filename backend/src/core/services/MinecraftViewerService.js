@@ -110,6 +110,8 @@ class MinecraftViewerService {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:health', message.payload);
             } else if (message.type === 'viewer:chat') {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:chat', message.payload);
+            } else if (message.type === 'viewer:blockUpdate') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:blockUpdate', message.payload);
             }
         });
     }
