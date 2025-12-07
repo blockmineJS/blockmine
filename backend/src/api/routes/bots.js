@@ -16,6 +16,7 @@ const apiKeysRouter = require('./apiKeys');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
 const { filterSecretSettings, prepareSettingsForSave, isGroupedSettings } = require('../../core/utils/secretsFilter');
+const PluginHooks = require('../../core/PluginHooks');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -793,21 +794,23 @@ router.put('/:botId/plugins/:pluginId', authenticateUniversal, checkBotAccess, a
         const pluginId = parseInt(req.params.pluginId);
         const { isEnabled, settings } = req.body;
         const dataToUpdate = {};
-        
+
+        // Получаем текущий плагин для проверки изменения статуса
+        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) return res.status(404).json({ error: 'Плагин не найден' });
+
+        const wasEnabled = plugin.isEnabled;
+
         if (typeof isEnabled === 'boolean') dataToUpdate.isEnabled = isEnabled;
-        
+
         if (settings) {
-            // Получаем существующий плагин для обработки секретных значений
-            const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-            if (!plugin) return res.status(404).json({ error: 'Плагин не найден' });
-            
             const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
             const existingSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
             const manifestSettings = manifest.settings || {};
-            
+
             // Определяем тип настроек (обычные или группированные)
             const isGrouped = isGroupedSettings(manifestSettings);
-            
+
             // Подготавливаем настройки для сохранения (сохраняем существующие значения для замаскированных секретов)
             const settingsToSave = prepareSettingsForSave(settings, existingSettings, manifestSettings, isGrouped);
 
@@ -819,13 +822,26 @@ router.put('/:botId/plugins/:pluginId', authenticateUniversal, checkBotAccess, a
 
             dataToUpdate.settings = JSON.stringify(settingsToSave);
         }
-        
+
         if (Object.keys(dataToUpdate).length === 0) return res.status(400).json({ error: "Нет данных для обновления" });
         const updated = await prisma.installedPlugin.update({ where: { id: pluginId }, data: dataToUpdate });
+
+        // Вызываем хуки onEnable/onDisable если статус изменился
+        if (typeof isEnabled === 'boolean' && wasEnabled !== isEnabled) {
+            const pluginHooks = new PluginHooks({ prisma });
+            if (isEnabled) {
+                // Плагин был включён
+                await pluginHooks.callOnEnable(pluginId);
+            } else {
+                // Плагин был выключен
+                await pluginHooks.callOnDisable(pluginId);
+            }
+        }
+
         res.json(updated);
-    } catch (error) { 
+    } catch (error) {
         console.error("[API Error] /plugins/:pluginId PUT:", error);
-        res.status(500).json({ error: 'Не удалось обновить плагин' }); 
+        res.status(500).json({ error: 'Не удалось обновить плагин' });
     }
 });
 

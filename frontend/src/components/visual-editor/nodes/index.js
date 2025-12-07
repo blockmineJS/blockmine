@@ -130,6 +130,49 @@ import {
   debugLogDefinition,
 } from './debug';
 
+// Inventory nodes
+import {
+  inventoryGetAllDefinition,
+  inventoryFindItemDefinition,
+  inventoryCountItemDefinition,
+  inventoryHasItemDefinition,
+  inventoryGetSlotDefinition,
+  inventoryGetHeldItemDefinition,
+  inventoryEquipDefinition,
+  inventoryDropDefinition,
+  inventorySelectSlotDefinition,
+} from './inventory';
+
+// Navigation nodes
+import {
+  navigationGoToDefinition,
+  navigationGoToPlayerDefinition,
+  navigationGoToEntityDefinition,
+  navigationFollowDefinition,
+  navigationStopDefinition,
+} from './navigation';
+
+// Container nodes
+import {
+  containerOpenDefinition,
+  containerCloseDefinition,
+  containerGetItemsDefinition,
+  containerDepositDefinition,
+  containerWithdrawDefinition,
+  containerDepositAllDefinition,
+  containerFindItemDefinition,
+} from './container';
+
+// Furnace nodes
+import {
+  furnaceOpenDefinition,
+  furnaceCloseDefinition,
+  furnacePutInputDefinition,
+  furnacePutFuelDefinition,
+  furnaceTakeOutputDefinition,
+  furnaceGetStatusDefinition,
+} from './furnace';
+
 // Event nodes
 import {
   eventCommandDefinition,
@@ -248,6 +291,41 @@ export function registerAllNodes() {
 
   // Debug category
   NodeRegistry.register(debugLogDefinition);
+
+  // Inventory category
+  NodeRegistry.register(inventoryGetAllDefinition);
+  NodeRegistry.register(inventoryFindItemDefinition);
+  NodeRegistry.register(inventoryCountItemDefinition);
+  NodeRegistry.register(inventoryHasItemDefinition);
+  NodeRegistry.register(inventoryGetSlotDefinition);
+  NodeRegistry.register(inventoryGetHeldItemDefinition);
+  NodeRegistry.register(inventoryEquipDefinition);
+  NodeRegistry.register(inventoryDropDefinition);
+  NodeRegistry.register(inventorySelectSlotDefinition);
+
+  // Navigation category
+  NodeRegistry.register(navigationGoToDefinition);
+  NodeRegistry.register(navigationGoToPlayerDefinition);
+  NodeRegistry.register(navigationGoToEntityDefinition);
+  NodeRegistry.register(navigationFollowDefinition);
+  NodeRegistry.register(navigationStopDefinition);
+
+  // Container category
+  NodeRegistry.register(containerOpenDefinition);
+  NodeRegistry.register(containerCloseDefinition);
+  NodeRegistry.register(containerGetItemsDefinition);
+  NodeRegistry.register(containerDepositDefinition);
+  NodeRegistry.register(containerWithdrawDefinition);
+  NodeRegistry.register(containerDepositAllDefinition);
+  NodeRegistry.register(containerFindItemDefinition);
+
+  // Furnace category
+  NodeRegistry.register(furnaceOpenDefinition);
+  NodeRegistry.register(furnaceCloseDefinition);
+  NodeRegistry.register(furnacePutInputDefinition);
+  NodeRegistry.register(furnacePutFuelDefinition);
+  NodeRegistry.register(furnaceTakeOutputDefinition);
+  NodeRegistry.register(furnaceGetStatusDefinition);
 
   // Event category
   NodeRegistry.register(eventCommandDefinition);

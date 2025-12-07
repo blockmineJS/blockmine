@@ -136,6 +136,62 @@ async function onUnload({ botId, prisma }) {
 module.exports = { onLoad, onUnload };
 ```
 
+### Дополнительные хуки жизненного цикла
+
+#### onEnable / onDisable
+
+Вызываются когда плагин включают/выключают через UI (без удаления):
+
+```javascript
+async function onEnable({ botId, settings, store, prisma }) {
+    console.log(`[MyPlugin] Плагин включён для бота ${botId}`);
+    // Можно запустить фоновые задачи, подписаться на события и т.д.
+}
+
+async function onDisable({ botId, settings, store, prisma }) {
+    console.log(`[MyPlugin] Плагин выключен для бота ${botId}`);
+    // Можно остановить фоновые задачи, отписаться от событий и т.д.
+}
+
+module.exports = { onLoad, onUnload, onEnable, onDisable };
+```
+
+#### onUpdate
+
+Вызывается при обновлении плагина — для миграции данных:
+
+```javascript
+async function onUpdate({ botId, oldVersion, newVersion, settings, store, prisma }) {
+    console.log(`[MyPlugin] Обновление ${oldVersion} → ${newVersion}`);
+
+    // Миграция данных при смене версии
+    if (oldVersion === '1.0.0' && newVersion.startsWith('2.')) {
+        // Миграция данных с v1 на v2
+        const oldData = await store.get('config');
+        if (oldData && oldData.legacyField) {
+            await store.set('config', {
+                ...oldData,
+                newField: oldData.legacyField,
+                legacyField: undefined
+            });
+            console.log('[MyPlugin] Миграция данных успешна');
+        }
+    }
+}
+
+module.exports = { onLoad, onUnload, onEnable, onDisable, onUpdate };
+```
+
+### Таблица хуков
+
+| Хук | Когда вызывается | Параметры |
+|-----|------------------|-----------|
+| `onLoad` | При загрузке плагина (старт бота) | `(bot, { settings, store, console })` |
+| `onUnload` | При удалении плагина | `({ botId, prisma })` |
+| `onEnable` | При включении плагина через UI | `({ botId, settings, store, prisma })` |
+| `onDisable` | При выключении плагина через UI | `({ botId, settings, store, prisma })` |
+| `onUpdate` | После обновления плагина | `({ botId, oldVersion, newVersion, settings, store, prisma })` |
+
 ## 3. КОНСТАНТЫ (constants.js)
 
 ```javascript

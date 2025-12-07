@@ -172,8 +172,15 @@ class GraphExecutionEngine {
   }
 
   async traverse(node, fromPinId) {
-      const connection = this.activeGraph.connections.find(c => c.sourceNodeId === node.id && c.sourcePinId === fromPinId);
-      if (!connection) return;
+      // Находим соединение к СУЩЕСТВУЮЩЕЙ ноде (пропускаем мусорные соединения к удалённым нодам)
+      const connection = this.activeGraph.connections.find(c => {
+          if (c.sourceNodeId !== node.id || c.sourcePinId !== fromPinId) return false;
+          const targetExists = this.activeGraph.nodes.some(n => n.id === c.targetNodeId);
+          return targetExists;
+      });
+      if (!connection) {
+          return;
+      }
 
       const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
       if (!nextNode) return;

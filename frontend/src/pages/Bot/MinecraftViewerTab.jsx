@@ -4,7 +4,9 @@ import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import MinecraftChat from '@/components/minecraft/MinecraftChat';
 import MinecraftHotbar from '@/components/minecraft/MinecraftHotbar';
-import { loadBlockTextures, getBlockMaterial } from './blockTextureLoader';
+import { loadBlockTextures, getBlockMaterial, isEntityBlock } from './blockTextureLoader';
+import { getEntityGeometry, getEntityMaterial, isEntityBlock as isEntityModel } from './entityModels';
+import { useCoordinatePickerStore } from '@/stores/coordinatePickerStore';
 
 const MinecraftViewerTab = () => {
     const { botId } = useParams();
@@ -24,6 +26,7 @@ const MinecraftViewerTab = () => {
     const chunkCacheRef = useRef(new Map()); // Кэш чанков блоков
     const frustumRef = useRef(new THREE.Frustum());
     const blocksMapRef = useRef(new Map()); // Карта блоков для коллизий (x,y,z -> true)
+    const pickMarkerRef = useRef(null); // Маркер выбранной точки для pickMode
 
     const [connected, setConnected] = useState(false);
     const [chatOpen, setChatOpen] = useState(false);
@@ -32,6 +35,17 @@ const MinecraftViewerTab = () => {
     const [error, setError] = useState(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [selectedHotbarSlot, setSelectedHotbarSlot] = useState(0);
+
+    // Coordinate picker store
+    const {
+        isPickMode,
+        selectedCoords,
+        hoveredCoords,
+        setHoveredCoords,
+        setSelectedCoords,
+        confirmSelection,
+        cancelPicking
+    } = useCoordinatePickerStore();
 
     const [settings, setSettings] = useState(() => {
         const defaults = {
@@ -167,6 +181,14 @@ const MinecraftViewerTab = () => {
         highlight.visible = false;
         scene.add(highlight);
         highlightRef.current = highlight;
+
+        // Маркер для режима выбора координат (зелёный столбик)
+        const pickMarkerGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2, 8);
+        const pickMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const pickMarker = new THREE.Mesh(pickMarkerGeometry, pickMarkerMaterial);
+        pickMarker.visible = false;
+        scene.add(pickMarker);
+        pickMarkerRef.current = pickMarker;
 
         rendererRef.current = renderer;
         sceneRef.current = scene;
@@ -665,7 +687,9 @@ const MinecraftViewerTab = () => {
             chunkCacheRef.current.delete(chunkKey);
         });
 
+        // Геометрия со смещением: блок занимает (0,0,0) до (1,1,1) вместо центрирования
         const geometry = new THREE.BoxGeometry(1, 1, 1);
+        geometry.translate(0.5, 0.5, 0.5);
 
         chanksToUpdate.forEach(chunkKey => {
             const chunkBlockList = chunkBlocks.get(chunkKey);
@@ -682,8 +706,14 @@ const MinecraftViewerTab = () => {
 
             const meshes = [];
             Object.entries(blocksByMaterial).forEach(([blockName, blockList]) => {
-                const material = getBlockMaterial(blockName);
-                const instancedMesh = new THREE.InstancedMesh(geometry, material, blockList.length);
+                // Проверяем, является ли блок entity-блоком (сундук, шалкер и т.д.)
+                const isEntity = isEntityModel(blockName);
+
+                // Используем разные геометрии и материалы для entity-блоков
+                const blockGeometry = isEntity ? getEntityGeometry(blockName) : geometry;
+                const material = isEntity ? getEntityMaterial(blockName) : getBlockMaterial(blockName);
+
+                const instancedMesh = new THREE.InstancedMesh(blockGeometry, material, blockList.length);
 
                 const matrix = new THREE.Matrix4();
                 blockList.forEach((block, i) => {
@@ -693,20 +723,20 @@ const MinecraftViewerTab = () => {
 
                 instancedMesh.instanceMatrix.needsUpdate = true;
 
-                if (!geometry.boundingSphere) {
-                    geometry.computeBoundingSphere();
+                if (!blockGeometry.boundingSphere) {
+                    blockGeometry.computeBoundingSphere();
                 }
 
-                // Создаём bounding sphere для всего чанка на основе блоков
-                const centerX = blockList.reduce((sum, b) => sum + b.x, 0) / blockList.length;
-                const centerY = blockList.reduce((sum, b) => sum + b.y, 0) / blockList.length;
-                const centerZ = blockList.reduce((sum, b) => sum + b.z, 0) / blockList.length;
+                // Создаём bounding sphere для всего чанка на основе блоков (с учётом смещения +0.5)
+                const centerX = blockList.reduce((sum, b) => sum + b.x + 0.5, 0) / blockList.length;
+                const centerY = blockList.reduce((sum, b) => sum + b.y + 0.5, 0) / blockList.length;
+                const centerZ = blockList.reduce((sum, b) => sum + b.z + 0.5, 0) / blockList.length;
 
                 const maxDist = Math.max(...blockList.map(b =>
                     Math.sqrt(
-                        Math.pow(b.x - centerX, 2) +
-                        Math.pow(b.y - centerY, 2) +
-                        Math.pow(b.z - centerZ, 2)
+                        Math.pow(b.x + 0.5 - centerX, 2) +
+                        Math.pow(b.y + 0.5 - centerY, 2) +
+                        Math.pow(b.z + 0.5 - centerZ, 2)
                     )
                 )) + 1; // +1 для размера блока
 
@@ -941,7 +971,7 @@ const MinecraftViewerTab = () => {
 
                 const raycaster = raycasterRef.current;
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                raycaster.far = 5;
+                raycaster.far = isPickMode ? 50 : 5; // Больше дистанция для выбора точки
 
                 const intersects = raycaster.intersectObjects(blocksGroup.children, true);
                 if (intersects.length > 0) {
@@ -962,6 +992,25 @@ const MinecraftViewerTab = () => {
                     const blockY = Math.floor(blockPos.y);
                     const blockZ = Math.floor(blockPos.z);
 
+                    // В режиме выбора координат - сохраняем координаты
+                    if (isPickMode) {
+                        const coords = {
+                            x: blockX,
+                            y: blockY + 1, // +1 чтобы бот стоял НА блоке
+                            z: blockZ
+                        };
+                        setSelectedCoords(coords);
+                        console.log(`[MinecraftViewer] Selected coordinates:`, coords);
+
+                        // Показываем маркер
+                        if (pickMarkerRef.current) {
+                            pickMarkerRef.current.position.set(blockX + 0.5, blockY + 1.5, blockZ + 0.5);
+                            pickMarkerRef.current.visible = true;
+                        }
+                        return;
+                    }
+
+                    // Обычный режим - копаем блок
                     console.log(`[MinecraftViewer] Breaking block at ${blockX}, ${blockY}, ${blockZ}`);
 
                     socketRef.current?.emit('viewer:control', {
@@ -1003,7 +1052,7 @@ const MinecraftViewerTab = () => {
             window.removeEventListener('wheel', handleWheel);
             canvasRef.current?.removeEventListener('click', handleClick);
         };
-    }, [connected, chatOpen, botState]);
+    }, [connected, chatOpen, botState, isPickMode, setSelectedCoords]);
 
     const sendChatMessage = (message) => {
         socketRef.current?.emit('viewer:control', {
@@ -1165,6 +1214,51 @@ const MinecraftViewerTab = () => {
                             <div>Chunks: {chunkCacheRef.current.size}</div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Панель выбора координат */}
+            {isPickMode && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                    <div className="text-cyan-400 text-xl font-bold animate-pulse">
+                        + Кликните на блок
+                    </div>
+                </div>
+            )}
+            {isPickMode && (
+                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900/95 border border-cyan-500 rounded-lg p-4 z-20">
+                    <div className="text-center mb-3">
+                        <div className="text-cyan-400 font-bold text-lg">📍 Выбор координат</div>
+                        <div className="text-gray-400 text-sm">Кликните на блок чтобы выбрать точку назначения</div>
+                    </div>
+
+                    {selectedCoords ? (
+                        <div className="text-center mb-3">
+                            <div className="text-green-400 font-mono text-lg">
+                                X: {selectedCoords.x}  Y: {selectedCoords.y}  Z: {selectedCoords.z}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center mb-3 text-gray-500">
+                            Координаты не выбраны
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 justify-center">
+                        <button
+                            onClick={cancelPicking}
+                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            onClick={() => selectedCoords && confirmSelection(selectedCoords)}
+                            disabled={!selectedCoords}
+                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
+                        >
+                            ✓ Подтвердить
+                        </button>
+                    </div>
                 </div>
             )}
 

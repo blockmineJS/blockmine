@@ -411,7 +411,8 @@ process.on('message', async (message) => {
             };
 
             const context = {
-                bot: botApi,
+                bot: bot,  // Полный mineflayer bot
+                botApi: botApi,  // API для обратной совместимости
                 eventArgs: eventArgs || {},
                 players: playerList,
                 botState: bot ? {
@@ -427,7 +428,7 @@ process.on('message', async (message) => {
                 eventArgs: eventArgs
             };
 
-            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+            const engine = new GraphExecutionEngine(NodeRegistry, bot);
             await engine.execute(graph, context, eventType);
 
 
@@ -849,7 +850,8 @@ process.on('message', async (message) => {
                         } : null;
 
                         const context = {
-                            bot: botInstance.api,
+                            bot: botInstance,  // Полный mineflayer bot для доступа к blockAt, inventory и т.д.
+                            botApi: botInstance.api,  // API для обратной совместимости
                             user,
                             args,
                             typeChat,
@@ -1459,7 +1461,8 @@ process.on('message', async (message) => {
             const players = bot ? Object.keys(bot.players) : [];
 
             const context = {
-                bot: botApi,
+                bot: bot,  // Полный mineflayer bot
+                botApi: botApi,  // API для обратной совместимости
                 players,
                 botState: {
                     health: bot?.health,
@@ -1482,7 +1485,7 @@ process.on('message', async (message) => {
                 eventArgs: eventArgs
             };
 
-            const engine = new GraphExecutionEngine(NodeRegistry, botApi);
+            const engine = new GraphExecutionEngine(NodeRegistry, bot);
 
             await engine.execute(graph, context, eventType);
 

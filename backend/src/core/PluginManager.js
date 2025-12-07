@@ -5,6 +5,7 @@ const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
 const AdmZip = require('adm-zip');
 const semver = require('semver');
+const PluginHooks = require('./PluginHooks');
 
 const prisma = new PrismaClient();
 
@@ -400,6 +401,15 @@ class PluginManager {
             } catch (settingsError) {
                 console.error(`[PluginManager] Не удалось восстановить настройки для ${plugin.name}:`, settingsError);
             }
+        }
+
+        // Вызываем хук onUpdate для миграции данных плагина
+        try {
+            const pluginHooks = new PluginHooks({ prisma });
+            await pluginHooks.callOnUpdate(newPlugin.id, oldVersion, newPlugin.version);
+        } catch (hookError) {
+            console.error(`[PluginManager] Ошибка выполнения хука onUpdate для ${plugin.name}:`, hookError);
+            // Не прерываем обновление из-за ошибки в хуке
         }
 
         return newPlugin;

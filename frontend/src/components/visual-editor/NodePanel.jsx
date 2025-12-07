@@ -2,6 +2,30 @@ import React from 'react';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
+// Маппинг категорий на русские названия
+const CATEGORY_LABELS = {
+  data: '📊 Данные',
+  flow: '🔀 Управление',
+  math: '🔢 Математика',
+  logic: '🧠 Логика',
+  string: '📝 Строки',
+  array: '📦 Массивы',
+  object: '🗃️ Объекты',
+  action: '⚡ Действия',
+  time: '⏰ Время',
+  user: '👤 Пользователи',
+  type: '🔄 Типы',
+  bot: '🤖 Бот',
+  debug: '🐛 Отладка',
+  inventory: '🎒 Инвентарь',
+  navigation: '🧭 Навигация',
+  container: '📦 Контейнеры',
+  furnace: '🔥 Печка',
+  event: '📡 События',
+};
+
+const getCategoryLabel = (category) => CATEGORY_LABELS[category] || category;
+
 const NodePanel = () => {
   const { availableNodes } = useVisualEditorStore();
 
@@ -17,7 +41,7 @@ const NodePanel = () => {
         <Accordion type="multiple" className="w-full" defaultValue={Object.keys(availableNodes)}>
             {Object.entries(availableNodes).map(([category, nodes]) => (
                 <AccordionItem value={category} key={category}>
-                    <AccordionTrigger>{category}</AccordionTrigger>
+                    <AccordionTrigger>{getCategoryLabel(category)}</AccordionTrigger>
                     <AccordionContent>
                         <div className="space-y-2">
                         {nodes.map((node) => (
