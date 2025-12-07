@@ -10,7 +10,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:open',
-    label: '📦 Открыть',
+    label: '📦 Контейнер: открыть',
     category: 'Контейнеры',
     description: 'Открывает контейнер (сундук, бочку) по координатам.',
     graphType: GRAPH_TYPES.ALL,
@@ -34,7 +34,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:close',
-    label: '📦 Закрыть',
+    label: '📦 Контейнер: закрыть',
     category: 'Контейнеры',
     description: 'Закрывает текущий открытый контейнер.',
     graphType: GRAPH_TYPES.ALL,
@@ -51,7 +51,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:deposit',
-    label: '📦 Положить',
+    label: '📦 Контейнер: положить',
     category: 'Контейнеры',
     description: 'Кладёт предмет из инвентаря в открытый контейнер.',
     graphType: GRAPH_TYPES.ALL,
@@ -74,7 +74,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:withdraw',
-    label: '📦 Забрать',
+    label: '📦 Контейнер: забрать',
     category: 'Контейнеры',
     description: 'Забирает предмет из контейнера в инвентарь.',
     graphType: GRAPH_TYPES.ALL,
@@ -97,7 +97,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:deposit_all',
-    label: '📦 Положить всё',
+    label: '📦 Контейнер: положить всё',
     category: 'Контейнеры',
     description: 'Кладёт все предметы (или определённого типа) в контейнер.',
     graphType: GRAPH_TYPES.ALL,
@@ -120,7 +120,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:get_items',
-    label: '📦 Контейнер: Содержимое',
+    label: '📦 Контейнер: содержимое',
     category: 'Контейнеры',
     description: 'Получает список предметов из открытого контейнера.',
     graphType: GRAPH_TYPES.ALL,
@@ -138,7 +138,7 @@ function registerNodes(registry) {
 
   registry.registerNodeType({
     type: 'container:find_item',
-    label: '📦 Найти предмет',
+    label: '📦 Контейнер: найти предмет',
     category: 'Контейнеры',
     description: 'Ищет предмет в открытом контейнере.',
     graphType: GRAPH_TYPES.ALL,

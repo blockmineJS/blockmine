@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const containerCloseDefinition = new NodeDefinition({
   type: 'container:close',
   category: 'container',
-  label: '📦 Закрыть',
+  label: '📦 Контейнер: закрыть',
   description: 'Закрывает текущий открытый контейнер',
 
   computeInputs: (data) => [

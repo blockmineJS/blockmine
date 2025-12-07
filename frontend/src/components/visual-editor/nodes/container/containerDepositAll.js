@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const containerDepositAllDefinition = new NodeDefinition({
   type: 'container:deposit_all',
   category: 'container',
-  label: '📦 Положить всё',
+  label: '📦 Контейнер: положить всё',
   description: 'Кладёт все предметы (или определённого типа) в контейнер',
 
   computeInputs: (data) => [
