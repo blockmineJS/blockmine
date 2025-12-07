@@ -1,6 +1,24 @@
 # История версий
 
 
+## [1.24.0](https://github.com/blockmineJS/blockmine/compare/v1.23.4...v1.24.0) (2025-12-07)
+
+
+### 🐛 Исправления
+
+* во вкладке пользователи пофикшено изменение ролей ([925b4c8](https://github.com/blockmineJS/blockmine/commit/925b4c8427b0982d2360ff289d68c4e17723ced6))
+* ограничения доступа для массовых действий и настроек плагинов ([a433177](https://github.com/blockmineJS/blockmine/commit/a43317730d1dacb0dc8aceb1711f64384bc9d650))
+* попытка фикса рекурсии при setup ([f2c05a8](https://github.com/blockmineJS/blockmine/commit/f2c05a88959d67b02486f446370f3e7ae50ea2af))
+* сохранение настроек прокси при перезагрузке плагинов ([22c8f7d](https://github.com/blockmineJS/blockmine/commit/22c8f7d762b0aecda655ebbf6696253e6aa3c313))
+* управленя - пользователи теперь корректно делает сортировку ([13676bf](https://github.com/blockmineJS/blockmine/commit/13676bf25c72e908240f9c387c07576be3349520))
+
+
+### ✨ Новые возможности
+
+* в 3d viewer добавлен хот бар ([76649cd](https://github.com/blockmineJS/blockmine/commit/76649cdd46f68930acd69991b124aa84dc2dbb99))
+* новые ноды. ходьба, печка, контейнер. фиксы и выбор координат в 3d ([5c89398](https://github.com/blockmineJS/blockmine/commit/5c89398f1d7459077375887833852506d0e8f591))
+* ai assistant update ([5827c26](https://github.com/blockmineJS/blockmine/commit/5827c261ce59d265698a94d17b965e0c233794b5))
+
 ### [1.23.4](https://github.com/blockmineJS/blockmine/compare/v1.23.3...v1.23.4) (2025-11-29)
 
 
