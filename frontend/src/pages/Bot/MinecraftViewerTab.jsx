@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import MinecraftChat from '@/components/minecraft/MinecraftChat';
+import MinecraftHotbar from '@/components/minecraft/MinecraftHotbar';
 import { loadBlockTextures, getBlockMaterial } from './blockTextureLoader';
 
 const MinecraftViewerTab = () => {
@@ -30,6 +31,7 @@ const MinecraftViewerTab = () => {
     const [botState, setBotState] = useState(null);
     const [error, setError] = useState(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [selectedHotbarSlot, setSelectedHotbarSlot] = useState(0);
 
     const [settings, setSettings] = useState(() => {
         const defaults = {
@@ -386,6 +388,37 @@ const MinecraftViewerTab = () => {
             setChatMessages(prev => [...prev, { text: data.rawText, timestamp: Date.now() }]);
         });
 
+        socket.on('viewer:blockUpdate', (data) => {
+            if (!blocksGroupRef.current || !data.position) return;
+
+            const { x, y, z } = data.position;
+
+            setBotState(prev => {
+                if (!prev || !prev.blocks) return prev;
+
+                const updatedBlocks = prev.blocks.filter(
+                    b => !(b.x === x && b.y === y && b.z === z)
+                );
+
+                if (data.newBlock.type !== 0) {
+                    updatedBlocks.push({
+                        x, y, z,
+                        type: data.newBlock.type,
+                        name: data.newBlock.name
+                    });
+                }
+
+                updateSingleBlock(data.position, data.oldBlock, data.newBlock, updatedBlocks);
+
+                return {
+                    ...prev,
+                    blocks: updatedBlocks
+                };
+            });
+
+            console.log('[MinecraftViewer] Block updated:', data);
+        });
+
         socket.on('viewer:error', ({ message }) => {
             console.error('[MinecraftViewer] Error:', message);
             setError(message);
@@ -547,7 +580,30 @@ const MinecraftViewerTab = () => {
         return colorMap[blockName] || 0xcccccc;
     };
 
-    const renderBlocks = (blocks) => {
+    // Обновление одного блока в реальном времени
+    const updateSingleBlock = (position, oldBlock, newBlock, updatedBlocks) => {
+        if (!blocksGroupRef.current) return;
+
+        const { x, y, z } = position;
+        const chunkKey = getChunkKey(x, y, z);
+
+        const cached = chunkCacheRef.current.get(chunkKey);
+        if (cached) {
+            if (cached.meshes) {
+                cached.meshes.forEach(mesh => {
+                    if (mesh.geometry) mesh.geometry.dispose();
+                    if (mesh.material) mesh.material.dispose();
+                    blocksGroupRef.current.remove(mesh);
+                });
+            }
+            chunkCacheRef.current.delete(chunkKey);
+        }
+
+        // Форсируем перерисовку с обновленными блоками
+        renderBlocks(updatedBlocks, true); // true = форсировать обновление
+    };
+
+    const renderBlocks = (blocks, forceUpdate = false) => {
         if (!blocksGroupRef.current) return;
 
         const blocksGroup = blocksGroupRef.current;
@@ -590,9 +646,8 @@ const MinecraftViewerTab = () => {
             }
         }
 
-        // Если изменений меньше 10%, пропускаем
         const changePercentage = changedChunks / Math.max(chunkBlocks.size, 1);
-        if (changePercentage < 0.1 && changedChunks > 0 && changedChunks < 3) {
+        if (!forceUpdate && changePercentage < 0.1 && changedChunks > 0 && changedChunks < 3) {
             return;
         }
 
@@ -803,6 +858,16 @@ const MinecraftViewerTab = () => {
                 return;
             }
 
+            // Переключение слотов хотбара (1-9)
+            if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+                const slotIndex = parseInt(e.code.replace('Digit', '')) - 1;
+                setSelectedHotbarSlot(slotIndex);
+                socketRef.current?.emit('viewer:control', {
+                    command: { type: 'hotbar_slot', slot: slotIndex }
+                });
+                return;
+            }
+
             keysPressed.current[e.code] = true;
 
             const keyMap = {
@@ -911,15 +976,31 @@ const MinecraftViewerTab = () => {
             }
         };
 
+        const handleWheel = (e) => {
+            if (chatOpen) return;
+
+            e.preventDefault();
+            const delta = Math.sign(e.deltaY);
+            setSelectedHotbarSlot(prev => {
+                const newSlot = (prev + delta + 9) % 9;
+                socketRef.current?.emit('viewer:control', {
+                    command: { type: 'hotbar_slot', slot: newSlot }
+                });
+                return newSlot;
+            });
+        };
+
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('wheel', handleWheel, { passive: false });
         canvasRef.current?.addEventListener('click', handleClick);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('wheel', handleWheel);
             canvasRef.current?.removeEventListener('click', handleClick);
         };
     }, [connected, chatOpen, botState]);
@@ -1096,6 +1177,18 @@ const MinecraftViewerTab = () => {
                     setChatOpen(false);
                 }}
                 alwaysShowMessages={true}
+            />
+
+            {/* Хот бар */}
+            <MinecraftHotbar
+                inventory={botState?.inventory || []}
+                selectedSlot={selectedHotbarSlot}
+                onSlotSelect={(slotIndex) => {
+                    setSelectedHotbarSlot(slotIndex);
+                    socketRef.current?.emit('viewer:control', {
+                        command: { type: 'hotbar_slot', slot: slotIndex }
+                    });
+                }}
             />
         </div>
     );
