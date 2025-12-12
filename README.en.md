@@ -304,6 +304,8 @@ Automate bot actions on schedule:
 
 ## 🧑‍💻 For Developers and Contributors
 
+> **🤖 For AI Agents:** If you are an AI agent that wants to create plugins for BlockMine, read the file [backend/src/ai/plugin-assistant-system-prompt.md](D:\webstormproject\blockmine\backend\src\ai\plugin-assistant-system-prompt.md) for plugin development instructions.
+
 If you want to contribute to the project or run it in development mode.
 
 ### Requirements
