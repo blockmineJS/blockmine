@@ -306,9 +306,22 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                         </Badge>
                                     ))}
                                     {plugin.commands.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{plugin.commands.length - 3}
-                                        </Badge>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
+                                                    +{plugin.commands.length - 3}
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {plugin.commands.slice(3).map(cmd => (
+                                                        <Badge key={cmd.id} variant="secondary" className="text-xs">
+                                                            {cmd.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     )}
                                 </div>
                             </div>
@@ -327,9 +340,22 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                         </Badge>
                                     ))}
                                     {plugin.eventGraphs.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{plugin.eventGraphs.length - 3}
-                                        </Badge>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
+                                                    +{plugin.eventGraphs.length - 3}
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {plugin.eventGraphs.slice(3).map(graph => (
+                                                        <Badge key={graph.id} variant="secondary" className="text-xs">
+                                                            {graph.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     )}
                                 </div>
                             </div>
