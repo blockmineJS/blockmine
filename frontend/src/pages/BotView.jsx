@@ -76,39 +76,39 @@ export default function BotView() {
     return (
         <>
             <div className="flex flex-col h-full w-full overflow-hidden">
-                <header className="shrink-0 p-6 border-b">
-                    <div className="flex flex-wrap items-center gap-3 mb-4">
-                        <div className="flex-1">
-                            <h1 className="text-2xl font-bold tracking-tight">
-                                {bot.username}
-                            </h1>
-                            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                                <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                    {bot.server.host}:{bot.server.port}
-                                </span>
-                                {bot.note && (
-                                    <span className="text-xs bg-muted px-2 py-1 rounded-full">
-                                        {bot.note}
+                <header className="shrink-0 p-4 border-b">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h1 className="text-xl font-bold tracking-tight truncate">
+                                        {bot.username}
+                                    </h1>
+                                    <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                        {bot.server.host}:{bot.server.port}
                                     </span>
-                                )}
+                                    {bot.note && (
+                                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                                            {bot.note}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-auto mt-2 sm:mt-0">
+                        <div className={cn(
+                            "flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-medium transition-all shrink-0",
+                            isRunning
+                                ? "bg-green-500/10 border-green-500/20 text-green-600"
+                                : "bg-red-500/10 border-red-500/20 text-red-600"
+                        )}>
                             <div className={cn(
-                                "flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-medium transition-all",
-                                isRunning 
-                                    ? "bg-green-500/10 border-green-500/20 text-green-600" 
-                                    : "bg-red-500/10 border-red-500/20 text-red-600"
-                            )}>
-                                <div className={cn(
-                                    "w-2 h-2 rounded-full",
-                                    isRunning ? "bg-green-500 animate-pulse" : "bg-red-500"
-                                )} />
-                                <span className="uppercase font-bold">
-                                    {botStatuses[bot.id] || 'stopped'}
-                                </span>
-                            </div>
+                                "w-1.5 h-1.5 rounded-full",
+                                isRunning ? "bg-green-500 animate-pulse" : "bg-red-500"
+                            )} />
+                            <span className="uppercase font-bold">
+                                {botStatuses[bot.id] || 'stopped'}
+                            </span>
                         </div>
                     </div>
                     
@@ -218,37 +218,37 @@ export default function BotView() {
                             </NavLink>
                         </nav>
                         
-                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
                             {hasPermission('bot:start_stop') && (
                                 <>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => startBot(bot.id)} 
+                                    <Button
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() => startBot(bot.id)}
                                         disabled={isRunning}
-                                        className="bg-green-500/10 border-green-500/20 text-green-600 hover:bg-green-500/20 hover:text-green-700"
+                                        className="h-7 px-2 text-xs bg-green-500/10 border-green-500/20 text-green-600 hover:bg-green-500/20 hover:text-green-700"
                                     >
-                                        <Play className="h-4 w-4 mr-1" />
+                                        <Play className="h-3 w-3 mr-1" />
                                         <span className="hidden sm:inline">{t('actions.start')}</span>
                                     </Button>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => stopBot(bot.id)} 
+                                    <Button
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() => stopBot(bot.id)}
                                         disabled={!isRunning}
-                                        className="bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 hover:text-red-700"
+                                        className="h-7 px-2 text-xs bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 hover:text-red-700"
                                     >
-                                        <Square className="h-4 w-4 mr-1" />
+                                        <Square className="h-3 w-3 mr-1" />
                                         <span className="hidden sm:inline">{t('actions.stop')}</span>
                                     </Button>
                                     <Button
                                        variant="outline"
-                                       size="sm"
+                                       size="xs"
                                        onClick={() => restartBot(bot.id)}
                                        disabled={!isRunning}
-                                       className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
+                                       className="h-7 px-2 text-xs bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
                                     >
-                                       <Sparkles className="h-4 w-4 mr-1" />
+                                       <Sparkles className="h-3 w-3 mr-1" />
                                        <span className="hidden sm:inline">{t('actions.restart')}</span>
                                     </Button>
                                 </>
@@ -258,26 +258,26 @@ export default function BotView() {
                                     <DialogTrigger asChild>
                                         <Button
                                             variant="outline"
-                                            size="icon" 
+                                            size="xs"
                                             title={t('actions.export')}
-                                            className="bg-blue-500/10 border-blue-500/20 text-blue-600 hover:bg-blue-500/20 hover:text-blue-700"
+                                            className="h-7 w-7 p-0 bg-blue-500/10 border-blue-500/20 text-blue-600 hover:bg-blue-500/20 hover:text-blue-700"
                                         >
-                                            <Download className="h-4 w-4" />
+                                            <Download className="h-3 w-3" />
                                         </Button>
                                     </DialogTrigger>
                                     <ExportBotDialog bot={bot} onCancel={() => setIsExportModalOpen(false)} />
                                 </Dialog>
                             )}
                             {hasPermission('bot:delete') && (
-                                 <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={() => setIsDeleteConfirmOpen(true)} 
-                                    disabled={isRunning} 
+                                 <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => setIsDeleteConfirmOpen(true)}
+                                    disabled={isRunning}
                                     title={t('actions.delete')}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10"
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3 w-3" />
                                 </Button>
                             )}
                         </div>
