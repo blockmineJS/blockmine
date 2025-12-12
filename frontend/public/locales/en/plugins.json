@@ -1,0 +1,110 @@
+{
+  "title": "Plugins",
+  "tabs": {
+    "installed": "Installed",
+    "browser": "Browse"
+  },
+  "actions": {
+    "checkUpdates": "Check for updates",
+    "installLocal": "Install locally",
+    "createPlugin": "Create plugin",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "update": "Update",
+    "enable": "Enable",
+    "disable": "Disable",
+    "settings": "Settings",
+    "edit": "Edit",
+    "fork": "Fork",
+    "reload": "Reload",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "ui": {
+    "error": "Error",
+    "success": "Success",
+    "loadError": "Failed to load plugin page content.",
+    "actionSuccess": "Action completed successfully.",
+    "noData": "No data to display",
+    "empty": "Empty",
+    "unknownComponent": "Unknown component type",
+    "save": "Save",
+    "startBot": "Start",
+    "starting": "Starting...",
+    "startingBot": "Starting bot...",
+    "botStartingDesc": "Please wait, bot is connecting to server.",
+    "botNotRunning": "Bot is not running",
+    "botNotRunningDesc": "To work with the plugin interface, you need to start the bot.",
+    "botStartError": "Failed to start bot.",
+    "loadError2": "Failed to load UI for this plugin."
+  },
+  "ide": {
+    "error": "Error",
+    "success": "Success",
+    "loadStructureError": "Failed to load plugin structure.",
+    "loadFileError": "Failed to load file.",
+    "openFileError": "Failed to open file.",
+    "saveError": "Failed to save file.",
+    "unsavedChanges": "You have unsaved changes. Are you sure you want to close this tab?",
+    "pluginRenamed": "Plugin renamed",
+    "pluginRenamedDesc": "{{oldName}} → {{newName}}. Redirecting...",
+    "fileSaved": "File {{name}} saved.",
+    "operationSuccess": "Operation \"{{operation}}\" completed.",
+    "operationError": "Failed to perform operation",
+    "confirmDeleteFolder": "Are you sure you want to delete folder \"{{name}}\" and all its contents?",
+    "confirmDeleteFile": "Are you sure you want to delete file \"{{name}}\"?",
+    "fileMoved": "File moved.",
+    "moveError": "Failed to move file"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "installed": "Installed",
+    "updateAvailable": "Update available"
+  },
+  "messages": {
+    "noPlugins": "No installed plugins",
+    "noPluginsDesc": "Install plugins from catalog or create your own",
+    "loading": "Loading plugins...",
+    "installing": "Installing...",
+    "updating": "Updating...",
+    "deleting": "Deleting..."
+  },
+  "localInstall": {
+    "title": "Install local plugin",
+    "description": "Enter the path to the plugin folder on the server",
+    "pathLabel": "Plugin path",
+    "pathPlaceholder": "/path/to/plugin/folder",
+    "install": "Install"
+  },
+  "createDialog": {
+    "title": "Create new plugin",
+    "description": "Enter a name for your new plugin. The name must be unique.",
+    "nameLabel": "Plugin name",
+    "namePlaceholder": "my-plugin",
+    "templateLabel": "Template",
+    "templates": {
+      "empty": "Empty plugin",
+      "command": "Plugin with example command",
+      "events": "Plugin with events"
+    },
+    "create": "Create and open",
+    "invalidNameFormat": "Invalid name format. Name must consist of letters, numbers and hyphens, but cannot start or end with a hyphen.",
+    "validationError": "Validation error",
+    "enterValidName": "Please enter a valid plugin name."
+  },
+  "browser": {
+    "search": "Search plugins...",
+    "categories": "Categories",
+    "all": "All",
+    "noResults": "No plugins found"
+  },
+  "details": {
+    "version": "Version",
+    "author": "Author",
+    "description": "Description",
+    "dependencies": "Dependencies",
+    "commands": "Commands",
+    "events": "Events"
+  }
+}

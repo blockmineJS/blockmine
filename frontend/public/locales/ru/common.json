@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "BlockMine",
+    "loading": "Загрузка..."
+  },
+  "bot": {
+    "start": "Запустить",
+    "stop": "Остановить",
+    "restart": "Перезапустить",
+    "delete": "Удалить",
+    "create": "Создать бота",
+    "status": {
+      "online": "В сети",
+      "offline": "Оффлайн",
+      "connecting": "Подключение...",
+      "error": "Ошибка"
+    }
+  },
+  "actions": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "add": "Добавить",
+    "search": "Поиск",
+    "refresh": "Обновить",
+    "copy": "Копировать",
+    "close": "Закрыть"
+  },
+  "fields": {
+    "name": "Имя"
+  },
+  "messages": {
+    "success": "Успех!",
+    "error": "Произошла ошибка",
+    "saved": "Сохранено",
+    "deleted": "Удалено",
+    "copied": "Скопировано"
+  },
+  "plurals": {
+    "bot_one": "{{count}} бот",
+    "bot_few": "{{count}} бота",
+    "bot_many": "{{count}} ботов",
+    "plugin_one": "{{count}} плагин",
+    "plugin_few": "{{count}} плагина",
+    "plugin_many": "{{count}} плагинов"
+  }
+}

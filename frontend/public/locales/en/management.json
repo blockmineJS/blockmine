@@ -1,0 +1,114 @@
+{
+  "title": "Bot Management",
+  "description": "Configure users, groups, permissions and commands for bot {{username}}.",
+  "tabs": {
+    "users": "Users",
+    "groups": "Groups",
+    "permissions": "Permissions",
+    "commands": "Commands"
+  },
+  "messages": {
+    "success": "Success",
+    "error": "Error",
+    "commandCreated": "Command \"{{name}}\" created successfully.",
+    "commandCreateError": "Failed to create command",
+    "loadError": "Failed to load management data."
+  },
+  "commandEdit": {
+    "title": "Edit command: {{name}}",
+    "enabled": "Command enabled",
+    "aliases": "Aliases",
+    "aliasesPlaceholder": "e.g., ping",
+    "aliasesDescription": "Additional names to call the command.",
+    "cooldown": "Cooldown (seconds)",
+    "requiredPermission": "Required permission",
+    "selectPermission": "Select permission...",
+    "noPermission": "Not required",
+    "allowedChatTypes": "Allowed chat types",
+    "chatTypesPlaceholder": "e.g., trade",
+    "chatTypesDescription": "Chat types where the command will work.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "createCommand": {
+    "title": "Create new command",
+    "description": "Enter name and description for your new command. You can configure it later.",
+    "name": "Name",
+    "commandDescription": "Description",
+    "create": "Create"
+  },
+  "commandDetail": {
+    "title": "Command: {{name}}",
+    "tabOverview": "Overview",
+    "tabSettings": "Settings",
+    "usage": "Usage",
+    "arguments": "Arguments",
+    "argument": "Argument",
+    "type": "Type",
+    "required": "Required",
+    "yes": "Yes",
+    "no": "No",
+    "source": "Source",
+    "enabled": "Command enabled",
+    "aliases": "Aliases",
+    "cooldown": "Cooldown (sec)",
+    "requiredPermission": "Required permission",
+    "noPermission": "Not required",
+    "allowedChatTypes": "Allowed chat types",
+    "close": "Close",
+    "saveSettings": "Save settings"
+  },
+  "userEdit": {
+    "title": "Edit user: {{name}}",
+    "description": "Manage groups and blacklist status.",
+    "blacklist": "Blacklist",
+    "blacklistDescription": "Blacklisted user cannot use commands.",
+    "userGroups": "User groups",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "commands": {
+    "title": "Commands",
+    "activeCount": "{{active}} of {{total}} active",
+    "description": "List of all commands available to the bot",
+    "import": "Import",
+    "create": "Create",
+    "searchPlaceholder": "Search by name or description...",
+    "table": {
+      "enabled": "On",
+      "command": "Command",
+      "type": "Type",
+      "source": "Source",
+      "aliases": "Aliases",
+      "permission": "Perm",
+      "cooldown": "CD",
+      "actions": "Actions"
+    },
+    "loading": "Loading...",
+    "notFound": "Commands not found",
+    "empty": "No commands",
+    "open": "Open",
+    "export": "Export",
+    "delete": "Delete",
+    "noPermission": "None",
+    "noPermissionTooltip": "This command can be used by everyone",
+    "deleteConfirm": {
+      "title": "Are you sure?",
+      "description": "Are you sure you want to delete the command \"{{name}}\"? This action cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "toast": {
+      "created": "Command \"{{name}}\" created successfully.",
+      "createError": "Failed to create command: {{error}}",
+      "deleted": "Command \"{{name}}\" deleted.",
+      "deleteError": "Failed to delete command: {{error}}",
+      "enabled": "Command \"{{name}}\" has been enabled.",
+      "disabled": "Command \"{{name}}\" has been disabled.",
+      "toggleError": "Failed to change command status.",
+      "updated": "Command \"{{name}}\" settings updated."
+    }
+  }
+}

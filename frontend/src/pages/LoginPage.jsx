@@ -2,6 +2,7 @@ import { shallow } from 'zustand/shallow';
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/stores/appStore';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import axios from 'axios';
 
 export default function LoginPage() {
+    const { t } = useTranslation('login');
     const login = useAppStore((state) => state.login);
     const isAuthenticated = useAppStore((state) => state.isAuthenticated);
     const navigate = useNavigate();
@@ -65,7 +67,7 @@ export default function LoginPage() {
         try {
             await login(username, password);
         } catch (err) {
-            setError(err.message || 'Не удалось войти.');
+            setError(err.message || t('loginError'));
         } finally {
             setIsLoading(false);
         }
@@ -76,7 +78,7 @@ export default function LoginPage() {
         setRecoveryError('');
         
         if (!recoveryCode) {
-            setRecoveryError('Введите код восстановления');
+            setRecoveryError(t('recovery.enterCode'));
             return;
         }
         
@@ -94,7 +96,7 @@ export default function LoginPage() {
             }
             
         } catch (err) {
-            setRecoveryError(err.response?.data?.error || 'Ошибка при проверке кода');
+            setRecoveryError(err.response?.data?.error || t('recovery.verifyError'));
         } finally {
             setRecoveryLoading(false);
         }
@@ -106,12 +108,12 @@ export default function LoginPage() {
         setRecoverySuccess(null);
         
         if (newPassword !== confirmPassword) {
-            setRecoveryError('Пароли не совпадают');
+            setRecoveryError(t('recovery.passwordMismatch'));
             return;
         }
-        
+
         if (newPassword.length < 4) {
-            setRecoveryError('Пароль должен содержать минимум 4 символа');
+            setRecoveryError(t('recovery.passwordTooShort'));
             return;
         }
         
@@ -136,7 +138,7 @@ export default function LoginPage() {
             }, 3000);
             
         } catch (err) {
-            setRecoveryError(err.response?.data?.error || 'Ошибка при сбросе пароля');
+            setRecoveryError(err.response?.data?.error || t('recovery.resetError'));
         } finally {
             setRecoveryLoading(false);
         }
@@ -157,17 +159,17 @@ export default function LoginPage() {
         <div className="flex items-center justify-center min-h-screen bg-background">
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Вход в BlockMine</CardTitle>
-                    <CardDescription>Введите ваши учетные данные для доступа к панели.</CardDescription>
+                    <CardTitle className="text-2xl">{t('title')}</CardTitle>
+                    <CardDescription>{t('description')}</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="username">Имя пользователя</Label>
+                            <Label htmlFor="username">{t('username')}</Label>
                             <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Пароль</Label>
+                            <Label htmlFor="password">{t('password')}</Label>
                             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                         </div>
                         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -175,16 +177,16 @@ export default function LoginPage() {
                     <CardFooter className="flex flex-col gap-2">
                         <Button type="submit" className="w-full" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Войти
+                            {t('submit')}
                         </Button>
-                        <Button 
-                            type="button" 
-                            variant="link" 
+                        <Button
+                            type="button"
+                            variant="link"
                             className="text-sm text-muted-foreground hover:text-primary"
                             onClick={() => setShowRecovery(true)}
                         >
                             <KeyRound className="mr-1 h-3 w-3" />
-                            Забыли пароль?
+                            {t('forgotPassword')}
                         </Button>
                     </CardFooter>
                 </form>
@@ -197,12 +199,12 @@ export default function LoginPage() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {recoveryStep === 1 ? 'Проверка кода восстановления' : 'Установка нового пароля'}
+                            {recoveryStep === 1 ? t('recovery.titleVerify') : t('recovery.titleReset')}
                         </DialogTitle>
                         <DialogDescription>
-                            {recoveryStep === 1 
-                                ? 'Введите код восстановления из конфигурационного файла'
-                                : `Установите новый пароль для пользователя ${adminUsername}`
+                            {recoveryStep === 1
+                                ? t('recovery.descriptionVerify')
+                                : t('recovery.descriptionReset', { username: adminUsername })
                             }
                         </DialogDescription>
                     </DialogHeader>
@@ -212,19 +214,19 @@ export default function LoginPage() {
                             <AlertDescription className="text-green-600">
                                 <strong>{recoverySuccess.message}</strong>
                                 <br />
-                                Имя пользователя: <strong>{recoverySuccess.username}</strong>
+                                {t('recovery.usernameLabel')}: <strong>{recoverySuccess.username}</strong>
                                 <br />
-                                Вы можете использовать новый пароль для входа.
+                                {t('recovery.canUseNewPassword')}
                             </AlertDescription>
                         </Alert>
                     ) : recoveryStep === 1 ? (
                         <form onSubmit={handleVerifyCode}>
                             <div className="space-y-4 py-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="recovery-code">Код восстановления</Label>
+                                    <Label htmlFor="recovery-code">{t('recovery.codeLabel')}</Label>
                                     <Input
                                         id="recovery-code"
-                                        placeholder="bmr-xxxxxxxxxxxx"
+                                        placeholder={t('recovery.codePlaceholder')}
                                         value={recoveryCode}
                                         onChange={(e) => setRecoveryCode(e.target.value)}
                                         required
@@ -232,7 +234,7 @@ export default function LoginPage() {
                                         autoFocus
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        Код восстановления находится в файле конфигурации:
+                                        {t('recovery.codeHint')}
                                     </p>
                                     {configPath && (
                                         <div className="mt-2 p-2 bg-muted rounded-md">
@@ -258,11 +260,11 @@ export default function LoginPage() {
                                     }}
                                     disabled={recoveryLoading}
                                 >
-                                    Отмена
+                                    {t('recovery.cancel')}
                                 </Button>
                                 <Button type="submit" disabled={recoveryLoading || !recoveryCode}>
                                     {recoveryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Проверить код
+                                    {t('recovery.verify')}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -271,13 +273,12 @@ export default function LoginPage() {
                             <div className="space-y-4 py-4">
                                 <Alert>
                                     <AlertDescription>
-                                        Код восстановления подтверждён. 
-                                        Пользователь: <strong>{adminUsername}</strong>
+                                        {t('recovery.codeVerified')} {t('recovery.user')}: <strong>{adminUsername}</strong>
                                     </AlertDescription>
                                 </Alert>
-                                
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="new-password">Новый пароль</Label>
+                                    <Label htmlFor="new-password">{t('recovery.newPassword')}</Label>
                                     <Input
                                         id="new-password"
                                         type="password"
@@ -288,9 +289,9 @@ export default function LoginPage() {
                                         autoFocus
                                     />
                                 </div>
-                                
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="confirm-password">Подтвердите пароль</Label>
+                                    <Label htmlFor="confirm-password">{t('recovery.confirmPassword')}</Label>
                                     <Input
                                         id="confirm-password"
                                         type="password"
@@ -315,11 +316,11 @@ export default function LoginPage() {
                                     onClick={() => setRecoveryStep(1)}
                                     disabled={recoveryLoading}
                                 >
-                                    Назад
+                                    {t('recovery.back')}
                                 </Button>
                                 <Button type="submit" disabled={recoveryLoading || !newPassword || !confirmPassword}>
                                     {recoveryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Сбросить пароль
+                                    {t('recovery.reset')}
                                 </Button>
                             </DialogFooter>
                         </form>

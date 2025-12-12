@@ -1,0 +1,85 @@
+{
+  "title": "System Overview",
+  "subtitle": "Monitor and manage your BlockMineJS bots",
+  "import": "Import",
+  "startAll": "Start All",
+  "stopAll": "Stop All",
+  "botImported": "Bot \"{{name}}\" imported successfully.",
+  "confirmMassAction": "Are you sure you want to {{action}} ALL bots?",
+  "actions": {
+    "start": "start",
+    "stop": "stop"
+  },
+  "metrics": {
+    "totalBots": "Total Bots",
+    "active": "Active",
+    "systemCpu": "System CPU",
+    "systemRam": "System RAM"
+  },
+  "resourceMonitoring": {
+    "title": "Resource Monitoring",
+    "description": "CPU and RAM usage by all running bots"
+  },
+  "quickActions": {
+    "title": "Quick Actions",
+    "description": "Navigate to main sections",
+    "scheduler": "Scheduler",
+    "settings": "Settings",
+    "suggest": "Suggest",
+    "currentVersion": "Current version",
+    "changelog": "Changelog",
+    "servers": "Servers"
+  },
+  "systemHealth": {
+    "title": "System Health",
+    "panel": "Control Panel",
+    "websocket": "WebSocket Server",
+    "database": "Database",
+    "uptime": "Uptime"
+  },
+  "resources": {
+    "title": "System Resources",
+    "activeBots": "Active bots",
+    "totalMemory": "Total memory"
+  },
+  "botDistribution": {
+    "title": "Bot Distribution",
+    "running": "Running",
+    "stopped": "Stopped"
+  },
+  "activity": {
+    "active": "Active",
+    "stopped": "Stopped"
+  },
+  "widgets": {
+    "botStatus": {
+      "title": "Bot Status",
+      "noBots": "No bots to display.",
+      "running": "Running",
+      "stopped": "Stopped"
+    },
+    "recentActivity": {
+      "title": "Recent Activity",
+      "description": "Summary of recent messages from bot consoles.",
+      "noActivity": "No activity. Start some bots."
+    },
+    "quickManage": {
+      "title": "All Bots",
+      "description": "Quick management of all bots in the system",
+      "bot": "Bot",
+      "status": "Status",
+      "actions": "Actions",
+      "running": "Running",
+      "stopped": "Stopped",
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "console": "Console",
+      "settings": "Settings",
+      "noBots": "No bots found.",
+      "commandSent": "Command sent",
+      "restartingBot": "Bot {{name}} is restarting.",
+      "actionSent": "Command {{action}} sent to bot."
+    }
+  }
+}

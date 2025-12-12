@@ -1,0 +1,62 @@
+{
+  "title": "Task Scheduler",
+  "description": "Automate bot actions using cron tasks.",
+  "createTask": "Create task",
+  "table": {
+    "status": "Status",
+    "name": "Name",
+    "schedule": "Schedule",
+    "nextRun": "Next run",
+    "action": "Action",
+    "actions": "Actions"
+  },
+  "cron": {
+    "disabled": "Disabled",
+    "onStartup": "On startup",
+    "onStartupHuman": "Runs on panel startup",
+    "noSchedule": "No schedule",
+    "error": "Error"
+  },
+  "actions": {
+    "startBot": "Start bot",
+    "stopBot": "Stop bot",
+    "restartBot": "Restart bot",
+    "sendCommand": "Send command"
+  },
+  "empty": "No tasks found.",
+  "deleteDialog": {
+    "title": "Delete task \"{{name}}\"?",
+    "description": "This action is irreversible and will remove the task from the schedule.",
+    "confirm": "Yes, delete"
+  },
+  "form": {
+    "titleEdit": "Edit task",
+    "titleCreate": "Create new task",
+    "descriptionStartup": "This task will be executed once on each panel startup.",
+    "descriptionSchedule": "Tasks are executed on schedule for selected bots.",
+    "taskName": "Task name",
+    "runOnStartup": "Run on panel startup",
+    "runOnStartupDescription": "Task will be executed once on each panel start/restart.",
+    "schedule": "Schedule",
+    "advancedMode": "Advanced mode",
+    "cronHelp": "Help with cron patterns",
+    "repeatEvery": "Repeat every",
+    "minutes": "Minutes",
+    "hours": "Hours",
+    "days": "Days",
+    "startTime": "Start time",
+    "action": "Action",
+    "selectAction": "Select action",
+    "targetBots": "Target bots",
+    "allBots": "All bots",
+    "selectedCount": "{{count}} selected",
+    "selectBots": "Select bots...",
+    "searchBots": "Search bots...",
+    "noBotsFound": "No bots found.",
+    "commandToSend": "Command to send",
+    "commandPlaceholder": "Hello, world!",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "save": "Save"
+  }
+}

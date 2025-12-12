@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,17 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для data:get_argument ноды
  */
 const DataGetArgumentSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
 
   return (
     <div className="p-2">
-      <Label>Имя аргумента:</Label>
+      <Label>{t('nodeSettings.argumentName')}</Label>
       <Select
         value={data.argumentName || ''}
         onValueChange={(value) => updateNodeData(nodeId, { argumentName: value })}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Выберите аргумент..." />
+          <SelectValue placeholder={t('nodeSettings.selectArgument')} />
         </SelectTrigger>
         <SelectContent>
           {(commandArguments || []).map(arg => (

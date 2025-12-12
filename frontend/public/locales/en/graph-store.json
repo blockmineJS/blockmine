@@ -1,0 +1,70 @@
+{
+  "title": "Graph Store",
+  "subtitle": "Publish and install visual graphs for your bots",
+  "publish": {
+    "button": "Publish graph",
+    "title": "Publish graph",
+    "name": "Name",
+    "namePlaceholder": "Graph name",
+    "author": "Author",
+    "authorPlaceholder": "Your name",
+    "description": "Description",
+    "descriptionPlaceholder": "Graph description (minimum 10 characters)",
+    "file": "Graph file (JSON)",
+    "submit": "Publish",
+    "cancel": "Cancel"
+  },
+  "search": {
+    "placeholder": "Search graphs...",
+    "allCategories": "All categories",
+    "allTypes": "All types",
+    "commands": "Commands",
+    "events": "Events"
+  },
+  "card": {
+    "author": "Author",
+    "command": "Command",
+    "event": "Event",
+    "downloads": "downloads",
+    "likes": "likes",
+    "install": "Install"
+  },
+  "install": {
+    "title": "Install graph",
+    "selectBot": "Select bot",
+    "selectBotPlaceholder": "Select bot for installation",
+    "submit": "Install",
+    "installing": "Installing...",
+    "cancel": "Cancel",
+    "type": "Type"
+  },
+  "messages": {
+    "loadError": "Failed to load categories",
+    "loadGraphsError": "Failed to load graphs",
+    "serverUnavailable": "Graph store server is unavailable",
+    "loadBotsError": "Failed to load bots",
+    "selectBotError": "Select a bot for installation",
+    "downloadError": "Failed to get graph data",
+    "unknownType": "Unknown graph type",
+    "installCancelled": "Installation cancelled",
+    "installError": "Error installing graph",
+    "likeSuccess": "Thanks for the like!",
+    "likeError": "Error liking graph",
+    "allFieldsRequired": "All fields are required",
+    "descriptionMin": "Description must contain at least 10 characters",
+    "publishSuccess": "Graph published and awaiting moderation!",
+    "publishError": "Error publishing",
+    "graphLoaded": "Graph loaded",
+    "fileReadError": "Error reading file",
+    "commandCreated": "Command created successfully!",
+    "eventCreated": "Event created successfully!",
+    "alreadyExistsCommand": "Command with name \"{{name}}\" already exists. Enter a new name:",
+    "alreadyExistsEvent": "Event with name \"{{name}}\" already exists. Enter a new name:"
+  },
+  "warning": {
+    "title": "Graph store server is unavailable",
+    "description": "Data cannot be loaded. Try refreshing the page later."
+  },
+  "loading": "Loading...",
+  "empty": "No graphs found"
+}

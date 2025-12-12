@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function PluginsTab() {
+    const { t } = useTranslation('plugins');
     const { botId } = useParams();
     const intBotId = parseInt(botId, 10);
 
@@ -137,16 +139,16 @@ export default function PluginsTab() {
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div>
-                            <h1 className="text-xl font-bold tracking-tight">Плагины</h1>
+                            <h1 className="text-xl font-bold tracking-tight">{t('title')}</h1>
                         </div>
                         <TabsList className="h-9">
                             <TabsTrigger value="installed" className="flex items-center gap-1.5 text-xs">
                                 <Package className="h-3.5 w-3.5" />
-                                Установленные ({installedPlugins.length})
+                                {t('tabs.installed')} ({installedPlugins.length})
                             </TabsTrigger>
                             <TabsTrigger value="browser" className="flex items-center gap-1.5 text-xs" disabled={!canInstall}>
                                 <Puzzle className="h-3.5 w-3.5" />
-                                Обзор
+                                {t('tabs.browser')}
                             </TabsTrigger>
                         </TabsList>
                     </div>
@@ -169,21 +171,21 @@ export default function PluginsTab() {
                         </Button>
                         </span>
                         </TooltipTrigger>
-                        <TooltipContent>Проверить обновления</TooltipContent>
+                        <TooltipContent>{t('actions.checkUpdates')}</TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" disabled={!canInstall}>
                                     <FolderPlus className="h-4 w-4" />
-                                    <span className="ml-2">Установить локально</span>
+                                    <span className="ml-2">{t('actions.installLocal')}</span>
                                 </Button>
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
-                            <span className="ml-2">Создать плагин</span>
+                            <span className="ml-2">{t('actions.createPlugin')}</span>
                         </Button>
                     </div>
                 </div>

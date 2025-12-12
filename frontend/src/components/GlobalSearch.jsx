@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -7,6 +8,7 @@ import { Bot, Users, Puzzle, LayoutDashboard, Clock, Server } from 'lucide-react
 import { useAppStore } from '@/stores/appStore';
 
 const GlobalSearch = () => {
+  const { t } = useTranslation('dialogs');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ bots: [], users: [], plugins: [] });
@@ -63,9 +65,9 @@ const GlobalSearch = () => {
     const count = results[key]?.length || 0;
     if (count === 0) return null;
     const headings = {
-      bots: 'Боты',
-      users: 'Пользователи',
-      plugins: 'Плагины',
+      bots: t('search.bots'),
+      users: t('search.users'),
+      plugins: t('search.plugins'),
     };
     return `${headings[key]} (${count})`;
   };
@@ -74,38 +76,38 @@ const GlobalSearch = () => {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
-      <DialogTitle className="sr-only">Глобальный поиск</DialogTitle>
+      <DialogTitle className="sr-only">{t('search.title')}</DialogTitle>
       <DialogDescription className="sr-only">
-        Используйте эту палитру для быстрого поиска по ботам, пользователям и плагинам, а также для навигации по приложению.
+        {t('search.description')}
       </DialogDescription>
-      <CommandInput 
-        placeholder="Искать или перейти к..." 
-        value={query} 
+      <CommandInput
+        placeholder={t('search.placeholder')}
+        value={query}
         onValueChange={setQuery}
       />
       <CommandList key={query}>
         {isLoading ? (
-            <div className="p-6 text-center text-sm">Загрузка...</div>
+            <div className="p-6 text-center text-sm">{t('search.loading')}</div>
         ) : (
           <>
-            {!hasResults && query ? (<CommandEmpty>Ничего не найдено.</CommandEmpty>) : null}
+            {!hasResults && query ? (<CommandEmpty>{t('search.noResults')}</CommandEmpty>) : null}
             
             {!query && (
-                <CommandGroup heading="Навигация">
+                <CommandGroup heading={t('search.navigation')}>
                   <CommandItem onSelect={() => runCommand(() => navigate('/'))}>
                     <LayoutDashboard className="mr-2 h-4 w-4" />
-                    <span>Дашборд</span>
+                    <span>{t('search.dashboard')}</span>
                   </CommandItem>
                   {hasPermission('task:list') && (
                     <CommandItem onSelect={() => runCommand(() => navigate('/tasks'))}>
                       <Clock className="mr-2 h-4 w-4" />
-                      <span>Планировщик</span>
+                      <span>{t('search.scheduler')}</span>
                     </CommandItem>
                   )}
                   {hasPermission('server:list') && (
                     <CommandItem onSelect={() => runCommand(() => navigate('/servers'))}>
                       <Server className="mr-2 h-4 w-4" />
-                      <span>Серверы</span>
+                      <span>{t('search.servers')}</span>
                     </CommandItem>
                   )}
                 </CommandGroup>
@@ -130,7 +132,7 @@ const GlobalSearch = () => {
                 {results.users.map((user) => (
                   <CommandItem key={`user-${user.id}`} value={`user-${user.username}`} onSelect={() => runCommand(() => navigate(`/bots/${user.botId}/management`))}>
                     <Users className="mr-2 h-4 w-4" />
-                    <span>{user.username} (для бота ID: {user.botId})</span>
+                    <span>{user.username} ({t('search.forBotId', { botId: user.botId })})</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -141,7 +143,7 @@ const GlobalSearch = () => {
                 {results.plugins.map((plugin) => (
                   <CommandItem key={`plugin-${plugin.id}`} value={`plugin-${plugin.name}`} onSelect={() => runCommand(() => navigate(`/bots/${plugin.botId}/plugins`))}>
                     <Puzzle className="mr-2 h-4 w-4" />
-                    <span>{plugin.name} (установлен у бота ID: {plugin.botId})</span>
+                    <span>{plugin.name} ({t('search.installedForBotId', { botId: plugin.botId })})</span>
                   </CommandItem>
                 ))}
               </CommandGroup>

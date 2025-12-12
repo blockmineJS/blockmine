@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +12,7 @@ import { apiHelper } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 
 export default function ProxiesPage() {
+    const { t } = useTranslation('proxies');
     const [proxies, setProxies] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,7 +27,7 @@ export default function ProxiesPage() {
             const data = await apiHelper('/api/proxies');
             setProxies(data.items || []);
         } catch (error) {
-            console.error('Ошибка загрузки прокси:', error);
+            console.error('Proxy loading error:', error);
         }
         setIsLoading(false);
     };
@@ -54,7 +56,7 @@ export default function ProxiesPage() {
             await apiHelper(url, {
                 method,
                 body: JSON.stringify(proxyData),
-            }, `Прокси успешно ${isEdit ? 'обновлен' : 'создан'}.`);
+            }, t(isEdit ? 'messages.updated' : 'messages.created'));
 
             handleCloseModal();
             await fetchProxies();
@@ -66,7 +68,7 @@ export default function ProxiesPage() {
     const handleConfirmDelete = async () => {
         if (!proxyToDelete) return;
         try {
-            await apiHelper(`/api/proxies/${proxyToDelete.id}`, { method: 'DELETE' }, "Прокси удален.");
+            await apiHelper(`/api/proxies/${proxyToDelete.id}`, { method: 'DELETE' }, t('messages.deleted'));
             await fetchProxies();
         } catch (error) {
         }
@@ -78,14 +80,14 @@ export default function ProxiesPage() {
                 <Card className="h-full flex flex-col">
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
-                            <CardTitle>Управление прокси</CardTitle>
-                            <CardDescription>Добавляйте и редактируйте прокси-серверы для подключения ботов.</CardDescription>
+                            <CardTitle>{t('title')}</CardTitle>
+                            <CardDescription>{t('description')}</CardDescription>
                         </div>
                         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => handleOpenModal()}>
                                     <Plus className="mr-2 h-4 w-4" />
-                                    Добавить прокси
+                                    {t('addProxy')}
                                 </Button>
                             </DialogTrigger>
                             <ProxyForm proxy={editingProxy} onSubmit={handleSubmit} onCancel={handleCloseModal} isSaving={isSaving} />
@@ -95,12 +97,12 @@ export default function ProxiesPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Название</TableHead>
-                                    <TableHead>Тип</TableHead>
-                                    <TableHead>Адрес</TableHead>
-                                    <TableHead>Боты</TableHead>
-                                    <TableHead>Заметка</TableHead>
-                                    <TableHead className="text-right">Действия</TableHead>
+                                    <TableHead>{t('table.name')}</TableHead>
+                                    <TableHead>{t('table.type')}</TableHead>
+                                    <TableHead>{t('table.address')}</TableHead>
+                                    <TableHead>{t('table.bots')}</TableHead>
+                                    <TableHead>{t('table.note')}</TableHead>
+                                    <TableHead className="text-right">{t('table.actions')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -109,7 +111,7 @@ export default function ProxiesPage() {
                                         <TableCell colSpan={6} className="text-center h-24">
                                             <div className="flex justify-center items-center">
                                                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                                                Загрузка прокси...
+                                                {t('loading')}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -146,7 +148,7 @@ export default function ProxiesPage() {
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
-                                            Прокси не найдены. Добавьте свой первый прокси.
+                                            {t('empty')}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -160,10 +162,10 @@ export default function ProxiesPage() {
                  <ConfirmationDialog
                     open={!!proxyToDelete}
                     onOpenChange={() => setProxyToDelete(null)}
-                    title={`Удалить прокси "${proxyToDelete.name}"?`}
-                    description="Это действие необратимо. Если этот прокси используется ботами, вы не сможете его удалить."
+                    title={t('deleteDialog.title', { name: proxyToDelete.name })}
+                    description={t('deleteDialog.description')}
                     onConfirm={handleConfirmDelete}
-                    confirmText="Да, удалить"
+                    confirmText={t('deleteDialog.confirm')}
                 />
             )}
         </>

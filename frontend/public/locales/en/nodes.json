@@ -1,0 +1,1077 @@
+{
+  "common": {
+    "pins": {
+      "exec": "Execute",
+      "execDone": "Done",
+      "value": "Value",
+      "result": "Result",
+      "condition": "Condition",
+      "array": "Array",
+      "element": "Element",
+      "index": "Index",
+      "success": "Success?",
+      "error": "Error",
+      "true": "True",
+      "false": "False"
+    },
+    "placeholders": {
+      "select": "Select...",
+      "enterText": "Enter text...",
+      "variableName": "variable_name"
+    }
+  },
+
+  "flow:branch": {
+    "label": "Branch",
+    "description": "Conditional branching based on boolean value",
+    "pins": {
+      "exec": "Execute",
+      "condition": "Condition",
+      "exec_true": "True",
+      "exec_true_desc": "Executes if condition is true",
+      "exec_false": "False",
+      "exec_false_desc": "Executes if condition is false"
+    }
+  },
+
+  "flow:sequence": {
+    "label": "Sequence",
+    "description": "Sequentially executes multiple branches"
+  },
+
+  "flow:switch": {
+    "label": "Switch",
+    "description": "Selects execution branch based on value",
+    "pins": {
+      "value_desc": "Value to compare"
+    }
+  },
+
+  "flow:for_each": {
+    "label": "For Each Loop",
+    "description": "Executes \"Loop Body\" for each element in \"Array\"",
+    "pins": {
+      "loop_body": "Loop Body",
+      "element": "Element",
+      "index": "Index",
+      "completed": "Completed"
+    }
+  },
+
+  "flow:while": {
+    "label": "While Loop",
+    "description": "Executes \"Loop Body\" while condition is true",
+    "pins": {
+      "condition": "Condition",
+      "loop_body": "Loop Body",
+      "iteration": "Iteration",
+      "completed": "Completed"
+    }
+  },
+
+  "flow:break": {
+    "label": "Break Loop",
+    "description": "Immediately breaks out of the loop (For Each Loop) and passes control to its Completed exit"
+  },
+
+  "flow:delay": {
+    "label": "Delay",
+    "description": "Waits specified milliseconds, then continues execution",
+    "pins": {
+      "delay": "Delay (ms)",
+      "next": "Next"
+    }
+  },
+
+  "data:cast": {
+    "label": "Cast Type",
+    "description": "Converts value to selected type",
+    "pins": {
+      "value": "Value",
+      "result": "Result"
+    }
+  },
+
+  "data:type_check": {
+    "label": "Check Type",
+    "description": "Checks if value matches type",
+    "pins": {
+      "value_desc": "Value to check",
+      "result_desc": "True if type matches"
+    }
+  },
+
+  "data:get_variable": {
+    "label": "Get Variable",
+    "description": "Get variable value",
+    "pins": {
+      "variableName": "Variable Name",
+      "value": "Value",
+      "value_desc": "Variable value"
+    }
+  },
+
+  "data:get_argument": {
+    "label": "Get Argument",
+    "description": "Gets command argument value",
+    "pins": {
+      "argumentName": "Argument Name",
+      "value": "Value",
+      "value_desc": "Argument value"
+    }
+  },
+
+  "data:make_object": {
+    "label": "Make Object",
+    "description": "Creates object from JSON"
+  },
+
+  "data:number_literal": {
+    "label": "Number",
+    "description": "Simple numeric value."
+  },
+
+  "data:boolean_literal": {
+    "label": "Boolean",
+    "description": "Boolean value (true/false)",
+    "pins": {
+      "value": "Value",
+      "value_desc": "Boolean value"
+    }
+  },
+
+  "data:get_entity_field": {
+    "label": "Entity Field",
+    "description": "Gets fields from entity object",
+    "pins": {
+      "entity": "Entity",
+      "entity_desc": "Entity object"
+    }
+  },
+
+  "data:get_server_players": {
+    "label": "Server Players",
+    "description": "List of all players on server",
+    "pins": {
+      "players": "Players",
+      "players_desc": "Array of player names"
+    }
+  },
+
+  "data:get_nearby_entities": {
+    "label": "Nearby Entities",
+    "description": "Entities within radius from bot",
+    "pins": {
+      "radius": "Radius",
+      "radius_desc": "Search radius",
+      "entities": "Entities",
+      "entities_desc": "Array of entities"
+    }
+  },
+
+  "data:get_nearby_players": {
+    "label": "Nearby Players",
+    "description": "Players near the bot",
+    "pins": {
+      "radius": "Radius",
+      "radius_desc": "Search radius",
+      "players": "Players",
+      "players_desc": "Array of players with distance"
+    }
+  },
+
+  "data:entity_info": {
+    "label": "Entity Info",
+    "description": "Entity information",
+    "pins": {
+      "entity": "Entity",
+      "entity_desc": "Entity object"
+    }
+  },
+
+  "data:get_user_field": {
+    "label": "User Field",
+    "description": "Gets bot user field"
+  },
+
+  "data:length": {
+    "label": "Length",
+    "description": "Returns length of array or string",
+    "pins": {
+      "data": "Array or String",
+      "data_desc": "Data to measure",
+      "length": "Length",
+      "length_desc": "Element/character count"
+    }
+  },
+
+  "logic:compare": {
+    "label": "Compare",
+    "description": "Compares two values"
+  },
+
+  "logic:operation": {
+    "label": "Logic Operation",
+    "description": "Logical operations",
+    "pins": {
+      "result": "Result",
+      "result_desc": "Result of logical operation"
+    }
+  },
+
+  "logic:not": {
+    "label": "! NOT",
+    "description": "Inverts boolean value (NOT)",
+    "pins": {
+      "value": "Value",
+      "result": "Result",
+      "result_desc": "Inverted value"
+    }
+  },
+
+  "math:operation": {
+    "label": "Math Operation",
+    "description": "Mathematical operations and comparisons",
+    "pins": {
+      "a_desc": "First number",
+      "b_desc": "Second number",
+      "result_desc": "Operation result"
+    }
+  },
+
+  "math:random_number": {
+    "label": "Random Number",
+    "description": "Generates random number in specified range",
+    "pins": {
+      "min": "Min",
+      "max": "Max",
+      "result": "Result"
+    }
+  },
+
+  "string:concat": {
+    "label": "Concatenate Strings",
+    "description": "Concatenates multiple strings into one",
+    "pins": {
+      "string_n": "String {{n}}"
+    }
+  },
+
+  "data:string_literal": {
+    "label": "String",
+    "description": "String with variable support {name}",
+    "pins": {
+      "text": "Text",
+      "value_desc": "Final string"
+    },
+    "placeholder": "Enter text with {variables}..."
+  },
+
+  "string:contains": {
+    "label": "Contains",
+    "description": "Checks if string contains substring"
+  },
+
+  "string:matches": {
+    "label": "Matches",
+    "description": "Checks if string matches regular expression"
+  },
+
+  "string:starts_with": {
+    "label": "Starts With",
+    "description": "Checks if string starts with substring"
+  },
+
+  "string:ends_with": {
+    "label": "Ends With",
+    "description": "Checks if string ends with substring"
+  },
+
+  "string:length": {
+    "label": "String Length",
+    "description": "Returns string length"
+  },
+
+  "string:equals": {
+    "label": "Equals",
+    "description": "Checks equality of two strings"
+  },
+
+  "string:split": {
+    "label": "Split",
+    "description": "Splits string by delimiter"
+  },
+
+  "string:to_upper": {
+    "label": "To Upper Case",
+    "description": "Converts string to upper case"
+  },
+
+  "string:to_lower": {
+    "label": "To Lower Case",
+    "description": "Converts string to lower case"
+  },
+
+  "data:array_literal": {
+    "label": "Array",
+    "description": "Creates array from elements",
+    "pins": {
+      "array_desc": "Created array"
+    }
+  },
+
+  "array:get_random_element": {
+    "label": "Random Element",
+    "description": "Returns random element from array and its index",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "element": "Element",
+      "element_desc": "Random element",
+      "index": "Index",
+      "index_desc": "Element index"
+    }
+  },
+
+  "array:contains": {
+    "label": "Contains Element",
+    "description": "Checks if array contains element",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "element": "Element",
+      "element_desc": "Element to search",
+      "result": "Found",
+      "result_desc": "True if element found",
+      "index": "Index",
+      "index_desc": "Element index (-1 if not found)"
+    }
+  },
+
+  "array:get_by_index": {
+    "label": "Get By Index",
+    "description": "Gets array element by index",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "index": "Index",
+      "index_desc": "Element index",
+      "element": "Element",
+      "element_desc": "Element at index"
+    }
+  },
+
+  "array:get_next": {
+    "label": "Next Element",
+    "description": "Gets next array element",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "current_index": "Current Index",
+      "current_index_desc": "Current index",
+      "next_element": "Next Element",
+      "next_element_desc": "Next element",
+      "next_index": "Next Index",
+      "next_index_desc": "Next index",
+      "has_next": "Has Next?",
+      "has_next_desc": "True if next element exists"
+    }
+  },
+
+  "array:add_element": {
+    "label": "Add Element",
+    "description": "Adds element to end of array",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "element": "Element",
+      "element_desc": "Element to add",
+      "result": "New Array",
+      "result_desc": "Array with added element"
+    }
+  },
+
+  "array:remove_by_index": {
+    "label": "Remove By Index",
+    "description": "Removes element from array by its index",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "index": "Index",
+      "index_desc": "Element index to remove",
+      "result": "New Array",
+      "result_desc": "Array without element"
+    }
+  },
+
+  "array:find_index": {
+    "label": "Find Index",
+    "description": "Finds element index in array",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Input array",
+      "element": "Element",
+      "element_desc": "Element to search",
+      "index": "Index",
+      "index_desc": "Element index (-1 if not found)"
+    }
+  },
+
+  "array:join": {
+    "label": "Join to String",
+    "description": "Joins array to string with delimiter",
+    "pins": {
+      "array": "Array",
+      "array_desc": "Array to join",
+      "separator": "Separator",
+      "separator_desc": "Separator between elements",
+      "result": "Result",
+      "result_desc": "String from array elements"
+    }
+  },
+
+  "object:create": {
+    "label": "Create Object",
+    "description": "Creates object from key-value pairs",
+    "pins": {
+      "key_n": "Key {{n}}",
+      "value_n": "Value {{n}}",
+      "object_desc": "Created object"
+    }
+  },
+
+  "object:get": {
+    "label": "Get Property",
+    "description": "Gets object property value"
+  },
+
+  "object:set": {
+    "label": "Set Property",
+    "description": "Sets object property value"
+  },
+
+  "object:delete": {
+    "label": "Delete Property",
+    "description": "Deletes property from object"
+  },
+
+  "object:has_key": {
+    "label": "Has Key",
+    "description": "Checks if key exists in object"
+  },
+
+  "action:send_message": {
+    "label": "Send Message",
+    "description": "Sends message to chat. Supports variables in format {varName}",
+    "pins": {
+      "chat_type": "Chat Type",
+      "message": "Message",
+      "recipient": "Recipient",
+      "done": "Done"
+    },
+    "placeholders": {
+      "message": "Message text with {variables}",
+      "recipient": "Player name"
+    }
+  },
+
+  "action:http_request": {
+    "label": "HTTP Request",
+    "description": "Executes HTTP request. Supports variables: {varName}",
+    "pins": {
+      "url_desc": "Request URL",
+      "method_desc": "HTTP method",
+      "queryParams_desc": "URL parameters (?key=value)",
+      "headers_desc": "HTTP headers",
+      "body_desc": "Request body",
+      "exec_desc": "Executes after request",
+      "response_desc": "Server response",
+      "error_desc": "Error if any"
+    }
+  },
+
+  "action:send_log": {
+    "label": "Log",
+    "description": "Sends message to bot logs"
+  },
+
+  "action:send_websocket_response": {
+    "label": "WebSocket Response",
+    "description": "Sends response to client via WebSocket API",
+    "pins": {
+      "data": "Data",
+      "data_desc": "Data to send"
+    }
+  },
+
+  "action:bot_look_at": {
+    "label": "Look At",
+    "description": "Turns bot head towards target",
+    "pins": {
+      "target": "Target",
+      "target_desc": "Position or entity",
+      "offsetY": "Offset Y",
+      "offsetY_desc": "Y adjustment"
+    }
+  },
+
+  "action:bot_set_variable": {
+    "label": "Set Variable",
+    "description": "Writes value to variable",
+    "pins": {
+      "name": "Name",
+      "name_desc": "Variable name",
+      "value": "Value",
+      "persist": "Store in DB?",
+      "execDone": "Done"
+    }
+  },
+
+  "action:create_command": {
+    "label": "Create Command",
+    "description": "Creates new command"
+  },
+
+  "action:update_command": {
+    "label": "Update Command",
+    "description": "Updates existing command"
+  },
+
+  "action:delete_command": {
+    "label": "Delete Command",
+    "description": "Deletes command"
+  },
+
+  "time:datetime_literal": {
+    "label": "Date/Time",
+    "description": "Creates date/time value"
+  },
+
+  "time:now": {
+    "label": "Now",
+    "description": "Returns current date and time",
+    "pins": {
+      "now": "Now"
+    }
+  },
+
+  "time:format": {
+    "label": "Format Time",
+    "description": "Formats date/time to string"
+  },
+
+  "time:add": {
+    "label": "Add Time",
+    "description": "Adds interval to date/time"
+  },
+
+  "time:diff": {
+    "label": "Time Difference",
+    "description": "Calculates difference between dates"
+  },
+
+  "time:compare": {
+    "label": "Compare Time",
+    "description": "Compares two dates/times"
+  },
+
+  "user:check_blacklist": {
+    "label": "Is Blacklisted?",
+    "description": "Checks if user is in blacklist",
+    "pins": {
+      "user": "User",
+      "user_desc": "User to check",
+      "is_blacklisted": "Blacklisted",
+      "is_blacklisted_desc": "True if in blacklist"
+    }
+  },
+
+  "user:set_blacklist": {
+    "label": "Blacklist",
+    "description": "Manages user blacklist",
+    "pins": {
+      "user": "User",
+      "user_desc": "User",
+      "add": "Add",
+      "add_desc": "True = add to blacklist"
+    }
+  },
+
+  "user:get_groups": {
+    "label": "User Groups",
+    "description": "Returns user groups",
+    "pins": {
+      "user": "User",
+      "user_desc": "User",
+      "groups": "Groups",
+      "groups_desc": "Array of groups"
+    }
+  },
+
+  "user:get_permissions": {
+    "label": "User Permissions",
+    "description": "Returns user permissions",
+    "pins": {
+      "user": "User",
+      "user_desc": "User",
+      "permissions": "Permissions",
+      "permissions_desc": "Array of permissions"
+    }
+  },
+
+  "type:to_string": {
+    "label": "To String",
+    "description": "Converts value to string"
+  },
+
+  "bot:get_position": {
+    "label": "Bot Position",
+    "description": "Returns current bot position in the world",
+    "pins": {
+      "position": "Position",
+      "position_desc": "Object with coordinates {x, y, z}"
+    }
+  },
+
+  "debug:log": {
+    "label": "Debug",
+    "description": "Outputs value to server console",
+    "pins": {
+      "exec": "Execute",
+      "value": "Value",
+      "value_desc": "Value to output",
+      "execDone": "Done"
+    }
+  },
+
+  "event:command": {
+    "label": "On Command",
+    "description": "Starting point for command graph",
+    "pins": {
+      "command_name": "Command Name",
+      "user": "User",
+      "args": "Arguments",
+      "chat_type": "Chat Type",
+      "success": "Success",
+      "success_desc": "Returns true if command executed without errors"
+    }
+  },
+
+  "event:chat": {
+    "label": "Chat Message",
+    "description": "Triggers when chat message is received",
+    "pins": {
+      "username": "Player",
+      "message": "Message",
+      "chatType": "Chat Type"
+    }
+  },
+
+  "event:raw_message": {
+    "label": "Raw Message",
+    "description": "Triggers on any message received"
+  },
+
+  "event:player_joined": {
+    "label": "Player Joined",
+    "description": "Triggers when player joins server"
+  },
+
+  "event:player_left": {
+    "label": "Player Left",
+    "description": "Triggers when player leaves server"
+  },
+
+  "event:entity_spawn": {
+    "label": "Entity Spawned",
+    "description": "Triggers when entity spawns"
+  },
+
+  "event:entity_moved": {
+    "label": "Entity Moving",
+    "description": "Triggers when entity moves"
+  },
+
+  "event:entity_gone": {
+    "label": "Entity Gone",
+    "description": "Triggers when entity disappears"
+  },
+
+  "event:bot_died": {
+    "label": "Bot Died",
+    "description": "Triggers when bot dies"
+  },
+
+  "event:bot_startup": {
+    "label": "Bot Startup",
+    "description": "Triggers when bot starts"
+  },
+
+  "event:health": {
+    "label": "Health",
+    "description": "Triggers on health change"
+  },
+
+  "event:websocket_call": {
+    "label": "WebSocket Call",
+    "description": "Triggers on WebSocket call"
+  },
+
+  "inventory:get_all": {
+    "label": "All Inventory",
+    "description": "Returns all bot inventory as item array",
+    "pins": {
+      "items": "Items",
+      "items_desc": "Array of items in inventory",
+      "count": "Slot Count",
+      "count_desc": "Number of occupied slots"
+    }
+  },
+
+  "inventory:find_item": {
+    "label": "Find Item",
+    "description": "Finds item in inventory",
+    "pins": {
+      "itemName": "Item Name",
+      "itemName_desc": "Item name (minecraft id without prefix)",
+      "item": "Item",
+      "item_desc": "Item object {name, count, slot, metadata}",
+      "found": "Found?",
+      "found_desc": "true if item found",
+      "slot": "Slot",
+      "slot_desc": "Slot number where item found"
+    }
+  },
+
+  "inventory:count_item": {
+    "label": "Count Items",
+    "description": "Counts number of items",
+    "pins": {
+      "itemName": "Item Name",
+      "itemName_desc": "Item name to count",
+      "count": "Count",
+      "count_desc": "Total amount of item in inventory"
+    }
+  },
+
+  "inventory:has_item": {
+    "label": "Has Item?",
+    "description": "Checks if item exists",
+    "pins": {
+      "itemName": "Item Name",
+      "itemName_desc": "Item name to check",
+      "minCount": "Min Count",
+      "minCount_desc": "Minimum required amount (default 1)",
+      "hasItem": "Has?",
+      "hasItem_desc": "true if item exists in required amount",
+      "actualCount": "Actual",
+      "actualCount_desc": "Actual item count"
+    }
+  },
+
+  "inventory:get_slot": {
+    "label": "Get Slot",
+    "description": "Gets item from slot",
+    "pins": {
+      "slotNumber": "Slot Number",
+      "slotNumber_desc": "Slot number (0-8 hotbar, 9-35 inventory, 36-39 armor, 40 offhand)",
+      "item": "Item",
+      "item_desc": "Item object or null if slot is empty",
+      "isEmpty": "Empty?",
+      "isEmpty_desc": "true if slot is empty"
+    }
+  },
+
+  "inventory:get_held_item": {
+    "label": "Held Item",
+    "description": "Returns item in hand",
+    "pins": {
+      "hand": "Hand",
+      "hand_desc": "Which hand to check",
+      "item": "Item",
+      "item_desc": "Item object or null",
+      "name": "Name",
+      "name_desc": "Item name",
+      "count": "Count",
+      "count_desc": "Stack count",
+      "hasItem": "Has Item?",
+      "hasItem_desc": "true if hand has item"
+    }
+  },
+
+  "inventory:equip": {
+    "label": "Equip",
+    "description": "Equips item",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name to equip",
+      "destination": "Destination",
+      "destination_desc": "Where to equip item",
+      "success": "Success?",
+      "success_desc": "true if item successfully equipped"
+    }
+  },
+
+  "inventory:drop": {
+    "label": "Drop",
+    "description": "Drops item",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name to drop",
+      "count": "Count",
+      "count_desc": "How many to drop (empty = whole stack)",
+      "dropAll": "Drop all?",
+      "dropAll_desc": "Drop all such items from inventory",
+      "dropped": "Dropped",
+      "dropped_desc": "How many items dropped"
+    }
+  },
+
+  "inventory:select_slot": {
+    "label": "Select Slot",
+    "description": "Selects hotbar slot",
+    "pins": {
+      "slot": "Slot",
+      "slot_desc": "Hotbar slot number (0-8)",
+      "item": "Item",
+      "item_desc": "Item in selected slot (or null)"
+    }
+  },
+
+  "navigation:go_to": {
+    "label": "Go To",
+    "description": "Moves bot to specified coordinates using pathfinding",
+    "pins": {
+      "range": "Range",
+      "range_desc": "Distance to stop at (default 1 block)",
+      "arrived": "Arrived",
+      "failed": "Failed",
+      "success_desc": "true if bot reached the point"
+    }
+  },
+
+  "navigation:go_to_player": {
+    "label": "Go To Player",
+    "description": "Moves bot to player",
+    "pins": {
+      "playerName": "Player Name",
+      "playerName_desc": "Player nickname",
+      "range": "Range",
+      "range_desc": "Distance to stop at",
+      "success": "Success?",
+      "success_desc": "true if bot reached player",
+      "playerPosition": "Player Position",
+      "playerPosition_desc": "Player coordinates {x, y, z}"
+    }
+  },
+
+  "navigation:go_to_entity": {
+    "label": "Go To Entity",
+    "description": "Moves bot to entity",
+    "pins": {
+      "entity": "Entity",
+      "entity_desc": "Entity object (from 'Nearby Entities')",
+      "range": "Range",
+      "range_desc": "Distance to stop at",
+      "success": "Success?",
+      "success_desc": "true if bot reached entity"
+    }
+  },
+
+  "navigation:follow": {
+    "label": "Follow",
+    "description": "Bot follows target",
+    "pins": {
+      "target": "Target",
+      "target_desc": "Player nickname to follow",
+      "range": "Distance",
+      "range_desc": "Distance to keep",
+      "following": "Following?",
+      "following_desc": "true if started following"
+    }
+  },
+
+  "navigation:stop": {
+    "label": "Stop Movement",
+    "description": "Stops bot movement"
+  },
+
+  "container:open": {
+    "label": "Container: Open",
+    "description": "Opens container (chest, barrel) at coordinates",
+    "pins": {
+      "x": "X",
+      "x_desc": "Container X coordinate",
+      "y": "Y",
+      "y_desc": "Container Y coordinate",
+      "z": "Z",
+      "z_desc": "Container Z coordinate",
+      "opened": "Opened",
+      "error": "Error",
+      "container": "Container",
+      "container_desc": "Opened container object",
+      "success": "Success?",
+      "success_desc": "true if container is open"
+    }
+  },
+
+  "container:close": {
+    "label": "Container: Close",
+    "description": "Closes opened container"
+  },
+
+  "container:get_items": {
+    "label": "Container Items",
+    "description": "Gets list of items from opened container",
+    "pins": {
+      "container": "Container",
+      "container_desc": "Container object (if not specified - currently open)",
+      "items": "Items",
+      "items_desc": "Array of items in container",
+      "count": "Count",
+      "count_desc": "Number of occupied slots"
+    }
+  },
+
+  "container:deposit": {
+    "label": "Deposit to Container",
+    "description": "Puts item from inventory into opened container",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name to move",
+      "count": "Count",
+      "count_desc": "Amount (empty = all)",
+      "deposited": "Deposited",
+      "deposited_desc": "How many items deposited",
+      "success": "Success?",
+      "success_desc": "true if anything deposited"
+    }
+  },
+
+  "container:withdraw": {
+    "label": "Withdraw from Container",
+    "description": "Takes item from container to inventory",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name to take",
+      "count": "Count",
+      "count_desc": "Amount (empty = all)",
+      "withdrawn": "Withdrawn",
+      "withdrawn_desc": "How many items withdrawn",
+      "success": "Success?",
+      "success_desc": "true if anything withdrawn"
+    }
+  },
+
+  "container:deposit_all": {
+    "label": "Deposit All",
+    "description": "Puts all items (or specific type) into container",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name (empty = all items)",
+      "keepOne": "Keep 1?",
+      "keepOne_desc": "Keep at least 1 item in inventory",
+      "deposited": "Deposited",
+      "deposited_desc": "How many items deposited"
+    }
+  },
+
+  "container:find_item": {
+    "label": "Find in Container",
+    "description": "Searches for item in opened container",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name to search",
+      "item": "Found",
+      "item_desc": "Found item or null",
+      "slot": "Slot",
+      "slot_desc": "Slot number (-1 if not found)",
+      "totalCount": "Total",
+      "totalCount_desc": "Total amount in container",
+      "found": "Found?",
+      "found_desc": "true if item found"
+    }
+  },
+
+  "furnace:open": {
+    "label": "Furnace: Open",
+    "description": "Opens furnace (regular, blast, smoker) at coordinates",
+    "pins": {
+      "x": "X",
+      "x_desc": "Furnace X coordinate",
+      "y": "Y",
+      "y_desc": "Furnace Y coordinate",
+      "z": "Z",
+      "z_desc": "Furnace Z coordinate",
+      "opened": "Opened",
+      "error": "Error",
+      "furnace": "Furnace",
+      "furnace_desc": "Opened furnace object",
+      "success": "Success?",
+      "success_desc": "true if furnace is open"
+    }
+  },
+
+  "furnace:close": {
+    "label": "Furnace: Close",
+    "description": "Closes furnace"
+  },
+
+  "furnace:put_input": {
+    "label": "Furnace: Put Input",
+    "description": "Puts item in furnace smelting slot",
+    "pins": {
+      "itemName": "Item",
+      "itemName_desc": "Item name for smelting",
+      "count": "Count",
+      "count_desc": "Amount (empty = all)",
+      "success": "Success?",
+      "success_desc": "true if item placed"
+    }
+  },
+
+  "furnace:put_fuel": {
+    "label": "Furnace: Put Fuel",
+    "description": "Puts fuel in furnace fuel slot",
+    "pins": {
+      "itemName": "Fuel",
+      "itemName_desc": "Fuel name (coal, charcoal, etc.)",
+      "count": "Count",
+      "count_desc": "Amount (empty = all)",
+      "success": "Success?",
+      "success_desc": "true if fuel placed"
+    }
+  },
+
+  "furnace:take_output": {
+    "label": "Furnace: Take Output",
+    "description": "Takes finished item from furnace output slot",
+    "pins": {
+      "item": "Item",
+      "item_desc": "Taken item",
+      "count": "Count",
+      "count_desc": "Number of items taken",
+      "success": "Success?",
+      "success_desc": "true if item taken"
+    }
+  },
+
+  "furnace:get_status": {
+    "label": "Furnace: Status",
+    "description": "Gets current furnace status (fuel, progress, items in slots)",
+    "pins": {
+      "inputItem": "Input",
+      "inputItem_desc": "Item in smelting slot",
+      "fuelItem": "Fuel",
+      "fuelItem_desc": "Item in fuel slot",
+      "outputItem": "Output",
+      "outputItem_desc": "Finished item",
+      "fuel": "Fuel%",
+      "fuel_desc": "Remaining fuel (0-1)",
+      "progress": "Progress",
+      "progress_desc": "Smelting progress (0-1)",
+      "isBurning": "Burning?",
+      "isBurning_desc": "true if furnace is working"
+    }
+  }
+}

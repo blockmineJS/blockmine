@@ -1,0 +1,49 @@
+{
+  "notFound": {
+    "title": "Плагин не найден",
+    "description": "Не удалось загрузить информацию о плагине.",
+    "back": "Вернуться назад"
+  },
+  "backToStore": "Вернуться в магазин",
+  "by": "от",
+  "buttons": {
+    "installing": "Установка...",
+    "installed": "Установлен",
+    "install": "Установить",
+    "fork": "Форк"
+  },
+  "stats": {
+    "totalDownloads": "Всего загрузок",
+    "updated": "Обновлено"
+  },
+  "dates": {
+    "today": "Сегодня",
+    "yesterday": "Вчера",
+    "daysAgo": "{{count}} дней назад",
+    "weeksAgo": "{{count}} недель назад",
+    "monthsAgo": "{{count}} месяцев назад"
+  },
+  "tabs": {
+    "overview": "Обзор",
+    "changelog": "Изменения"
+  },
+  "overview": {
+    "description": "Описание",
+    "noDescription": "Описание отсутствует.",
+    "info": "Информация",
+    "version": "Версия",
+    "dependencies": "Зависимости"
+  },
+  "changelog": {
+    "title": "Описание релиза",
+    "empty": {
+      "title": "Описание релиза не найдено",
+      "description": "Описание может быть добавлено в GitHub релиз плагина"
+    }
+  },
+  "messages": {
+    "statsError": "Не удалось загрузить статистику",
+    "releaseError": "Не удалось загрузить описание релиза",
+    "error": "Ошибка"
+  }
+}

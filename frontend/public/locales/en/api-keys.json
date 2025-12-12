@@ -1,0 +1,58 @@
+{
+  "title": "Panel API Keys",
+  "description": "Manage your API keys for REST API and WebSocket panel access",
+  "createKey": "Create API Key",
+  "experimental": "Experimental feature. Documentation not yet available.",
+  "about": {
+    "title": "About Panel API Keys",
+    "description": "Panel API keys allow you to access the BlockMine panel API and WebSocket for automation and integrations. Keys inherit your user permissions by default.",
+    "security": "Security: Treat API keys like passwords. Never share them publicly or add them to version control."
+  },
+  "table": {
+    "title": "Your API Keys",
+    "name": "Name",
+    "prefix": "Key Prefix",
+    "lastUsed": "Last Used",
+    "created": "Created",
+    "status": "Status",
+    "actions": "Actions",
+    "loading": "Loading...",
+    "empty": "No API keys. Create one to get started.",
+    "never": "Never",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "createDialog": {
+    "title": "Create New API Key",
+    "description": "Choose a descriptive name for your API key",
+    "nameLabel": "Key Name",
+    "namePlaceholder": "e.g., Production Bot, Development",
+    "cancel": "Cancel",
+    "create": "Create Key"
+  },
+  "createdDialog": {
+    "title": "API Key Successfully Created!",
+    "description": "Make sure to copy your API key now. You won't be able to see it again!",
+    "warning": "This is the only time you'll see this key. Copy it now!",
+    "nameLabel": "Key Name",
+    "keyLabel": "API Key",
+    "hide": "Hide",
+    "show": "Show",
+    "copy": "Copy",
+    "usage": "Usage Example",
+    "confirm": "I've Saved My Key"
+  },
+  "messages": {
+    "loadError": "Error loading API keys",
+    "nameRequired": "Key name is required",
+    "createSuccess": "API key created successfully",
+    "createError": "Error creating API key",
+    "deleteConfirm": "Are you sure you want to delete this API key? This action is irreversible.",
+    "deleteSuccess": "API key deleted",
+    "deleteError": "Error deleting API key",
+    "copied": "Copied",
+    "copiedDescription": "API key copied to clipboard",
+    "error": "Error",
+    "success": "Success"
+  }
+}

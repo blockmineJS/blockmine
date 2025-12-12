@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "BlockMine",
+    "loading": "Loading..."
+  },
+  "bot": {
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "delete": "Delete",
+    "create": "Create Bot",
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "connecting": "Connecting...",
+      "error": "Error"
+    }
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "close": "Close"
+  },
+  "fields": {
+    "name": "Name"
+  },
+  "messages": {
+    "success": "Success!",
+    "error": "An error occurred",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "copied": "Copied"
+  },
+  "plurals": {
+    "bot_one": "{{count}} bot",
+    "bot_other": "{{count}} bots",
+    "plugin_one": "{{count}} plugin",
+    "plugin_other": "{{count}} plugins"
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,6 +9,7 @@ import { apiHelper } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 export default function ExportBotDialog({ bot, onCancel }) {
+    const { t } = useTranslation('bots');
     const [loading, setLoading] = useState(false);
     const [options, setOptions] = useState({
         includeCommands: true,
@@ -37,10 +39,10 @@ export default function ExportBotDialog({ bot, onCancel }) {
                 link.click();
                 link.parentNode.removeChild(link);
                 window.URL.revokeObjectURL(downloadUrl);
-                toast({ title: "Успех!", description: "Экспорт бота запущен." });
+                toast({ title: t('export.success'), description: t('export.successMessage') });
                 onCancel();
             } else {
-                throw new Error("Не удалось получить файл для скачивания от сервера.");
+                throw new Error(t('export.downloadError'));
             }
         } catch (error) {
             console.error("Ошибка экспорта бота:", error);
@@ -52,53 +54,53 @@ export default function ExportBotDialog({ bot, onCancel }) {
     return (
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Экспорт конфигурации: {bot.username}</DialogTitle>
+                <DialogTitle>{t('export.title', { username: bot.username })}</DialogTitle>
                 <DialogDescription>
-                    Выберите данные, которые вы хотите включить в ZIP-архив.
+                    {t('export.description')}
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
                 <div className="flex items-center space-x-2">
                     <Checkbox id="includeCommands" checked={options.includeCommands} onCheckedChange={(checked) => handleCheckedChange('includeCommands', checked)} />
-                    <Label htmlFor="includeCommands">Настройки команд (алиасы, кулдауны и т.д.)</Label>
+                    <Label htmlFor="includeCommands">{t('export.includeCommands')}</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="includePermissions" checked={options.includePermissions} onCheckedChange={(checked) => handleCheckedChange('includePermissions', checked)} />
-                    <Label htmlFor="includePermissions">Пользователи и права доступа</Label>
+                    <Label htmlFor="includePermissions">{t('export.includePermissions')}</Label>
                 </div>
                 <div className="flex items-start space-x-2">
                     <Checkbox id="includePluginFiles" checked={options.includePluginFiles} onCheckedChange={(checked) => handleCheckedChange('includePluginFiles', checked)} />
                     <div className="grid gap-1.5 leading-none">
-                        <Label htmlFor="includePluginFiles">Включить файлы плагинов</Label>
+                        <Label htmlFor="includePluginFiles">{t('export.includePluginFiles')}</Label>
                         <p className="text-sm text-muted-foreground">
-                            Сохраняет не только список плагинов, но и их файлы, включая конфиги. Рекомендуется для полного бэкапа.
+                            {t('export.includePluginFilesDesc')}
                         </p>
                     </div>
                 </div>
                 <div className="flex items-start space-x-2">
                     <Checkbox id="includePluginDataStore" checked={options.includePluginDataStore} onCheckedChange={(checked) => handleCheckedChange('includePluginDataStore', checked)} />
                     <div className="grid gap-1.5 leading-none">
-                        <Label htmlFor="includePluginDataStore">Базы данных плагинов</Label>
+                        <Label htmlFor="includePluginDataStore">{t('export.includePluginDataStore')}</Label>
                         <p className="text-sm text-muted-foreground">
-                            Все значения, которые плагины хранили в своих базах данных (DataStore), будут сохранены.
+                            {t('export.includePluginDataStoreDesc')}
                         </p>
                     </div>
                 </div>
                 <div className="flex items-start space-x-2">
                     <Checkbox id="includeEventGraphs" checked={options.includeEventGraphs} onCheckedChange={(checked) => handleCheckedChange('includeEventGraphs', checked)} />
                     <div className="grid gap-1.5 leading-none">
-                        <Label htmlFor="includeEventGraphs">Графы событий (субграфы)</Label>
+                        <Label htmlFor="includeEventGraphs">{t('export.includeEventGraphs')}</Label>
                         <p className="text-sm text-muted-foreground">
-                            Сохраняет все созданные графы событий и их настройки.
+                            {t('export.includeEventGraphsDesc')}
                         </p>
                     </div>
                 </div>
             </div>
             <DialogFooter>
-                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button variant="ghost" onClick={onCancel}>{t('export.cancel')}</Button>
                 <Button onClick={handleDownload} disabled={loading}>
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {loading ? 'Экспорт...' : 'Скачать архив'}
+                    {loading ? t('export.exporting') : t('export.download')}
                 </Button>
             </DialogFooter>
         </DialogContent>

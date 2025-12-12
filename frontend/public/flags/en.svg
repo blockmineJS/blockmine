@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7410 3900">
+  <rect fill="#B22234" width="7410" height="3900"/>
+  <g fill="#fff">
+    <rect y="300" width="7410" height="300"/>
+    <rect y="900" width="7410" height="300"/>
+    <rect y="1500" width="7410" height="300"/>
+    <rect y="2100" width="7410" height="300"/>
+    <rect y="2700" width="7410" height="300"/>
+    <rect y="3300" width="7410" height="300"/>
+  </g>
+  <rect fill="#3C3B6E" width="2964" height="2100"/>
+  <g fill="#fff">
+    <g id="s18">
+      <g id="s9">
+        <g id="s5">
+          <g id="s4">
+            <path id="s" d="M247 90l70.534 217.082-184.66-134.164h228.253L176.466 307.082z"/>
+            <use href="#s" y="420"/>
+            <use href="#s" y="840"/>
+            <use href="#s" y="1260"/>
+          </g>
+          <use href="#s" y="1680"/>
+        </g>
+        <use href="#s4" x="247" y="210"/>
+      </g>
+      <use href="#s9" x="494"/>
+    </g>
+    <use href="#s18" x="988"/>
+    <use href="#s9" x="1976"/>
+    <use href="#s5" x="2470"/>
+  </g>
+</svg>

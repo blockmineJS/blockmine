@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
 
 export default function ConfigurationPage() {
+    const { t } = useTranslation('configuration');
     const { botId } = useParams();
 
     const servers = useAppStore((state) => state.servers);
@@ -35,7 +37,7 @@ export default function ConfigurationPage() {
             setAllSettings(data);
             setChanges({});
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
+            toast({ variant: 'destructive', title: t('messages.error'), description: error.message });
         }
         setIsLoading(false);
     }, [botId, toast, refreshBotList]);
@@ -88,7 +90,7 @@ export default function ConfigurationPage() {
                 );
             }
 
-            toast({ title: "Успех!", description: "Все изменения сохранены." });
+            toast({ title: t('messages.success'), description: t('messages.allSaved') });
             setChanges({});
             setFormErrors({});
             
@@ -105,10 +107,10 @@ export default function ConfigurationPage() {
             if (error.message.includes('уже существует')) {
                 setFormErrors({ username: error.message });
             } else {
-                toast({ 
-                    variant: "destructive", 
-                    title: "Ошибка сохранения", 
-                    description: error.message || 'Произошла неизвестная ошибка при сохранении' 
+                toast({
+                    variant: "destructive",
+                    title: t('messages.saveError'),
+                    description: error.message || t('messages.unknownError')
                 });
             }
         }
@@ -116,11 +118,11 @@ export default function ConfigurationPage() {
     };
 
     if (isLoading) {
-        return <div className="text-center p-10">Загрузка конфигурации...</div>;
+        return <div className="text-center p-10">{t('loading')}</div>;
     }
 
     if (!allSettings) {
-        return <div className="text-center p-10 text-destructive">Не удалось загрузить данные.</div>;
+        return <div className="text-center p-10 text-destructive">{t('loadError')}</div>;
     }
 
     const hasChanges = Object.keys(changes).length > 0;
@@ -130,17 +132,17 @@ export default function ConfigurationPage() {
             <header className="p-6 border-b flex justify-between items-center shrink-0">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">
-                        Конфигурация бота
+                        {t('title')}
                     </h2>
-                    <p className="text-sm text-muted-foreground">Все настройки в одном месте. Нажмите "Сохранить", чтобы применить изменения.</p>
+                    <p className="text-sm text-muted-foreground">{t('description')}</p>
                 </div>
-                <Button 
-                    onClick={handleSaveAll} 
+                <Button
+                    onClick={handleSaveAll}
                     disabled={!hasChanges || isSaving || (!canEditBot && !canEditPlugin)}
                     size="lg"
                 >
                     {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-                    Сохранить
+                    {t('save')}
                 </Button>
             </header>
 
@@ -148,11 +150,11 @@ export default function ConfigurationPage() {
                 <TabsList className="m-6 shrink-0 self-start bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg">
                     <TabsTrigger value="general" className="flex items-center gap-2">
                         <Settings className="h-4 w-4" />
-                        Общие
+                        {t('tabs.general')}
                     </TabsTrigger>
                     <TabsTrigger value="plugins" className="flex items-center gap-2">
                         <Puzzle className="h-4 w-4" />
-                        Плагины
+                        {t('tabs.plugins')}
                     </TabsTrigger>
                 </TabsList>
                 
@@ -181,7 +183,7 @@ export default function ConfigurationPage() {
                                             <span>{plugin.name}</span>
                                         </div>
                                         <p className="text-sm font-normal text-muted-foreground ml-4">
-                                            {plugin.description || 'Нет описания.'}
+                                            {plugin.description || t('plugins.noDescription')}
                                         </p>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-6 pb-6 border-t pt-6">
@@ -196,7 +198,7 @@ export default function ConfigurationPage() {
                         </Accordion>
                     ) : (
                         <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed max-w-2xl mx-auto bg-muted/30">
-                            У установленных плагинов нет настраиваемых параметров.
+                            {t('plugins.empty')}
                         </div>
                     )}
                 </TabsContent>

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { FixedSizeList } from 'react-window';
 import { cn } from '@/lib/utils';
 
 export default function BotQuickManageWidget({ bots, botStatuses }) {
+    const { t } = useTranslation('dashboard');
     const { toast } = useToast();
     const navigate = useNavigate();
     const containerRef = useRef(null);
@@ -24,14 +26,14 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                 await apiHelper(`/api/bots/${bot.id}/stop`, { method: 'POST' });
                 setTimeout(async () => {
                     await apiHelper(`/api/bots/${bot.id}/start`, { method: 'POST' });
-                    toast({ title: "Команда отправлена", description: `Бот ${bot.username} перезапускается.` });
+                    toast({ title: t('widgets.quickManage.commandSent'), description: t('widgets.quickManage.restartingBot', { name: bot.username }) });
                 }, 2000);
             } catch (error) {
             }
             return;
         }
         try {
-            await apiHelper(`/api/bots/${bot.id}/${action}`, { method: 'POST' }, `Команда ${action} отправлена боту.`);
+            await apiHelper(`/api/bots/${bot.id}/${action}`, { method: 'POST' }, t('widgets.quickManage.actionSent', { action }));
         } catch (error) {
         }
     };
@@ -82,11 +84,11 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                 </div>
                 <div className="flex-1">
                     <span className={`px-3 py-1 text-xs rounded-full font-medium ${
-                        isRunning 
-                            ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
+                        isRunning
+                            ? 'bg-green-500/10 text-green-600 border border-green-500/20'
                             : 'bg-red-500/10 text-red-600 border border-red-500/20'
                     }`}>
-                        {isRunning ? 'Запущен' : 'Остановлен'}
+                        {isRunning ? t('widgets.quickManage.running') : t('widgets.quickManage.stopped')}
                     </span>
                 </div>
                 <div className="flex-1 flex justify-end">
@@ -99,23 +101,23 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                         <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem disabled={isRunning} onClick={() => handleAction(bot, 'start')} className="cursor-pointer">
                                 <Play className="mr-2 h-4 w-4" />
-                                Запустить
+                                {t('widgets.quickManage.start')}
                             </DropdownMenuItem>
                             <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'stop')} className="text-destructive cursor-pointer">
                                 <Square className="mr-2 h-4 w-4" />
-                                Остановить
+                                {t('widgets.quickManage.stop')}
                             </DropdownMenuItem>
                             <DropdownMenuItem disabled={!isRunning} onClick={() => handleAction(bot, 'restart')} className="cursor-pointer">
                                 <RefreshCw className="mr-2 h-4 w-4" />
-                                Перезапустить
+                                {t('widgets.quickManage.restart')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/console`)} className="cursor-pointer">
                                 <Terminal className="mr-2 h-4 w-4" />
-                                Консоль
+                                {t('widgets.quickManage.console')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate(`/bots/${bot.id}/settings`)} className="cursor-pointer">
                                 <Settings className="mr-2 h-4 w-4" />
-                                Настройки
+                                {t('widgets.quickManage.settings')}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -127,15 +129,15 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
     return (
         <div className="h-full flex flex-col">
             <div className="mb-4">
-                <CardTitle className="text-base font-semibold">Все боты</CardTitle>
-                <CardDescription className="text-sm">Быстрое управление состоянием всех ботов в системе</CardDescription>
+                <CardTitle className="text-base font-semibold">{t('widgets.quickManage.title')}</CardTitle>
+                <CardDescription className="text-sm">{t('widgets.quickManage.description')}</CardDescription>
             </div>
             
             <div className="flex-grow overflow-hidden border rounded-lg bg-background/50 flex flex-col">
                 <div className="flex items-center px-4 py-2 bg-muted/50 border-b shrink-0">
-                    <div className="flex-1 font-semibold text-sm text-muted-foreground">Бот</div>
-                    <div className="flex-1 font-semibold text-sm text-muted-foreground">Статус</div>
-                    <div className="flex-1 text-right font-semibold text-sm text-muted-foreground">Действия</div>
+                    <div className="flex-1 font-semibold text-sm text-muted-foreground">{t('widgets.quickManage.bot')}</div>
+                    <div className="flex-1 font-semibold text-sm text-muted-foreground">{t('widgets.quickManage.status')}</div>
+                    <div className="flex-1 text-right font-semibold text-sm text-muted-foreground">{t('widgets.quickManage.actions')}</div>
                 </div>
 
                 <div className="flex-grow" ref={containerRef}>
@@ -152,7 +154,7 @@ export default function BotQuickManageWidget({ bots, botStatuses }) {
                     )}
                     {bots.length === 0 && (
                         <div className="flex items-center justify-center h-full text-muted-foreground">
-                            <p>Боты не найдены.</p>
+                            <p>{t('widgets.quickManage.noBots')}</p>
                         </div>
                     )}
                 </div>

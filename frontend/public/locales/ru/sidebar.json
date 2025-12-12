@@ -1,0 +1,27 @@
+{
+  "dashboard": "Дашборд",
+  "scheduler": "Планировщик",
+  "graphStore": "Магазин графов",
+  "apiKeys": "API Ключи",
+  "proxy": "Прокси",
+  "changelog": "История версий",
+  "bots": "Боты",
+  "admin": "Администрирование",
+  "servers": "Серверы",
+  "proxies": "Прокси",
+  "createBot": "Создать бота",
+  "createBotTitle": "Создание нового бота",
+  "createBotDescription": "Заполните информацию ниже, чтобы добавить нового бота в панель.",
+  "importBot": "Импорт бота",
+  "logout": "Выйти",
+  "whatsNew": "Что нового?",
+  "openMenu": "Открыть меню",
+  "botImported": "Бот \"{{name}}\" успешно импортирован.",
+  "botOrderError": "Не удалось обновить порядок ботов",
+  "contribute": {
+    "suggest": "Предложить улучшение",
+    "change": "Предложить изменение",
+    "question": "Задать вопрос",
+    "improve": "Улучшить BlockMine"
+  }
+}

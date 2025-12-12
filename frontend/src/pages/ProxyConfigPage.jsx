@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ProxyConfigPage() {
+    const { t } = useTranslation('proxies');
     const { toast } = useToast();
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
@@ -49,26 +51,26 @@ export default function ProxyConfigPage() {
 
     const validateProxySettings = (settings) => {
         const newErrors = {};
-        
+
         if (!settings.host.trim()) {
-            newErrors.host = 'IP адрес обязателен';
+            newErrors.host = t('config.validation.hostRequired');
         } else if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(settings.host.trim())) {
-            newErrors.host = 'Неверный формат IP адреса';
+            newErrors.host = t('config.validation.hostInvalid');
         }
-        
+
         if (!settings.port.trim()) {
-            newErrors.port = 'Порт обязателен';
+            newErrors.port = t('config.validation.portRequired');
         } else {
             const port = parseInt(settings.port);
             if (isNaN(port) || port < 1 || port > 65535) {
-                newErrors.port = 'Порт должен быть между 1 и 65535';
+                newErrors.port = t('config.validation.portRange');
             }
         }
-        
+
         if (settings.username && settings.username.length < 3) {
-            newErrors.username = 'Имя пользователя должно содержать минимум 3 символа';
+            newErrors.username = t('config.validation.usernameMin');
         }
-        
+
         return newErrors;
     };
 
@@ -109,13 +111,13 @@ export default function ProxyConfigPage() {
         try {
             await new Promise(resolve => setTimeout(resolve, 2000));
             toast({
-                title: "Тест соединения",
-                description: "Подключение к проксе успешно!",
+                title: t('config.messages.testTitle'),
+                description: t('config.messages.testSuccess'),
             });
         } catch (error) {
             toast({
-                title: "Ошибка теста",
-                description: "Не удалось подключиться к прокси серверу",
+                title: t('config.messages.testTitle'),
+                description: t('config.messages.testError'),
                 variant: "destructive",
             });
         } finally {
@@ -132,8 +134,8 @@ export default function ProxyConfigPage() {
 
         if (selectedBots.length === 0) {
             toast({
-                title: "Ошибка",
-                description: "Выберите хотя бы одного бота",
+                title: t('common:error'),
+                description: t('config.messages.selectBot'),
                 variant: "destructive",
             });
             return;
@@ -158,20 +160,20 @@ export default function ProxyConfigPage() {
             
             if (result.success) {
                 toast({
-                    title: "Успех!",
-                    description: `Настройки прокси применены к ${selectedBots.length} бот(ам)`,
+                    title: t('config.messages.success'),
+                    description: t('config.messages.applySuccess', { count: selectedBots.length }),
                 });
-                
+
                 setProxySettings({ host: '', port: '', username: '', password: '' });
                 setSelectedBots([]);
             } else {
-                throw new Error(result.error || 'Неизвестная ошибка');
+                throw new Error(result.error || t('common:error'));
             }
         } catch (error) {
             console.error('Proxy application error:', error);
             toast({
-                title: "Ошибка",
-                description: error.message || "Не удалось применить настройки прокси",
+                title: t('common:error'),
+                description: error.message || t('config.messages.applyError'),
                 variant: "destructive",
             });
         } finally {
@@ -195,8 +197,8 @@ export default function ProxyConfigPage() {
             <div className="flex items-center gap-3 mb-6">
                 <Globe className="h-8 w-8 text-blue-600" />
                 <div>
-                    <h1 className="text-3xl font-bold">Прокси конфигурация</h1>
-                    <p className="text-muted-foreground">Настройка прокси для нескольких ботов одновременно</p>
+                    <h1 className="text-3xl font-bold">{t('config.title')}</h1>
+                    <p className="text-muted-foreground">{t('config.subtitle')}</p>
                 </div>
             </div>
 
@@ -205,19 +207,19 @@ export default function ProxyConfigPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Globe className="h-5 w-5" />
-                            Настройки прокси
+                            {t('config.settings.title')}
                         </CardTitle>
                         <CardDescription>
-                            Введите параметры SOCKS5 прокси сервера
+                            {t('config.settings.description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="host">IP адрес *</Label>
+                                <Label htmlFor="host">{t('config.settings.host')} *</Label>
                                 <Input
                                     id="host"
-                                    placeholder="127.0.0.1"
+                                    placeholder={t('config.settings.hostPlaceholder')}
                                     value={proxySettings.host}
                                     onChange={(e) => handleSettingsChange('host', e.target.value)}
                                     className={cn(errors.host && "border-red-500")}
@@ -227,11 +229,11 @@ export default function ProxyConfigPage() {
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="port">Порт *</Label>
+                                <Label htmlFor="port">{t('config.settings.port')} *</Label>
                                 <Input
                                     id="port"
                                     type="number"
-                                    placeholder="1080"
+                                    placeholder={t('config.settings.portPlaceholder')}
                                     min="1"
                                     max="65535"
                                     value={proxySettings.port}
@@ -243,12 +245,12 @@ export default function ProxyConfigPage() {
                                 )}
                             </div>
                         </div>
-                        
+
                         <div className="space-y-2">
-                            <Label htmlFor="username">Имя пользователя</Label>
+                            <Label htmlFor="username">{t('config.settings.username')}</Label>
                             <Input
                                 id="username"
-                                placeholder="Оставьте пустым если не требуется"
+                                placeholder={t('config.settings.optionalPlaceholder')}
                                 value={proxySettings.username}
                                 onChange={(e) => handleSettingsChange('username', e.target.value)}
                                 className={cn(errors.username && "border-red-500")}
@@ -257,13 +259,13 @@ export default function ProxyConfigPage() {
                                 <p className="text-sm text-red-500">{errors.username}</p>
                             )}
                         </div>
-                        
+
                         <div className="space-y-2">
-                            <Label htmlFor="password">Пароль</Label>
+                            <Label htmlFor="password">{t('config.settings.password')}</Label>
                             <Input
                                 id="password"
                                 type="password"
-                                placeholder="Оставьте пустым если не требуется"
+                                placeholder={t('config.settings.optionalPlaceholder')}
                                 value={proxySettings.password}
                                 onChange={(e) => handleSettingsChange('password', e.target.value)}
                             />
@@ -281,7 +283,7 @@ export default function ProxyConfigPage() {
                                 ) : (
                                     <TestTube className="h-4 w-4 mr-2" />
                                 )}
-                                Тест соединения
+                                {t('config.buttons.testConnection')}
                             </Button>
                             <Button
                                 variant="outline"
@@ -289,7 +291,7 @@ export default function ProxyConfigPage() {
                                 disabled={isApplying}
                             >
                                 <X className="h-4 w-4 mr-2" />
-                                Очистить
+                                {t('config.buttons.clear')}
                             </Button>
                         </div>
                     </CardContent>
@@ -298,13 +300,13 @@ export default function ProxyConfigPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center justify-between">
-                            <span>Выбор ботов</span>
+                            <span>{t('config.botSelection.title')}</span>
                             <Badge variant="secondary">
                                 {selectedBotsCount}/{totalBotsCount}
                             </Badge>
                         </CardTitle>
                         <CardDescription>
-                            Выберите ботов для применения настроек прокси
+                            {t('config.botSelection.description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -312,13 +314,13 @@ export default function ProxyConfigPage() {
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Поиск ботов..."
+                                    placeholder={t('config.botSelection.search')}
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     className="pl-10"
                                 />
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                                 <Checkbox
                                     id="select-all"
@@ -326,7 +328,7 @@ export default function ProxyConfigPage() {
                                     onCheckedChange={handleSelectAll}
                                 />
                                 <Label htmlFor="select-all" className="text-sm font-medium">
-                                    Выбрать всех ({totalBotsCount})
+                                    {t('config.botSelection.selectAll')} ({totalBotsCount})
                                 </Label>
                             </div>
                         </div>
@@ -337,7 +339,7 @@ export default function ProxyConfigPage() {
                             {groupedBots.running.length > 0 && (
                                 <div>
                                     <p className="text-sm font-medium text-green-600 mb-2">
-                                        Запущенные боты ({groupedBots.running.length})
+                                        {t('config.botSelection.running')} ({groupedBots.running.length})
                                     </p>
                                     {groupedBots.running.map(bot => (
                                         <div key={bot.id} className="flex items-center space-x-3 p-2 rounded-lg border">
@@ -358,7 +360,7 @@ export default function ProxyConfigPage() {
                                                 </p>
                                                 {bot.proxyHost && (
                                                     <p className="text-xs text-blue-600">
-                                                        Прокси: {bot.proxyHost}:{bot.proxyPort}
+                                                        {t('config.botSelection.proxy')}: {bot.proxyHost}:{bot.proxyPort}
                                                     </p>
                                                 )}
                                             </div>
@@ -370,7 +372,7 @@ export default function ProxyConfigPage() {
                             {groupedBots.stopped.length > 0 && (
                                 <div>
                                     <p className="text-sm font-medium text-gray-600 mb-2 mt-4">
-                                        Остановленные боты ({groupedBots.stopped.length})
+                                        {t('config.botSelection.stopped')} ({groupedBots.stopped.length})
                                     </p>
                                     {groupedBots.stopped.map(bot => (
                                         <div key={bot.id} className="flex items-center space-x-3 p-2 rounded-lg border opacity-75">
@@ -391,7 +393,7 @@ export default function ProxyConfigPage() {
                                                 </p>
                                                 {bot.proxyHost && (
                                                     <p className="text-xs text-blue-600">
-                                                        Прокси: {bot.proxyHost}:{bot.proxyPort}
+                                                        {t('config.botSelection.proxy')}: {bot.proxyHost}:{bot.proxyPort}
                                                     </p>
                                                 )}
                                             </div>
@@ -403,7 +405,7 @@ export default function ProxyConfigPage() {
                             {filteredBots.length === 0 && (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Globe className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                    <p>Боты не найдены</p>
+                                    <p>{t('config.botSelection.notFound')}</p>
                                 </div>
                             )}
                         </div>
@@ -420,7 +422,7 @@ export default function ProxyConfigPage() {
                                 ) : (
                                     <Check className="h-4 w-4 mr-2" />
                                 )}
-                                Применить к выбранным ({selectedBotsCount})
+                                {t('config.buttons.apply')} ({selectedBotsCount})
                             </Button>
                         </div>
                     </CardContent>
@@ -430,27 +432,26 @@ export default function ProxyConfigPage() {
             <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Подтверждение применения прокси</DialogTitle>
+                        <DialogTitle>{t('config.confirmDialog.title')}</DialogTitle>
                         <DialogDescription>
-                            Вы собираетесь применить настройки прокси к {selectedBotsCount} бот(ам).
-                            Это действие обновит конфигурацию ботов.
+                            {t('config.confirmDialog.description', { count: selectedBotsCount })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <div className="space-y-2 text-sm">
-                            <p><strong>Прокси сервер:</strong> {proxySettings.host}:{proxySettings.port}</p>
+                            <p><strong>{t('config.confirmDialog.proxyServer')}:</strong> {proxySettings.host}:{proxySettings.port}</p>
                             {proxySettings.username && (
-                                <p><strong>Пользователь:</strong> {proxySettings.username}</p>
+                                <p><strong>{t('config.confirmDialog.user')}:</strong> {proxySettings.username}</p>
                             )}
-                            <p><strong>Количество ботов:</strong> {selectedBotsCount}</p>
+                            <p><strong>{t('config.confirmDialog.botCount')}:</strong> {selectedBotsCount}</p>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
-                            Отмена
+                            {t('config.confirmDialog.cancel')}
                         </Button>
                         <Button onClick={confirmApplyProxy}>
-                            Применить
+                            {t('config.confirmDialog.apply')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

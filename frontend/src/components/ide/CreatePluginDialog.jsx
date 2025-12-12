@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dialog,
     DialogContent,
@@ -18,6 +19,7 @@ const VALID_PLUGIN_NAME_PATTERN = /[^a-zA-Z0-9-]/g;
 const isValidPluginName = (name) => /^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$/.test(name);
 
 export default function CreatePluginDialog({ open, onOpenChange, onCreate }) {
+    const { t } = useTranslation('plugins');
     const [name, setName] = useState('');
     const [template, setTemplate] = useState('empty');
     const [error, setError] = useState('');
@@ -26,7 +28,7 @@ export default function CreatePluginDialog({ open, onOpenChange, onCreate }) {
         const sanitizedName = e.target.value.replace(VALID_PLUGIN_NAME_PATTERN, '');
         setName(sanitizedName);
         if (sanitizedName && !isValidPluginName(sanitizedName)) {
-            setError('Неверный формат имени. Имя должно состоять из букв, цифр и дефисов, но не может начинаться или заканчиваться дефисом.');
+            setError(t('createDialog.invalidNameFormat'));
         } else {
             setError('');
         }
@@ -36,8 +38,8 @@ export default function CreatePluginDialog({ open, onOpenChange, onCreate }) {
         if (!isValidPluginName(name)) {
             toast({
                 variant: 'destructive',
-                title: 'Ошибка валидации',
-                description: 'Пожалуйста, введите корректное имя плагина.'
+                title: t('createDialog.validationError'),
+                description: t('createDialog.enterValidName')
             });
             return;
         }
@@ -53,38 +55,38 @@ export default function CreatePluginDialog({ open, onOpenChange, onCreate }) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Создать новый плагин</DialogTitle>
+                    <DialogTitle>{t('createDialog.title')}</DialogTitle>
                     <DialogDescription>
-                        Введите имя для вашего нового плагина. Имя должно быть уникальным.
+                        {t('createDialog.description')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Имя плагина (например, my-awesome-plugin)</Label>
-                        <Input 
-                            id="name" 
+                        <Label htmlFor="name">{t('createDialog.nameLabel')} ({t('createDialog.namePlaceholder')})</Label>
+                        <Input
+                            id="name"
                             value={name}
                             onChange={handleNameChange}
                         />
                         {error && <p className="text-sm text-destructive">{error}</p>}
                     </div>
                     <div className="space-y-2">
-                        <Label>Шаблон</Label>
+                        <Label>{t('createDialog.templateLabel')}</Label>
                         <RadioGroup value={template} onValueChange={setTemplate}>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="empty" id="r1" />
-                                <Label htmlFor="r1">Пустой плагин</Label>
+                                <Label htmlFor="r1">{t('createDialog.templates.empty')}</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="command" id="r2" />
-                                <Label htmlFor="r2">Плагин с командой-примером</Label>
+                                <Label htmlFor="r2">{t('createDialog.templates.command')}</Label>
                             </div>
                         </RadioGroup>
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
-                    <Button onClick={handleCreate} disabled={isButtonDisabled}>Создать и открыть</Button>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>{t('actions.cancel')}</Button>
+                    <Button onClick={handleCreate} disabled={isButtonDisabled}>{t('createDialog.create')}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

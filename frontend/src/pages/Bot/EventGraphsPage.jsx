@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useTransition } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { ReactFlowProvider } from 'reactflow';
 import VisualEditorCanvas from '../../components/visual-editor/VisualEditorCanvas';
@@ -31,18 +32,18 @@ function EventGraphsPage() {
   }
 }
 
-function EmptyState({ onActionClick }) {
+function EmptyState({ onActionClick, t }) {
     return (
         <div className="text-center p-12 border-2 border-dashed rounded-lg">
             <ToyBrick className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium">Графов событий пока нет</h3>
+            <h3 className="mt-4 text-lg font-medium">{t('empty.title')}</h3>
             <p className="mt-1 text-sm text-gray-500">
-                Начните с создания своего первого графа для автоматизации действий бота.
+                {t('empty.description')}
             </p>
             <div className="mt-6">
                 <Button onClick={onActionClick}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Создать первый граф
+                    {t('empty.createFirst')}
                 </Button>
             </div>
         </div>
@@ -57,6 +58,7 @@ function EventGraphList({ botId }) {
   const [sharingGraphId, setSharingGraphId] = useState(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const { t } = useTranslation('event-graphs');
 
   const fetchEventGraphs = async () => {
     setLoading(true);
@@ -64,7 +66,7 @@ function EventGraphList({ botId }) {
       const graphs = await apiHelper(`/api/bots/${botId}/event-graphs`);
       setEventGraphs(graphs);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить графы событий.' });
+      toast({ variant: 'destructive', title: t('messages.error'), description: t('messages.loadError') });
     }
     setLoading(false);
   };
@@ -77,9 +79,9 @@ function EventGraphList({ botId }) {
           body: { isEnabled: !graph.isEnabled },
         });
         setEventGraphs(prev => prev.map(g => (g.id === graph.id ? { ...g, isEnabled: updatedGraph.isEnabled } : g)));
-        toast({ title: 'Успешно', description: `Граф "${graph.name}" был ${updatedGraph.isEnabled ? 'включен' : 'выключен'}.` });
+        toast({ title: t('messages.success'), description: t('messages.toggleSuccess', { name: graph.name, status: updatedGraph.isEnabled ? t('messages.enabled') : t('messages.disabled') }) });
       } catch (error) {
-        toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось изменить статус графа.' });
+        toast({ variant: 'destructive', title: t('messages.error'), description: t('messages.toggleError') });
       }
     });
   };
@@ -87,10 +89,10 @@ function EventGraphList({ botId }) {
   const handleDuplicate = async (graphId) => {
     try {
         await apiHelper(`/api/bots/${botId}/event-graphs/${graphId}/duplicate`, { method: 'POST' });
-        toast({ title: 'Успешно', description: `Граф был скопирован.` });
+        toast({ title: t('messages.success'), description: t('messages.duplicateSuccess') });
         fetchEventGraphs();
     } catch (error) {
-        toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось скопировать граф.' });
+        toast({ variant: 'destructive', title: t('messages.error'), description: t('messages.duplicateError') });
     }
   };
 
@@ -108,24 +110,24 @@ function EventGraphList({ botId }) {
   }, [botId]);
 
   if (loading) {
-    return <div>Загрузка графов событий...</div>;
+    return <div>{t('loading.graphs')}</div>;
   }
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h1 className="text-2xl font-bold">Графы событий</h1>
-            <p className="text-muted-foreground">Управляйте сценариями поведения вашего бота.</p>
+            <h1 className="text-2xl font-bold">{t('title')}</h1>
+            <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <Share2 className="mr-2 h-4 w-4" />
-            Импорт
+            {t('actions.import')}
           </Button>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Создать
+            {t('actions.create')}
           </Button>
         </div>
       </div>
@@ -135,18 +137,18 @@ function EventGraphList({ botId }) {
       <ShareEventGraphDialog botId={botId} graphId={sharingGraphId} onCancel={() => setSharingGraphId(null)} />
 
       {eventGraphs.length === 0 ? (
-        <EmptyState onActionClick={() => setIsCreateDialogOpen(true)} />
+        <EmptyState onActionClick={() => setIsCreateDialogOpen(true)} t={t} />
       ) : (
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Статус</TableHead>
-                <TableHead>Название</TableHead>
-                <TableHead>Плагин</TableHead>
-                <TableHead>Триггеры</TableHead>
-                <TableHead>Статистика</TableHead>
-                <TableHead className="text-right">Действия</TableHead>
+                <TableHead className="w-[80px]">{t('table.status')}</TableHead>
+                <TableHead>{t('table.name')}</TableHead>
+                <TableHead>{t('table.plugin')}</TableHead>
+                <TableHead>{t('table.triggers')}</TableHead>
+                <TableHead>{t('table.stats')}</TableHead>
+                <TableHead className="text-right">{t('table.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,7 +188,7 @@ function EventGraphList({ botId }) {
                             <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
                           </Link>
                         </TooltipTrigger>
-                        <TooltipContent>Редактировать</TooltipContent>
+                        <TooltipContent>{t('actions.edit')}</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
 
@@ -197,29 +199,29 @@ function EventGraphList({ botId }) {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleDuplicate(graph.id)}>
                           <Copy className="mr-2 h-4 w-4" />
-                          <span>Дублировать</span>
+                          <span>{t('actions.duplicate')}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setSharingGraphId(graph.id)}>
                           <Share2 className="mr-2 h-4 w-4" />
-                          <span>Поделиться</span>
+                          <span>{t('actions.share')}</span>
                         </DropdownMenuItem>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-500 focus:text-red-500">
                               <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Удалить</span>
+                              <span>{t('actions.delete')}</span>
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                              <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Это действие необратимо. Граф "{graph.name}" будет удален навсегда.
+                                {t('deleteDialog.description', { name: graph.name })}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Отмена</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteEventGraph(graph.id)} className="bg-destructive hover:bg-destructive/90">Удалить</AlertDialogAction>
+                              <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteEventGraph(graph.id)} className="bg-destructive hover:bg-destructive/90">{t('actions.delete')}</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
@@ -239,6 +241,7 @@ function EventGraphList({ botId }) {
 function EventGraphEditor({ botId, eventId }) {
   const { init, isLoading, command, saveGraph, isSaving } = useVisualEditorStore();
   const [error, setError] = useState(null);
+  const { t } = useTranslation('event-graphs');
 
   useEffect(() => {
     useVisualEditorStore.setState({ nodes: [], edges: [], command: null, isLoading: true });
@@ -257,20 +260,20 @@ function EventGraphEditor({ botId, eventId }) {
   }, [botId, eventId]);
 
   if (isLoading) {
-    return <div>Загрузка графа события...</div>;
+    return <div>{t('loading.editor')}</div>;
   }
 
   if (error) {
-    return <div>Ошибка: {error}</div>;
+    return <div>{t('messages.error')}: {error}</div>;
   }
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-900 text-white">
       <ReactFlowProvider>
         <header className="p-2 border-b flex justify-between items-center">
-          <h1 className="text-lg font-bold">Редактор графа: {command?.name}</h1>
+          <h1 className="text-lg font-bold">{t('editor.title')}: {command?.name}</h1>
           <Button onClick={() => saveGraph(botId, 'event')} disabled={isSaving}>
-            {isSaving ? 'Сохранение...' : 'Сохранить'}
+            {isSaving ? t('actions.saving') : t('actions.save')}
           </Button>
         </header>
         <ResizablePanelGroup direction="horizontal" className="flex-grow">

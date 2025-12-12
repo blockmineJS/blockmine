@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +12,7 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { apiHelper } from '@/lib/api';
 
 export default function ServersPage() {
+    const { t } = useTranslation('servers');
     const servers = useAppStore((state) => state.servers);
     const fetchInitialData = useAppStore((state) => state.fetchInitialData);
     const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +58,7 @@ export default function ServersPage() {
             await apiHelper(url, {
                 method,
                 body: JSON.stringify(serverData),
-            }, `Сервер успешно ${isEdit ? 'обновлен' : 'создан'}.`);
+            }, t(isEdit ? 'messages.updated' : 'messages.created'));
             
             handleCloseModal();
             await fetchInitialData();
@@ -68,7 +70,7 @@ export default function ServersPage() {
     const handleConfirmDelete = async () => {
         if (!serverToDelete) return;
         try {
-            await apiHelper(`/api/servers/${serverToDelete.id}`, { method: 'DELETE' }, "Сервер удален.");
+            await apiHelper(`/api/servers/${serverToDelete.id}`, { method: 'DELETE' }, t('messages.deleted'));
             await fetchInitialData();
         } catch (error) {
         }
@@ -80,14 +82,14 @@ export default function ServersPage() {
                 <Card className="h-full flex flex-col">
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
-                            <CardTitle>Управление серверами</CardTitle>
-                            <CardDescription>Добавляйте и редактируйте серверы, к которым будут подключаться боты.</CardDescription>
+                            <CardTitle>{t('title')}</CardTitle>
+                            <CardDescription>{t('description')}</CardDescription>
                         </div>
                         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => handleOpenModal()}>
                                     <Plus className="mr-2 h-4 w-4" />
-                                    Добавить сервер
+                                    {t('addServer')}
                                 </Button>
                             </DialogTrigger>
                             <ServerForm server={editingServer} onSubmit={handleSubmit} onCancel={handleCloseModal} isSaving={isSaving} />
@@ -97,10 +99,10 @@ export default function ServersPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Название</TableHead>
-                                    <TableHead>Адрес</TableHead>
-                                    <TableHead>Версия</TableHead>
-                                    <TableHead className="text-right">Действия</TableHead>
+                                    <TableHead>{t('table.name')}</TableHead>
+                                    <TableHead>{t('table.address')}</TableHead>
+                                    <TableHead>{t('table.version')}</TableHead>
+                                    <TableHead className="text-right">{t('table.actions')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -109,7 +111,7 @@ export default function ServersPage() {
                                         <TableCell colSpan={4} className="text-center h-24">
                                             <div className="flex justify-center items-center">
                                                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                                                Загрузка серверов...
+                                                {t('loading')}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -132,7 +134,7 @@ export default function ServersPage() {
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
-                                            Серверы не найдены. Добавьте свой первый сервер.
+                                            {t('empty')}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -146,10 +148,10 @@ export default function ServersPage() {
                  <ConfirmationDialog
                     open={!!serverToDelete}
                     onOpenChange={() => setServerToDelete(null)}
-                    title={`Удалить сервер "${serverToDelete.name}"?`}
-                    description="Это действие необратимо. Если к этому серверу привязаны боты, вы не сможете его удалить."
+                    title={t('deleteDialog.title', { name: serverToDelete.name })}
+                    description={t('deleteDialog.description')}
                     onConfirm={handleConfirmDelete}
-                    confirmText="Да, удалить"
+                    confirmText={t('deleteDialog.confirm')}
                 />
             )}
         </>

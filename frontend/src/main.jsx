@@ -2,10 +2,12 @@ import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import './index.css';
+import './i18n';
 
 import { useAppStore } from '@/stores/appStore';
 import { Toaster } from "@/components/ui/toaster";
 import { Loader2 } from 'lucide-react';
+import LanguageSelectModal from '@/components/LanguageSelectModal';
 
 import Layout from "./pages/Layout";
 import LoginPage from "./pages/LoginPage";
@@ -56,7 +58,12 @@ function Root() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <LanguageSelectModal />
+      <Outlet />
+    </>
+  );
 }
 
 function ProtectedLayout() {

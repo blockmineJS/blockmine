@@ -1,0 +1,49 @@
+{
+  "notFound": {
+    "title": "Plugin not found",
+    "description": "Failed to load plugin information.",
+    "back": "Go back"
+  },
+  "backToStore": "Back to store",
+  "by": "by",
+  "buttons": {
+    "installing": "Installing...",
+    "installed": "Installed",
+    "install": "Install",
+    "fork": "Fork"
+  },
+  "stats": {
+    "totalDownloads": "Total downloads",
+    "updated": "Updated"
+  },
+  "dates": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "weeksAgo": "{{count}} weeks ago",
+    "monthsAgo": "{{count}} months ago"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "changelog": "Changelog"
+  },
+  "overview": {
+    "description": "Description",
+    "noDescription": "No description available.",
+    "info": "Information",
+    "version": "Version",
+    "dependencies": "Dependencies"
+  },
+  "changelog": {
+    "title": "Release notes",
+    "empty": {
+      "title": "No release notes found",
+      "description": "Release notes can be added to the plugin's GitHub release"
+    }
+  },
+  "messages": {
+    "statsError": "Failed to load statistics",
+    "releaseError": "Failed to load release notes",
+    "error": "Error"
+  }
+}

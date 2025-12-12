@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import { api } from '@/lib/api';
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
 export default function GraphStorePage() {
+    const { t } = useTranslation('graph-store');
     const [graphs, setGraphs] = useState([]);
     const [categories, setCategories] = useState([]);
     const [bots, setBots] = useState([]);
@@ -49,7 +51,7 @@ export default function GraphStorePage() {
             const data = await response.json();
             setCategories(data);
         } catch (error) {
-            console.error('Ошибка загрузки категорий:', error);
+            console.error('Error loading categories:', error);
             setCategories([]);
             setServerAvailable(false);
         }
@@ -70,10 +72,10 @@ export default function GraphStorePage() {
             const data = await response.json();
             setGraphs(data.graphs || []);
         } catch (error) {
-            console.error('Ошибка загрузки графов:', error);
+            console.error('Error loading graphs:', error);
             setGraphs([]);
             setServerAvailable(false);
-            toast.error('Сервер магазина графов недоступен');
+            toast.error(t('messages.serverUnavailable'));
         } finally {
             setLoading(false);
         }
@@ -84,7 +86,7 @@ export default function GraphStorePage() {
             const botsData = await api.get('/api/bots');
             setBots(botsData || []);
         } catch (error) {
-            console.error('Ошибка загрузки ботов:', error);
+            console.error('Error loading bots:', error);
             setBots([]);
         }
     };
@@ -97,7 +99,7 @@ export default function GraphStorePage() {
 
     const handleInstallConfirm = async () => {
         if (!selectedBot) {
-            toast.error('Выберите бота для установки');
+            toast.error(t('messages.selectBotError'));
             return;
         }
 
@@ -109,7 +111,7 @@ export default function GraphStorePage() {
             });
             
             if (!response.ok) {
-                throw new Error('Не удалось получить данные графа');
+                throw new Error(t('messages.downloadError'));
             }
             
             const data = await response.json();
@@ -134,15 +136,15 @@ export default function GraphStorePage() {
                 };
                 
                 try {
-                    await api.post(`/api/bots/${selectedBot}/commands`, commandData, 'Команда успешно создана!');
+                    await api.post(`/api/bots/${selectedBot}/commands`, commandData, t('messages.commandCreated'));
                 } catch (error) {
                     if (error.message.includes('already exists')) {
-                        const newName = prompt(`Команда с именем "${selectedGraph.name}" уже существует. Введите новое имя для команды:`, `${selectedGraph.name}_copy`);
+                        const newName = prompt(t('messages.alreadyExistsCommand', { name: selectedGraph.name }), `${selectedGraph.name}_copy`);
                         if (newName && newName.trim()) {
                             commandData.name = newName.trim();
-                            await api.post(`/api/bots/${selectedBot}/commands`, commandData, 'Команда успешно создана!');
+                            await api.post(`/api/bots/${selectedBot}/commands`, commandData, t('messages.commandCreated'));
                         } else {
-                            throw new Error('Установка отменена');
+                            throw new Error(t('messages.installCancelled'));
                         }
                     } else {
                         throw error;
@@ -157,22 +159,22 @@ export default function GraphStorePage() {
                 };
                 
                 try {
-                    await api.post(`/api/bots/${selectedBot}/event-graphs`, eventData, 'Событие успешно создано!');
+                    await api.post(`/api/bots/${selectedBot}/event-graphs`, eventData, t('messages.eventCreated'));
                 } catch (error) {
                     if (error.message.includes('already exists')) {
-                        const newName = prompt(`Событие с именем "${selectedGraph.name}" уже существует. Введите новое имя для события:`, `${selectedGraph.name}_copy`);
+                        const newName = prompt(t('messages.alreadyExistsEvent', { name: selectedGraph.name }), `${selectedGraph.name}_copy`);
                         if (newName && newName.trim()) {
                             eventData.name = newName.trim();
-                            await api.post(`/api/bots/${selectedBot}/event-graphs`, eventData, 'Событие успешно создано!');
+                            await api.post(`/api/bots/${selectedBot}/event-graphs`, eventData, t('messages.eventCreated'));
                         } else {
-                            throw new Error('Установка отменена');
+                            throw new Error(t('messages.installCancelled'));
                         }
                     } else {
                         throw error;
                     }
                 }
             } else {
-                throw new Error('Неизвестный тип графа');
+                throw new Error(t('messages.unknownType'));
             }
             
             setInstallDialogOpen(false);
@@ -180,8 +182,8 @@ export default function GraphStorePage() {
             setSelectedBot('');
             
         } catch (error) {
-            console.error('Ошибка установки:', error);
-            toast.error(error.message || 'Ошибка при установке графа');
+            console.error('Installation error:', error);
+            toast.error(error.message || t('messages.installError'));
         } finally {
             setInstalling(false);
         }
@@ -202,27 +204,27 @@ export default function GraphStorePage() {
             });
             
             if (response.ok) {
-                toast.success('Спасибо за лайк!');
+                toast.success(t('messages.likeSuccess'));
                 loadGraphs();
             } else {
                 const error = await response.json();
-                toast.error(error.error || 'Ошибка при постановке лайка');
+                toast.error(error.error || t('messages.likeError'));
             }
         } catch (error) {
-            console.error('Ошибка:', error);
-            toast.error('Сервер недоступен. Попробуйте позже.');
+            console.error('Error:', error);
+            toast.error(t('messages.serverUnavailable'));
         }
     };
 
     const handlePublish = async () => {
         try {
             if (!publishForm.name || !publishForm.author || !publishForm.description || !publishForm.graphData) {
-                toast.error('Все поля обязательны');
+                toast.error(t('messages.allFieldsRequired'));
                 return;
             }
 
             if (publishForm.description.length < 10) {
-                toast.error('Описание должно содержать минимум 10 символов');
+                toast.error(t('messages.descriptionMin'));
                 return;
             }
 
@@ -248,7 +250,7 @@ export default function GraphStorePage() {
             });
 
             if (response.ok) {
-                toast.success('Граф опубликован и ожидает модерации!');
+                toast.success(t('messages.publishSuccess'));
                 setPublishDialogOpen(false);
                 setPublishForm({
                     name: '',
@@ -258,11 +260,11 @@ export default function GraphStorePage() {
                 });
             } else {
                 const error = await response.json();
-                toast.error(error.error || 'Ошибка при публикации');
+                toast.error(error.error || t('messages.publishError'));
             }
         } catch (error) {
-            console.error('Ошибка:', error);
-            toast.error('Сервер недоступен. Попробуйте позже.');
+            console.error('Error:', error);
+            toast.error(t('messages.serverUnavailable'));
         }
     };
 
@@ -274,9 +276,9 @@ export default function GraphStorePage() {
                 try {
                     const graphData = JSON.parse(e.target.result);
                     setPublishForm(prev => ({ ...prev, graphData }));
-                    toast.success('Граф загружен');
+                    toast.success(t('messages.graphLoaded'));
                 } catch (error) {
-                    toast.error('Ошибка при чтении файла');
+                    toast.error(t('messages.fileReadError'));
                 }
             };
             reader.readAsText(file);
@@ -292,52 +294,52 @@ export default function GraphStorePage() {
             <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-                        Магазин графов
+                        {t('title')}
                     </h1>
-                    <p className="text-muted-foreground mt-1">Публикуйте и устанавливайте визуальные графы для ваших ботов</p>
+                    <p className="text-muted-foreground mt-1">{t('subtitle')}</p>
                 </div>
                 <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                     <DialogTrigger asChild>
                         <Button disabled={!serverAvailable} className="border-blue-500/20 hover:bg-blue-500/5 hover:border-blue-500/40">
                             <Upload className="w-4 h-4 mr-2" />
-                            Опубликовать граф
+                            {t('publish.button')}
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Опубликовать граф</DialogTitle>
+                            <DialogTitle>{t('publish.title')}</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="name">Название</Label>
+                                <Label htmlFor="name">{t('publish.name')}</Label>
                                 <Input
                                     id="name"
                                     value={publishForm.name}
                                     onChange={(e) => setPublishForm(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Название графа"
+                                    placeholder={t('publish.namePlaceholder')}
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="author">Автор</Label>
+                                <Label htmlFor="author">{t('publish.author')}</Label>
                                 <Input
                                     id="author"
                                     value={publishForm.author}
                                     onChange={(e) => setPublishForm(prev => ({ ...prev, author: e.target.value }))}
-                                    placeholder="Ваше имя"
+                                    placeholder={t('publish.authorPlaceholder')}
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="description">Описание</Label>
+                                <Label htmlFor="description">{t('publish.description')}</Label>
                                 <Textarea
                                     id="description"
                                     value={publishForm.description}
                                     onChange={(e) => setPublishForm(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Описание графа (минимум 10 символов)"
+                                    placeholder={t('publish.descriptionPlaceholder')}
                                     rows={3}
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="file">Файл графа (JSON)</Label>
+                                <Label htmlFor="file">{t('publish.file')}</Label>
                                 <Input
                                     id="file"
                                     type="file"
@@ -347,10 +349,10 @@ export default function GraphStorePage() {
                             </div>
                             <div className="flex gap-2">
                                 <Button onClick={handlePublish} className="flex-1">
-                                    Опубликовать
+                                    {t('publish.submit')}
                                 </Button>
                                 <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
-                                    Отмена
+                                    {t('publish.cancel')}
                                 </Button>
                             </div>
                         </div>
@@ -368,10 +370,10 @@ export default function GraphStorePage() {
                         </div>
                         <div className="ml-3">
                             <h3 className="text-sm font-medium text-yellow-800">
-                                Сервер магазина графов недоступен
+                                {t('warning.title')}
                             </h3>
                             <div className="mt-2 text-sm text-yellow-700">
-                                <p>Данные не могут быть загружены. Попробуйте обновить страницу позже.</p>
+                                <p>{t('warning.description')}</p>
                             </div>
                         </div>
                     </div>
@@ -385,7 +387,7 @@ export default function GraphStorePage() {
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                                 <Input
-                                    placeholder="Поиск графов..."
+                                    placeholder={t('search.placeholder')}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="pl-10"
@@ -394,10 +396,10 @@ export default function GraphStorePage() {
                         </div>
                         <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={!serverAvailable}>
                             <SelectTrigger className="w-full md:w-48">
-                                <SelectValue placeholder="Все категории" />
+                                <SelectValue placeholder={t('search.allCategories')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Все категории</SelectItem>
+                                <SelectItem value="all">{t('search.allCategories')}</SelectItem>
                                 {categories.map(category => (
                                     <SelectItem key={category.id} value={category.id.toString()}>
                                         {category.name}
@@ -407,12 +409,12 @@ export default function GraphStorePage() {
                         </Select>
                         <Select value={selectedType} onValueChange={setSelectedType} disabled={!serverAvailable}>
                             <SelectTrigger className="w-full md:w-48">
-                                <SelectValue placeholder="Все типы" />
+                                <SelectValue placeholder={t('search.allTypes')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Все типы</SelectItem>
-                                <SelectItem value="COMMAND">Команды</SelectItem>
-                                <SelectItem value="EVENT">События</SelectItem>
+                                <SelectItem value="all">{t('search.allTypes')}</SelectItem>
+                                <SelectItem value="COMMAND">{t('search.commands')}</SelectItem>
+                                <SelectItem value="EVENT">{t('search.events')}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -420,9 +422,9 @@ export default function GraphStorePage() {
             </Card>
 
             {loading ? (
-                <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
+                <div className="text-center py-8 text-muted-foreground">{t('loading')}</div>
             ) : graphs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">Графы не найдены</div>
+                <div className="text-center py-8 text-muted-foreground">{t('empty')}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {graphs.map(graph => (
@@ -431,11 +433,11 @@ export default function GraphStorePage() {
                                 <div className="flex justify-between items-start">
                                     <CardTitle className="text-lg">{graph.name}</CardTitle>
                                     <Badge variant={graph.graphType === 'COMMAND' ? 'default' : 'secondary'}>
-                                        {graph.graphType === 'COMMAND' ? 'Команда' : 'Событие'}
+                                        {graph.graphType === 'COMMAND' ? t('card.command') : t('card.event')}
                                     </Badge>
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                    Автор: {graph.author} | {graph.category.name}
+                                    {t('card.author')}: {graph.author} | {graph.category.name}
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -443,18 +445,18 @@ export default function GraphStorePage() {
                                     {graph.description}
                                 </p>
                                 <div className="flex justify-between items-center text-sm text-muted-foreground mb-4">
-                                    <span>📥 {graph.downloads} скачиваний</span>
-                                    <span>❤️ {graph.likes} лайков</span>
+                                    <span>📥 {graph.downloads} {t('card.downloads')}</span>
+                                    <span>❤️ {graph.likes} {t('card.likes')}</span>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button 
-                                        onClick={() => handleInstall(graph)} 
-                                        size="sm" 
+                                    <Button
+                                        onClick={() => handleInstall(graph)}
+                                        size="sm"
                                         className="flex-1"
                                         disabled={!serverAvailable}
                                     >
                                         <Settings className="w-4 h-4 mr-1" />
-                                        Установить
+                                        {t('card.install')}
                                     </Button>
                                     <Button 
                                         onClick={() => handleLike(graph.id)} 
@@ -474,7 +476,7 @@ export default function GraphStorePage() {
             <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Установить граф</DialogTitle>
+                        <DialogTitle>{t('install.title')}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                         {selectedGraph && (
@@ -482,15 +484,15 @@ export default function GraphStorePage() {
                                 <h4 className="font-medium">{selectedGraph.name}</h4>
                                 <p className="text-sm text-muted-foreground">{selectedGraph.description}</p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Автор: {selectedGraph.author} | Тип: {selectedGraph.graphType === 'COMMAND' ? 'Команда' : 'Событие'}
+                                    {t('card.author')}: {selectedGraph.author} | {t('install.type')}: {selectedGraph.graphType === 'COMMAND' ? t('card.command') : t('card.event')}
                                 </p>
                             </div>
                         )}
                         <div>
-                            <Label htmlFor="bot-select">Выберите бота</Label>
+                            <Label htmlFor="bot-select">{t('install.selectBot')}</Label>
                             <Select value={selectedBot} onValueChange={setSelectedBot}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Выберите бота для установки" />
+                                    <SelectValue placeholder={t('install.selectBotPlaceholder')} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {bots.map(bot => (
@@ -502,19 +504,19 @@ export default function GraphStorePage() {
                             </Select>
                         </div>
                         <div className="flex gap-2">
-                            <Button 
-                                onClick={handleInstallConfirm} 
+                            <Button
+                                onClick={handleInstallConfirm}
                                 className="flex-1"
                                 disabled={!selectedBot || installing}
                             >
-                                {installing ? 'Установка...' : 'Установить'}
+                                {installing ? t('install.installing') : t('install.submit')}
                             </Button>
-                            <Button 
-                                variant="outline" 
+                            <Button
+                                variant="outline"
                                 onClick={() => setInstallDialogOpen(false)}
                                 disabled={installing}
                             >
-                                Отмена
+                                {t('install.cancel')}
                             </Button>
                         </div>
                     </div>

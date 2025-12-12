@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { shallow } from 'zustand/shallow';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Trash2, Package } from 'lucide-react';
 import VariablesPanel from './VariablesPanel';
 
 const SettingsPanel = () => {
+  const { t } = useTranslation('visual-editor');
   const command = useVisualEditorStore(state => state.command);
   const updateCommand = useVisualEditorStore(state => state.updateCommand);
   const addArgument = useVisualEditorStore(state => state.addArgument);
@@ -48,7 +50,7 @@ const SettingsPanel = () => {
   }, [command]);
 
   if (!command) {
-    return <div className="p-4">Загрузка настроек...</div>;
+    return <div className="p-4">{t('loadingSettings')}</div>;
   }
 
   const args = isEventGraph ? [] : safeJsonParse(command.argumentsJson);
@@ -65,10 +67,10 @@ const SettingsPanel = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <h3 className="text-lg font-bold">{isEventGraph ? 'Настройки графа событий' : 'Настройки команды'}</h3>
-      
+      <h3 className="text-lg font-bold">{isEventGraph ? t('settings.titleEventGraph') : t('settings.titleCommand')}</h3>
+
       <div>
-        <Label htmlFor="command-name">{isEventGraph ? 'Имя графа' : 'Имя команды'}</Label>
+        <Label htmlFor="command-name">{isEventGraph ? t('settings.graphName') : t('settings.commandName')}</Label>
         <Input
           id="command-name"
           value={command.name || ''}
@@ -82,13 +84,13 @@ const SettingsPanel = () => {
             checked={command.isEnabled}
             onCheckedChange={(checked) => updateCommand({ isEnabled: checked })}
         />
-        <Label htmlFor="is-enabled">Включено</Label>
+        <Label htmlFor="is-enabled">{t('settings.enabled')}</Label>
       </div>
 
       <div>
         <Label htmlFor="plugin-owner" className="flex items-center gap-2">
           <Package className="h-4 w-4" />
-          Плагин-владелец
+          {t('settings.pluginOwner')}
         </Label>
         <Select
           value={command.pluginOwnerId ? command.pluginOwnerId.toString() : "none"}
@@ -98,10 +100,10 @@ const SettingsPanel = () => {
           }}
         >
           <SelectTrigger id="plugin-owner">
-            <SelectValue placeholder="Выберите плагин..." />
+            <SelectValue placeholder={t('settings.selectPlugin')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Нет (системный)</SelectItem>
+            <SelectItem value="none">{t('settings.noPluginSystem')}</SelectItem>
             {availablePlugins?.length > 0 ? (
               availablePlugins
                 .filter(plugin => {
@@ -110,18 +112,18 @@ const SettingsPanel = () => {
                 })
                 .map(plugin => (
                   <SelectItem key={plugin.id} value={plugin.id.toString()}>
-                    {plugin.name} ({plugin.sourceType}) {plugin.isEnabled ? '(активен)' : '(неактивен)'}
+                    {plugin.name} ({plugin.sourceType}) {plugin.isEnabled ? t('settings.pluginActive') : t('settings.pluginInactive')}
                   </SelectItem>
                 ))
             ) : (
-              <SelectItem value="loading" disabled>Загрузка плагинов... ({availablePlugins?.length || 0} найдено)</SelectItem>
+              <SelectItem value="loading" disabled>{t('settings.loadingPlugins')} ({availablePlugins?.length || 0})</SelectItem>
             )}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground mt-1">
-          {availablePlugins?.length > 0 
-            ? `Привязка к локальному плагину позволит автоматически удалить ${isEventGraph ? 'граф' : 'команду'} при удалении плагина`
-            : 'Для назначения плагина-владельца требуются права plugin:list'
+          {availablePlugins?.length > 0
+            ? t('settings.pluginBindNote', { type: isEventGraph ? t('settings.pluginBindNoteGraph') : t('settings.pluginBindNoteCommand') })
+            : t('settings.pluginPermissionNote')
           }
         </p>
       </div>
@@ -129,7 +131,7 @@ const SettingsPanel = () => {
       {!isEventGraph && (
         <>
           <div>
-            <Label htmlFor="command-description">Описание</Label>
+            <Label htmlFor="command-description">{t('settings.description')}</Label>
             <Textarea
               id="command-description"
               value={command.description || ''}
@@ -138,7 +140,7 @@ const SettingsPanel = () => {
           </div>
 
           <div>
-            <Label htmlFor="command-aliases">Алиасы (через запятую)</Label>
+            <Label htmlFor="command-aliases">{t('settings.aliases')}</Label>
             <Input
               id="command-aliases"
               value={aliasesStr}
@@ -148,16 +150,16 @@ const SettingsPanel = () => {
           </div>
 
           <div>
-            <Label htmlFor="command-permission">Права доступа</Label>
+            <Label htmlFor="command-permission">{t('settings.permission')}</Label>
             <Select
               value={command.permissionId ? command.permissionId.toString() : "none"}
               onValueChange={(value) => updateCommand({ permissionId: value === 'none' ? null : parseInt(value) })}
             >
               <SelectTrigger id="command-permission">
-                <SelectValue placeholder="Выберите право..." />
+                <SelectValue placeholder={t('settings.selectPermission')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Нет</SelectItem>
+                <SelectItem value="none">{t('settings.noPermission')}</SelectItem>
                 {permissions.map(perm => (
                   <SelectItem key={perm.id} value={perm.id.toString()}>{perm.name}</SelectItem>
                 ))}
@@ -166,7 +168,7 @@ const SettingsPanel = () => {
         </div>
 
           <div>
-            <Label htmlFor="command-cooldown">Кулдаун (секунды)</Label>
+            <Label htmlFor="command-cooldown">{t('settings.cooldown')}</Label>
             <Input
               id="command-cooldown"
               type="number"
@@ -176,12 +178,12 @@ const SettingsPanel = () => {
               placeholder="0"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Время в секундах, которое должно пройти между использованиями команды
+              {t('settings.cooldownNote')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label>Типы чатов (через запятую)</Label>
+            <Label>{t('settings.chatTypes')}</Label>
             <Input
               id="command-chat-types"
               value={chatTypesStr}
@@ -191,12 +193,12 @@ const SettingsPanel = () => {
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-bold">Аргументы команды</h4>
+            <h4 className="font-bold">{t('settings.arguments')}</h4>
             <div className="space-y-2">
               {args.map((arg, index) => (
                 <div key={arg.id || index} className="flex items-center gap-2 p-2 border rounded-md">
                   <Input
-                    placeholder="Имя" 
+                    placeholder={t('settings.argName')}
                     value={arg.name}
                     onChange={(e) => updateArgument(arg.id, { name: e.target.value })}
                     className="flex-grow"
@@ -217,7 +219,7 @@ const SettingsPanel = () => {
                       checked={arg.required}
                       onCheckedChange={(checked) => updateArgument(arg.id, { required: checked })}
                     />
-                    <Label htmlFor={`required-${arg.id}`}>Обяз.</Label>
+                    <Label htmlFor={`required-${arg.id}`}>{t('settings.argRequired')}</Label>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => removeArgument(arg.id)}>
                     <Trash2 className="h-4 w-4" />
@@ -225,7 +227,7 @@ const SettingsPanel = () => {
                 </div>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={addArgument}>Добавить аргумент</Button>
+            <Button variant="outline" size="sm" onClick={addArgument}>{t('settings.addArgument')}</Button>
           </div>
         </>
       )}

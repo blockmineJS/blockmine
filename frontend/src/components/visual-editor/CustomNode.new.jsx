@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useRef } from 'react';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import BaseNode from './core/base/BaseNode';
+import { useNodeTranslation } from './hooks/useNodeTranslation';
 
 function CustomNode({ data, type, id: nodeId }) {
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
@@ -16,6 +17,9 @@ function CustomNode({ data, type, id: nodeId }) {
   const isTraceViewerOpen = useVisualEditorStore(state => state.isTraceViewerOpen);
   const breakpoints = useVisualEditorStore(state => state.breakpoints);
   const debugSession = useVisualEditorStore(state => state.debugSession);
+
+  // i18n переводы для нод
+  const { getNodeTranslation, getPinName, getPinDescription, getPlaceholder } = useNodeTranslation();
 
   const nodeEdges = useMemo(
     () => edges.filter(e => e.target === nodeId || e.source === nodeId),
@@ -34,14 +38,31 @@ function CustomNode({ data, type, id: nodeId }) {
     [variables, commandArguments]
   );
 
+  // Функция для перевода пинов
+  const translatePins = useCallback((pins) => {
+    if (!pins || !Array.isArray(pins)) return pins;
+    return pins.map(pin => ({
+      ...pin,
+      name: getPinName(type, pin.id, pin.name),
+      description: getPinDescription(type, pin.id, pin.description),
+      placeholder: pin.placeholder ? getPlaceholder(type, pin.id, pin.placeholder) : pin.placeholder,
+    }));
+  }, [type, getPinName, getPinDescription, getPlaceholder]);
+
   const inputs = useMemo(
-    () => definition ? definition.getInputs(data, context) : [],
-    [definition, data, context]
+    () => definition ? translatePins(definition.getInputs(data, context)) : [],
+    [definition, data, context, translatePins]
   );
 
   const outputs = useMemo(
-    () => definition ? definition.getOutputs(data, context) : [],
-    [definition, data, context]
+    () => definition ? translatePins(definition.getOutputs(data, context)) : [],
+    [definition, data, context, translatePins]
+  );
+
+  // Получаем переведённые label и description
+  const nodeTranslation = useMemo(
+    () => getNodeTranslation(type),
+    [type, getNodeTranslation]
   );
 
   // Получаем inputs и outputs из trace для текущего шага, если воспроизводится трассировка
@@ -111,8 +132,8 @@ function CustomNode({ data, type, id: nodeId }) {
       <BaseNode
         nodeId={nodeId}
         type={type}
-        label={definition.label}
-        description={definition.description}
+        label={nodeTranslation.label || definition.label}
+        description={nodeTranslation.description || definition.description}
         inputs={inputs}
         outputs={outputs}
         SettingsComponent={definition.SettingsComponent}
@@ -135,9 +156,9 @@ function CustomNode({ data, type, id: nodeId }) {
   if (!nodeConfig) {
     return (
       <div className="min-w-64 bg-red-900 border-red-600 text-white p-4 rounded">
-        <p className="font-bold">Ошибка</p>
-        <p className="text-sm">Неизвестный тип ноды: {type}</p>
-        <p className="text-xs mt-2">Нода не найдена ни в новом реестре, ни в старой системе</p>
+        <p className="font-bold">Error</p>
+        <p className="text-sm">Unknown node type: {type}</p>
+        <p className="text-xs mt-2">Node not found in registry</p>
       </div>
     );
   }
@@ -145,8 +166,8 @@ function CustomNode({ data, type, id: nodeId }) {
   return (
     <div className="min-w-64 bg-yellow-900 border-yellow-600 text-white p-4 rounded">
       <p className="font-bold">{nodeConfig.name || type}</p>
-      <p className="text-sm">Нода использует старую систему</p>
-      <p className="text-xs mt-2">Требуется миграция на новую архитектуру</p>
+      <p className="text-sm">Legacy node</p>
+      <p className="text-xs mt-2">Migration required</p>
     </div>
   );
 }

@@ -1,0 +1,27 @@
+{
+  "dashboard": "Dashboard",
+  "scheduler": "Scheduler",
+  "graphStore": "Graph Store",
+  "apiKeys": "API Keys",
+  "proxy": "Proxy",
+  "changelog": "Version History",
+  "bots": "Bots",
+  "admin": "Administration",
+  "servers": "Servers",
+  "proxies": "Proxies",
+  "createBot": "Create Bot",
+  "createBotTitle": "Create New Bot",
+  "createBotDescription": "Fill in the information below to add a new bot to the panel.",
+  "importBot": "Import Bot",
+  "logout": "Logout",
+  "whatsNew": "What's New?",
+  "openMenu": "Open Menu",
+  "botImported": "Bot \"{{name}}\" imported successfully.",
+  "botOrderError": "Failed to update bot order",
+  "contribute": {
+    "suggest": "Suggest Improvement",
+    "change": "Suggest Change",
+    "question": "Ask Question",
+    "improve": "Improve BlockMine"
+  }
+}

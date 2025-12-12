@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Play, Square, RotateCw, Edit, Trash2 } from 'lucide-react';
 
 export default function BotCard({ bot, status, logs, onStart, onStop, onRestart, onEdit, onDelete }) {
+    const { t } = useTranslation('bots');
     const isRunning = status === 'running';
 
     return (
@@ -20,7 +22,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                     </div>
                     <div className="flex gap-2">
                         <Badge variant={isRunning ? "default" : "secondary"}>
-                            {isRunning ? 'Запущен' : 'Остановлен'}
+                            {isRunning ? t('status.running') : t('status.stopped')}
                         </Badge>
                         <TooltipProvider>
                             <Tooltip>
@@ -34,7 +36,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                                         <Edit className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Редактировать</TooltipContent>
+                                <TooltipContent>{t('card.edit')}</TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                         <TooltipProvider>
@@ -49,7 +51,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Удалить</TooltipContent>
+                                <TooltipContent>{t('card.delete')}</TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                     </div>
@@ -70,7 +72,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                     className="flex-1"
                 >
                     <Play className="mr-2 h-4 w-4" />
-                    Запустить
+                    {t('actions.start')}
                 </Button>
                 <Button
                     onClick={() => onStop(bot.id)}
@@ -80,7 +82,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                     className="flex-1"
                 >
                     <Square className="mr-2 h-4 w-4" />
-                    Остановить
+                    {t('actions.stop')}
                 </Button>
                 <Button
                     onClick={() => onRestart(bot.id)}
@@ -90,7 +92,7 @@ export default function BotCard({ bot, status, logs, onStart, onStop, onRestart,
                     className="flex-1"
                 >
                     <RotateCw className="mr-2 h-4 w-4" />
-                    Перезапустить
+                    {t('actions.restart')}
                 </Button>
             </CardFooter>
         </Card>

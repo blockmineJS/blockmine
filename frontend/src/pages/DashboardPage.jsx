@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ import { cn } from '@/lib/utils';
 import { apiHelper } from '@/lib/api';
 
 export default function DashboardPage() {
+    const { t } = useTranslation(['dashboard', 'common']);
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const resourceUsage = useAppStore(state => state.resourceUsage);
@@ -48,7 +50,7 @@ export default function DashboardPage() {
     const changelog = useAppStore(state => state.changelog);
     const setShowChangelogDialog = useAppStore(state => state.setShowChangelogDialog);
     const fetchChangelog = useAppStore(state => state.fetchChangelog);
-    
+
     const { toast } = useToast();
     const navigate = useNavigate();
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -158,8 +160,10 @@ export default function DashboardPage() {
     }, [bots]);
 
     const handleMassAction = async (action) => {
-        const actionName = action === 'start' ? 'запустить' : 'остановить';
-        if (!window.confirm(`Вы уверены, что хотите ${actionName} ВСЕХ ботов?`)) return;
+        const actionName = action === 'start'
+            ? t('actions.start')
+            : t('actions.stop');
+        if (!window.confirm(t('confirmMassAction', { action: actionName }))) return;
         
         if (action === 'start') {
             await startAllBots();
@@ -171,7 +175,10 @@ export default function DashboardPage() {
     const handleImportSuccess = (newBot) => {
         setIsImportModalOpen(false);
         fetchInitialData();
-        toast({ title: "Успех!", description: `Бот "${newBot.username}" успешно импортирован.` });
+        toast({
+            title: t('messages.success', { ns: 'common' }),
+            description: t('botImported', { name: newBot.username })
+        });
         navigate(`/bots/${newBot.id}`);
     };
 
@@ -183,10 +190,10 @@ export default function DashboardPage() {
                     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
                         <div>
                             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
-                                Обзор системы
+                                {t('title')}
                             </h1>
                             <p className="text-muted-foreground">
-                                Мониторинг и управление вашими ботами BlockMineJS
+                                {t('subtitle')}
                             </p>
                         </div>
                         
@@ -196,7 +203,7 @@ export default function DashboardPage() {
                                     <DialogTrigger asChild>
                                         <Button variant="outline">
                                             <Upload className="mr-2 h-4 w-4" />
-                                            Импорт
+                                            {t('import')}
                                         </Button>
                                     </DialogTrigger>
                                     <ImportBotDialog onImportSuccess={handleImportSuccess} onCancel={() => setIsImportModalOpen(false)} />
@@ -207,11 +214,11 @@ export default function DashboardPage() {
                                 <>
                                     <Button onClick={() => handleMassAction('start')} variant="outline" size="sm">
                                         <Play className="mr-2 h-3.5 w-3.5" />
-                                        Запустить все
+                                        {t('startAll')}
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={() => handleMassAction('stop')}>
                                         <Square className="mr-2 h-3.5 w-3.5" />
-                                        Остановить все
+                                        {t('stopAll')}
                                     </Button>
                                 </>
                             )}
@@ -221,27 +228,27 @@ export default function DashboardPage() {
                         {/* Key Metrics */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <MetricCard
-                                label="Всего ботов"
+                                label={t('metrics.totalBots')}
                                 value={stats.totalBots}
                                 icon={Bot}
                                 trend={stats.totalBots > 0 ? 'neutral' : 'down'}
                             />
                             <MetricCard
-                                label="Активных"
+                                label={t('metrics.active')}
                                 value={stats.runningBots}
                                 icon={Activity}
                                 trend={stats.runningBots > 0 ? 'up' : 'down'}
                                 accentColor="text-green-500"
                             />
                             <MetricCard
-                                label="Системный CPU"
+                                label={t('metrics.systemCpu')}
                                 value={`${stats.systemCpu.toFixed(1)}%`}
                                 icon={Cpu}
                                 trend={stats.systemCpu > 80 ? 'up' : 'neutral'}
                                 accentColor={stats.systemCpu > 80 ? 'text-red-500' : undefined}
                             />
                             <MetricCard
-                                label="Системная RAM"
+                                label={t('metrics.systemRam')}
                                 value={`${stats.systemMemoryPercent}%`}
                                 icon={MemoryStick}
                                 trend={stats.systemMemoryPercent > 80 ? 'up' : 'neutral'}
@@ -262,8 +269,8 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-2">
                                     <Activity className="h-5 w-5 text-primary" />
                                     <div>
-                                        <CardTitle>Мониторинг ресурсов</CardTitle>
-                                        <CardDescription>Использование CPU и RAM всеми запущенными ботами</CardDescription>
+                                        <CardTitle>{t('resourceMonitoring.title')}</CardTitle>
+                                        <CardDescription>{t('resourceMonitoring.description')}</CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -277,8 +284,8 @@ export default function DashboardPage() {
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle>Быстрые действия</CardTitle>
-                                        <CardDescription>Переходы к основным разделам</CardDescription>
+                                        <CardTitle>{t('quickActions.title')}</CardTitle>
+                                        <CardDescription>{t('quickActions.description')}</CardDescription>
                                     </div>
                                     <Zap className="h-5 w-5 text-primary" />
                                 </div>
@@ -287,24 +294,24 @@ export default function DashboardPage() {
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         <QuickActionButton
                                             icon={<CalendarClock className="h-5 w-5" />}
-                                            label="Планировщик"
+                                            label={t('quickActions.scheduler')}
                                             onClick={() => navigate('/tasks')}
                                         />
                                         <QuickActionButton
                                             icon={<Settings className="h-5 w-5" />}
-                                            label="Настройки"
+                                            label={t('quickActions.settings')}
                                             onClick={() => hasPermission('panel:user:list') && navigate('/admin')}
                                             disabled={!hasPermission('panel:user:list')}
                                         />
                                         <QuickActionButton
                                             icon={<MessageSquarePlus className="h-5 w-5" />}
-                                            label="Предложить"
+                                            label={t('quickActions.suggest')}
                                             onClick={() => window.open('https://github.com/sadzxc/BlockMineJS/issues/new', '_blank')}
                                         />
                                         <QuickActionButton
                                             icon={<Info className="h-5 w-5" />}
                                             label={`v${appVersion || '...'}`}
-                                            description="Текущая версия"
+                                            description={t('quickActions.currentVersion')}
                                             onClick={async () => {
                                                 if (!changelog) await fetchChangelog();
                                                 setShowChangelogDialog(true);
@@ -312,7 +319,7 @@ export default function DashboardPage() {
                                         />
                                         <QuickActionButton
                                             icon={<FileText className="h-5 w-5" />}
-                                            label="Changelog"
+                                            label={t('quickActions.changelog')}
                                             onClick={async () => {
                                                 if (!changelog) await fetchChangelog();
                                                 setShowChangelogDialog(true);
@@ -320,7 +327,7 @@ export default function DashboardPage() {
                                         />
                                         <QuickActionButton
                                             icon={<Server className="h-5 w-5" />}
-                                            label="Серверы"
+                                            label={t('quickActions.servers')}
                                             onClick={() => navigate('/servers')}
                                         />
                                     </div>
@@ -335,25 +342,25 @@ export default function DashboardPage() {
                             <CardHeader>
                                 <CardTitle className="text-base flex items-center gap-2">
                                     <Activity className="h-4 w-4" />
-                                    Состояние системы
+                                    {t('systemHealth.title')}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <SystemStatusItem
-                                    label="Панель управления"
+                                    label={t('systemHealth.panel')}
                                     status={systemHealth.panel ? "operational" : "error"}
                                 />
                                 <SystemStatusItem
-                                    label="WebSocket сервер"
+                                    label={t('systemHealth.websocket')}
                                     status={systemHealth.websocket ? "operational" : "error"}
                                 />
                                 <SystemStatusItem
-                                    label="База данных"
+                                    label={t('systemHealth.database')}
                                     status={systemHealth.database ? "operational" : "error"}
                                 />
                                 <div className="pt-2 border-t">
                                     <SystemStatusItem
-                                        label="Uptime"
+                                        label={t('systemHealth.uptime')}
                                         status="operational"
                                         value={stats.uptime}
                                     />
@@ -364,7 +371,7 @@ export default function DashboardPage() {
                             {/* Resource Overview */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Ресурсы системы</CardTitle>
+                                    <CardTitle className="text-base">{t('resources.title')}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <ResourceBar
@@ -381,11 +388,11 @@ export default function DashboardPage() {
                                     />
                                     <div className="pt-2 border-t space-y-2">
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-muted-foreground">Активных ботов</span>
+                                            <span className="text-muted-foreground">{t('resources.activeBots')}</span>
                                             <span className="font-medium">{stats.runningBots}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-muted-foreground">Всего памяти</span>
+                                            <span className="text-muted-foreground">{t('resources.totalMemory')}</span>
                                             <span className="font-medium">{stats.systemMemoryTotal}MB</span>
                                         </div>
                                     </div>
@@ -395,21 +402,21 @@ export default function DashboardPage() {
                         {/* Bot Distribution */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Распределение ботов</CardTitle>
+                                <CardTitle className="text-base">{t('botDistribution.title')}</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full bg-green-500" />
-                                            <span className="text-sm">Запущено</span>
+                                            <span className="text-sm">{t('botDistribution.running')}</span>
                                         </div>
                                         <span className="text-sm font-medium">{stats.runningBots}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full bg-gray-400" />
-                                            <span className="text-sm">Остановлено</span>
+                                            <span className="text-sm">{t('botDistribution.stopped')}</span>
                                         </div>
                                         <span className="text-sm font-medium">{stats.stoppedBots}</span>
                                     </div>
@@ -476,10 +483,11 @@ function QuickActionButton({ icon, label, description, onClick, disabled, count 
 }
 
 function ActivityItem({ activity, navigate }) {
+    const { t } = useTranslation('dashboard');
     const isRunning = activity.status === 'running';
-    
+
     return (
-        <div 
+        <div
             className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer group"
             onClick={() => navigate(`/bots/${activity.id}`)}
         >
@@ -502,7 +510,7 @@ function ActivityItem({ activity, navigate }) {
                 </p>
             </div>
             <Badge variant={isRunning ? "default" : "secondary"} className="flex-shrink-0">
-                {isRunning ? "Активен" : "Остановлен"}
+                {isRunning ? t('activity.active') : t('activity.stopped')}
             </Badge>
         </div>
     );

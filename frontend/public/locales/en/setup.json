@@ -1,0 +1,17 @@
+{
+  "title": "Initial Setup",
+  "description": "Create an administrator account for the BlockMine panel.",
+  "username": "Admin username",
+  "password": "Password (min. 4 characters)",
+  "confirmPassword": "Confirm password",
+  "submit": "Create",
+  "errors": {
+    "passwordMin": "Password must be at least 4 characters.",
+    "passwordMismatch": "Passwords do not match.",
+    "createFailed": "Failed to create account."
+  },
+  "messages": {
+    "welcome": "Welcome!",
+    "loginSuccess": "You have successfully logged in."
+  }
+}

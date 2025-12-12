@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -9,17 +10,22 @@ const COLORS = {
 };
 
 export default function BotStatusChartWidget({ stats }) {
+    const { t } = useTranslation('dashboard');
+
+    const runningLabel = t('widgets.botStatus.running');
+    const stoppedLabel = t('widgets.botStatus.stopped');
+
     const data = [
-        { name: 'Запущено', value: stats.runningBots },
-        { name: 'Остановлено', value: stats.stoppedBots },
+        { name: runningLabel, value: stats.runningBots, key: 'running' },
+        { name: stoppedLabel, value: stats.stoppedBots, key: 'stopped' },
     ].filter(d => d.value > 0);
 
     if (data.length === 0) {
        return (
          <Card>
-            <CardHeader><CardTitle>Статус ботов</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t('widgets.botStatus.title')}</CardTitle></CardHeader>
             <CardContent className="flex items-center justify-center h-full text-muted-foreground">
-                Нет ботов для отображения.
+                {t('widgets.botStatus.noBots')}
             </CardContent>
          </Card>
        )
@@ -28,7 +34,7 @@ export default function BotStatusChartWidget({ stats }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Статус ботов</CardTitle>
+                <CardTitle>{t('widgets.botStatus.title')}</CardTitle>
             </CardHeader>
             <CardContent className="h-[200px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -44,7 +50,7 @@ export default function BotStatusChartWidget({ stats }) {
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                             {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[entry.name === 'Запущено' ? 'running' : 'stopped']} />
+                                <Cell key={`cell-${index}`} fill={COLORS[entry.key]} />
                             ))}
                         </Pie>
                         <Tooltip

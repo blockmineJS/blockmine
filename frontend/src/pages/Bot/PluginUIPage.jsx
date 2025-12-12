@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
 import { useToast } from '@/hooks/use-toast';
@@ -21,11 +22,11 @@ import { Loader2, PowerOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 
-const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading }) => {
+const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading, t }) => {
     if (!schema) return null;
 
     const renderChildren = (children) => children.map((child, i) => (
-        <RecursiveRenderer key={i} schema={child} data={data} onAction={onAction} onDataChange={onDataChange} actionLoading={actionLoading} />
+        <RecursiveRenderer key={i} schema={child} data={data} onAction={onAction} onDataChange={onDataChange} actionLoading={actionLoading} t={t} />
     ));
     
     const gridSpanClass = schema.gridSpan ? `md:col-span-${schema.gridSpan}` : '';
@@ -71,7 +72,7 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
                         {tableData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={schema.columns.length} className="text-center text-muted-foreground">
-                                    Нет данных для отображения
+                                    {t('ui.noData')}
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -135,7 +136,7 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
                             </div>
                         ))
                     ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">Пусто</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">{t('ui.empty')}</p>
                     )}
                 </div>
             );
@@ -154,7 +155,7 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
                 });
                 onAction(schema.action, formData);
             };
-            return <form onSubmit={handleFormSubmit} className="space-y-4">{renderChildren(schema.children)}<Button type="submit" disabled={actionLoading === schema.action}>{actionLoading === schema.action && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{schema.submitLabel || "Сохранить"}</Button></form>;
+            return <form onSubmit={handleFormSubmit} className="space-y-4">{renderChildren(schema.children)}<Button type="submit" disabled={actionLoading === schema.action}>{actionLoading === schema.action && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{schema.submitLabel || t('ui.save')}</Button></form>;
         
         case 'Input':
             return <div className="space-y-2"><Label htmlFor={schema.component_id}>{schema.label}</Label><Input id={schema.component_id} type={schema.inputType || 'text'} value={data[schema.dataKey] || ''} onChange={(e) => onDataChange(schema.dataKey, e.target.value)} /></div>;
@@ -173,13 +174,14 @@ const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading
         case 'Switch':
             return <div className="flex items-center space-x-2"><Switch id={schema.component_id} checked={!!data[schema.dataKey]} onCheckedChange={(checked) => onDataChange(schema.dataKey, checked)} /><Label htmlFor={schema.component_id}>{schema.label}</Label></div>;
         default:
-            return <div className="text-red-500 font-bold p-2 bg-red-500/10 rounded-md">Неизвестный тип компонента: {schema.type}</div>;
+            return <div className="text-red-500 font-bold p-2 bg-red-500/10 rounded-md">{t('ui.unknownComponent')}: {schema.type}</div>;
     }
 };
 
 export default function PluginUIPage() {
     const { botId, pluginName, pluginPath } = useParams();
     const { toast } = useToast();
+    const { t } = useTranslation('plugins');
     const socket = useAppStore(state => state.socket);
     const botStatuses = useAppStore(state => state.botStatuses);
     const startBot = useAppStore(state => state.startBot);
@@ -213,7 +215,7 @@ export default function PluginUIPage() {
                 return merged;
             });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить содержимое страницы плагина.' });
+            toast({ variant: 'destructive', title: t('ui.error'), description: t('ui.loadError') });
         } finally {
             setLoading(false);
         }
@@ -274,7 +276,7 @@ export default function PluginUIPage() {
                 { method: 'POST', body: JSON.stringify({ actionName, payload }) }
             );
             
-            toast({ title: "Успех!", description: response.message || 'Действие успешно выполнено.' });
+            toast({ title: t('ui.success'), description: response.message || t('ui.actionSuccess') });
 
             if (response.result) {
                 setPageData(prevData => ({ ...prevData, ...response.result }));
@@ -298,9 +300,9 @@ export default function PluginUIPage() {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-4">
                     <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
-                    <h2 className="text-xl font-semibold text-muted-foreground">Запуск бота...</h2>
+                    <h2 className="text-xl font-semibold text-muted-foreground">{t('ui.startingBot')}</h2>
                     <p className="text-sm text-muted-foreground">
-                        Пожалуйста, подождите, бот подключается к серверу.
+                        {t('ui.botStartingDesc')}
                     </p>
                 </div>
             </div>
@@ -312,21 +314,21 @@ export default function PluginUIPage() {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-4">
                     <PowerOff className="h-16 w-16 text-muted-foreground mx-auto" />
-                    <h2 className="text-xl font-semibold text-muted-foreground">Бот не запущен</h2>
+                    <h2 className="text-xl font-semibold text-muted-foreground">{t('ui.botNotRunning')}</h2>
                     <p className="text-sm text-muted-foreground max-w-md">
-                        Для работы с интерфейсом плагина необходимо запустить бота. 
+                        {t('ui.botNotRunningDesc')}
                     </p>
-                    <Button 
+                    <Button
                         onClick={async () => {
                             setIsStartingBot(true);
                             try {
                                 await startBot(parseInt(botId));
                             } catch (error) {
                                 setIsStartingBot(false);
-                                toast({ 
-                                    variant: 'destructive', 
-                                    title: 'Ошибка', 
-                                    description: 'Не удалось запустить бота.' 
+                                toast({
+                                    variant: 'destructive',
+                                    title: t('ui.error'),
+                                    description: t('ui.botStartError')
                                 });
                             }
                         }}
@@ -334,7 +336,7 @@ export default function PluginUIPage() {
                         className="mt-4"
                     >
                         {isStartingBot && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isStartingBot ? 'Запуск...' : 'Запустить'}
+                        {isStartingBot ? t('ui.starting') : t('ui.startBot')}
                     </Button>
                 </div>
             </div>
@@ -342,12 +344,12 @@ export default function PluginUIPage() {
     }
 
     if (!pageSchema || !pageData) {
-        return <div className="p-4 text-center">Не удалось загрузить UI для этого плагина.</div>;
+        return <div className="p-4 text-center">{t('ui.loadError2')}</div>;
     }
 
     return (
         <div className="p-4">
-            <RecursiveRenderer schema={pageSchema} data={pageData} onAction={handleAction} onDataChange={onDataChange} actionLoading={actionLoading}/>
+            <RecursiveRenderer schema={pageSchema} data={pageData} onAction={handleAction} onDataChange={onDataChange} actionLoading={actionLoading} t={t}/>
         </div>
     );
 }

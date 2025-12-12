@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { apiHelper } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { ru } from 'date-fns/locale';
 const WebSocketTab = () => {
     const { botId } = useParams();
     const { toast } = useToast();
+    const { t } = useTranslation('websocket');
 
     const [keys, setKeys] = useState([]);
     const [logs, setLogs] = useState([]);
@@ -44,8 +46,8 @@ const WebSocketTab = () => {
         } catch (error) {
             console.error('[WebSocketTab] Error loading keys:', error);
             toast({
-                title: "Ошибка",
-                description: "Не удалось загрузить API ключи",
+                title: t('messages.error'),
+                description: t('messages.loadKeysError'),
                 variant: "destructive",
             });
         } finally {
@@ -64,8 +66,8 @@ const WebSocketTab = () => {
         } catch (error) {
             console.error('[WebSocketTab] Error loading logs:', error);
             toast({
-                title: "Ошибка",
-                description: "Не удалось загрузить логи подключений",
+                title: t('messages.error'),
+                description: t('messages.loadLogsError'),
                 variant: "destructive",
             });
         } finally {
@@ -101,8 +103,8 @@ const WebSocketTab = () => {
     const handleCreateKey = async () => {
         if (!newKeyName.trim()) {
             toast({
-                title: "Ошибка",
-                description: "Введите название ключа",
+                title: t('messages.error'),
+                description: t('messages.enterKeyName'),
                 variant: "destructive",
             });
             return;
@@ -122,14 +124,14 @@ const WebSocketTab = () => {
                 setCreatedKey(response.key);
                 setKeys([...keys, response.apiKey]);
                 toast({
-                    title: "Успех",
-                    description: "API ключ создан",
+                    title: t('messages.success'),
+                    description: t('messages.keyCreated'),
                 });
             }
         } catch (error) {
             toast({
-                title: "Ошибка",
-                description: "Не удалось создать ключ",
+                title: t('messages.error'),
+                description: t('messages.keyCreateError'),
                 variant: "destructive",
             });
         } finally {
@@ -139,7 +141,7 @@ const WebSocketTab = () => {
 
     // Удалить ключ
     const handleDeleteKey = async (keyId) => {
-        if (!confirm('Вы уверены, что хотите удалить этот ключ? Все приложения, использующие его, потеряют доступ.')) {
+        if (!confirm(t('messages.deleteConfirm'))) {
             return;
         }
 
@@ -150,14 +152,14 @@ const WebSocketTab = () => {
             if (response.success) {
                 setKeys(keys.filter(k => k.id !== keyId));
                 toast({
-                    title: "Успех",
-                    description: "API ключ удален",
+                    title: t('messages.success'),
+                    description: t('messages.keyDeleted'),
                 });
             }
         } catch (error) {
             toast({
-                title: "Ошибка",
-                description: "Не удалось удалить ключ",
+                title: t('messages.error'),
+                description: t('messages.keyDeleteError'),
                 variant: "destructive",
             });
         }
@@ -167,8 +169,8 @@ const WebSocketTab = () => {
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         toast({
-            title: "Скопировано",
-            description: "Ключ скопирован в буфер обмена",
+            title: t('messages.copied'),
+            description: t('messages.copiedHint'),
         });
     };
 
@@ -178,12 +180,7 @@ const WebSocketTab = () => {
             'Write': 'default',
             'ReadWrite': 'default',
         };
-        const labels = {
-            'Read': 'Чтение',
-            'Write': 'Запись',
-            'ReadWrite': 'Чтение/Запись',
-        };
-        return <Badge variant={variants[permission] || 'default'}>{labels[permission] || permission}</Badge>;
+        return <Badge variant={variants[permission] || 'default'}>{t(`permissions.${permission}`) || permission}</Badge>;
     };
 
     return (
@@ -194,7 +191,7 @@ const WebSocketTab = () => {
                         <Users className="h-5 w-5 text-green-500" />
                         <div>
                             <p className="text-2xl font-bold text-green-500">{connectedClients}</p>
-                            <p className="text-xs text-muted-foreground">Клиентов</p>
+                            <p className="text-xs text-muted-foreground">{t('clients')}</p>
                         </div>
                     </div>
                 </Card>
@@ -205,7 +202,7 @@ const WebSocketTab = () => {
                     setCreateDialogOpen(true);
                 }}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Создать ключ
+                    {t('createKey')}
                 </Button>
             </div>
 
@@ -213,15 +210,15 @@ const WebSocketTab = () => {
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="keys">
                         <Key className="mr-2 h-4 w-4" />
-                        API Ключи
+                        {t('tabs.keys')}
                     </TabsTrigger>
                     <TabsTrigger value="logs">
                         <Activity className="mr-2 h-4 w-4" />
-                        Логи подключений
+                        {t('tabs.logs')}
                     </TabsTrigger>
                     <TabsTrigger value="docs">
                         <Settings className="mr-2 h-4 w-4" />
-                        Документация
+                        {t('tabs.docs')}
                     </TabsTrigger>
                 </TabsList>
 
@@ -229,30 +226,30 @@ const WebSocketTab = () => {
                 <TabsContent value="keys" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Ваши API Ключи</CardTitle>
+                            <CardTitle>{t('keys.title')}</CardTitle>
                             <CardDescription>
-                                Создавайте и управляйте API ключами для доступа к боту через WebSocket
+                                {t('keys.description')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {loading ? (
-                                <div className="text-center py-8">Загрузка...</div>
+                                <div className="text-center py-8">{t('keys.loading')}</div>
                             ) : keys.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Key className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                                    <p>У вас пока нет API ключей</p>
-                                    <p className="text-sm">Создайте первый ключ, чтобы начать использовать WebSocket API</p>
+                                    <p>{t('keys.empty')}</p>
+                                    <p className="text-sm">{t('keys.emptyHint')}</p>
                                 </div>
                             ) : (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Название</TableHead>
-                                            <TableHead>Ключ</TableHead>
-                                            <TableHead>Права</TableHead>
-                                            <TableHead>Создан</TableHead>
-                                            <TableHead>Последнее использование</TableHead>
-                                            <TableHead className="text-right">Действия</TableHead>
+                                            <TableHead>{t('keys.name')}</TableHead>
+                                            <TableHead>{t('keys.key')}</TableHead>
+                                            <TableHead>{t('keys.permissions')}</TableHead>
+                                            <TableHead>{t('keys.createdAt')}</TableHead>
+                                            <TableHead>{t('keys.lastUsed')}</TableHead>
+                                            <TableHead className="text-right">{t('keys.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -269,7 +266,7 @@ const WebSocketTab = () => {
                                                 <TableCell className="text-sm text-muted-foreground">
                                                     {key.lastUsedAt
                                                         ? format(new Date(key.lastUsedAt), 'dd MMM yyyy HH:mm', { locale: ru })
-                                                        : 'Никогда'}
+                                                        : t('keys.never')}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -293,28 +290,28 @@ const WebSocketTab = () => {
                 <TabsContent value="logs" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Логи подключений</CardTitle>
+                            <CardTitle>{t('logs.title')}</CardTitle>
                             <CardDescription>
-                                История подключений к WebSocket API (последние 50)
+                                {t('logs.description')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {logsLoading ? (
-                                <div className="text-center py-8">Загрузка...</div>
+                                <div className="text-center py-8">{t('keys.loading')}</div>
                             ) : logs.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Activity className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                                    <p>Пока нет подключений</p>
+                                    <p>{t('logs.empty')}</p>
                                 </div>
                             ) : (
                                 <ScrollArea className="h-[500px]">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Действие</TableHead>
-                                                <TableHead>Ключ</TableHead>
-                                                <TableHead>IP адрес</TableHead>
-                                                <TableHead>Время</TableHead>
+                                                <TableHead>{t('logs.action')}</TableHead>
+                                                <TableHead>{t('logs.key')}</TableHead>
+                                                <TableHead>{t('logs.ip')}</TableHead>
+                                                <TableHead>{t('logs.time')}</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -322,7 +319,7 @@ const WebSocketTab = () => {
                                                 <TableRow key={log.id}>
                                                     <TableCell>
                                                         <Badge variant={log.action === 'connect' ? 'default' : 'secondary'}>
-                                                            {log.action === 'connect' ? 'Подключение' : 'Отключение'}
+                                                            {log.action === 'connect' ? t('logs.connect') : t('logs.disconnect')}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
@@ -349,7 +346,7 @@ const WebSocketTab = () => {
                         <AlertDescription>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <strong>ID текущего бота:</strong> <code className="ml-2 bg-background px-2 py-1 rounded text-sm font-mono">{botId}</code>
+                                    <strong>{t('docs.botId')}:</strong> <code className="ml-2 bg-background px-2 py-1 rounded text-sm font-mono">{botId}</code>
                                 </div>
                                 <Button
                                     variant="ghost"
@@ -364,23 +361,23 @@ const WebSocketTab = () => {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Подключение к WebSocket API</CardTitle>
+                            <CardTitle>{t('docs.title')}</CardTitle>
                             <CardDescription>
-                                Примеры использования API для разных языков программирования
+                                {t('docs.description')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ScrollArea className="h-[600px] pr-4">
                                 <div className="space-y-6">
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Endpoint</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.endpoint')}</h3>
                                 <code className="block bg-muted p-3 rounded text-sm">
                                     http://localhost:3001/bot-api
                                 </code>
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Параметры подключения</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.params')}</h3>
                                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                                     <li><code>query.botId</code> - ID бота: <code className="bg-background px-1 rounded">{botId}</code></li>
                                     <li><code>auth.token</code> - Ваш API ключ</li>
@@ -390,17 +387,17 @@ const WebSocketTab = () => {
                             <Alert className="bg-green-500/10 border-green-500/20">
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                                 <AlertDescription>
-                                    <strong className="text-green-700 dark:text-green-400">Рекомендуется:</strong> Используйте высокоуровневый SDK <code>blockmine-sdk</code> для простого использования API
+                                    <strong className="text-green-700 dark:text-green-400">{t('docs.recommended')}:</strong> {t('docs.recommendedHint')}
                                 </AlertDescription>
                             </Alert>
 
                             <div>
                                 <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                                     <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                    Вариант 1: Высокоуровневый SDK (рекомендуется)
+                                    {t('docs.sdkTitle')}
                                 </h3>
                                 <p className="text-sm text-muted-foreground mb-3">
-                                    Простой Promise-based API для работы с ботом
+                                    {t('docs.sdkDescription')}
                                 </p>
                                 <pre className="bg-muted p-4 rounded text-xs overflow-x-auto">
 {`// Установка:
@@ -468,9 +465,9 @@ main().catch(console.error);`}
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Вариант 2: Прямое использование Socket.IO</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.rawTitle')}</h3>
                                 <p className="text-sm text-muted-foreground mb-3">
-                                    Для продвинутых пользователей, которым нужен полный контроль
+                                    {t('docs.rawDescription')}
                                 </p>
                                 <pre className="bg-muted p-4 rounded text-xs overflow-x-auto">
 {`const io = require('socket.io-client');
@@ -514,7 +511,7 @@ socket.emit('action:send_message', {
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Доступные события (Read)</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.eventsTitle')}</h3>
                                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                                     <li><code>bot:status</code> - Статус бота изменился (online: true/false)</li>
                                     <li><code>chat:message</code> - Сообщение в чате (type, username, message, raw_message)</li>
@@ -528,7 +525,7 @@ socket.emit('action:send_message', {
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Доступные действия</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.actionsTitle')}</h3>
                                 <div className="space-y-3">
                                     <div>
                                         <h4 className="font-medium text-sm mb-1">Статус и управление ботом:</h4>
@@ -557,7 +554,7 @@ socket.emit('action:send_message', {
                             </div>
 
                             <div>
-                                <h3 className="text-lg font-semibold mb-2">Примеры использования</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t('docs.examplesTitle')}</h3>
                                 <div className="space-y-4">
                                     <div>
                                         <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
@@ -652,9 +649,9 @@ socket.on('action:result', (data) => {
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Создать API ключ</DialogTitle>
+                        <DialogTitle>{t('createDialog.title')}</DialogTitle>
                         <DialogDescription>
-                            Создайте новый API ключ для доступа к боту через WebSocket
+                            {t('createDialog.description')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -663,11 +660,11 @@ socket.on('action:result', (data) => {
                             <Alert>
                                 <AlertTriangle className="h-4 w-4" />
                                 <AlertDescription>
-                                    <strong>Важно!</strong> Сохраните этот ключ сейчас. Вы не сможете увидеть его снова.
+                                    {t('createDialog.saveWarning')}
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
-                                <Label>Ваш API ключ</Label>
+                                <Label>{t('createDialog.keyCreated')}</Label>
                                 <div className="flex gap-2">
                                     <Input value={createdKey} readOnly className="font-mono text-sm" />
                                     <Button onClick={() => copyToClipboard(createdKey)} size="icon">
@@ -679,23 +676,23 @@ socket.on('action:result', (data) => {
                     ) : (
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label>Название ключа</Label>
+                                <Label>{t('createDialog.nameLabel')}</Label>
                                 <Input
-                                    placeholder="Например: Discord-бот"
+                                    placeholder={t('createDialog.namePlaceholder')}
                                     value={newKeyName}
                                     onChange={(e) => setNewKeyName(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Права доступа</Label>
+                                <Label>{t('createDialog.permissionsLabel')}</Label>
                                 <Select value={newKeyPermissions} onValueChange={setNewKeyPermissions}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Read">Только чтение (получение событий)</SelectItem>
-                                        <SelectItem value="Write">Только запись (отправка действий)</SelectItem>
-                                        <SelectItem value="ReadWrite">Чтение и запись (полный доступ)</SelectItem>
+                                        <SelectItem value="Read">{t('createDialog.readOnly')}</SelectItem>
+                                        <SelectItem value="Write">{t('createDialog.writeOnly')}</SelectItem>
+                                        <SelectItem value="ReadWrite">{t('createDialog.readWrite')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -704,14 +701,14 @@ socket.on('action:result', (data) => {
 
                     <DialogFooter>
                         {createdKey ? (
-                            <Button onClick={() => setCreateDialogOpen(false)}>Закрыть</Button>
+                            <Button onClick={() => setCreateDialogOpen(false)}>{t('createDialog.close')}</Button>
                         ) : (
                             <>
                                 <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                                    Отмена
+                                    {t('createDialog.cancel')}
                                 </Button>
                                 <Button onClick={handleCreateKey} disabled={creating}>
-                                    {creating ? 'Создание...' : 'Создать'}
+                                    {creating ? t('createDialog.creating') : t('createDialog.create')}
                                 </Button>
                             </>
                         )}

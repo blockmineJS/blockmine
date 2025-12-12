@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,7 @@ import PermissionsManager from '@/components/management/PermissionsManager';
 import { CreateCommandDialog } from '@/components/management/CreateCommandDialog';
 
 export default function ManagementPage() {
+    const { t } = useTranslation('management');
     const { botId } = useParams();
     const { bots } = useAppStore();
     const bot = useMemo(() => bots.find(b => b.id === parseInt(botId)), [bots, botId]);
@@ -37,12 +39,12 @@ export default function ManagementPage() {
         method: 'POST',
         body: JSON.stringify({ ...commandData, isVisual: true }),
       });
-      toast({ title: 'Успех', description: `Команда \"${newCommand.name}\" успешно создана.` });
+      toast({ title: t('messages.success'), description: t('messages.commandCreated', { name: newCommand.name }) });
       fetchData();
       setIsCreateDialogOpen(false);
       navigate(`/bots/${bot.id}/commands/visual/${newCommand.id}`);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
+      toast({ variant: 'destructive', title: t('messages.error'), description: `${t('messages.commandCreateError')}: ${error.message}` });
     }
   };
 
@@ -56,7 +58,7 @@ export default function ManagementPage() {
             setUserPage(data.users.page);
             setUserPageSize(data.users.pageSize);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить данные управления.' });
+            toast({ variant: 'destructive', title: t('messages.error'), description: t('messages.loadError') });
         }
         setIsLoading(false);
     }, [bot, toast, userPageSize, sortConfig]);
@@ -129,16 +131,16 @@ export default function ManagementPage() {
     return (
         <div className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Управление ботом</CardTitle>
+                <CardTitle>{t('title')}</CardTitle>
                 <CardDescription>
-                    Настройте пользователей, группы, права и команды для бота {bot?.username}.
+                    {t('description', { username: bot?.username })}
                 </CardDescription>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="mt-2">
-                        <TabsTrigger value="users">Пользователи</TabsTrigger>
-                        <TabsTrigger value="groups">Группы</TabsTrigger>
-                        <TabsTrigger value="permissions">Права</TabsTrigger>
-                        <TabsTrigger value="commands">Команды</TabsTrigger>
+                        <TabsTrigger value="users">{t('tabs.users')}</TabsTrigger>
+                        <TabsTrigger value="groups">{t('tabs.groups')}</TabsTrigger>
+                        <TabsTrigger value="permissions">{t('tabs.permissions')}</TabsTrigger>
+                        <TabsTrigger value="commands">{t('tabs.commands')}</TabsTrigger>
                     </TabsList>
             </Tabs>
             </CardHeader>

@@ -1,9 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Play, Square, ArrowRight } from 'lucide-react';
 
 const DebugControls = () => {
+  const { t } = useTranslation('visual-editor');
   const debugSession = useVisualEditorStore(state => state.debugSession);
   const continueExecution = useVisualEditorStore(state => state.continueExecution);
   const stepExecution = useVisualEditorStore(state => state.stepExecution);
@@ -18,7 +20,7 @@ const DebugControls = () => {
       <div className="flex items-center gap-2 bg-slate-900 border-2 border-amber-500 rounded-lg p-3 shadow-2xl">
         <div className="flex items-center gap-2 px-3 border-r border-slate-700">
           <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-          <span className="text-sm font-semibold text-amber-400">На паузе</span>
+          <span className="text-sm font-semibold text-amber-400">{t('debugControls.paused')}</span>
         </div>
 
         <Button
@@ -28,7 +30,7 @@ const DebugControls = () => {
           onClick={() => continueExecution()}
         >
           <Play className="w-4 h-4 mr-2" />
-          Продолжить (F5)
+          {t('debugControls.continue')}
         </Button>
 
         <Button
@@ -38,7 +40,7 @@ const DebugControls = () => {
           onClick={() => stepExecution()}
         >
           <ArrowRight className="w-4 h-4 mr-2" />
-          Шаг вперед (F10)
+          {t('debugControls.stepForward')}
         </Button>
 
         <Button
@@ -47,7 +49,7 @@ const DebugControls = () => {
           onClick={() => stopExecution()}
         >
           <Square className="w-4 h-4 mr-2" />
-          Стоп (Shift+F5)
+          {t('debugControls.stop')}
         </Button>
       </div>
     </div>

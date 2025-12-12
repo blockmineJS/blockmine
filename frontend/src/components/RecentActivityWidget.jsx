@@ -1,22 +1,25 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from './ui/badge';
 
 export default function RecentActivityWidget({ bots, botLogs }) {
-    const recentLogs = bots.flatMap(bot => 
+    const { t } = useTranslation('dashboard');
+
+    const recentLogs = bots.flatMap(bot =>
         (botLogs[bot.id] || []).slice(0, 5).map(log => ({
             botUsername: bot.username,
             log: log,
-            id: `${bot.id}-${log}-${Math.random()}` 
+            id: `${bot.id}-${log}-${Math.random()}`
         }))
     ).sort(() => Math.random() - 0.5).slice(0, 20);
 
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Последняя активность</CardTitle>
-                <CardDescription>Сводка последних сообщений из консоли ботов.</CardDescription>
+                <CardTitle>{t('widgets.recentActivity.title')}</CardTitle>
+                <CardDescription>{t('widgets.recentActivity.description')}</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-hidden">
                 <ScrollArea className="h-full pr-4">
@@ -29,7 +32,7 @@ export default function RecentActivityWidget({ bots, botLogs }) {
                                 </p>
                             </div>
                         )) : (
-                            <p className="text-sm text-muted-foreground text-center pt-8">Нет активности. Запустите ботов.</p>
+                            <p className="text-sm text-muted-foreground text-center pt-8">{t('widgets.recentActivity.noActivity')}</p>
                         )}
                     </div>
                 </ScrollArea>

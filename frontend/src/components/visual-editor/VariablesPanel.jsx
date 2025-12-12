@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { shallow } from 'zustand/shallow';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2 } from 'lucide-react';
 
 const VariablesPanel = () => {
+    const { t } = useTranslation('visual-editor');
     const command = useVisualEditorStore(state => state.command);
     const addVariable = useVisualEditorStore(state => state.addVariable);
     const updateVariable = useVisualEditorStore(state => state.updateVariable);
@@ -17,12 +19,12 @@ const VariablesPanel = () => {
 
     return (
         <div className="space-y-2 p-2 border-t">
-            <h4 className="font-bold">Переменные</h4>
+            <h4 className="font-bold">{t('variables.title')}</h4>
             <div className="space-y-2">
                 {variables.map((variable) => (
                     <div key={variable.id} className="flex items-center gap-2 p-2 border rounded-md">
                         <Input
-                            placeholder="Имя"
+                            placeholder={t('variables.namePlaceholder')}
                             value={variable.name}
                             onChange={(e) => updateVariable(variable.id, { name: e.target.value })}
                             className="flex-grow"
@@ -39,7 +41,7 @@ const VariablesPanel = () => {
                             </SelectContent>
                         </Select>
                         <Input
-                            placeholder="Значение по умолч."
+                            placeholder={t('variables.valuePlaceholder')}
                             value={variable.value}
                             onChange={(e) => updateVariable(variable.id, { value: e.target.value })}
                             className="flex-grow"
@@ -50,7 +52,7 @@ const VariablesPanel = () => {
                     </div>
                 ))}
             </div>
-            <Button variant="outline" size="sm" onClick={addVariable}>Добавить переменную</Button>
+            <Button variant="outline" size="sm" onClick={addVariable}>{t('variables.addVariable')}</Button>
         </div>
     );
 };

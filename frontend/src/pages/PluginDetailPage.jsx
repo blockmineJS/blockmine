@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 
 export default function PluginDetailPage() {
+    const { t } = useTranslation('plugin-detail');
     const { pluginName, botId } = useParams();
     const intBotId = parseInt(botId, 10);
     const navigate = useNavigate();
@@ -40,7 +42,7 @@ export default function PluginDetailPage() {
             setIsLoading(true);
             try {
                 const response = await fetch(`/api/plugins/catalog/${pluginName}`);
-                if (!response.ok) throw new Error('Плагин не найден');
+                if (!response.ok) throw new Error(t('notFound.title'));
                 const data = await response.json();
                 
                 try {
@@ -53,7 +55,7 @@ export default function PluginDetailPage() {
                         }
                     }
                 } catch (statsError) {
-                    console.warn('Не удалось загрузить статистику:', statsError.message);
+                    console.warn('Failed to load stats:', statsError.message);
                 }
                 
                 setPlugin(data);
@@ -75,10 +77,10 @@ export default function PluginDetailPage() {
                         }
                     }
                 } catch (releaseError) {
-                    console.warn('Не удалось загрузить описание релиза:', releaseError.message);
+                    console.warn('Failed to load release notes:', releaseError.message);
                 }
             } catch (error) {
-                toast({ variant: 'destructive', title: 'Ошибка', description: error.message });
+                toast({ variant: 'destructive', title: t('messages.error'), description: error.message });
             } finally {
                 setIsLoading(false);
             }
@@ -128,11 +130,11 @@ export default function PluginDetailPage() {
 
     const formatDate = (date) => {
         const days = Math.floor((Date.now() - date) / (1000 * 60 * 60 * 24));
-        if (days === 0) return 'Сегодня';
-        if (days === 1) return 'Вчера';
-        if (days < 7) return `${days} дней назад`;
-        if (days < 30) return `${Math.floor(days / 7)} недель назад`;
-        return `${Math.floor(days / 30)} месяцев назад`;
+        if (days === 0) return t('dates.today');
+        if (days === 1) return t('dates.yesterday');
+        if (days < 7) return t('dates.daysAgo', { count: days });
+        if (days < 30) return t('dates.weeksAgo', { count: Math.floor(days / 7) });
+        return t('dates.monthsAgo', { count: Math.floor(days / 30) });
     };
 
     if (isLoading) {
@@ -146,11 +148,11 @@ export default function PluginDetailPage() {
     if (!plugin) {
         return (
             <div className="p-8 text-center">
-                <h2 className="text-2xl font-bold text-destructive">Плагин не найден</h2>
-                <p className="text-muted-foreground mt-2">Не удалось загрузить информацию о плагине.</p>
+                <h2 className="text-2xl font-bold text-destructive">{t('notFound.title')}</h2>
+                <p className="text-muted-foreground mt-2">{t('notFound.description')}</p>
                 <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Вернуться назад
+                    {t('notFound.back')}
                 </Button>
             </div>
         );
@@ -162,7 +164,7 @@ export default function PluginDetailPage() {
                 <div className="relative max-w-6xl mx-auto">
                     <Link to={`/bots/${botId}/plugins`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
                         <ArrowLeft className="h-4 w-4" />
-                        Вернуться в магазин
+                        {t('backToStore')}
                     </Link>
                     
                     <div className="flex flex-col md:flex-row gap-6 items-start">
@@ -175,7 +177,7 @@ export default function PluginDetailPage() {
                             </div>
                             
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                                <span>от {plugin.author}</span>
+                                <span>{t('by')} {plugin.author}</span>
                                 <Separator orientation="vertical" className="h-4" />
                                 <span>v{plugin.latestTag.replace('v','')}</span>
                             </div>
@@ -206,17 +208,17 @@ export default function PluginDetailPage() {
                                 {isInstalling ? (
                                     <>
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        Установка...
+                                        {t('buttons.installing')}
                                     </>
                                 ) : isInstalled ? (
                                     <>
                                         <CheckCircle className="mr-2 h-5 w-5" />
-                                        Установлен
+                                        {t('buttons.installed')}
                                     </>
                                 ) : (
                                     <>
                                         <Download className="mr-2 h-5 w-5" />
-                                        Установить
+                                        {t('buttons.install')}
                                     </>
                                 )}
                             </Button>
@@ -240,7 +242,7 @@ export default function PluginDetailPage() {
                                     ) : (
                                         <GitBranch className="mr-2 h-4 w-4" />
                                     )}
-                                    Форк
+                                    {t('buttons.fork')}
                                 </Button>
                             </div>
                         </div>
@@ -253,19 +255,19 @@ export default function PluginDetailPage() {
                     <Card className="text-center p-4">
                         <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
                         <p className="text-2xl font-bold">{plugin.downloads || 0}</p>
-                        <p className="text-sm text-muted-foreground">Всего загрузок</p>
+                        <p className="text-sm text-muted-foreground">{t('stats.totalDownloads')}</p>
                     </Card>
                     <Card className="text-center p-4">
                         <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
                         <p className="text-2xl font-bold">{formatDate(stats.lastUpdated)}</p>
-                        <p className="text-sm text-muted-foreground">Обновлено</p>
+                        <p className="text-sm text-muted-foreground">{t('stats.updated')}</p>
                     </Card>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="overview">Обзор</TabsTrigger>
-                        <TabsTrigger value="changelog">Изменения</TabsTrigger>
+                        <TabsTrigger value="overview">{t('tabs.overview')}</TabsTrigger>
+                        <TabsTrigger value="changelog">{t('tabs.changelog')}</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="overview" className="mt-6">
@@ -273,12 +275,12 @@ export default function PluginDetailPage() {
                             <div className="md:col-span-2">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Описание</CardTitle>
+                                        <CardTitle>{t('overview.description')}</CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="prose prose-invert max-w-none">
                                             <ReactMarkdown>
-                                                {plugin.fullDescription || plugin.description || 'Описание отсутствует.'}
+                                                {plugin.fullDescription || plugin.description || t('overview.noDescription')}
                                             </ReactMarkdown>
                                         </div>
                                     </CardContent>
@@ -288,22 +290,22 @@ export default function PluginDetailPage() {
                             <div className="space-y-4">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Информация</CardTitle>
+                                        <CardTitle>{t('overview.info')}</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Версия</span>
+                                            <span className="text-muted-foreground">{t('overview.version')}</span>
                                             <span>{plugin.latestTag}</span>
                                         </div>
                                     </CardContent>
                                 </Card>
-                                
+
                                 {plugin.dependencies && plugin.dependencies.length > 0 && (
                                     <Card>
                                         <CardHeader>
                                             <CardTitle className="flex items-center gap-2">
                                                 <GitBranch className="h-5 w-5" />
-                                                Зависимости
+                                                {t('overview.dependencies')}
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent>
@@ -325,7 +327,7 @@ export default function PluginDetailPage() {
                     <TabsContent value="changelog" className="mt-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Описание релиза</CardTitle>
+                                <CardTitle>{t('changelog.title')}</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {changelog ? (
@@ -337,9 +339,9 @@ export default function PluginDetailPage() {
                                 ) : (
                                     <div className="text-center py-8 text-muted-foreground">
                                         <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                        <p>Описание релиза не найдено</p>
+                                        <p>{t('changelog.empty.title')}</p>
                                         <p className="text-sm mt-2">
-                                            Описание может быть добавлено в GitHub релиз плагина
+                                            {t('changelog.empty.description')}
                                         </p>
                                     </div>
                                 )}

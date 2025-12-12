@@ -1,0 +1,22 @@
+{
+  "title": "Bot Configuration",
+  "description": "All settings in one place. Click \"Save\" to apply changes.",
+  "save": "Save",
+  "loading": "Loading configuration...",
+  "loadError": "Failed to load data.",
+  "tabs": {
+    "general": "General",
+    "plugins": "Plugins"
+  },
+  "plugins": {
+    "noDescription": "No description.",
+    "empty": "Installed plugins have no configurable settings."
+  },
+  "messages": {
+    "success": "Success!",
+    "allSaved": "All changes saved.",
+    "saveError": "Save error",
+    "unknownError": "An unknown error occurred while saving",
+    "error": "Error"
+  }
+}

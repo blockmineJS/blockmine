@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
  * Отображается поверх графа, управляет подсветкой нод
  */
 const TraceViewer = () => {
+  const { t } = useTranslation('visual-editor');
   const {
     trace,
     isTraceViewerOpen,
@@ -133,7 +135,7 @@ const TraceViewer = () => {
                 {trace.status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
                 {trace.status === 'error' && <XCircle className="w-3 h-3" />}
                 {trace.status === 'running' && <Clock className="w-3 h-3 animate-spin" />}
-                {trace.status === 'completed' ? 'Завершено' : trace.status === 'error' ? 'Ошибка' : 'Выполняется'}
+                {trace.status === 'completed' ? t('traceViewer.completed') : trace.status === 'error' ? t('traceViewer.error') : t('traceViewer.running')}
               </Badge>
               <span className="text-sm text-slate-400">{trace.eventType}</span>
               {duration && (
@@ -192,7 +194,7 @@ const TraceViewer = () => {
               {/* Счётчик шагов */}
               <div className="flex-1 text-center">
                 <span className="text-sm text-slate-300">
-                  Шаг {playbackState.currentStepIndex + 1} / {executionSteps.length}
+                  {t('traceViewer.step', { current: playbackState.currentStepIndex + 1, total: executionSteps.length })}
                 </span>
               </div>
 
@@ -225,20 +227,20 @@ const TraceViewer = () => {
             {isDetailsExpanded && currentStep && (
               <div className="mt-3 p-3 bg-slate-800 rounded-lg space-y-2 max-h-60 overflow-y-auto">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400">Нода:</span>
+                  <span className="text-xs text-slate-400">{t('traceViewer.node')}</span>
                   <span className="text-xs font-mono text-slate-200">{currentStep.nodeType}</span>
                 </div>
 
                 {currentStep.duration && (
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Время:</span>
+                    <span className="text-xs text-slate-400">{t('traceViewer.time')}</span>
                     <span className="text-xs font-mono text-slate-200">{currentStep.duration}ms</span>
                   </div>
                 )}
 
                 {currentStep.inputs && Object.keys(currentStep.inputs).length > 0 && (
                   <div className="mt-2">
-                    <div className="text-xs font-medium text-slate-400 mb-1">Входы:</div>
+                    <div className="text-xs font-medium text-slate-400 mb-1">{t('traceViewer.inputs')}</div>
                     <div className="p-2 bg-slate-900 rounded text-xs font-mono max-h-32 overflow-y-auto">
                       <pre className="whitespace-pre-wrap break-words text-slate-300">
                         {JSON.stringify(currentStep.inputs, null, 2)}
@@ -249,7 +251,7 @@ const TraceViewer = () => {
 
                 {currentStep.outputs && Object.keys(currentStep.outputs).length > 0 && (
                   <div className="mt-2">
-                    <div className="text-xs font-medium text-slate-400 mb-1">Выходы:</div>
+                    <div className="text-xs font-medium text-slate-400 mb-1">{t('traceViewer.outputs')}</div>
                     <div className="p-2 bg-slate-900 rounded text-xs font-mono max-h-32 overflow-y-auto">
                       <pre className="whitespace-pre-wrap break-words text-slate-300">
                         {JSON.stringify(currentStep.outputs, null, 2)}

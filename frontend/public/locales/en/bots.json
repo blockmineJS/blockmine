@@ -1,0 +1,110 @@
+{
+  "view": {
+    "loading": "Loading bot data...",
+    "deleteError": "Failed to delete bot"
+  },
+  "tabs": {
+    "console": "Console",
+    "minecraftViewer": "3D Control",
+    "plugins": "Plugins",
+    "settings": "Settings",
+    "events": "Events",
+    "management": "Management",
+    "websocket": "WebSocket"
+  },
+  "actions": {
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "export": "Export bot",
+    "delete": "Delete bot"
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped"
+  },
+  "deleteDialog": {
+    "title": "Delete bot {{username}}?",
+    "description": "This action is irreversible. All configuration associated with this bot will be deleted.",
+    "confirm": "Yes, delete bot"
+  },
+  "card": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "form": {
+    "titleCreate": "Create new bot",
+    "titleEdit": "Basic settings",
+    "importBadge": "Import",
+    "descriptionImport": "Configure the new bot parameters. Data from the archive will be applied automatically.",
+    "descriptionCreate": "Fill in the information below to add a new bot to the panel.",
+    "descriptionEdit": "Here you can change the basic bot parameters.",
+    "username": "Bot name",
+    "note": "Short note",
+    "notePlaceholder": "E.g., Main bot 1",
+    "password": "Password (enter to change)",
+    "passwordPlaceholder": "••••••••",
+    "prefix": "Command prefix",
+    "server": "Server",
+    "serverPlaceholder": "Select server",
+    "owners": "Bot owners",
+    "ownersPlaceholder": "Owner nickname",
+    "ownersDescription": "Owners have full access to all commands of this bot, ignoring any restrictions.",
+    "proxyTitle": "Proxy settings",
+    "proxyDescription": "Select a proxy from the list or configure manually.",
+    "proxy": "Proxy",
+    "proxyNone": "No proxy",
+    "proxyCustom": "Configure manually",
+    "proxyHost": "Host",
+    "proxyPort": "Port",
+    "proxyUsername": "Login",
+    "proxyPassword": "Proxy password",
+    "saving": "Saving...",
+    "createBot": "Create bot",
+    "saveChanges": "Save changes"
+  },
+  "export": {
+    "title": "Export configuration: {{username}}",
+    "description": "Select the data you want to include in the ZIP archive.",
+    "includeCommands": "Command settings (aliases, cooldowns, etc.)",
+    "includePermissions": "Users and access rights",
+    "includePluginFiles": "Include plugin files",
+    "includePluginFilesDesc": "Saves not only the list of plugins, but also their files, including configs. Recommended for full backup.",
+    "includePluginDataStore": "Plugin databases",
+    "includePluginDataStoreDesc": "All values that plugins stored in their databases (DataStore) will be saved.",
+    "includeEventGraphs": "Event graphs (subgraphs)",
+    "includeEventGraphsDesc": "Saves all created event graphs and their settings.",
+    "cancel": "Cancel",
+    "exporting": "Exporting...",
+    "download": "Download archive",
+    "success": "Success!",
+    "successMessage": "Bot export started.",
+    "downloadError": "Failed to get file for download from server."
+  },
+  "import": {
+    "title": "Import bot from archive",
+    "description": "Select a ZIP archive previously exported from the panel. A new bot will be created with all plugins and settings. Passwords are not transferred.",
+    "fileLabel": "Export file (.zip)",
+    "fileSelected": "✓ File selected: {{name}} ({{size}} KB)",
+    "cancel": "Cancel",
+    "uploadAndConfigure": "Upload and configure",
+    "configureTitle": "Configure imported bot",
+    "configureDescription": "Configure the new bot parameters. Data from the archive will be applied automatically.",
+    "importedData": "Imported data:",
+    "plugins": "Plugins: {{count}} pcs.",
+    "commands": "Commands: {{count}} pcs.",
+    "eventGraphs": "Event graphs: {{count}} pcs.",
+    "settings": "Settings: {{count}} pcs.",
+    "back": "Back",
+    "createBot": "Create bot",
+    "error": "Error",
+    "selectFileError": "Please select a file to import.",
+    "success": "Success",
+    "uploadSuccess": "Archive uploaded. Configure the new bot parameters.",
+    "uploadError": "Failed to upload archive.",
+    "clientError": "Client error",
+    "prepareError": "Failed to prepare data for sending.",
+    "createSuccess": "Bot created with imported settings.",
+    "createError": "Failed to create bot."
+  }
+}

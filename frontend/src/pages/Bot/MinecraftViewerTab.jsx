@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import MinecraftChat from '@/components/minecraft/MinecraftChat';
@@ -9,6 +10,7 @@ import { getEntityGeometry, getEntityMaterial, isEntityBlock as isEntityModel } 
 import { useCoordinatePickerStore } from '@/stores/coordinatePickerStore';
 
 const MinecraftViewerTab = () => {
+    const { t } = useTranslation('minecraft-viewer');
     const { botId } = useParams();
     const canvasRef = useRef(null);
     const socketRef = useRef(null);
@@ -1064,7 +1066,7 @@ const MinecraftViewerTab = () => {
         return (
             <div className="flex items-center justify-center h-full bg-gray-900">
                 <div className="bg-red-900 text-red-200 p-6 rounded">
-                    <h2 className="text-xl font-bold mb-2">Error</h2>
+                    <h2 className="text-xl font-bold mb-2">{t('error')}</h2>
                     <p>{error}</p>
                 </div>
             </div>
@@ -1074,7 +1076,7 @@ const MinecraftViewerTab = () => {
     if (!connected) {
         return (
             <div className="flex items-center justify-center h-full bg-gray-900">
-                <div className="text-white">Connecting to bot...</div>
+                <div className="text-white">{t('connecting')}</div>
             </div>
         );
     }
@@ -1091,7 +1093,7 @@ const MinecraftViewerTab = () => {
             <button
                 onClick={() => setSettingsOpen(!settingsOpen)}
                 className="absolute top-4 left-4 bg-black bg-opacity-70 hover:bg-opacity-90 text-white p-2 rounded z-10"
-                title="Настройки (Esc)"
+                title={t('settingsButton')}
             >
                 ⚙️
             </button>
@@ -1100,7 +1102,7 @@ const MinecraftViewerTab = () => {
             {settingsOpen && (
                 <div className="absolute top-14 left-4 bg-black bg-opacity-90 text-white p-4 rounded w-72 z-20">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold">Настройки</h3>
+                        <h3 className="font-bold">{t('settings.title')}</h3>
                         <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-white">✕</button>
                     </div>
 
@@ -1108,7 +1110,7 @@ const MinecraftViewerTab = () => {
                         {/* Радиус отображения */}
                         <div>
                             <label className="block text-sm mb-1">
-                                Радиус отображения: {settings.renderDistance} блоков
+                                {t('settings.renderDistance', { value: settings.renderDistance })}
                             </label>
                             <input
                                 type="range"
@@ -1124,7 +1126,7 @@ const MinecraftViewerTab = () => {
                         {/* Сила синхронизации */}
                         <div>
                             <label className="block text-sm mb-1">
-                                Сила синхронизации: {settings.correctionSpeed.toFixed(1)}x
+                                {t('settings.correctionSpeed', { value: settings.correctionSpeed.toFixed(1) })}
                             </label>
                             <input
                                 type="range"
@@ -1136,14 +1138,14 @@ const MinecraftViewerTab = () => {
                                 className="w-full accent-blue-500"
                             />
                             <div className="text-xs text-gray-400 mt-1">
-                                Меньше = плавнее движение, Больше = точнее позиция
+                                {t('settings.correctionSpeedHint')}
                             </div>
                         </div>
 
                         {/* Чувствительность мыши */}
                         <div>
                             <label className="block text-sm mb-1">
-                                Чувствительность мыши: {settings.sensitivity.toFixed(1)}x
+                                {t('settings.sensitivity', { value: settings.sensitivity.toFixed(1) })}
                             </label>
                             <input
                                 type="range"
@@ -1165,7 +1167,7 @@ const MinecraftViewerTab = () => {
                                     onChange={(e) => updateSetting('localMovement', e.target.checked)}
                                     className="accent-blue-500"
                                 />
-                                <span className="text-sm">Предикты (локальное движение)</span>
+                                <span className="text-sm">{t('settings.localMovement')}</span>
                             </label>
 
                             <label className="flex items-center gap-2 cursor-pointer">
@@ -1175,7 +1177,7 @@ const MinecraftViewerTab = () => {
                                     onChange={(e) => updateSetting('showDebug', e.target.checked)}
                                     className="accent-blue-500"
                                 />
-                                <span className="text-sm">Показывать отладку</span>
+                                <span className="text-sm">{t('settings.showDebug')}</span>
                             </label>
                         </div>
 
@@ -1190,7 +1192,7 @@ const MinecraftViewerTab = () => {
                             })}
                             className="w-full mt-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
                         >
-                            Сбросить настройки
+                            {t('settings.reset')}
                         </button>
                     </div>
                 </div>
@@ -1221,15 +1223,15 @@ const MinecraftViewerTab = () => {
             {isPickMode && (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                     <div className="text-cyan-400 text-xl font-bold animate-pulse">
-                        + Кликните на блок
+                        {t('picker.clickOnBlock')}
                     </div>
                 </div>
             )}
             {isPickMode && (
                 <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900/95 border border-cyan-500 rounded-lg p-4 z-20">
                     <div className="text-center mb-3">
-                        <div className="text-cyan-400 font-bold text-lg">📍 Выбор координат</div>
-                        <div className="text-gray-400 text-sm">Кликните на блок чтобы выбрать точку назначения</div>
+                        <div className="text-cyan-400 font-bold text-lg">{t('picker.title')}</div>
+                        <div className="text-gray-400 text-sm">{t('picker.description')}</div>
                     </div>
 
                     {selectedCoords ? (
@@ -1240,7 +1242,7 @@ const MinecraftViewerTab = () => {
                         </div>
                     ) : (
                         <div className="text-center mb-3 text-gray-500">
-                            Координаты не выбраны
+                            {t('picker.notSelected')}
                         </div>
                     )}
 
@@ -1249,14 +1251,14 @@ const MinecraftViewerTab = () => {
                             onClick={cancelPicking}
                             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
                         >
-                            Отмена
+                            {t('picker.cancel')}
                         </button>
                         <button
                             onClick={() => selectedCoords && confirmSelection(selectedCoords)}
                             disabled={!selectedCoords}
                             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
                         >
-                            ✓ Подтвердить
+                            {t('picker.confirm')}
                         </button>
                     </div>
                 </div>

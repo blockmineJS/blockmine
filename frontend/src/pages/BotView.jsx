@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi, Gamepad2 } from 'lucide-react';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
@@ -12,6 +13,7 @@ import * as Icons from 'lucide-react';
 const EMPTY_EXTENSIONS = [];
 
 export default function BotView() {
+    const { t } = useTranslation('bots');
     const { botId } = useParams();
     const navigate = useNavigate();
     
@@ -56,7 +58,7 @@ export default function BotView() {
             await deleteBot(bot.id);
             navigate('/', { replace: true });
         } catch (e) {
-            console.error("Не удалось удалить бота:", e);
+            console.error(t('view.deleteError'), e);
         }
     };
 
@@ -64,7 +66,7 @@ export default function BotView() {
         return (
             <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Загрузка данных бота...
+                {t('view.loading')}
             </div>
         );
     }
@@ -122,7 +124,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Terminal className="h-4 w-4" />
-                                Консоль
+                                {t('tabs.console')}
                             </NavLink>
                             <NavLink
                                 to="minecraft-viewer"
@@ -134,7 +136,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Gamepad2 className="h-4 w-4" />
-                                3D Управление
+                                {t('tabs.minecraftViewer')}
                             </NavLink>
                             <NavLink
                                 to="plugins" 
@@ -146,7 +148,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Puzzle className="h-4 w-4" />
-                                Плагины
+                                {t('tabs.plugins')}
                             </NavLink>
                              {uiExtensions.map(ext => {
                                 const IconComponent = Icons[ext.icon] || Icons.Puzzle;
@@ -176,9 +178,9 @@ export default function BotView() {
                                 )}
                             >
                                 <Settings className="h-4 w-4" />
-                                Настройки
+                                {t('tabs.settings')}
                             </NavLink>
-                            <NavLink 
+                            <NavLink
                                 to="events" 
                                 className={({isActive}) => cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
@@ -188,7 +190,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Zap className="h-4 w-4" />
-                                События
+                                {t('tabs.events')}
                             </NavLink>
                             <NavLink
                                 to="management"
@@ -200,7 +202,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Users className="h-4 w-4" />
-                                Управление
+                                {t('tabs.management')}
                             </NavLink>
                             <NavLink
                                 to="websocket"
@@ -212,7 +214,7 @@ export default function BotView() {
                                 )}
                             >
                                 <Wifi className="h-4 w-4" />
-                                Веб-сокет
+                                {t('tabs.websocket')}
                             </NavLink>
                         </nav>
                         
@@ -227,7 +229,7 @@ export default function BotView() {
                                         className="bg-green-500/10 border-green-500/20 text-green-600 hover:bg-green-500/20 hover:text-green-700"
                                     >
                                         <Play className="h-4 w-4 mr-1" />
-                                        <span className="hidden sm:inline">Запустить</span>
+                                        <span className="hidden sm:inline">{t('actions.start')}</span>
                                     </Button>
                                     <Button 
                                         variant="outline" 
@@ -237,7 +239,7 @@ export default function BotView() {
                                         className="bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 hover:text-red-700"
                                     >
                                         <Square className="h-4 w-4 mr-1" />
-                                        <span className="hidden sm:inline">Остановить</span>
+                                        <span className="hidden sm:inline">{t('actions.stop')}</span>
                                     </Button>
                                     <Button
                                        variant="outline"
@@ -247,7 +249,7 @@ export default function BotView() {
                                        className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
                                     >
                                        <Sparkles className="h-4 w-4 mr-1" />
-                                       <span className="hidden sm:inline">Перезапустить</span>
+                                       <span className="hidden sm:inline">{t('actions.restart')}</span>
                                     </Button>
                                 </>
                             )}
@@ -257,7 +259,7 @@ export default function BotView() {
                                         <Button
                                             variant="outline"
                                             size="icon" 
-                                            title="Экспортировать бота"
+                                            title={t('actions.export')}
                                             className="bg-blue-500/10 border-blue-500/20 text-blue-600 hover:bg-blue-500/20 hover:text-blue-700"
                                         >
                                             <Download className="h-4 w-4" />
@@ -272,7 +274,7 @@ export default function BotView() {
                                     size="icon" 
                                     onClick={() => setIsDeleteConfirmOpen(true)} 
                                     disabled={isRunning} 
-                                    title="Удалить бота"
+                                    title={t('actions.delete')}
                                     className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -290,10 +292,10 @@ export default function BotView() {
             <ConfirmationDialog
                 open={isDeleteConfirmOpen}
                 onOpenChange={setIsDeleteConfirmOpen}
-                title={`Удалить бота ${bot.username}?`}
-                description="Это действие необратимо. Вся конфигурация, связанная с этим ботом, будет удалена."
+                title={t('deleteDialog.title', { username: bot.username })}
+                description={t('deleteDialog.description')}
                 onConfirm={handleDeleteConfirm}
-                confirmText="Да, удалить бота"
+                confirmText={t('deleteDialog.confirm')}
             />
         </>
     );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
  * - Продолжить выполнение с изменёнными значениями
  */
 const WhatIfEditor = () => {
+  const { t } = useTranslation('visual-editor');
   const debugSession = useVisualEditorStore(state => state.debugSession);
   const continueExecution = useVisualEditorStore(state => state.continueExecution);
   const stopExecution = useVisualEditorStore(state => state.stopExecution);
@@ -119,11 +121,11 @@ const WhatIfEditor = () => {
           <code className={`text-sm ${isEdited ? 'text-yellow-300' : 'text-blue-300'}`}>
             {typeof displayValue === 'object'
               ? JSON.stringify(displayValue, null, 2)
-              : String(displayValue || '(empty)')}
+              : String(displayValue || t('whatIfEditor.empty'))}
           </code>
           {isEdited && (
             <Badge variant="outline" className="ml-2 text-xs border-yellow-500 text-yellow-500">
-              Изменено
+              {t('whatIfEditor.modified')}
             </Badge>
           )}
         </div>
@@ -144,26 +146,26 @@ const WhatIfEditor = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-          Выполнение приостановлено
+          {t('whatIfEditor.title')}
         </CardTitle>
         <p className="text-xs text-slate-400 mt-1">
-          Нода: <span className="text-white font-medium">{nodeLabel}</span>
+          {t('whatIfEditor.node')} <span className="text-white font-medium">{nodeLabel}</span>
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-sm text-slate-300">
           <p className="mb-2">
-            💡 Редактируйте значения прямо на нодах - кликните на зелёные бейджи с данными
+            💡 {t('whatIfEditor.editHint')}
           </p>
           <p className="text-xs text-slate-400">
-            Все изменения синхронизируются в реальном времени между пользователями
+            {t('whatIfEditor.syncHint')}
           </p>
         </div>
 
         {/* Variables */}
         {Object.keys(context?.variables || {}).length > 0 && (
           <div>
-            <Label className="text-xs text-slate-400 mb-2 block">📦 Переменные графа</Label>
+            <Label className="text-xs text-slate-400 mb-2 block">{t('whatIfEditor.graphVariables')}</Label>
             <div className="space-y-2">
               {Object.entries(context.variables).map(([key, value]) => (
                 <div key={key} className="space-y-1">
@@ -183,7 +185,7 @@ const WhatIfEditor = () => {
             className="flex-1"
           >
             <Play className="w-4 h-4 mr-2" />
-            Продолжить (F5)
+            {t('whatIfEditor.continue')}
           </Button>
           <Button
             size="sm"
@@ -191,14 +193,13 @@ const WhatIfEditor = () => {
             onClick={handleStop}
           >
             <StopCircle className="w-4 h-4 mr-2" />
-            Стоп
+            {t('whatIfEditor.stop')}
           </Button>
         </div>
 
         {Object.keys(editedValues).length > 0 && (
           <div className="text-xs text-yellow-500 bg-yellow-900/20 p-2 rounded border border-yellow-700">
-            ⚠️ Вы изменили {Object.keys(editedValues).length} {Object.keys(editedValues).length === 1 ? 'значение' : Object.keys(editedValues).length < 5 ? 'значения' : 'значений'}.
-            Нажмите "Продолжить" для применения изменений.
+            {t('whatIfEditor.changesWarning', { count: Object.keys(editedValues).length })}
           </div>
         )}
       </CardContent>

@@ -1,0 +1,70 @@
+{
+  "changelog": {
+    "title": "What's new in version {{version}}",
+    "selectVersion": "Select version",
+    "noData": "No data to display"
+  },
+  "contribute": {
+    "title": "Suggest an improvement or ask a question",
+    "guide": "Here's a quick guide on how to submit your requests properly.",
+    "description": "To ask a question, report a bug, or suggest a new idea, go to our GitHub Issues page. Click the \"New issue\" button and select an appropriate template. For a simple question, you can create a blank issue.",
+    "imageAlt": "How to create a GitHub issue",
+    "close": "Close",
+    "goToGithub": "Go to GitHub"
+  },
+  "search": {
+    "title": "Global Search",
+    "description": "Use this palette to quickly search bots, users, and plugins, as well as navigate the app.",
+    "placeholder": "Search or go to...",
+    "loading": "Loading...",
+    "noResults": "No results found.",
+    "navigation": "Navigation",
+    "dashboard": "Dashboard",
+    "scheduler": "Scheduler",
+    "servers": "Servers",
+    "bots": "Bots",
+    "users": "Users",
+    "plugins": "Plugins",
+    "forBotId": "for bot ID: {{botId}}",
+    "installedForBotId": "installed for bot ID: {{botId}}"
+  },
+  "import": {
+    "eventGraph": {
+      "title": "Import Event Graph",
+      "description": "Paste the previously copied code to import the graph. A new event graph will be created.",
+      "success": "Event graph imported successfully."
+    },
+    "command": {
+      "title": "Import Command",
+      "description": "Paste the previously copied code to import the command. A new command will be created.",
+      "success": "Command imported successfully."
+    },
+    "codeLabel": "Import code",
+    "placeholder": "Paste JSON here...",
+    "cancel": "Cancel",
+    "submit": "Import",
+    "invalidJson": "Invalid JSON format."
+  },
+  "share": {
+    "eventGraph": {
+      "title": "Share Event Graph",
+      "description": "Copy this code to import the event graph on another bot or share it.",
+      "fetchError": "Failed to get graph data:"
+    },
+    "command": {
+      "title": "Share Command",
+      "description": "Copy this code to import the command on another bot or share it.",
+      "fetchError": "Failed to get command data:"
+    },
+    "codeLabel": "Import code",
+    "close": "Close",
+    "copyCode": "Copy code",
+    "copied": "Copied!",
+    "copiedDescription": "Import code copied to clipboard.",
+    "copyError": "Failed to copy code. Try selecting and copying manually.",
+    "loadError": "Failed to load data for export."
+  },
+  "common": {
+    "error": "Error"
+  }
+}

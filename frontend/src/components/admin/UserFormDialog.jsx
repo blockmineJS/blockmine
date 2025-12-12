@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { apiHelper } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 
 export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSaving }) {
+    const { t } = useTranslation('admin');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [roleId, setRoleId] = useState('');
@@ -51,15 +53,15 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!username || !roleId) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Имя пользователя и роль обязательны.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.usernameRequired') });
             return;
         }
         if (!isEditMode && (!password || password.length < 4)) {
-             toast({ variant: 'destructive', title: 'Ошибка', description: 'Пароль (мин. 4 символа) обязателен для нового пользователя.' });
+             toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordRequired') });
             return;
         }
         if (isEditMode && password && password.length < 4) {
-             toast({ variant: 'destructive', title: 'Ошибка', description: 'Новый пароль должен содержать не менее 4 символов.' });
+             toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordMinLength') });
             return;
         }
 
@@ -74,24 +76,24 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
     return (
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>{isEditMode ? 'Редактировать пользователя' : 'Создать нового пользователя'}</DialogTitle>
+                <DialogTitle>{isEditMode ? t('userForm.editTitle') : t('userForm.createTitle')}</DialogTitle>
                 <DialogDescription>
-                    {isEditMode ? `Редактирование данных для ${user.username}.` : 'Заполните данные для создания новой учетной записи.'}
+                    {isEditMode ? t('userForm.editDescription', { name: user.username }) : t('userForm.createDescription')}
                 </DialogDescription>
             </DialogHeader>
             <form id="user-form" onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="space-y-2">
-                    <Label htmlFor="username">Имя пользователя</Label>
+                    <Label htmlFor="username">{t('userForm.username')}</Label>
                     <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={isEditMode} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password">{isEditMode ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль'}</Label>
+                    <Label htmlFor="password">{isEditMode ? t('userForm.newPassword') : t('userForm.password')}</Label>
                     <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="roleId">Роль</Label>
+                    <Label htmlFor="roleId">{t('userForm.role')}</Label>
                     <Select value={roleId} onValueChange={setRoleId} required>
-                        <SelectTrigger><SelectValue placeholder="Выберите роль..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('userForm.selectRole')} /></SelectTrigger>
                         <SelectContent>
                             {roles.map(role => (
                                 <SelectItem key={role.id} value={role.id.toString()}>{role.name}</SelectItem>
@@ -102,7 +104,7 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <Checkbox id="allBots" checked={allBots} onCheckedChange={(v) => setAllBots(!!v)} disabled={isOwner} />
-                        <Label htmlFor="allBots">Доступ ко всем ботам {isOwner ? '(владелец, всегда включено)' : ''}</Label>
+                        <Label htmlFor="allBots">{t('userForm.allBotsAccess')} {isOwner ? t('userForm.ownerNote') : ''}</Label>
                     </div>
                     {!allBots && !isOwner && (
                         <div className="max-h-48 overflow-auto border rounded p-2 space-y-1">
@@ -126,9 +128,9 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
                 </div>
             </form>
             <DialogFooter>
-                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button variant="ghost" onClick={onCancel}>{t('userForm.cancel')}</Button>
                 <Button type="submit" form="user-form" disabled={isSaving}>
-                    {isSaving ? 'Сохранение...' : 'Сохранить'}
+                    {isSaving ? t('userForm.saving') : t('userForm.save')}
                 </Button>
             </DialogFooter>
         </DialogContent>

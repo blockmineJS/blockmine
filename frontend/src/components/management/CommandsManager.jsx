@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ const OWNER_TYPES = {
 };
 
 export default function CommandsManager({ commands = [], allPermissions = [], botId, isLoading, onDataChange }) {
+    const { t } = useTranslation('management');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCommand, setEditingCommand] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -82,12 +84,12 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 method: 'POST',
                 body: JSON.stringify({ ...commandData, isVisual: true }),
             });
-            toast({ title: 'Успех', description: `Команда "${newCommand.name}" успешно создана.` });
+            toast({ title: t('messages.success'), description: t('commands.toast.created', { name: newCommand.name }) });
             onDataChange();
             setIsCreateDialogOpen(false);
       navigate(`/bots/${botId}/commands/visual/${newCommand.id}`);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось создать команду: ${error.message}` });
+            toast({ variant: 'destructive', title: t('messages.error'), description: t('commands.toast.createError', { error: error.message }) });
         }
     };
 
@@ -95,10 +97,10 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
         if (!commandToDelete) return;
         try {
             await apiHelper(`/api/bots/${botId}/commands/${commandToDelete.id}`, { method: 'DELETE' });
-            toast({ title: 'Успех', description: `Команда "${commandToDelete.name}" удалена.` });
+            toast({ title: t('messages.success'), description: t('commands.toast.deleted', { name: commandToDelete.name }) });
             onDataChange();
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось удалить команду: ${error.message}` });
+            toast({ variant: 'destructive', title: t('messages.error'), description: t('commands.toast.deleteError', { error: error.message }) });
         }
         setIsDeleteDialogOpen(false);
         setCommandToDelete(null);
@@ -128,14 +130,14 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
 
         const success = await updateCommand(command.id, { isEnabled }, true);
         if (success) {
-            toast({ title: "Успех!", description: `Команда "${command.name}" была ${isEnabled ? 'включена' : 'выключена'}.` });
+            toast({ title: t('messages.success'), description: isEnabled ? t('commands.toast.enabled', { name: command.name }) : t('commands.toast.disabled', { name: command.name }) });
         } else {
             setLocalCommands(prevCommands =>
                 prevCommands.map(cmd =>
                     cmd.id === command.id ? { ...cmd, isEnabled: !isEnabled } : cmd
                 )
             );
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось изменить статус команды.' });
+            toast({ variant: 'destructive', title: t('messages.error'), description: t('commands.toast.toggleError') });
         }
     };
 
@@ -144,7 +146,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
         setIsSaving(true);
         const success = await updateCommand(editingCommand.id, commandData);
         if (success) {
-            toast({ title: "Успех!", description: `Настройки команды ${editingCommand.name} обновлены.` });
+            toast({ title: t('messages.success'), description: t('commands.toast.updated', { name: editingCommand.name }) });
             handleCloseModal();
         }
         setIsSaving(false);
@@ -157,20 +159,20 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                         <div className="flex items-baseline gap-3 mb-1">
-                            <CardTitle className="text-2xl font-bold tracking-tight">Команды</CardTitle>
+                            <CardTitle className="text-2xl font-bold tracking-tight">{t('commands.title')}</CardTitle>
                             <span className="text-sm text-muted-foreground">
-                                {stats.active} из {stats.total} активно
+                                {t('commands.activeCount', { active: stats.active, total: stats.total })}
                             </span>
                         </div>
-                        <CardDescription>Список всех команд, доступных боту</CardDescription>
+                        <CardDescription>{t('commands.description')}</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                             <Upload className="mr-2 h-4 w-4" />
-                            Импорт
+                            {t('commands.import')}
                         </Button>
                         <Button onClick={() => setIsCreateDialogOpen(true)}>
-                            <Sparkles className="mr-2 h-4 w-4" />Создать
+                            <Sparkles className="mr-2 h-4 w-4" />{t('commands.create')}
                         </Button>
                     </div>
                 </div>
@@ -179,7 +181,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 <div className="relative mt-4">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Поиск по названию или описанию..."
+                        placeholder={t('commands.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9"
@@ -191,22 +193,22 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[60px]">Вкл</TableHead>
-                            <TableHead>Команда</TableHead>
-                            <TableHead>Тип</TableHead>
-                            <TableHead>Источник</TableHead>
-                            <TableHead>Алиасы</TableHead>
-                            <TableHead>Право</TableHead>
-                            <TableHead className="w-[80px]">CD</TableHead>
-                            <TableHead className="text-right w-[140px]">Действия</TableHead>
+                            <TableHead className="w-[60px]">{t('commands.table.enabled')}</TableHead>
+                            <TableHead>{t('commands.table.command')}</TableHead>
+                            <TableHead>{t('commands.table.type')}</TableHead>
+                            <TableHead>{t('commands.table.source')}</TableHead>
+                            <TableHead>{t('commands.table.aliases')}</TableHead>
+                            <TableHead>{t('commands.table.permission')}</TableHead>
+                            <TableHead className="w-[80px]">{t('commands.table.cooldown')}</TableHead>
+                            <TableHead className="text-right w-[140px]">{t('commands.table.actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={8} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={8} className="text-center">{t('commands.loading')}</TableCell></TableRow>
                         ) : filteredCommands.length === 0 ? (
                             <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">
-                                {searchQuery ? 'Команды не найдены' : 'Нет команд'}
+                                {searchQuery ? t('commands.notFound') : t('commands.empty')}
                             </TableCell></TableRow>
                         ) : (
                             filteredCommands.map(command => (
@@ -251,11 +253,11 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                                 <TooltipTrigger asChild>
                                                     <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-500 cursor-help">
                                                         <AlertTriangle className="h-3.5 w-3.5" />
-                                                        <span>Нет</span>
+                                                        <span>{t('commands.noPermission')}</span>
                                                     </div>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    <p>Эту команду смогут использовать все</p>
+                                                    <p>{t('commands.noPermissionTooltip')}</p>
                                                 </TooltipContent>
                                             </Tooltip>
                                         )}
@@ -268,12 +270,12 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }}>
                                                     <FilePenLine className="h-3 w-3 mr-1" />
-                                                    Открыть
+                                                    {t('commands.open')}
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" title="Экспорт" onClick={e => { e.stopPropagation(); setCommandToShare(command); }}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" title={t('commands.export')} onClick={e => { e.stopPropagation(); setCommandToShare(command); }}>
                                                     <Share2 className="h-3 w-3" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title="Удалить" onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title={t('commands.delete')} onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
                                                     <Trash2 className="h-3 w-3" />
                                                 </Button>
                                             </div>
@@ -320,14 +322,14 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                        <AlertDialogTitle>{t('commands.deleteConfirm.title')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Вы действительно хотите удалить команду "{commandToDelete?.name}"? Это действие нельзя будет отменить.
+                            {t('commands.deleteConfirm.description', { name: commandToDelete?.name })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Отмена</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteCommand}>Удалить</AlertDialogAction>
+                        <AlertDialogCancel>{t('commands.deleteConfirm.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteCommand}>{t('commands.deleteConfirm.delete')}</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

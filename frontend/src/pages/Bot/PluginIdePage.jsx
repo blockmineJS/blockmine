@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
 import { toast } from '@/hooks/use-toast';
@@ -9,6 +10,7 @@ import Workbench from '@/components/ide/Workbench';
 export default function PluginIdePage() {
     const { botId, pluginName } = useParams();
     const navigate = useNavigate();
+    const { t } = useTranslation('plugins');
     const [structure, setStructure] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [openTabs, setOpenTabs] = useState([]);
@@ -24,7 +26,7 @@ export default function PluginIdePage() {
             const data = await apiHelper(`/api/bots/${botId}/plugins/ide/${pluginName}/structure`);
             setStructure(data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить структуру плагина.' });
+            toast({ variant: 'destructive', title: t('ide.error'), description: t('ide.loadStructureError') });
         } finally {
             setIsLoading(false);
         }
@@ -58,7 +60,7 @@ export default function PluginIdePage() {
             setActiveTab(file.path);
         } catch (error) {
             console.error('Failed to load file content:', error);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить файл.' });
+            toast({ variant: 'destructive', title: t('ide.error'), description: t('ide.loadFileError') });
         }
     };
 
@@ -104,7 +106,7 @@ export default function PluginIdePage() {
             }, 200);
         } catch (error) {
             console.error('Failed to load file:', error);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось открыть файл.' });
+            toast({ variant: 'destructive', title: t('ide.error'), description: t('ide.openFileError') });
         }
     };
 
@@ -112,7 +114,7 @@ export default function PluginIdePage() {
         const tabPath = file.path;
         const tab = openTabs.find(t => t.path === tabPath);
         if (tab.isDirty) {
-            if (!window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть вкладку?')) {
+            if (!window.confirm(t('ide.unsavedChanges'))) {
                 return;
             }
         }
@@ -149,8 +151,8 @@ export default function PluginIdePage() {
             // Проверка на переименование плагина
             if (result?.renamed && result?.newName) {
                 toast({
-                    title: 'Плагин переименован',
-                    description: `${result.oldName} → ${result.newName}. Перенаправление...`
+                    title: t('ide.pluginRenamed'),
+                    description: t('ide.pluginRenamedDesc', { oldName: result.oldName, newName: result.newName })
                 });
 
                 // Перенаправить на новый URL через 1 секунду
@@ -158,10 +160,10 @@ export default function PluginIdePage() {
                     navigate(`/bots/${botId}/plugins/ide/${result.newName}`);
                 }, 1000);
             } else {
-                toast({ title: 'Успех', description: `Файл ${currentTab.name} сохранен.` });
+                toast({ title: t('ide.success'), description: t('ide.fileSaved', { name: currentTab.name }) });
             }
         } catch (e) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить файл.' });
+            toast({ variant: 'destructive', title: t('ide.error'), description: t('ide.saveError') });
         }
     };
 
@@ -173,10 +175,10 @@ export default function PluginIdePage() {
                 body: JSON.stringify({ operation, path, newPath }),
             });
             await fetchStructure();
-            toast({ title: 'Успех!', description: `Операция "${operation}" выполнена.` });
+            toast({ title: t('ide.success'), description: t('ide.operationSuccess', { operation }) });
             return true;
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось выполнить операцию: ${error.message}` });
+            toast({ variant: 'destructive', title: t('ide.error'), description: `${t('ide.operationError')}: ${error.message}` });
             return false;
         }
     };
@@ -186,8 +188,8 @@ export default function PluginIdePage() {
         if (!nodeToDelete) return;
 
         const message = nodeToDelete.type === 'folder'
-            ? `Вы уверены, что хотите удалить папку "${nodeToDelete.name}" и всё её содержимое?`
-            : `Вы уверены, что хотите удалить файл "${nodeToDelete.name}"?`;
+            ? t('ide.confirmDeleteFolder', { name: nodeToDelete.name })
+            : t('ide.confirmDeleteFile', { name: nodeToDelete.name });
 
         if (window.confirm(message)) {
             (async () => {
@@ -249,9 +251,9 @@ export default function PluginIdePage() {
                 }
             }
 
-            toast({ title: 'Успех!', description: `Файл перемещен.` });
+            toast({ title: t('ide.success'), description: t('ide.fileMoved') });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: `Не удалось переместить файл: ${error.message}` });
+            toast({ variant: 'destructive', title: t('ide.error'), description: `${t('ide.moveError')}: ${error.message}` });
         }
     };
 

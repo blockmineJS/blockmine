@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Handle, Position } from 'reactflow';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -62,6 +63,7 @@ const Pin = React.memo(({
   debugMode = null,
   connectingPin = null
 }) => {
+  const { t } = useTranslation('nodes');
   const position = isInput ? Position.Left : Position.Right;
 
   let isCompatible = false;
@@ -208,8 +210,8 @@ const Pin = React.memo(({
     // Дефолтные опции для Boolean
     if (!options) {
       options = [
-        { value: 'false', label: 'Нет' },
-        { value: 'true', label: 'Да' }
+        { value: 'false', label: t('common.pins.false') },
+        { value: 'true', label: t('common.pins.true') }
       ];
     }
 
@@ -230,7 +232,7 @@ const Pin = React.memo(({
           }}
         >
           <SelectTrigger className="nodrag w-[120px] h-8 bg-slate-900 border-slate-500 text-sm">
-            <SelectValue placeholder="Выбрать..." />
+            <SelectValue placeholder={t('common.placeholders.select')} />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
@@ -281,6 +283,7 @@ const BaseNode = ({
   breakpoint = null,
   isPausedNode = false,
 }) => {
+  const { t } = useTranslation('visual-editor');
   const [isBreakpointDialogOpen, setIsBreakpointDialogOpen] = useState(false);
   const [editingValue, setEditingValue] = useState(null);
 
@@ -595,7 +598,7 @@ const BaseNode = ({
           onClose={() => setEditingValue(null)}
           value={editingValue.value}
           onSave={handleSaveValue}
-          title={`Редактировать значение`}
+          title={t('debugPanel.editValue')}
           pinName={editingValue.pinName}
         />
       )}

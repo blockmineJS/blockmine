@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from '@/lib/clipboard';
 
 export default function ShareCommandDialog({ botId, commandId, onCancel }) {
+    const { t } = useTranslation('dialogs');
     const [commandData, setCommandData] = useState(null);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -21,11 +23,11 @@ export default function ShareCommandDialog({ botId, commandId, onCancel }) {
                 const data = await apiHelper(`/api/bots/${botId}/commands/${commandId}/export`);
                 setCommandData(JSON.stringify(data, null, 2));
             } catch (error) {
-                console.error("Не удалось получить данные команды:", error);
+                console.error(t('share.command.fetchError'), error);
                 toast({
                     variant: 'destructive',
-                    title: 'Ошибка',
-                    description: 'Не удалось загрузить данные для экспорта.',
+                    title: t('common.error'),
+                    description: t('share.loadError'),
                 });
                 onCancel();
             } finally {
@@ -36,21 +38,21 @@ export default function ShareCommandDialog({ botId, commandId, onCancel }) {
         if (commandId) {
             fetchCommandData();
         }
-    }, [botId, commandId, onCancel, toast]);
+    }, [botId, commandId, onCancel, toast, t]);
 
     const handleCopy = async () => {
         if (commandData) {
             const success = await copyToClipboard(commandData);
             if (success) {
                 toast({
-                    title: 'Скопировано!',
-                    description: 'Код для импорта скопирован в буфер обмена.',
+                    title: t('share.copied'),
+                    description: t('share.copiedDescription'),
                 });
             } else {
                 toast({
                     variant: 'destructive',
-                    title: 'Ошибка',
-                    description: 'Не удалось скопировать код. Попробуйте выделить и скопировать вручную.',
+                    title: t('common.error'),
+                    description: t('share.copyError'),
                 });
             }
         }
@@ -60,13 +62,13 @@ export default function ShareCommandDialog({ botId, commandId, onCancel }) {
         <Dialog open={!!commandId} onOpenChange={(isOpen) => !isOpen && onCancel()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Поделиться командой</DialogTitle>
+                    <DialogTitle>{t('share.command.title')}</DialogTitle>
                     <DialogDescription>
-                        Скопируйте этот код, чтобы импортировать команду на другом боте или поделиться ей.
+                        {t('share.command.description')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label htmlFor="command-json">Код для импорта</Label>
+                    <Label htmlFor="command-json">{t('share.codeLabel')}</Label>
                     {loading ? (
                         <div className="flex items-center justify-center h-24">
                             <Loader2 className="h-8 w-8 animate-spin" />
@@ -81,10 +83,10 @@ export default function ShareCommandDialog({ botId, commandId, onCancel }) {
                     )}
                 </div>
                 <DialogFooter>
-                    <Button variant="ghost" onClick={onCancel}>Закрыть</Button>
+                    <Button variant="ghost" onClick={onCancel}>{t('share.close')}</Button>
                     <Button onClick={handleCopy} disabled={loading || !commandData}>
                         <Copy className="mr-2 h-4 w-4" />
-                        Скопировать код
+                        {t('share.copyCode')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

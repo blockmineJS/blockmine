@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { apiHelper } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Loader2, Save, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function GlobalSettingsManager() {
+    const { t } = useTranslation('admin');
     const [settings, setSettings] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +25,7 @@ export default function GlobalSettingsManager() {
                 telemetry: data.telemetry || { enabled: true }
             });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить глобальные настройки.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('settings.loadError') });
         } finally {
             setIsLoading(false);
         }
@@ -53,7 +55,7 @@ export default function GlobalSettingsManager() {
                     allowExternalAccess: settings.server.allowExternalAccess,
                     telemetryEnabled: settings.telemetry.enabled,
                 }),
-            }, "Настройки сохранены. Перезапустите панель для применения.");
+            }, t('settings.saveSuccess'));
         } catch(error) {
         } finally {
             setIsSaving(false);
@@ -67,25 +69,25 @@ export default function GlobalSettingsManager() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Глобальные настройки</CardTitle>
+                <CardTitle>{t('settings.title')}</CardTitle>
                 <CardDescription>
-                    Эти настройки влияют на работу всей панели. Изменения некоторых из них требуют перезапуска.
+                    {t('settings.description')}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                  <Alert>
                     <Terminal className="h-4 w-4" />
-                    <AlertTitle>Требуется перезапуск</AlertTitle>
+                    <AlertTitle>{t('settings.restartRequired')}</AlertTitle>
                     <AlertDescription>
-                        После сохранения настроек необходимо перезапустить панель, например, командой <code>npx blockmine</code> в терминале.
+                        <Trans i18nKey="settings.restartDescription" t={t} components={{ code: <code /> }} />
                     </AlertDescription>
                 </Alert>
 
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div>
-                        <Label htmlFor="external-access" className="text-base font-medium">Внешний доступ</Label>
+                        <Label htmlFor="external-access" className="text-base font-medium">{t('settings.externalAccess')}</Label>
                         <p className="text-sm text-muted-foreground">
-                            Разрешить доступ к панели из локальной сети или интернета.
+                            {t('settings.externalAccessDescription')}
                         </p>
                     </div>
                     <Switch
@@ -94,12 +96,12 @@ export default function GlobalSettingsManager() {
                         onCheckedChange={(checked) => handleToggleChange('server.allowExternalAccess', checked)}
                     />
                 </div>
-                
+
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div>
-                        <Label htmlFor="telemetry" className="text-base font-medium">Анонимная телеметрия</Label>
+                        <Label htmlFor="telemetry" className="text-base font-medium">{t('settings.telemetry')}</Label>
                         <p className="text-sm text-muted-foreground">
-                            Отправлять анонимную статистику (кол-во ботов, плагинов) для улучшения проекта.
+                            {t('settings.telemetryDescription')}
                         </p>
                     </div>
                     <Switch
@@ -108,11 +110,11 @@ export default function GlobalSettingsManager() {
                         onCheckedChange={(checked) => handleToggleChange('telemetry.enabled', checked)}
                     />
                 </div>
-                
+
                 <div className="flex justify-end">
                     <Button onClick={handleSave} disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
-                        Сохранить настройки
+                        {t('settings.save')}
                     </Button>
                 </div>
             </CardContent>

@@ -1,0 +1,10 @@
+{
+  "performanceWarning": "Large number of logs may reduce performance. Clear logs to improve.",
+  "scrollDown": "Scroll down",
+  "clearConsole": "Clear console",
+  "gradient": "Gradient",
+  "viewOnlyMode": "View mode: sending commands is unavailable",
+  "sendAsBot": "Send as {{username}}...",
+  "startBotToSend": "Start the bot to send messages",
+  "noPermission": "Insufficient permissions to send commands"
+}

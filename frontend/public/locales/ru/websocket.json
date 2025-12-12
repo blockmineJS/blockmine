@@ -1,0 +1,86 @@
+{
+  "title": "WebSocket API",
+  "tabs": {
+    "keys": "API Ключи",
+    "logs": "Логи подключений",
+    "docs": "Документация"
+  },
+  "clients": "Клиентов",
+  "createKey": "Создать ключ",
+  "keys": {
+    "title": "Ваши API Ключи",
+    "description": "Создавайте и управляйте API ключами для доступа к боту через WebSocket",
+    "loading": "Загрузка...",
+    "empty": "У вас пока нет API ключей",
+    "emptyHint": "Создайте первый ключ, чтобы начать использовать WebSocket API",
+    "name": "Название",
+    "key": "Ключ",
+    "permissions": "Права",
+    "createdAt": "Создан",
+    "lastUsed": "Последнее использование",
+    "actions": "Действия",
+    "never": "Никогда"
+  },
+  "permissions": {
+    "Read": "Чтение",
+    "Write": "Запись",
+    "ReadWrite": "Чтение/Запись"
+  },
+  "logs": {
+    "title": "Логи подключений",
+    "description": "История подключений к WebSocket API (последние 50)",
+    "empty": "Пока нет подключений",
+    "action": "Действие",
+    "key": "Ключ",
+    "ip": "IP адрес",
+    "time": "Время",
+    "connect": "Подключение",
+    "disconnect": "Отключение"
+  },
+  "docs": {
+    "botId": "ID текущего бота",
+    "title": "Подключение к WebSocket API",
+    "description": "Примеры использования API для разных языков программирования",
+    "endpoint": "Endpoint",
+    "params": "Параметры подключения",
+    "recommended": "Рекомендуется",
+    "recommendedHint": "Используйте высокоуровневый SDK blockmine-sdk для простого использования API",
+    "sdkTitle": "Вариант 1: Высокоуровневый SDK (рекомендуется)",
+    "sdkDescription": "Простой Promise-based API для работы с ботом",
+    "rawTitle": "Вариант 2: Прямое использование Socket.IO",
+    "rawDescription": "Для продвинутых пользователей, которым нужен полный контроль",
+    "eventsTitle": "Доступные события (Read)",
+    "actionsTitle": "Доступные действия",
+    "examplesTitle": "Примеры использования"
+  },
+  "createDialog": {
+    "title": "Создать API ключ",
+    "description": "Создайте новый API ключ для доступа к боту через WebSocket",
+    "nameLabel": "Название ключа",
+    "namePlaceholder": "Например: Discord-бот",
+    "permissionsLabel": "Права доступа",
+    "readOnly": "Только чтение (получение событий)",
+    "writeOnly": "Только запись (отправка действий)",
+    "readWrite": "Чтение и запись (полный доступ)",
+    "creating": "Создание...",
+    "create": "Создать",
+    "cancel": "Отмена",
+    "close": "Закрыть",
+    "keyCreated": "Ваш API ключ",
+    "saveWarning": "Важно! Сохраните этот ключ сейчас. Вы не сможете увидеть его снова."
+  },
+  "messages": {
+    "error": "Ошибка",
+    "success": "Успех",
+    "loadKeysError": "Не удалось загрузить API ключи",
+    "loadLogsError": "Не удалось загрузить логи подключений",
+    "enterKeyName": "Введите название ключа",
+    "keyCreated": "API ключ создан",
+    "keyCreateError": "Не удалось создать ключ",
+    "keyDeleted": "API ключ удален",
+    "keyDeleteError": "Не удалось удалить ключ",
+    "deleteConfirm": "Вы уверены, что хотите удалить этот ключ? Все приложения, использующие его, потеряют доступ.",
+    "copied": "Скопировано",
+    "copiedHint": "Ключ скопирован в буфер обмена"
+  }
+}

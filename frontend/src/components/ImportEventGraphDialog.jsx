@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +9,7 @@ import { Loader2, Upload } from 'lucide-react';
 import { apiHelper } from '@/lib/api';
 
 export default function ImportEventGraphDialog({ botId, open, onOpenChange, onImportSuccess }) {
+    const { t } = useTranslation('dialogs');
     const [jsonInput, setJsonInput] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const { toast } = useToast();
@@ -17,7 +19,7 @@ export default function ImportEventGraphDialog({ botId, open, onOpenChange, onIm
         try {
             importData = JSON.parse(jsonInput);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Неверный формат JSON.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('import.invalidJson') });
             return;
         }
 
@@ -26,8 +28,8 @@ export default function ImportEventGraphDialog({ botId, open, onOpenChange, onIm
             await apiHelper(`/api/bots/${botId}/event-graphs/import`, {
                 method: 'POST',
                 body: JSON.stringify(importData),
-            }, `Граф события успешно импортирован.`);
-            
+            }, t('import.eventGraph.success'));
+
             onImportSuccess();
         } catch (error) {
         } finally {
@@ -39,27 +41,27 @@ export default function ImportEventGraphDialog({ botId, open, onOpenChange, onIm
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Импорт графа события</DialogTitle>
+                    <DialogTitle>{t('import.eventGraph.title')}</DialogTitle>
                     <DialogDescription>
-                        Вставьте ранее скопированный код для импорта графа. Будет создан новый граф события.
+                        {t('import.eventGraph.description')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label htmlFor="graph-json-input">Код для импорта</Label>
+                    <Label htmlFor="graph-json-input">{t('import.codeLabel')}</Label>
                     <Textarea
                         id="graph-json-input"
                         value={jsonInput}
                         onChange={(e) => setJsonInput(e.target.value)}
-                        placeholder='Вставьте сюда JSON...'
+                        placeholder={t('import.placeholder')}
                         className="h-64 font-mono text-xs"
                     />
                 </div>
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('import.cancel')}</Button>
                     <Button onClick={handleImport} disabled={isImporting || !jsonInput}>
                         {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <Upload className="mr-2 h-4 w-4" />
-                        Импортировать
+                        {t('import.submit')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

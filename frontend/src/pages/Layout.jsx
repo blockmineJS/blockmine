@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -29,6 +30,7 @@ import GlobalSearch from '@/components/GlobalSearch';
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ChangelogDialog from '@/components/ChangelogDialog';
 import PresenceButton from '@/components/PresenceButton';
 import { apiHelper } from '@/lib/api';
@@ -165,6 +167,7 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
 };
 
 const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
+    const { t } = useTranslation(['sidebar', 'common']);
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const hasPermission = useAppStore(state => state.hasPermission);
@@ -173,11 +176,16 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [isDragging, setIsDragging] = useState(false);
-    const [randomFeature, setRandomFeature] = useState({ text: 'Улучшить BlockMine', icon: <Lightbulb className="h-4 w-4 flex-shrink-0" /> });
+    const [randomFeature, setRandomFeature] = useState({ text: t('contribute.improve'), icon: <Lightbulb className="h-4 w-4 flex-shrink-0" /> });
     const [isContributeModalOpen, setIsContributeModalOpen] = useState(false);
 
     useEffect(() => {
-        const texts = ["Предложить улучшение", "Предложить изменение", "Задать вопрос", "Улучшить BlockMine"];
+        const texts = [
+            t('contribute.suggest'),
+            t('contribute.change'),
+            t('contribute.question'),
+            t('contribute.improve')
+        ];
         const icons = [
             <Lightbulb key="lightbulb" className="h-4 w-4 flex-shrink-0" />,
             <MessageSquarePlus key="msg" className="h-4 w-4 flex-shrink-0" />
@@ -185,7 +193,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
         const randomText = texts[Math.floor(Math.random() * texts.length)];
         const randomIcon = icons[Math.floor(Math.random() * icons.length)];
         setRandomFeature({ text: randomText, icon: randomIcon });
-    }, []);
+    }, [t]);
 
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
 
@@ -247,11 +255,11 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                 });
 
             } catch (error) {
-                console.error('[Drag] Ошибка:', error);
+                console.error('[Drag] Error:', error);
                 updateBotOrder(oldBots);
                 toast({
-                    title: "Ошибка",
-                    description: "Не удалось обновить порядок ботов",
+                    title: t('messages.error', { ns: 'common' }),
+                    description: t('botOrderError'),
                     variant: "destructive",
                 });
             }
@@ -343,26 +351,26 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     return (
         <nav className="flex-1 flex flex-col gap-1 p-4 min-h-0 overflow-y-auto md:overflow-visible pb-20 md:pb-0 overscroll-contain">
             <NavLink to="/" end onClick={onLinkClick} className={navLinkClasses}>
-                {iconAndText(<LayoutDashboard className="h-4 w-4 flex-shrink-0" />, "Дашборд")}
+                {iconAndText(<LayoutDashboard className="h-4 w-4 flex-shrink-0" />, t('dashboard'))}
             </NavLink>
-            
+
             {hasPermission('task:list') && (
                 <NavLink to="/tasks" onClick={onLinkClick} className={navLinkClasses}>
-                    {iconAndText(<Clock className="h-4 w-4 flex-shrink-0" />, "Планировщик")}
+                    {iconAndText(<Clock className="h-4 w-4 flex-shrink-0" />, t('scheduler'))}
                 </NavLink>
             )}
 
             <NavLink to="/graph-store" onClick={onLinkClick} className={navLinkClasses}>
-                {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, "Магазин графов")}
+                {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, t('graphStore'))}
             </NavLink>
 
             <NavLink to="/api-keys" onClick={onLinkClick} className={navLinkClasses}>
-                {iconAndText(<Key className="h-4 w-4 flex-shrink-0" />, "API Ключи")}
+                {iconAndText(<Key className="h-4 w-4 flex-shrink-0" />, t('apiKeys'))}
             </NavLink>
 
             {hasPermission('bot:update') && (
                 <NavLink to="/proxy-config" onClick={onLinkClick} className={navLinkClasses}>
-                    {iconAndText(<Globe className="h-4 w-4 flex-shrink-0" />, "Прокси")}
+                    {iconAndText(<Globe className="h-4 w-4 flex-shrink-0" />, t('proxy'))}
                 </NavLink>
             )}
 
@@ -397,14 +405,14 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                     onLinkClick();
                 }}
             >
-                {iconAndText(<Github className="h-4 w-4 flex-shrink-0" />, "История версий")}
+                {iconAndText(<Github className="h-4 w-4 flex-shrink-0" />, t('changelog'))}
             </Button>
-            
+
             <Separator className="my-2" />
-            
+
             {!isCollapsed && (
                 <div className="px-3 py-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Боты</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('bots')}</p>
                 </div>
             )}
             
@@ -461,6 +469,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
 };
 
 export default function Layout() {
+    const { t } = useTranslation(['sidebar', 'common']);
     const navigate = useNavigate();
     const location = useLocation();
     const { toast } = useToast();
@@ -521,7 +530,7 @@ export default function Layout() {
         setIsImportModalOpen(false);
         setIsSheetOpen(false);
         fetchInitialData().then(() => {
-            toast({ title: "Успех!", description: `Бот "${newBot.username}" успешно импортирован.` });
+            toast({ title: t('messages.success', { ns: 'common' }), description: t('botImported', { name: newBot.username }) });
             navigate(`/bots/${newBot.id}`);
         });
     };
@@ -592,7 +601,7 @@ export default function Layout() {
                         )}
                     >
                         <ShieldCheck className="h-4 w-4 flex-shrink-0" />
-                        <span className={cn(isCollapsed && "hidden")}>Администрирование</span>
+                        <span className={cn(isCollapsed && "hidden")}>{t('admin')}</span>
                     </NavLink>
                 )}
                 {hasPermission('server:list') && (
@@ -608,7 +617,7 @@ export default function Layout() {
                         )}
                     >
                         <Server className="h-4 w-4 flex-shrink-0" />
-                        <span className={cn(isCollapsed && "hidden")}>Серверы</span>
+                        <span className={cn(isCollapsed && "hidden")}>{t('servers')}</span>
                     </NavLink>
                 )}
 
@@ -625,7 +634,7 @@ export default function Layout() {
                         )}
                     >
                         <Globe className="h-4 w-4 flex-shrink-0" />
-                        <span className={cn(isCollapsed && "hidden")}>Прокси</span>
+                        <span className={cn(isCollapsed && "hidden")}>{t('proxies')}</span>
                     </NavLink>
                 )}
                 
@@ -638,14 +647,14 @@ export default function Layout() {
                                     size={isCollapsed ? "icon" : "sm"}
                                 >
                                     <PlusCircle className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                                    {!isCollapsed && "Создать бота"}
+                                    {!isCollapsed && t('createBot')}
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="h-[90vh] flex flex-col">
                                 <VisuallyHidden>
-                                    <DialogTitle>Создание нового бота</DialogTitle>
+                                    <DialogTitle>{t('createBotTitle')}</DialogTitle>
                                     <DialogDescription>
-                                        Заполните информацию ниже, чтобы добавить нового бота в панель.
+                                        {t('createBotDescription')}
                                     </DialogDescription>
                                 </VisuallyHidden>
                                 <BotForm servers={servers} proxies={proxies} onFormSubmit={handleCreateBot} isSaving={isSaving} isCreation={true} />
@@ -661,7 +670,7 @@ export default function Layout() {
                                     size={isCollapsed ? "icon" : "sm"}
                                 >
                                     <Upload className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                                    {!isCollapsed && "Импорт бота"}
+                                    {!isCollapsed && t('importBot')}
                                 </Button>
                             </DialogTrigger>
                             <ImportBotDialog 
@@ -676,7 +685,8 @@ export default function Layout() {
                 <Separator className="my-2"/>
 
                 <ThemeToggle isCollapsed={isCollapsed} />
-                
+                <LanguageSwitcher isCollapsed={isCollapsed} />
+
                 <Button 
                     variant="ghost" 
                     className={cn(
@@ -686,14 +696,14 @@ export default function Layout() {
                     onClick={handleLogout}
                 >
                     <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-2")}/>
-                    {!isCollapsed && "Выйти"}
+                    {!isCollapsed && t('logout')}
                 </Button>
-                
+
                 <div className={cn("pt-2 border-t text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
-                    <a 
-                        href="https://github.com/blockmineJS/blockmine" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                    <a
+                        href="https://github.com/blockmineJS/blockmine"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
                     >
                         <Github className="h-4 w-4" />
@@ -708,7 +718,7 @@ export default function Layout() {
                             useAppStore.setState({ showChangelogDialog: true });
                         }}
                     >
-                        Что нового?
+                        {t('whatsNew')}
                     </Button>
                 </div>
             </div>
@@ -731,7 +741,7 @@ export default function Layout() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full bg-background/80 backdrop-blur border"
-                            aria-label="Открыть меню"
+                            aria-label={t('openMenu')}
                         >
                             <Menu className="h-4 w-4" />
                         </Button>

@@ -1,0 +1,100 @@
+{
+  "title": "Administration",
+  "description": "Manage users, roles and global panel settings.",
+  "tabs": {
+    "users": "Users",
+    "roles": "Roles",
+    "settings": "Global settings"
+  },
+  "users": {
+    "title": "Panel Users",
+    "description": "Manage user accounts and their roles.",
+    "createUser": "Create User",
+    "table": {
+      "name": "Name",
+      "role": "Role",
+      "botAccess": "Bot Access",
+      "createdAt": "Created",
+      "actions": "Actions"
+    },
+    "allBots": "All bots",
+    "selectedBots": "Selected: {{count}}",
+    "deleteConfirm": "Delete user \"{{name}}\"?",
+    "deleteDescription": "This action is irreversible.",
+    "deleteButton": "Yes, delete",
+    "userUpdated": "User updated.",
+    "userCreated": "User created.",
+    "userDeleted": "User deleted.",
+    "loadError": "Failed to load data.",
+    "saveError": "Failed to save user."
+  },
+  "roles": {
+    "title": "Panel Roles",
+    "description": "Manage roles and their permission sets.",
+    "createRole": "Create Role",
+    "table": {
+      "name": "Name",
+      "permissions": "Permissions",
+      "actions": "Actions"
+    },
+    "allPermissions": "All permissions",
+    "roleCreated": "Role created successfully.",
+    "roleUpdated": "Role updated successfully.",
+    "roleDeleted": "Role deleted.",
+    "deleteConfirm": "Delete role \"{{name}}\"?",
+    "deleteDescription": "This action is irreversible. Make sure this role is not assigned to any user.",
+    "deleteButton": "Yes, delete",
+    "loadError": "Failed to load data."
+  },
+  "userForm": {
+    "editTitle": "Edit User",
+    "createTitle": "Create New User",
+    "editDescription": "Editing data for {{name}}.",
+    "createDescription": "Fill in the data to create a new account.",
+    "username": "Username",
+    "password": "Password",
+    "newPassword": "New password (leave empty to keep current)",
+    "role": "Role",
+    "selectRole": "Select role...",
+    "allBotsAccess": "Access to all bots",
+    "ownerNote": "(owner, always enabled)",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "validation": {
+      "usernameRequired": "Username and role are required.",
+      "passwordRequired": "Password (min. 4 characters) is required for new user.",
+      "passwordMinLength": "New password must be at least 4 characters."
+    }
+  },
+  "roleForm": {
+    "editTitle": "Edit Role",
+    "createTitle": "Create New Role",
+    "description": "Specify role name and select available permissions.",
+    "roleName": "Role Name",
+    "permissions": "Permissions",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "validation": {
+      "nameRequired": "Role name cannot be empty."
+    }
+  },
+  "settings": {
+    "title": "Global Settings",
+    "description": "These settings affect the entire panel. Some changes require a restart.",
+    "restartRequired": "Restart Required",
+    "restartDescription": "After saving settings, you need to restart the panel, for example using <code>npx blockmine</code> in the terminal.",
+    "externalAccess": "External Access",
+    "externalAccessDescription": "Allow panel access from local network or internet.",
+    "telemetry": "Anonymous Telemetry",
+    "telemetryDescription": "Send anonymous statistics (bot count, plugins) to improve the project.",
+    "save": "Save Settings",
+    "saveSuccess": "Settings saved. Restart the panel to apply.",
+    "loadError": "Failed to load global settings."
+  },
+  "common": {
+    "error": "Error",
+    "success": "Success"
+  }
+}

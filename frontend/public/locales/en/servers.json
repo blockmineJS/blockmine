@@ -1,0 +1,39 @@
+{
+  "title": "Server Management",
+  "description": "Add and edit servers that bots will connect to.",
+  "addServer": "Add server",
+  "table": {
+    "name": "Name",
+    "address": "Address",
+    "version": "Version",
+    "actions": "Actions"
+  },
+  "loading": "Loading servers...",
+  "empty": "No servers found. Add your first server.",
+  "messages": {
+    "created": "Server created successfully.",
+    "updated": "Server updated successfully.",
+    "deleted": "Server deleted."
+  },
+  "deleteDialog": {
+    "title": "Delete server \"{{name}}\"?",
+    "description": "This action is irreversible. If bots are linked to this server, you won't be able to delete it.",
+    "confirm": "Yes, delete"
+  },
+  "form": {
+    "titleEdit": "Edit server",
+    "titleAdd": "Add new server",
+    "description": "Fill in the server information. This data will be available when creating bots.",
+    "name": "Server name",
+    "namePlaceholder": "For example, mineblaze",
+    "host": "Address (host)",
+    "hostPlaceholder": "mc.mineblaze.net",
+    "port": "Port",
+    "version": "Minecraft version",
+    "versionPlaceholder": "1.20.1 most stable",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "save": "Save",
+    "create": "Create"
+  }
+}

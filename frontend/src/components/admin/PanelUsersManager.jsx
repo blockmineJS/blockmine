@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiHelper } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 
 export default function PanelUsersManager() {
+    const { t } = useTranslation('admin');
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function PanelUsersManager() {
             setRoles(rolesData);
         } catch (err) {
             console.error(err);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить данные.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('users.loadError') });
         } finally {
             setIsLoading(false);
         }
@@ -62,18 +64,18 @@ export default function PanelUsersManager() {
                     body: JSON.stringify(formData)
                 });
                 setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
-                toast({ title: 'Успешно', description: 'Пользователь обновлен.' });
+                toast({ title: t('common.success'), description: t('users.userUpdated') });
             } else {
                 const created = await apiHelper('/api/auth/users', {
                     method: 'POST',
                     body: JSON.stringify(formData)
                 });
                 setUsers(prev => [...prev, created]);
-                toast({ title: 'Успешно', description: 'Пользователь создан.' });
+                toast({ title: t('common.success'), description: t('users.userCreated') });
             }
         } catch (err) {
             console.error(err);
-            toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось сохранить пользователя.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('users.saveError') });
         } finally {
             setIsSaving(false);
             handleCloseModal();
@@ -84,7 +86,7 @@ export default function PanelUsersManager() {
         if (!userToDelete) return;
 
         try {
-            await apiHelper(`/api/auth/users/${userToDelete.id}`, { method: 'DELETE' }, 'Пользователь удален.');
+            await apiHelper(`/api/auth/users/${userToDelete.id}`, { method: 'DELETE' }, t('users.userDeleted'));
             setUserToDelete(null);
             fetchData();
         } catch (err) {
@@ -97,15 +99,15 @@ export default function PanelUsersManager() {
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
-                            <CardTitle>Пользователи панели</CardTitle>
-                            <CardDescription>Управление учетными записями и их ролями.</CardDescription>
+                            <CardTitle>{t('users.title')}</CardTitle>
+                            <CardDescription>{t('users.description')}</CardDescription>
                         </div>
-                        <Button onClick={() => handleOpenModal()}><Plus className="mr-2 h-4 w-4" />Создать пользователя</Button>
+                        <Button onClick={() => handleOpenModal()}><Plus className="mr-2 h-4 w-4" />{t('users.createUser')}</Button>
                     </div>
                 </CardHeader>
                 <CardContent className="flex-grow overflow-y-auto">
                     <Table>
-                        <TableHeader><TableRow><TableHead>Имя</TableHead><TableHead>Роль</TableHead><TableHead>Доступ к ботам</TableHead><TableHead>Дата создания</TableHead><TableHead className="text-right">Действия</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>{t('users.table.name')}</TableHead><TableHead>{t('users.table.role')}</TableHead><TableHead>{t('users.table.botAccess')}</TableHead><TableHead>{t('users.table.createdAt')}</TableHead><TableHead className="text-right">{t('users.table.actions')}</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
@@ -114,7 +116,7 @@ export default function PanelUsersManager() {
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">{user.username}</TableCell>
                                         <TableCell>{user.role.name}</TableCell>
-                                        <TableCell>{user.allBots ? 'Все боты' : `Выбрано: ${user.botAccess?.length || 0}`}</TableCell>
+                                        <TableCell>{user.allBots ? t('users.allBots') : t('users.selectedBots', { count: user.botAccess?.length || 0 })}</TableCell>
                                         <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenModal(user)}><Edit className="h-4 w-4" /></Button>
@@ -138,13 +140,13 @@ export default function PanelUsersManager() {
                 />
             </Dialog>
 
-            <ConfirmationDialog 
+            <ConfirmationDialog
                 open={!!userToDelete}
                 onOpenChange={() => setUserToDelete(null)}
-                title={`Удалить пользователя "${userToDelete?.username}"?`}
-                description="Это действие необратимо."
+                title={t('users.deleteConfirm', { name: userToDelete?.username })}
+                description={t('users.deleteDescription')}
                 onConfirm={handleDelete}
-                confirmText="Да, удалить"
+                confirmText={t('users.deleteButton')}
             />
         </>
     );

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -38,6 +39,7 @@ const LogLine = React.memo(({ log, gradientEnabled }) => {
 LogLine.displayName = 'LogLine';
 
 export default function ConsoleTab() {
+    const { t } = useTranslation('console');
     const { botId } = useParams();
     const bots = useAppStore(state => state.bots);
     const botLogs = useAppStore(state => state.botLogs);
@@ -161,7 +163,7 @@ const [gradientEnabled, setGradientEnabled] = useState(() => {
                         className="rounded-full h-8 w-8 p-0 bg-yellow-500 hover:bg-yellow-600 text-white"
                         variant="secondary"
                         size="sm"
-                        title={`Большое количество логов может снизить производительность. Очистите логи для улучшения.`}
+                        title={t('performanceWarning')}
                     >
                         <AlertTriangle className="h-4 w-4" />
                     </Button>
@@ -175,7 +177,7 @@ const [gradientEnabled, setGradientEnabled] = useState(() => {
                         className="rounded-full h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
                         variant="secondary"
                         size="sm"
-                        title="Прокрутить вниз"
+                        title={t('scrollDown')}
                     >
                         <ArrowDown className="h-4 w-4" />
                     </Button>
@@ -185,12 +187,12 @@ const [gradientEnabled, setGradientEnabled] = useState(() => {
                     className="rounded-full h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
                     variant="secondary"
                     size="sm"
-                    title="Очистить консоль"
+                    title={t('clearConsole')}
                 >
                     <Trash2 className="h-4 w-4" />
                 </Button>
                 <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm border border-border rounded-lg px-2 py-1.5 shadow-sm">
-                    <span className="text-xs font-medium text-foreground whitespace-nowrap">Градиент</span>
+                    <span className="text-xs font-medium text-foreground whitespace-nowrap">{t('gradient')}</span>
                     <Switch
                         checked={gradientEnabled}
                         onCheckedChange={handleGradientToggle}
@@ -201,12 +203,12 @@ const [gradientEnabled, setGradientEnabled] = useState(() => {
 
             <form onSubmit={handleSendCommand} className="flex-shrink-0 flex flex-col gap-2 p-2 bg-muted/50 border-t border-border">
                 {!canInteract && (
-                    <div className="text-xs text-muted-foreground px-1">Режим просмотра: отправка команд недоступна</div>
+                    <div className="text-xs text-muted-foreground px-1">{t('viewOnlyMode')}</div>
                 )}
                 <div className="flex items-center gap-2">
                 <Input
                     type="text"
-                    placeholder={status === 'running' ? `Отправить как ${bot?.username}...` : 'Запустите бота, чтобы отправлять сообщения'}
+                    placeholder={status === 'running' ? t('sendAsBot', { username: bot?.username }) : t('startBotToSend')}
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
                     disabled={status !== 'running' || !canInteract}
@@ -226,7 +228,7 @@ const [gradientEnabled, setGradientEnabled] = useState(() => {
                             </span>
                         </TooltipTrigger>
                         {!canInteract && (
-                            <TooltipContent>Недостаточно прав для отправки команд</TooltipContent>
+                            <TooltipContent>{t('noPermission')}</TooltipContent>
                         )}
                     </Tooltip>
                 </TooltipProvider>

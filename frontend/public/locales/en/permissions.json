@@ -1,0 +1,50 @@
+{
+  "title": "Permissions and Groups Management",
+  "description": "Create groups and distribute access permissions for commands and plugins.",
+  "tabs": {
+    "groups": "Groups",
+    "permissions": "Permissions"
+  },
+  "groups": {
+    "title": "Groups",
+    "description": "List of all groups and their permissions.",
+    "create": "Create group",
+    "table": {
+      "name": "Name",
+      "permissions": "Permissions",
+      "actions": "Actions",
+      "loading": "Loading..."
+    },
+    "messages": {
+      "created": "Group created successfully.",
+      "updated": "Group updated successfully.",
+      "deleted": "Group deleted.",
+      "systemDelete": "Cannot delete system group.",
+      "confirmDelete": "Are you sure you want to delete group \"{{name}}\"?"
+    }
+  },
+  "permissions": {
+    "title": "Permissions",
+    "description": "Complete list of all permissions registered in the system (including plugins).",
+    "table": {
+      "permission": "Permission",
+      "description": "Description",
+      "source": "Source",
+      "loading": "Loading..."
+    }
+  },
+  "common": {
+    "error": "Error",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "save": "Save"
+  },
+  "groupForm": {
+    "titleEdit": "Edit group",
+    "titleCreate": "Create new group",
+    "description": "Specify group name and select access permissions.",
+    "nameLabel": "Group name",
+    "permissionsLabel": "Access permissions",
+    "emptyName": "Group name cannot be empty."
+  }
+}

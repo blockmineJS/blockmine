@@ -1,0 +1,114 @@
+{
+  "title": "Управление ботом",
+  "description": "Настройте пользователей, группы, права и команды для бота {{username}}.",
+  "tabs": {
+    "users": "Пользователи",
+    "groups": "Группы",
+    "permissions": "Права",
+    "commands": "Команды"
+  },
+  "messages": {
+    "success": "Успех",
+    "error": "Ошибка",
+    "commandCreated": "Команда \"{{name}}\" успешно создана.",
+    "commandCreateError": "Не удалось создать команду",
+    "loadError": "Не удалось загрузить данные управления."
+  },
+  "commandEdit": {
+    "title": "Редактировать команду: {{name}}",
+    "enabled": "Команда включена",
+    "aliases": "Алиасы",
+    "aliasesPlaceholder": "Например, пинг",
+    "aliasesDescription": "Дополнительные имена для вызова команды.",
+    "cooldown": "Кулдаун (секунды)",
+    "requiredPermission": "Требуемое право",
+    "selectPermission": "Выберите право...",
+    "noPermission": "Не требуется",
+    "allowedChatTypes": "Разрешенные типы чатов",
+    "chatTypesPlaceholder": "Например, trade",
+    "chatTypesDescription": "Типы чатов, в которых будет работать команда.",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "saving": "Сохранение..."
+  },
+  "createCommand": {
+    "title": "Создать новую команду",
+    "description": "Введите имя и описание для вашей новой команды. Вы сможете настроить ее позже.",
+    "name": "Имя",
+    "commandDescription": "Описание",
+    "create": "Создать"
+  },
+  "commandDetail": {
+    "title": "Команда: {{name}}",
+    "tabOverview": "Обзор",
+    "tabSettings": "Настройки",
+    "usage": "Использование",
+    "arguments": "Аргументы",
+    "argument": "Аргумент",
+    "type": "Тип",
+    "required": "Обязательный",
+    "yes": "Да",
+    "no": "Нет",
+    "source": "Источник",
+    "enabled": "Команда включена",
+    "aliases": "Алиасы",
+    "cooldown": "Кулдаун (сек)",
+    "requiredPermission": "Требуемое право",
+    "noPermission": "Не требуется",
+    "allowedChatTypes": "Разрешенные типы чатов",
+    "close": "Закрыть",
+    "saveSettings": "Сохранить настройки"
+  },
+  "userEdit": {
+    "title": "Редактировать пользователя: {{name}}",
+    "description": "Управляйте группами и статусом черного списка.",
+    "blacklist": "Черный список",
+    "blacklistDescription": "Пользователь в черном списке не сможет использовать команды.",
+    "userGroups": "Группы пользователя",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "saving": "Сохранение..."
+  },
+  "commands": {
+    "title": "Команды",
+    "activeCount": "{{active}} из {{total}} активно",
+    "description": "Список всех команд, доступных боту",
+    "import": "Импорт",
+    "create": "Создать",
+    "searchPlaceholder": "Поиск по названию или описанию...",
+    "table": {
+      "enabled": "Вкл",
+      "command": "Команда",
+      "type": "Тип",
+      "source": "Источник",
+      "aliases": "Алиасы",
+      "permission": "Право",
+      "cooldown": "CD",
+      "actions": "Действия"
+    },
+    "loading": "Загрузка...",
+    "notFound": "Команды не найдены",
+    "empty": "Нет команд",
+    "open": "Открыть",
+    "export": "Экспорт",
+    "delete": "Удалить",
+    "noPermission": "Нет",
+    "noPermissionTooltip": "Эту команду смогут использовать все",
+    "deleteConfirm": {
+      "title": "Вы уверены?",
+      "description": "Вы действительно хотите удалить команду \"{{name}}\"? Это действие нельзя будет отменить.",
+      "cancel": "Отмена",
+      "delete": "Удалить"
+    },
+    "toast": {
+      "created": "Команда \"{{name}}\" успешно создана.",
+      "createError": "Не удалось создать команду: {{error}}",
+      "deleted": "Команда \"{{name}}\" удалена.",
+      "deleteError": "Не удалось удалить команду: {{error}}",
+      "enabled": "Команда \"{{name}}\" была включена.",
+      "disabled": "Команда \"{{name}}\" была выключена.",
+      "toggleError": "Не удалось изменить статус команды.",
+      "updated": "Настройки команды \"{{name}}\" обновлены."
+    }
+  }
+}

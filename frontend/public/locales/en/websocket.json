@@ -1,0 +1,86 @@
+{
+  "title": "WebSocket API",
+  "tabs": {
+    "keys": "API Keys",
+    "logs": "Connection Logs",
+    "docs": "Documentation"
+  },
+  "clients": "Clients",
+  "createKey": "Create Key",
+  "keys": {
+    "title": "Your API Keys",
+    "description": "Create and manage API keys for accessing the bot via WebSocket",
+    "loading": "Loading...",
+    "empty": "You don't have any API keys yet",
+    "emptyHint": "Create your first key to start using WebSocket API",
+    "name": "Name",
+    "key": "Key",
+    "permissions": "Permissions",
+    "createdAt": "Created",
+    "lastUsed": "Last Used",
+    "actions": "Actions",
+    "never": "Never"
+  },
+  "permissions": {
+    "Read": "Read",
+    "Write": "Write",
+    "ReadWrite": "Read/Write"
+  },
+  "logs": {
+    "title": "Connection Logs",
+    "description": "WebSocket API connection history (last 50)",
+    "empty": "No connections yet",
+    "action": "Action",
+    "key": "Key",
+    "ip": "IP Address",
+    "time": "Time",
+    "connect": "Connect",
+    "disconnect": "Disconnect"
+  },
+  "docs": {
+    "botId": "Current bot ID",
+    "title": "Connecting to WebSocket API",
+    "description": "API usage examples for different programming languages",
+    "endpoint": "Endpoint",
+    "params": "Connection parameters",
+    "recommended": "Recommended",
+    "recommendedHint": "Use the high-level blockmine-sdk SDK for easy API usage",
+    "sdkTitle": "Option 1: High-level SDK (recommended)",
+    "sdkDescription": "Simple Promise-based API for working with the bot",
+    "rawTitle": "Option 2: Direct Socket.IO usage",
+    "rawDescription": "For advanced users who need full control",
+    "eventsTitle": "Available events (Read)",
+    "actionsTitle": "Available actions",
+    "examplesTitle": "Usage examples"
+  },
+  "createDialog": {
+    "title": "Create API Key",
+    "description": "Create a new API key to access the bot via WebSocket",
+    "nameLabel": "Key name",
+    "namePlaceholder": "E.g.: Discord-bot",
+    "permissionsLabel": "Access permissions",
+    "readOnly": "Read only (receive events)",
+    "writeOnly": "Write only (send actions)",
+    "readWrite": "Read and write (full access)",
+    "creating": "Creating...",
+    "create": "Create",
+    "cancel": "Cancel",
+    "close": "Close",
+    "keyCreated": "Your API Key",
+    "saveWarning": "Important! Save this key now. You won't be able to see it again."
+  },
+  "messages": {
+    "error": "Error",
+    "success": "Success",
+    "loadKeysError": "Failed to load API keys",
+    "loadLogsError": "Failed to load connection logs",
+    "enterKeyName": "Enter key name",
+    "keyCreated": "API key created",
+    "keyCreateError": "Failed to create key",
+    "keyDeleted": "API key deleted",
+    "keyDeleteError": "Failed to delete key",
+    "deleteConfirm": "Are you sure you want to delete this key? All applications using it will lose access.",
+    "copied": "Copied",
+    "copiedHint": "Key copied to clipboard"
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiHelper } from '@/lib/api';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 
 export default function CreateEventGraphDialog({ botId, open, onOpenChange, onCreated }) {
+  const { t } = useTranslation('visual-editor');
   const [graphName, setGraphName] = useState('');
   const [selectedPluginId, setSelectedPluginId] = useState('none');
   const [availablePlugins, setAvailablePlugins] = useState([]);
@@ -58,27 +60,27 @@ export default function CreateEventGraphDialog({ botId, open, onOpenChange, onCr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Создать новый граф событий</DialogTitle>
+          <DialogTitle>{t('createGraph.title')}</DialogTitle>
         </DialogHeader>
         <div className="py-4 space-y-4">
           <div>
-            <Label htmlFor="graphName">Название графа</Label>
-            <Input 
+            <Label htmlFor="graphName">{t('createGraph.graphName')}</Label>
+            <Input
               id="graphName"
-              placeholder="Название графа"
+              placeholder={t('createGraph.graphNamePlaceholder')}
               value={graphName}
               onChange={(e) => setGraphName(e.target.value)}
             />
           </div>
-          
+
           <div>
-            <Label htmlFor="pluginOwner">Плагин-владелец</Label>
+            <Label htmlFor="pluginOwner">{t('createGraph.pluginOwner')}</Label>
             <Select value={selectedPluginId} onValueChange={setSelectedPluginId}>
               <SelectTrigger>
-                <SelectValue placeholder="Выберите плагин" />
+                <SelectValue placeholder={t('createGraph.selectPlugin')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Нет (системный)</SelectItem>
+                <SelectItem value="none">{t('createGraph.noPluginSystem')}</SelectItem>
                 {availablePlugins.map(plugin => (
                   <SelectItem key={plugin.id} value={plugin.id.toString()}>
                     {plugin.name} ({plugin.sourceType})
@@ -87,14 +89,14 @@ export default function CreateEventGraphDialog({ botId, open, onOpenChange, onCr
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              Привязка к локальному плагину позволит автоматически удалить граф при удалении плагина
+              {t('createGraph.pluginBindNote')}
             </p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('createGraph.cancel')}</Button>
           <Button onClick={handleCreate} disabled={!graphName || isCreating}>
-            {isCreating ? 'Создание...' : 'Создать'}
+            {isCreating ? t('createGraph.creating') : t('createGraph.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

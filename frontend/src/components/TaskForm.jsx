@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,17 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from '@/stores/appStore';
-
-const ALL_ACTIONS = [
-    { value: 'START_BOT', label: 'Запустить бота' },
-    { value: 'STOP_BOT', label: 'Остановить бота' },
-    { value: 'RESTART_BOT', label: 'Перезапустить бота' },
-    { value: 'SEND_COMMAND', label: 'Отправить команду' },
-];
-
-const STARTUP_ACTIONS = [
-    { value: 'START_BOT', label: 'Запустить бота' },
-];
 
 
 const generateCron = (simpleConfig) => {
@@ -47,7 +37,19 @@ const generateCron = (simpleConfig) => {
 };
 
 export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
+    const { t } = useTranslation('tasks');
     const bots = useAppStore(state => state.bots);
+
+    const ALL_ACTIONS = [
+        { value: 'START_BOT', label: t('actions.startBot') },
+        { value: 'STOP_BOT', label: t('actions.stopBot') },
+        { value: 'RESTART_BOT', label: t('actions.restartBot') },
+        { value: 'SEND_COMMAND', label: t('actions.sendCommand') },
+    ];
+
+    const STARTUP_ACTIONS = [
+        { value: 'START_BOT', label: t('actions.startBot') },
+    ];
 
     const [name, setName] = useState('');
     const [action, setAction] = useState('');
@@ -115,23 +117,23 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
         });
     };
 
-    const botOptions = [{ id: 'ALL', username: 'Все боты' }, ...bots];
+    const botOptions = [{ id: 'ALL', username: t('form.allBots') }, ...bots];
     const availableActions = runOnStartup ? STARTUP_ACTIONS : ALL_ACTIONS;
 
     return (
         <DialogContent className="max-w-2xl">
             <DialogHeader>
-                <DialogTitle>{task ? 'Редактировать задачу' : 'Создать новую задачу'}</DialogTitle>
+                <DialogTitle>{task ? t('form.titleEdit') : t('form.titleCreate')}</DialogTitle>
                 <DialogDescription>
                     {runOnStartup
-                        ? 'Эта задача будет выполнена один раз при каждом запуске панели.'
-                        : 'Задачи выполняются по расписанию для выбранных ботов.'
+                        ? t('form.descriptionStartup')
+                        : t('form.descriptionSchedule')
                     }
                 </DialogDescription>
             </DialogHeader>
             <form id="task-form" onSubmit={handleSubmit} className="space-y-6 py-4">
                 <div className="space-y-2">
-                    <Label htmlFor="name">Название задачи</Label>
+                    <Label htmlFor="name">{t('form.taskName')}</Label>
                     <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
                 </div>
                 
@@ -143,10 +145,10 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                     />
                     <div className="grid gap-1.5 leading-none">
                         <Label htmlFor="runOnStartup">
-                            Выполнять при запуске панели
+                            {t('form.runOnStartup')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                            Задача будет выполнена один раз при каждом старте/перезапуске панели.
+                            {t('form.runOnStartupDescription')}
                         </p>
                     </div>
                 </div>
@@ -154,9 +156,9 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                 {!runOnStartup && (
                     <div className="space-y-3 p-4 border rounded-lg">
                         <div className="flex items-center justify-between">
-                            <Label>Расписание</Label>
+                            <Label>{t('form.schedule')}</Label>
                             <div className="flex items-center space-x-2">
-                                <Label htmlFor="advanced-mode" className="text-sm">Продвинутый режим</Label>
+                                <Label htmlFor="advanced-mode" className="text-sm">{t('form.advancedMode')}</Label>
                                 <Switch id="advanced-mode" checked={isAdvancedMode} onCheckedChange={setIsAdvancedMode} />
                             </div>
                         </div>
@@ -165,13 +167,13 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                             <div>
                                 <Input value={cronPattern} onChange={e => setCronPattern(e.target.value)} placeholder="* * * * *" required />
                                 <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline mt-1 inline-block">
-                                    Помощь по cron-паттернам
+                                    {t('form.cronHelp')}
                                 </a>
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-2 items-end">
                                 <div className="space-y-1">
-                                    <Label>Повторять каждые</Label>
+                                    <Label>{t('form.repeatEvery')}</Label>
                                     <Input type="number" min="1" value={simpleConfig.intervalValue} onChange={e => handleSimpleConfigChange('intervalValue', parseInt(e.target.value) || 1)} />
                                 </div>
                                 <div className="space-y-1">
@@ -179,14 +181,14 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                                     <Select value={simpleConfig.intervalType} onValueChange={val => handleSimpleConfigChange('intervalType', val)}>
                                         <SelectTrigger><SelectValue/></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="minutes">Минут</SelectItem>
-                                            <SelectItem value="hours">Часов</SelectItem>
-                                            <SelectItem value="days">Дней</SelectItem>
+                                            <SelectItem value="minutes">{t('form.minutes')}</SelectItem>
+                                            <SelectItem value="hours">{t('form.hours')}</SelectItem>
+                                            <SelectItem value="days">{t('form.days')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label>Время запуска</Label>
+                                    <Label>{t('form.startTime')}</Label>
                                     <Input type="time" value={simpleConfig.time} onChange={e => handleSimpleConfigChange('time', e.target.value)} disabled={simpleConfig.intervalType === 'minutes'} />
                                 </div>
                             </div>
@@ -196,28 +198,28 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label>Действие</Label>
+                        <Label>{t('form.action')}</Label>
                         <Select value={action} onValueChange={setAction} required disabled={runOnStartup}>
-                            <SelectTrigger><SelectValue placeholder="Выберите действие" /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder={t('form.selectAction')} /></SelectTrigger>
                             <SelectContent>
                                 {availableActions.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label>Целевые боты</Label>
+                        <Label>{t('form.targetBots')}</Label>
                         <Popover open={open} onOpenChange={setOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
-                                    {targetBotIds.length > 0 ? `${targetBotIds.length} выбрано` : "Выберите ботов..."}
+                                    {targetBotIds.length > 0 ? t('form.selectedCount', { count: targetBotIds.length }) : t('form.selectBots')}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[300px] p-0">
                                 <Command>
-                                    <CommandInput placeholder="Поиск ботов..." />
+                                    <CommandInput placeholder={t('form.searchBots')} />
                                     <CommandList>
-                                        <CommandEmpty>Боты не найдены.</CommandEmpty>
+                                        <CommandEmpty>{t('form.noBotsFound')}</CommandEmpty>
                                         <CommandGroup>
                                             {botOptions.map(bot => (
                                                 <CommandItem
@@ -249,15 +251,15 @@ export default function TaskForm({ task, onSubmit, onCancel, isSaving }) {
                 </div>
                 {action === 'SEND_COMMAND' && (
                     <div className="space-y-2">
-                        <Label htmlFor="command">Команда для отправки</Label>
-                        <Input id="command" value={command} onChange={e => setCommand(e.target.value)} placeholder="Привет, мир!" required />
+                        <Label htmlFor="command">{t('form.commandToSend')}</Label>
+                        <Input id="command" value={command} onChange={e => setCommand(e.target.value)} placeholder={t('form.commandPlaceholder')} required />
                     </div>
                 )}
             </form>
             <DialogFooter>
-                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button variant="ghost" onClick={onCancel}>{t('form.cancel')}</Button>
                 <Button type="submit" form="task-form" disabled={isSaving}>
-                    {isSaving ? 'Сохранение...' : 'Сохранить'}
+                    {isSaving ? t('form.saving') : t('form.save')}
                 </Button>
             </DialogFooter>
         </DialogContent>

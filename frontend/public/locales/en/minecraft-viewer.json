@@ -1,0 +1,27 @@
+{
+  "connecting": "Connecting to bot...",
+  "error": "Error",
+  "settingsButton": "Settings (Esc)",
+  "settings": {
+    "title": "Settings",
+    "renderDistance": "Render distance: {{value}} blocks",
+    "correctionSpeed": "Sync strength: {{value}}x",
+    "correctionSpeedHint": "Less = smoother movement, More = more accurate position",
+    "sensitivity": "Mouse sensitivity: {{value}}x",
+    "localMovement": "Predictions (local movement)",
+    "showDebug": "Show debug info",
+    "reset": "Reset settings"
+  },
+  "hud": {
+    "health": "Health",
+    "food": "Food"
+  },
+  "picker": {
+    "clickOnBlock": "+ Click on a block",
+    "title": "📍 Coordinate selection",
+    "description": "Click on a block to select destination point",
+    "notSelected": "No coordinates selected",
+    "cancel": "Cancel",
+    "confirm": "✓ Confirm"
+  }
+}

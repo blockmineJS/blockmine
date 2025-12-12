@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,23 +14,23 @@ import { apiHelper } from '@/lib/api';
 
 const cronInfoCache = new Map();
 
-const CronInfo = ({ pattern, isEnabled, runOnStartup }) => {
+const CronInfo = ({ pattern, isEnabled, runOnStartup, t }) => {
     const [display, setDisplay] = useState({ nextRun: '...', human: '...' });
 
     useEffect(() => {
         const getCronDescription = async () => {
             if (!isEnabled) {
-                setDisplay({ nextRun: 'Отключено', human: 'Отключено' });
+                setDisplay({ nextRun: t('cron.disabled'), human: t('cron.disabled') });
                 return;
             }
 
             if (runOnStartup && !pattern) {
-                setDisplay({ nextRun: 'При старте', human: 'Выполняется при запуске панели' });
+                setDisplay({ nextRun: t('cron.onStartup'), human: t('cron.onStartupHuman') });
                 return;
             }
 
             if (!pattern) {
-                 setDisplay({ nextRun: 'n/a', human: 'Нет расписания' });
+                 setDisplay({ nextRun: 'n/a', human: t('cron.noSchedule') });
                  return;
             }
 
@@ -51,12 +52,12 @@ const CronInfo = ({ pattern, isEnabled, runOnStartup }) => {
 
             } catch (err) {
                 console.error(`Ошибка получения описания для "${pattern}":`, err);
-                setDisplay({ nextRun: <span className="text-destructive">Ошибка</span>, human: pattern });
+                setDisplay({ nextRun: <span className="text-destructive">{t('cron.error')}</span>, human: pattern });
             }
         };
 
         getCronDescription();
-    }, [pattern, isEnabled]);
+    }, [pattern, isEnabled, t]);
 
     return (
         <>
@@ -73,12 +74,13 @@ const CronInfo = ({ pattern, isEnabled, runOnStartup }) => {
 
 
 export default function TasksPage() {
+    const { t } = useTranslation('tasks');
     const { tasks, fetchTasks, createTask, updateTask, deleteTask } = useAppStore();
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
-    
+
     const [taskToDelete, setTaskToDelete] = useState(null);
 
     const normalizeCronPattern = (pattern) => {
@@ -128,10 +130,10 @@ export default function TasksPage() {
     };
 
     const actionLabels = {
-        START_BOT: 'Запустить бота',
-        STOP_BOT: 'Остановить бота',
-        RESTART_BOT: 'Перезапустить бота',
-        SEND_COMMAND: 'Отправить команду'
+        START_BOT: t('actions.startBot'),
+        STOP_BOT: t('actions.stopBot'),
+        RESTART_BOT: t('actions.restartBot'),
+        SEND_COMMAND: t('actions.sendCommand')
     };
 
     return (
@@ -139,14 +141,14 @@ export default function TasksPage() {
             <Card className="h-full flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                        <CardTitle>Планировщик задач</CardTitle>
-                        <CardDescription>Автоматизируйте действия ботов с помощью cron-задач.</CardDescription>
+                        <CardTitle>{t('title')}</CardTitle>
+                        <CardDescription>{t('description')}</CardDescription>
                     </div>
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={() => handleOpenModal()}>
                                 <Plus className="mr-2 h-4 w-4" />
-                                Создать задачу
+                                {t('createTask')}
                             </Button>
                         </DialogTrigger>
                         <TaskForm task={editingTask} onSubmit={handleSubmit} onCancel={handleCloseModal} isSaving={isSaving} />
@@ -156,12 +158,12 @@ export default function TasksPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[80px]">Статус</TableHead>
-                                <TableHead>Название</TableHead>
-                                <TableHead>Расписание</TableHead>
-                                <TableHead>Следующий запуск</TableHead>
-                                <TableHead>Действие</TableHead>
-                                <TableHead className="text-right">Действия</TableHead>
+                                <TableHead className="w-[80px]">{t('table.status')}</TableHead>
+                                <TableHead>{t('table.name')}</TableHead>
+                                <TableHead>{t('table.schedule')}</TableHead>
+                                <TableHead>{t('table.nextRun')}</TableHead>
+                                <TableHead>{t('table.action')}</TableHead>
+                                <TableHead className="text-right">{t('table.actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -172,8 +174,8 @@ export default function TasksPage() {
                                     <TableRow key={task.id}>
                                         <TableCell><Switch checked={task.isEnabled} onCheckedChange={(checked) => handleToggle(task, checked)} /></TableCell>
                                         <TableCell className="font-medium">{task.name}</TableCell>
-                                        
-                                        <CronInfo pattern={task.cronPattern} isEnabled={task.isEnabled} runOnStartup={task.runOnStartup} />
+
+                                        <CronInfo pattern={task.cronPattern} isEnabled={task.isEnabled} runOnStartup={task.runOnStartup} t={t} />
 
                                         <TableCell><Badge variant="secondary">{actionLabels[task.action] || task.action}</Badge></TableCell>
                                         <TableCell className="text-right">
@@ -183,7 +185,7 @@ export default function TasksPage() {
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Задачи не найдены.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">{t('empty')}</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -193,10 +195,10 @@ export default function TasksPage() {
             <ConfirmationDialog
                 open={!!taskToDelete}
                 onOpenChange={() => setTaskToDelete(null)}
-                title={`Удалить задачу "${taskToDelete?.name}"?`}
-                description="Это действие необратимо и приведет к удалению задачи из расписания."
+                title={t('deleteDialog.title', { name: taskToDelete?.name })}
+                description={t('deleteDialog.description')}
                 onConfirm={handleConfirmDelete}
-                confirmText="Да, удалить"
+                confirmText={t('deleteDialog.confirm')}
             />
         </div>
     );

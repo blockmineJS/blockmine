@@ -1,0 +1,85 @@
+{
+  "title": "Обзор системы",
+  "subtitle": "Мониторинг и управление вашими ботами BlockMineJS",
+  "import": "Импорт",
+  "startAll": "Запустить все",
+  "stopAll": "Остановить все",
+  "botImported": "Бот \"{{name}}\" успешно импортирован.",
+  "confirmMassAction": "Вы уверены, что хотите {{action}} ВСЕХ ботов?",
+  "actions": {
+    "start": "запустить",
+    "stop": "остановить"
+  },
+  "metrics": {
+    "totalBots": "Всего ботов",
+    "active": "Активных",
+    "systemCpu": "Системный CPU",
+    "systemRam": "Системная RAM"
+  },
+  "resourceMonitoring": {
+    "title": "Мониторинг ресурсов",
+    "description": "Использование CPU и RAM всеми запущенными ботами"
+  },
+  "quickActions": {
+    "title": "Быстрые действия",
+    "description": "Переходы к основным разделам",
+    "scheduler": "Планировщик",
+    "settings": "Настройки",
+    "suggest": "Предложить",
+    "currentVersion": "Текущая версия",
+    "changelog": "Changelog",
+    "servers": "Серверы"
+  },
+  "systemHealth": {
+    "title": "Состояние системы",
+    "panel": "Панель управления",
+    "websocket": "WebSocket сервер",
+    "database": "База данных",
+    "uptime": "Uptime"
+  },
+  "resources": {
+    "title": "Ресурсы системы",
+    "activeBots": "Активных ботов",
+    "totalMemory": "Всего памяти"
+  },
+  "botDistribution": {
+    "title": "Распределение ботов",
+    "running": "Запущено",
+    "stopped": "Остановлено"
+  },
+  "activity": {
+    "active": "Активен",
+    "stopped": "Остановлен"
+  },
+  "widgets": {
+    "botStatus": {
+      "title": "Статус ботов",
+      "noBots": "Нет ботов для отображения.",
+      "running": "Запущено",
+      "stopped": "Остановлено"
+    },
+    "recentActivity": {
+      "title": "Последняя активность",
+      "description": "Сводка последних сообщений из консоли ботов.",
+      "noActivity": "Нет активности. Запустите ботов."
+    },
+    "quickManage": {
+      "title": "Все боты",
+      "description": "Быстрое управление состоянием всех ботов в системе",
+      "bot": "Бот",
+      "status": "Статус",
+      "actions": "Действия",
+      "running": "Запущен",
+      "stopped": "Остановлен",
+      "start": "Запустить",
+      "stop": "Остановить",
+      "restart": "Перезапустить",
+      "console": "Консоль",
+      "settings": "Настройки",
+      "noBots": "Боты не найдены.",
+      "commandSent": "Команда отправлена",
+      "restartingBot": "Бот {{name}} перезапускается.",
+      "actionSent": "Команда {{action}} отправлена боту."
+    }
+  }
+}

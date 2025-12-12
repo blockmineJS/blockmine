@@ -1,0 +1,81 @@
+{
+  "title": "Proxy Management",
+  "description": "Add and edit proxy servers for bot connections.",
+  "addProxy": "Add proxy",
+  "table": {
+    "name": "Name",
+    "type": "Type",
+    "address": "Address",
+    "bots": "Bots",
+    "note": "Note",
+    "actions": "Actions"
+  },
+  "loading": "Loading proxies...",
+  "empty": "No proxies found. Add your first proxy.",
+  "messages": {
+    "created": "Proxy created successfully.",
+    "updated": "Proxy updated successfully.",
+    "deleted": "Proxy deleted.",
+    "loadError": "Failed to load proxies"
+  },
+  "deleteDialog": {
+    "title": "Delete proxy \"{{name}}\"?",
+    "description": "This action is irreversible. If this proxy is used by bots, you won't be able to delete it.",
+    "confirm": "Yes, delete"
+  },
+  "config": {
+    "title": "Proxy Configuration",
+    "subtitle": "Configure proxy for multiple bots at once",
+    "settings": {
+      "title": "Proxy Settings",
+      "description": "Enter SOCKS5 proxy server parameters",
+      "host": "IP address",
+      "port": "Port",
+      "username": "Username",
+      "password": "Password",
+      "hostPlaceholder": "127.0.0.1",
+      "portPlaceholder": "1080",
+      "optionalPlaceholder": "Leave empty if not required"
+    },
+    "validation": {
+      "hostRequired": "IP address is required",
+      "hostInvalid": "Invalid IP address format",
+      "portRequired": "Port is required",
+      "portRange": "Port must be between 1 and 65535",
+      "usernameMin": "Username must contain at least 3 characters"
+    },
+    "buttons": {
+      "testConnection": "Test connection",
+      "clear": "Clear",
+      "apply": "Apply to selected"
+    },
+    "botSelection": {
+      "title": "Bot Selection",
+      "description": "Select bots to apply proxy settings",
+      "search": "Search bots...",
+      "selectAll": "Select all",
+      "running": "Running bots",
+      "stopped": "Stopped bots",
+      "proxy": "Proxy",
+      "notFound": "No bots found"
+    },
+    "messages": {
+      "testSuccess": "Proxy connection successful!",
+      "testError": "Failed to connect to proxy server",
+      "testTitle": "Connection test",
+      "selectBot": "Select at least one bot",
+      "applySuccess": "Proxy settings applied to {{count}} bot(s)",
+      "applyError": "Failed to apply proxy settings",
+      "success": "Success!"
+    },
+    "confirmDialog": {
+      "title": "Confirm proxy application",
+      "description": "You are about to apply proxy settings to {{count}} bot(s). This will update the bot configuration.",
+      "proxyServer": "Proxy server",
+      "user": "User",
+      "botCount": "Number of bots",
+      "cancel": "Cancel",
+      "apply": "Apply"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactFlow, { Background, Controls, useReactFlow, useKeyPress } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -14,9 +15,11 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import CustomNode from './CustomNode.new';
 import CollaborativeCursors from './CollaborativeCursors';
 import CollaborativeConnections from './CollaborativeConnections';
+import { useNodeTranslation } from './hooks/useNodeTranslation';
 
 const VisualEditorCanvas = () => {
-
+  const { t } = useTranslation('visual-editor');
+  const { getNodeTranslation } = useNodeTranslation();
   const reactFlowWrapper = useRef(null);
   const menuRef = useRef(null);
   const { screenToFlowPosition, flowToScreenPosition } = useReactFlow();
@@ -229,25 +232,25 @@ const VisualEditorCanvas = () => {
             style={{ top: menuPosition.top, left: menuPosition.left, position: 'absolute', zIndex: 10 }}
           >
             <Command>
-              <CommandInput placeholder="Type a command or search..." />
+              <CommandInput placeholder={t('contextMenu.searchPlaceholder')} />
               <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
+                <CommandEmpty>{t('contextMenu.noResults')}</CommandEmpty>
 
                   {variables && variables.length > 0 && (
-                    <CommandGroup heading="📦 Переменные">
+                    <CommandGroup heading={t('contextMenu.variablesGroup')}>
                       {variables.map(variable => (
                         <React.Fragment key={`var-${variable.id}`}>
                           <CommandItem
-                            value={`Получить переменную ${variable.name}`}
+                            value={t('contextMenu.getVariable', { name: variable.name })}
                             onSelect={() => handleAddNodeFromMenu('data:get_variable', { variableName: variable.name })}
                           >
-                            📤 Получить переменную {variable.name}
+                            {t('contextMenu.getVariable', { name: variable.name })}
                           </CommandItem>
                           <CommandItem
-                            value={`Задать переменную ${variable.name}`}
+                            value={t('contextMenu.setVariable', { name: variable.name })}
                             onSelect={() => handleAddNodeFromMenu('action:bot_set_variable', { variableName: variable.name })}
                           >
-                            📥 Задать переменную {variable.name}
+                            {t('contextMenu.setVariable', { name: variable.name })}
                           </CommandItem>
                         </React.Fragment>
                       ))}
@@ -255,14 +258,14 @@ const VisualEditorCanvas = () => {
                   )}
 
                   {commandArguments && commandArguments.length > 0 && (
-                    <CommandGroup heading="🎯 Аргументы">
+                    <CommandGroup heading={t('contextMenu.argumentsGroup')}>
                       {commandArguments.map(arg => (
                         <CommandItem
                           key={`arg-${arg.id}`}
-                          value={`Получить аргумент ${arg.name}`}
+                          value={t('contextMenu.getArgument', { name: arg.name })}
                           onSelect={() => handleAddNodeFromMenu('data:get_argument', { argumentName: arg.name })}
                         >
-                          📤 Получить аргумент {arg.name}
+                          {t('contextMenu.getArgument', { name: arg.name })}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -270,17 +273,20 @@ const VisualEditorCanvas = () => {
 
                   {/* Обычные ноды */}
                   {Object.entries(filteredNodes).map(([category, nodes]) => (
-                    <CommandGroup key={category} heading={category}>
-                      {nodes.map(node => (
-                        <CommandItem
-                          key={node.type}
-                          value={node.label}
-                          onSelect={() => handleAddNodeFromMenu(node.type)}
-                          disabled={false}
-                        >
-                          {node.label}
-                        </CommandItem>
-                      ))}
+                    <CommandGroup key={category} heading={t(`nodePanel.categories.${category}`, category)}>
+                      {nodes.map(node => {
+                        const nodeLabel = getNodeTranslation(node.type).label || node.label;
+                        return (
+                          <CommandItem
+                            key={node.type}
+                            value={nodeLabel}
+                            onSelect={() => handleAddNodeFromMenu(node.type)}
+                            disabled={false}
+                          >
+                            {nodeLabel}
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   ))}
               </CommandList>

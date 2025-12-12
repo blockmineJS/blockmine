@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export default function ServerForm({ server, onSubmit, onCancel, isSaving }) {
+    const { t } = useTranslation('servers');
     const [formData, setFormData] = useState({
         name: '',
         host: '',
@@ -38,33 +40,33 @@ export default function ServerForm({ server, onSubmit, onCancel, isSaving }) {
     return (
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>{isEditMode ? 'Редактировать сервер' : 'Добавить новый сервер'}</DialogTitle>
+                <DialogTitle>{isEditMode ? t('form.titleEdit') : t('form.titleAdd')}</DialogTitle>
                 <DialogDescription>
-                    Заполните информацию о сервере. Эти данные будут доступны при создании ботов.
+                    {t('form.description')}
                 </DialogDescription>
             </DialogHeader>
             <form id="server-form" onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="space-y-2">
-                    <Label htmlFor="name">Название сервера</Label>
-                    <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Например, mineblaze" required />
+                    <Label htmlFor="name">{t('form.name')}</Label>
+                    <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder={t('form.namePlaceholder')} required />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="host">Адрес (хост)</Label>
-                    <Input id="host" name="host" value={formData.host} onChange={handleChange} placeholder="mc.mineblaze.net" required />
+                    <Label htmlFor="host">{t('form.host')}</Label>
+                    <Input id="host" name="host" value={formData.host} onChange={handleChange} placeholder={t('form.hostPlaceholder')} required />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="port">Порт</Label>
+                    <Label htmlFor="port">{t('form.port')}</Label>
                     <Input id="port" name="port" type="number" value={formData.port} onChange={handleChange} placeholder="25565" />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="version">Версия Minecraft</Label>
-                    <Input id="version" name="version" value={formData.version} onChange={handleChange} placeholder="1.20.1 самая стабильная" required />
+                    <Label htmlFor="version">{t('form.version')}</Label>
+                    <Input id="version" name="version" value={formData.version} onChange={handleChange} placeholder={t('form.versionPlaceholder')} required />
                 </div>
             </form>
             <DialogFooter>
-                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
+                <Button variant="ghost" onClick={onCancel}>{t('form.cancel')}</Button>
                 <Button type="submit" form="server-form" disabled={isSaving}>
-                    {isSaving ? 'Сохранение...' : (isEditMode ? 'Сохранить' : 'Создать')}
+                    {isSaving ? t('form.saving') : (isEditMode ? t('form.save') : t('form.create'))}
                 </Button>
             </DialogFooter>
         </DialogContent>

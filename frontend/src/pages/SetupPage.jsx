@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function SetupPage() {
+    const { t } = useTranslation('setup');
     const isAuthenticated = useAppStore((state) => state.isAuthenticated);
 
     const navigate = useNavigate();
@@ -31,12 +33,12 @@ export default function SetupPage() {
         e.preventDefault();
 
         if (password.length < 4) {
-            setError('Пароль должен содержать не менее 4 символов.');
+            setError(t('errors.passwordMin'));
             return;
         }
 
         if (password !== confirmPassword) {
-            setError('Пароли не совпадают.');
+            setError(t('errors.passwordMismatch'));
             return;
         }
 
@@ -47,12 +49,12 @@ export default function SetupPage() {
         try {
             await useAppStore.getState().setupAdmin(username, password);
 
-            toast({ title: "Добро пожаловать!", description: "Вы успешно вошли в систему." });
+            toast({ title: t('messages.welcome'), description: t('messages.loginSuccess') });
 
             navigate('/', { replace: true });
 
         } catch (err) {
-            setError(err.message || 'Не удалось создать аккаунт.');
+            setError(err.message || t('errors.createFailed'));
             isSubmittingRef.current = false;
         } finally {
             setIsLoading(false);
@@ -63,38 +65,38 @@ export default function SetupPage() {
         <div className="flex items-center justify-center min-h-screen bg-background">
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Первоначальная настройка</CardTitle>
-                    <CardDescription>Создайте аккаунт администратора для панели BlockMine.</CardDescription>
+                    <CardTitle className="text-2xl">{t('title')}</CardTitle>
+                    <CardDescription>{t('description')}</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="username">Имя администратора</Label>
-                            <Input 
-                                id="username" 
-                                value={username} 
-                                onChange={(e) => setUsername(e.target.value)} 
-                                required 
+                            <Label htmlFor="username">{t('username')}</Label>
+                            <Input
+                                id="username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                required
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Пароль (мин. 4 символа)</Label>
-                            <Input 
-                                id="password" 
-                                type="password" 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                required 
+                            <Label htmlFor="password">{t('password')}</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
                             />
                         </div>
                          <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
-                            <Input 
-                                id="confirmPassword" 
-                                type="password" 
-                                value={confirmPassword} 
-                                onChange={(e) => setConfirmPassword(e.target.value)} 
-                                required 
+                            <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+                            <Input
+                                id="confirmPassword"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
                             />
                         </div>
                         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -102,7 +104,7 @@ export default function SetupPage() {
                     <CardFooter>
                         <Button type="submit" className="w-full" disabled={isLoading}>
                              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Создать
+                            {t('submit')}
                         </Button>
                     </CardFooter>
                 </form>

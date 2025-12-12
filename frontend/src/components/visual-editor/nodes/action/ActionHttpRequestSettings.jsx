@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -6,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для action:http_request ноды
  */
 const ActionHttpRequestSettings = ({ nodeId, data, updateNodeData, nodeEdges }) => {
+  const { t } = useTranslation('visual-editor');
   // Проверяем есть ли подключение к пину method
   const hasMethodConnection = nodeEdges?.some(edge =>
     edge.target === nodeId && edge.targetHandle === 'method'
@@ -15,7 +17,7 @@ const ActionHttpRequestSettings = ({ nodeId, data, updateNodeData, nodeEdges }) 
     <div className="p-2 border-t border-slate-700">
       {!hasMethodConnection && (
         <>
-          <Label>HTTP Method:</Label>
+          <Label>{t('nodeSettings.httpMethod')}</Label>
           <Select
             value={data.method || 'GET'}
             onValueChange={(value) => updateNodeData(nodeId, { method: value })}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import GroupFormDialog from '@/components/GroupFormDialog';
 import { apiHelper } from '@/lib/api';
 
-function GroupsManager({ allPermissions, onDataChange }) {
+function GroupsManager({ allPermissions, onDataChange, t }) {
     const [groups, setGroups] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,7 +53,7 @@ function GroupsManager({ allPermissions, onDataChange }) {
             await apiHelper(url, {
                 method,
                 body: JSON.stringify(groupData),
-            }, `Группа успешно ${isEdit ? 'обновлена' : 'создана'}.`);
+            }, t(isEdit ? 'groups.messages.updated' : 'groups.messages.created'));
 
             handleCloseModal();
             fetchGroups();
@@ -64,12 +65,12 @@ function GroupsManager({ allPermissions, onDataChange }) {
 
     const handleDelete = async (group) => {
         if (group.owner === 'system') {
-            toast({ variant: "destructive", title: "Ошибка", description: "Нельзя удалить системную группу." });
+            toast({ variant: "destructive", title: t('common.error'), description: t('groups.messages.systemDelete') });
             return;
         }
-        if (window.confirm(`Вы уверены, что хотите удалить группу "${group.name}"?`)) {
+        if (window.confirm(t('groups.messages.confirmDelete', { name: group.name }))) {
             try {
-                await apiHelper(`/api/permissions/groups/${group.id}`, { method: 'DELETE' }, "Группа удалена.");
+                await apiHelper(`/api/permissions/groups/${group.id}`, { method: 'DELETE' }, t('groups.messages.deleted'));
                 fetchGroups();
                 onDataChange();
             } catch (error) {
@@ -82,12 +83,12 @@ function GroupsManager({ allPermissions, onDataChange }) {
             <CardHeader>
                  <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle>Группы</CardTitle>
-                        <CardDescription>Список всех групп и их прав.</CardDescription>
+                        <CardTitle>{t('groups.title')}</CardTitle>
+                        <CardDescription>{t('groups.description')}</CardDescription>
                     </div>
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                         <DialogTrigger asChild>
-                             <Button onClick={() => handleOpenModal()}><Plus className="mr-2 h-4 w-4"/>Создать группу</Button>
+                             <Button onClick={() => handleOpenModal()}><Plus className="mr-2 h-4 w-4"/>{t('groups.create')}</Button>
                         </DialogTrigger>
                         <GroupFormDialog group={editingGroup} allPermissions={allPermissions} onSubmit={handleSubmit} onCancel={handleCloseModal} isSaving={isSaving} />
                     </Dialog>
@@ -97,14 +98,14 @@ function GroupsManager({ allPermissions, onDataChange }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Название</TableHead>
-                            <TableHead>Права</TableHead>
-                            <TableHead className="text-right">Действия</TableHead>
+                            <TableHead>{t('groups.table.name')}</TableHead>
+                            <TableHead>{t('groups.table.permissions')}</TableHead>
+                            <TableHead className="text-right">{t('groups.table.actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={3} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={3} className="text-center">{t('groups.table.loading')}</TableCell></TableRow>
                         ) : (
                             groups.map(group => (
                                 <TableRow key={group.id}>
@@ -128,25 +129,25 @@ function GroupsManager({ allPermissions, onDataChange }) {
     );
 }
 
-function PermissionsManager({ allPermissions, isLoading }) {
+function PermissionsManager({ allPermissions, isLoading, t }) {
      return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Права</CardTitle>
-                <CardDescription>Полный список всех прав, зарегистрированных в системе (включая плагины).</CardDescription>
+                <CardTitle>{t('permissions.title')}</CardTitle>
+                <CardDescription>{t('permissions.description')}</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Право</TableHead>
-                            <TableHead>Описание</TableHead>
-                            <TableHead>Источник</TableHead>
+                            <TableHead>{t('permissions.table.permission')}</TableHead>
+                            <TableHead>{t('permissions.table.description')}</TableHead>
+                            <TableHead>{t('permissions.table.source')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                             <TableRow><TableCell colSpan={3} className="text-center">Загрузка...</TableCell></TableRow>
+                             <TableRow><TableCell colSpan={3} className="text-center">{t('permissions.table.loading')}</TableCell></TableRow>
                         ) : (
                             allPermissions.map(perm => (
                                 <TableRow key={perm.id}>
@@ -164,6 +165,7 @@ function PermissionsManager({ allPermissions, isLoading }) {
 }
 
 export default function PermissionsPage() {
+    const { t } = useTranslation('permissions');
     const [allPermissions, setAllPermissions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -184,21 +186,21 @@ export default function PermissionsPage() {
     return (
         <div className="h-full flex flex-col p-4">
             <CardHeader className="px-0">
-                <CardTitle>Управление правами и группами</CardTitle>
+                <CardTitle>{t('title')}</CardTitle>
                 <CardDescription>
-                    Создавайте группы и распределяйте права доступа для команд и плагинов.
+                    {t('description')}
                 </CardDescription>
             </CardHeader>
             <Tabs defaultValue="groups" className="flex-grow flex flex-col">
                 <TabsList>
-                    <TabsTrigger value="groups">Группы</TabsTrigger>
-                    <TabsTrigger value="permissions">Права</TabsTrigger>
+                    <TabsTrigger value="groups">{t('tabs.groups')}</TabsTrigger>
+                    <TabsTrigger value="permissions">{t('tabs.permissions')}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="groups" className="flex-grow mt-4">
-                    <GroupsManager allPermissions={allPermissions} onDataChange={fetchAllPermissions} />
+                    <GroupsManager allPermissions={allPermissions} onDataChange={fetchAllPermissions} t={t} />
                 </TabsContent>
                 <TabsContent value="permissions" className="flex-grow mt-4">
-                    <PermissionsManager allPermissions={allPermissions} isLoading={isLoading} />
+                    <PermissionsManager allPermissions={allPermissions} isLoading={isLoading} t={t} />
                 </TabsContent>
             </Tabs>
         </div>

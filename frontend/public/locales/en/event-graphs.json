@@ -1,0 +1,50 @@
+{
+  "title": "Event Graphs",
+  "description": "Manage your bot's behavior scenarios.",
+  "empty": {
+    "title": "No event graphs yet",
+    "description": "Start by creating your first graph to automate bot actions.",
+    "createFirst": "Create first graph"
+  },
+  "actions": {
+    "import": "Import",
+    "create": "Create",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "share": "Share",
+    "delete": "Delete",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "table": {
+    "status": "Status",
+    "name": "Name",
+    "plugin": "Plugin",
+    "triggers": "Triggers",
+    "stats": "Statistics",
+    "actions": "Actions"
+  },
+  "deleteDialog": {
+    "title": "Are you sure?",
+    "description": "This action is irreversible. Graph \"{{name}}\" will be deleted permanently."
+  },
+  "editor": {
+    "title": "Graph Editor"
+  },
+  "loading": {
+    "graphs": "Loading event graphs...",
+    "editor": "Loading event graph..."
+  },
+  "messages": {
+    "error": "Error",
+    "success": "Success",
+    "loadError": "Failed to load event graphs.",
+    "toggleError": "Failed to change graph status.",
+    "toggleSuccess": "Graph \"{{name}}\" was {{status}}.",
+    "enabled": "enabled",
+    "disabled": "disabled",
+    "duplicateSuccess": "Graph was duplicated.",
+    "duplicateError": "Failed to duplicate graph."
+  }
+}

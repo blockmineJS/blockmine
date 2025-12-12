@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import 'reactflow/dist/style.css';
 import {
     ReactFlow,
@@ -65,6 +66,7 @@ const edgeTypes = {
 function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
+    const { t } = useTranslation('visual-editor');
 
     const [botName, setBotName] = useState(null);
     const appSocket = useAppStore(state => state.socket);
@@ -300,7 +302,7 @@ function BotVisualEditorPage() {
         try {
             const graphId = entityId === 'new' ? null : parseInt(entityId);
             if (!graphId) {
-                toast.error('Сохраните граф перед просмотром трассировок');
+                toast.error(t('save.saveFirst'));
                 return;
             }
 
@@ -309,7 +311,7 @@ function BotVisualEditorPage() {
                 const eventNodes = nodes.filter(n => n.type?.startsWith('event:'));
 
                 if (eventNodes.length === 0) {
-                    toast.error('В графе нет event нод');
+                    toast.error(t('trace.noEventNodes'));
                     return;
                 }
 
@@ -347,11 +349,11 @@ function BotVisualEditorPage() {
                 }
                 useVisualEditorStore.getState().openTraceViewer(response.trace);
             } else {
-                toast.error('Трассировки не найдены для этого графа');
+                toast.error(t('trace.notFound'));
             }
         } catch (error) {
             console.error('Ошибка загрузки трассировки:', error);
-            toast.error('Не удалось загрузить трассировку');
+            toast.error(t('trace.loadError'));
         }
     };
 
@@ -368,12 +370,12 @@ function BotVisualEditorPage() {
     const handlePublish = async () => {
         try {
             if (!publishForm.name || !publishForm.author || !publishForm.description) {
-                toast.error('Все поля обязательны');
+                toast.error(t('publish.allFieldsRequired'));
                 return;
             }
 
             if (publishForm.description.length < 10) {
-                toast.error('Описание должно содержать минимум 10 символов');
+                toast.error(t('publish.descriptionMinLength'));
                 return;
             }
 
@@ -404,7 +406,7 @@ function BotVisualEditorPage() {
             });
 
             if (response.ok) {
-                toast.success('Граф опубликован и ожидает модерации!');
+                toast.success(t('publish.success'));
                 setPublishDialogOpen(false);
                 setPublishForm({
                     name: '',
@@ -413,11 +415,11 @@ function BotVisualEditorPage() {
                 });
             } else {
                 const error = await response.json();
-                toast.error(error.error || 'Ошибка при публикации');
+                toast.error(error.error || t('publish.error'));
             }
         } catch (error) {
             console.error('Ошибка:', error);
-            toast.error('Ошибка при публикации графа');
+            toast.error(t('publish.error'));
         }
     };
     
@@ -438,18 +440,18 @@ function BotVisualEditorPage() {
             const variableItems = [];
             variables.forEach(variable => {
                 variableItems.push({
-                    label: `📤 Получить переменную ${variable.name}`,
+                    label: `📤 ${t('variables.get')} ${variable.name}`,
                     type: 'data:get_variable',
                     data: { variableName: variable.name }
                 });
                 variableItems.push({
-                    label: `📥 Задать переменную ${variable.name}`,
+                    label: `📥 ${t('variables.set')} ${variable.name}`,
                     type: 'action:bot_set_variable',
                     data: { variableName: variable.name }
                 });
             });
             dynamicGroups.push({
-                label: '📦 Переменные',
+                label: `📦 ${t('variables.group')}`,
                 children: variableItems
             });
         }
@@ -457,12 +459,12 @@ function BotVisualEditorPage() {
         // Добавляем группу аргументов
         if (commandArguments && commandArguments.length > 0) {
             const argumentItems = commandArguments.map(arg => ({
-                label: `📤 Получить аргумент ${arg.name}`,
+                label: `📤 ${t('arguments.get')} ${arg.name}`,
                 type: 'data:get_argument',
                 data: { argumentName: arg.name }
             }));
             dynamicGroups.push({
-                label: '🎯 Аргументы',
+                label: `🎯 ${t('arguments.group')}`,
                 children: argumentItems
             });
         }
@@ -575,7 +577,7 @@ function BotVisualEditorPage() {
     };
 
     if (isLoading || Object.keys(availableNodes).length === 0) {
-        return <div className="flex items-center justify-center h-full">Загрузка редактора...</div>;
+        return <div className="flex items-center justify-center h-full">{t('loading')}</div>;
     }
 
     return (
@@ -585,7 +587,7 @@ function BotVisualEditorPage() {
                 onContextMenu={(e) => e.preventDefault()}
             >
                  <header className="p-2 border-b flex justify-between items-center">
-                    <h1 className="text-lg font-bold">Редактор: {command?.name}</h1>
+                    <h1 className="text-lg font-bold">{t('editor.title')}: {command?.name}</h1>
                     <div className="flex gap-2 items-center">
                         <CollaborativeUsersHeader />
                         <Button
@@ -594,7 +596,7 @@ function BotVisualEditorPage() {
                             onClick={handleToggleDebugMode}
                         >
                             <Bug className="w-4 h-4 mr-2" />
-                            {debugMode === 'live' ? 'Live Debug Вкл' : 'Live Debug'}
+                            {debugMode === 'live' ? t('debug.liveEnabled') : t('debug.live')}
                         </Button>
                         <Button
                             variant={isTraceViewerOpen ? 'default' : 'outline'}
@@ -602,54 +604,54 @@ function BotVisualEditorPage() {
                             onClick={() => handleToggleTraceViewer()}
                         >
                             <Zap className="w-4 h-4 mr-2" />
-                            {isTraceViewerOpen ? 'Трассировка Вкл' : 'Просмотр трассировки'}
+                            {isTraceViewerOpen ? t('debug.traceEnabled') : t('debug.traceView')}
                         </Button>
                         <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">
                                     <Share2 className="w-4 h-4 mr-2" />
-                                    Опубликовать
+                                    {t('publish.button')}
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-md">
                                 <DialogHeader>
-                                    <DialogTitle>Опубликовать граф в магазин</DialogTitle>
+                                    <DialogTitle>{t('publish.title')}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                     <div>
-                                        <Label htmlFor="name">Название</Label>
+                                        <Label htmlFor="name">{t('publish.name')}</Label>
                                         <Input
                                             id="name"
                                             value={publishForm.name}
                                             onChange={(e) => setPublishForm(prev => ({ ...prev, name: e.target.value }))}
-                                            placeholder="Название графа"
+                                            placeholder={t('publish.namePlaceholder')}
                                         />
                                     </div>
                                     <div>
-                                        <Label htmlFor="author">Автор</Label>
+                                        <Label htmlFor="author">{t('publish.author')}</Label>
                                         <Input
                                             id="author"
                                             value={publishForm.author}
                                             onChange={(e) => setPublishForm(prev => ({ ...prev, author: e.target.value }))}
-                                            placeholder="Ваше имя"
+                                            placeholder={t('publish.authorPlaceholder')}
                                         />
                                     </div>
                                     <div>
-                                        <Label htmlFor="description">Описание</Label>
+                                        <Label htmlFor="description">{t('publish.description')}</Label>
                                         <Textarea
                                             id="description"
                                             value={publishForm.description}
                                             onChange={(e) => setPublishForm(prev => ({ ...prev, description: e.target.value }))}
-                                            placeholder="Описание графа (минимум 10 символов)"
+                                            placeholder={t('publish.descriptionPlaceholder')}
                                             rows={3}
                                         />
                                     </div>
                                     <div className="flex gap-2">
                                         <Button onClick={handlePublish} className="flex-1">
-                                            Опубликовать
+                                            {t('publish.submit')}
                                         </Button>
                                         <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
-                                            Отмена
+                                            {t('publish.cancel')}
                                         </Button>
                                     </div>
                                 </div>
@@ -658,7 +660,7 @@ function BotVisualEditorPage() {
                         <Dialog open={showEventTypeDialog} onOpenChange={setShowEventTypeDialog}>
                             <DialogContent className="max-w-md">
                                 <DialogHeader>
-                                    <DialogTitle>Выберите тип события для просмотра</DialogTitle>
+                                    <DialogTitle>{t('selectEventType.title')}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-3">
                                     {availableEventTypes.map((eventType) => (
@@ -679,7 +681,7 @@ function BotVisualEditorPage() {
                             </DialogContent>
                         </Dialog>
                         <Button onClick={handleSave} disabled={isSaving}>
-                            {isSaving ? 'Сохранение...' : 'Сохранить'}
+                            {isSaving ? t('save.saving') : t('save.button')}
                         </Button>
                     </div>
                 </header>

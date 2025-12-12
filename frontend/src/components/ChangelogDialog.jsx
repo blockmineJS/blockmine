@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -54,6 +55,7 @@ function parseChangelog(markdownText) {
 }
 
 export default function ChangelogDialog() {
+    const { t } = useTranslation('dialogs');
     const showChangelogDialog = useAppStore(state => state.showChangelogDialog);
     const changelog = useAppStore(state => state.changelog);
     const appVersion = useAppStore(state => state.appVersion);
@@ -109,13 +111,13 @@ export default function ChangelogDialog() {
         <Dialog open={showChangelogDialog} onOpenChange={closeChangelogDialog}>
             <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle>Что нового в версии {appVersion}</DialogTitle>
+                    <DialogTitle>{t('changelog.title', { version: appVersion })}</DialogTitle>
                 </DialogHeader>
 
                 <div className="flex items-center justify-end border rounded-lg p-3">
                     <Select value={selectedVersion} onValueChange={handleJumpToVersion}>
                         <SelectTrigger className="w-44">
-                            <SelectValue placeholder="Выбрать версию" />
+                            <SelectValue placeholder={t('changelog.selectVersion')} />
                         </SelectTrigger>
                         <SelectContent>
                             {releases.map(r => (
@@ -127,7 +129,7 @@ export default function ChangelogDialog() {
 
                 <ScrollArea className="flex-1 w-full rounded-md border p-2 md:p-3">
                     {releases.length === 0 ? (
-                        <div className="text-center py-16 text-muted-foreground">Нет данных для отображения</div>
+                        <div className="text-center py-16 text-muted-foreground">{t('changelog.noData')}</div>
                     ) : (
                         <Accordion type="multiple" value={expanded} onValueChange={handleAccordionChange} className="w-full">
                             {releases.map((r) => (
@@ -194,7 +196,7 @@ export default function ChangelogDialog() {
                                                     td: ({ children }) => <td className="p-2">{children}</td>,
                                                 }}
                                             >
-                                                {r.body || 'Нет данных для отображения'}
+                                                {r.body || t('changelog.noData')}
                                             </ReactMarkdown>
                                         </div>
                                     </AccordionContent>
