@@ -10,6 +10,61 @@ const { execSync: execSyncRaw } = require('child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
 
+// Проверяет и устанавливает зависимости для всех плагинов
+async function ensurePluginDependencies(installedPlugins = [], sendLog = console.log) {
+    if (!installedPlugins || installedPlugins.length === 0) return;
+
+    sendLog(`[PluginLoader] Проверка зависимостей ${installedPlugins.length} плагинов...`);
+
+    for (const plugin of installedPlugins) {
+        if (!plugin || !plugin.path) continue;
+
+        try {
+            const packageJsonPath = path.join(plugin.path, 'package.json');
+
+            // Проверяем есть ли package.json
+            if (!fssync.existsSync(packageJsonPath)) {
+                continue;
+            }
+
+            const packageJson = JSON.parse(fssync.readFileSync(packageJsonPath, 'utf-8'));
+            const dependencies = packageJson.dependencies || {};
+
+            if (Object.keys(dependencies).length === 0) {
+                continue;
+            }
+
+            // Проверяем есть ли node_modules
+            const nodeModulesPath = path.join(plugin.path, 'node_modules');
+            const needsInstall = !fssync.existsSync(nodeModulesPath);
+
+            if (needsInstall) {
+                sendLog(`[PluginLoader] Установка зависимостей для ${plugin.name}...`);
+
+                try {
+                    execSync('npm install --omit=dev --no-audit --no-fund', {
+                        cwd: plugin.path,
+                        stdio: 'inherit'
+                    });
+                    sendLog(`[PluginLoader] ✓ Зависимости установлены для ${plugin.name}`);
+                } catch (e1) {
+                    sendLog(`[PluginLoader] Повторная попытка с --legacy-peer-deps для ${plugin.name}...`);
+                    execSync('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund', {
+                        cwd: plugin.path,
+                        stdio: 'inherit'
+                    });
+                    sendLog(`[PluginLoader] ✓ Зависимости установлены для ${plugin.name}`);
+                }
+            }
+
+        } catch (error) {
+            sendLog(`[PluginLoader] [WARN] Не удалось проверить зависимости для ${plugin.name}: ${error.message}`);
+        }
+    }
+
+    sendLog(`[PluginLoader] Проверка зависимостей завершена`);
+}
+
 // Создаёт обёрнутый console для перехвата логов плагина
 function createPluginConsole(botId, pluginName, originalConsole) {
     const emitLog = (level, args) => {
@@ -184,7 +239,10 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                 } catch (error) {
                     let handled = false;
                     let lastError = error;
-                    if (error.message.includes('Cannot find module')) {
+                    // Проверяем не только сообщение ошибки, но и весь стек
+                    const errorString = error.message + '\n' + (error.stack || '');
+                    const isModuleError = errorString.includes('Cannot find module');
+                    if (isModuleError) {
                         const moduleMatch = error.message.match(/Cannot find module '([^']+)'/);
                         const missingModule = moduleMatch ? moduleMatch[1] : null;
                         if (missingModule) {
@@ -300,4 +358,4 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
     }
 }
 
-module.exports = { initializePlugins };
+module.exports = { initializePlugins, ensurePluginDependencies };

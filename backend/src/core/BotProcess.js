@@ -6,7 +6,7 @@ const { Vec3 } = require('vec3');
 const { PrismaClient } = require('@prisma/client');
 const { loadCommands } = require('./system/CommandRegistry');
 const { getRuntimeCommandRegistry } = require('./system/RuntimeCommandRegistry');
-const { initializePlugins } = require('./PluginLoader');
+const { initializePlugins, ensurePluginDependencies } = require('./PluginLoader');
 const MessageQueue = require('./MessageQueue');
 const Command = require('./system/Command');
 const { parseArguments } = require('./system/parseArguments');
@@ -909,6 +909,7 @@ process.on('message', async (message) => {
                 }
             }
 
+            await ensurePluginDependencies(config.plugins, sendLog);
             await initializePlugins(bot, config.plugins, prisma);
             sendLog('[System] Все системы инициализированы.');
 
