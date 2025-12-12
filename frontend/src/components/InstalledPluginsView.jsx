@@ -89,7 +89,19 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
 
                 <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg truncate">{plugin.name}</h3>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <h3 className="font-semibold text-lg truncate cursor-help">
+                                    {plugin.displayName || plugin.name}
+                                </h3>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <div className="text-xs">
+                                    <div className="text-muted-foreground">ID плагина:</div>
+                                    <div className="font-mono">{plugin.name}</div>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
                         {isNew && (
                             <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
                                 <Sparkles className="h-3 w-3 mr-1" />
@@ -256,9 +268,19 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             )}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <CardTitle className="text-lg truncate">
-                                {plugin.name}
-                            </CardTitle>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <CardTitle className="text-lg truncate cursor-help">
+                                        {plugin.displayName || plugin.name}
+                                    </CardTitle>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <div className="text-xs">
+                                        <div className="text-muted-foreground">ID плагина:</div>
+                                        <div className="font-mono">{plugin.name}</div>
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
                             <CardDescription className="text-sm truncate">
                                 от {plugin.author || 'Неизвестный автор'}
                             </CardDescription>
@@ -514,7 +536,7 @@ export default function InstalledPluginsView({
         if (!searchQuery) return byFilter;
         const q = searchQuery.toLowerCase();
         return byFilter.filter(p => (
-            p.name?.toLowerCase().includes(q) ||
+            (p.displayName || p.name)?.toLowerCase().includes(q) ||
             p.description?.toLowerCase().includes(q) ||
             p.author?.toLowerCase().includes(q)
         ));

@@ -109,6 +109,7 @@ export const createPluginSlice = (set, get) => {
                     return {
                         ...p,
                         manifest,
+                        displayName: catalogPlugin?.displayName || manifest.displayName || p.name,
                         author: catalogPlugin?.author || manifest.author || 'Неизвестный автор',
                         description: p.description || manifest.description || 'Нет описания',
                         commands: p.commands || [],
