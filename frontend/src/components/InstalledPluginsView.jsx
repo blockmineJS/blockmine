@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -91,9 +91,12 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     <div className="flex items-center gap-2 mb-1">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <h3 className="font-semibold text-lg truncate cursor-help">
+                                <Link
+                                    to={`/bots/${botId}/plugins/view/${plugin.name}`}
+                                    className="font-semibold text-lg truncate hover:text-primary transition-colors cursor-pointer"
+                                >
                                     {plugin.displayName || plugin.name}
-                                </h3>
+                                </Link>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <div className="text-xs">
@@ -270,9 +273,14 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         <div className="min-w-0 flex-1">
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <CardTitle className="text-lg truncate cursor-help">
-                                        {plugin.displayName || plugin.name}
-                                    </CardTitle>
+                                    <Link
+                                        to={`/bots/${botId}/plugins/view/${plugin.name}`}
+                                        className="block"
+                                    >
+                                        <CardTitle className="text-lg truncate hover:text-primary transition-colors cursor-pointer">
+                                            {plugin.displayName || plugin.name}
+                                        </CardTitle>
+                                    </Link>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <div className="text-xs">
