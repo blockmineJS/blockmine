@@ -482,11 +482,13 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 **Формат options:**
 
 1. **Простой массив строк** - когда значение и label совпадают:
+
 ```javascript
 "options": ["easy", "normal", "hard"]
 ```
 
-2. **Массив объектов** - когда нужны разные value и label:
+1. **Массив объектов** - когда нужны разные value и label:
+
 ```javascript
 "options": [
     { "value": "ru", "label": "Русский" },
@@ -499,6 +501,7 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 Сохраненное значение всегда будет строкой (например: `"normal"`, `"ru"`)
 
 **Пример использования в плагине:**
+
 ```javascript
 module.exports = (bot, { settings }) => {
     const mode = settings.mode; // "easy" | "normal" | "hard"

@@ -9,6 +9,7 @@ import { Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import Editor from '@monaco-editor/react';
 import { useAppStore } from '@/stores/appStore';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -201,7 +202,7 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Select value={value || config.default || ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
+                    <Select value={value ?? config.default ?? ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
                         <SelectTrigger id={id}>
                             <SelectValue placeholder="Выберите значение" />
                         </SelectTrigger>
@@ -257,20 +258,10 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
         onSettingsChange(plugin.id, newSettings);
     };
 
-    // Определяем, какие поля показывать на основе условий
-    const shouldShowField = (key, config) => {
-        // Если есть поле actionsPreset, то поля enable* показываем только при custom
-        const actionsPresetValue = plugin.settings.actionsPreset;
-        if (actionsPresetValue !== undefined && key.startsWith('enable')) {
-            return actionsPresetValue === 'custom';
-        }
-        return true;
-    };
-
     return (
         <div className="space-y-6">
             {Object.entries(plugin.manifest.settings)
-                .filter(([key, config]) => shouldShowField(key, config))
+                .filter(([key, config]) => shouldShowField(key, plugin.settings?.actionsPreset))
                 .map(([key, config]) => (
                     <SettingField
                         key={key}

@@ -15,6 +15,7 @@ import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppStore } from '@/stores/appStore';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -205,7 +206,7 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Select value={value || config.default || ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
+                    <Select value={value ?? config.default ?? ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
                         <SelectTrigger id={id}>
                             <SelectValue placeholder="Выберите значение" />
                         </SelectTrigger>
@@ -384,16 +385,6 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         }
     };
 
-    // Определяем, какие поля показывать на основе условий
-    const shouldShowField = (key, config) => {
-        // Если есть поле actionsPreset, то поля enable* показываем только при custom
-        const actionsPresetValue = settings?.actionsPreset;
-        if (actionsPresetValue !== undefined && key.startsWith('enable')) {
-            return actionsPresetValue === 'custom';
-        }
-        return true;
-    };
-
     const renderSettings = () => {
         if (settings === null) return <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>;
         if (Object.keys(manifestSettings).length === 0) return <p className="text-muted-foreground p-4 text-center">У этого плагина нет настроек.</p>;
@@ -407,7 +398,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                             <AccordionContent className="pt-4 border-t space-y-4">
                                 {Object.entries(categoryConfig)
                                     .filter(([key]) => key !== 'label')
-                                    .filter(([key, config]) => shouldShowField(key, config))
+                                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
                                     .map(([key, config]) => (
                                         <SettingField
                                             key={key}
@@ -428,7 +419,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         return (
             <div className="space-y-4">
                 {Object.entries(manifestSettings)
-                    .filter(([key, config]) => shouldShowField(key, config))
+                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
                     .map(([key, config]) => (
                         <SettingField
                             key={key}
