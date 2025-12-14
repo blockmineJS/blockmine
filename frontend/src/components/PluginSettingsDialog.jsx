@@ -384,6 +384,16 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         }
     };
 
+    // Определяем, какие поля показывать на основе условий
+    const shouldShowField = (key, config) => {
+        // Если есть поле actionsPreset, то поля enable* показываем только при custom
+        const actionsPresetValue = settings?.actionsPreset;
+        if (actionsPresetValue !== undefined && key.startsWith('enable')) {
+            return actionsPresetValue === 'custom';
+        }
+        return true;
+    };
+
     const renderSettings = () => {
         if (settings === null) return <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>;
         if (Object.keys(manifestSettings).length === 0) return <p className="text-muted-foreground p-4 text-center">У этого плагина нет настроек.</p>;
@@ -395,16 +405,19 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                         <AccordionItem key={categoryKey} value={categoryKey} className="border rounded-lg bg-muted/20 px-4">
                             <AccordionTrigger className="text-base font-semibold hover:no-underline">{categoryConfig.label}</AccordionTrigger>
                             <AccordionContent className="pt-4 border-t space-y-4">
-                                {Object.entries(categoryConfig).filter(([key]) => key !== 'label').map(([key, config]) => (
-                                     <SettingField
-                                        key={key}
-                                        settingKey={key}
-                                        config={config}
-                                        value={settings[key]}
-                                        onChange={handleSettingChange}
-                                        readOnly={readOnly}
-                                    />
-                                ))}
+                                {Object.entries(categoryConfig)
+                                    .filter(([key]) => key !== 'label')
+                                    .filter(([key, config]) => shouldShowField(key, config))
+                                    .map(([key, config]) => (
+                                        <SettingField
+                                            key={key}
+                                            settingKey={key}
+                                            config={config}
+                                            value={settings[key]}
+                                            onChange={handleSettingChange}
+                                            readOnly={readOnly}
+                                        />
+                                    ))}
                             </AccordionContent>
                         </AccordionItem>
                     ))}
@@ -414,16 +427,18 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
 
         return (
             <div className="space-y-4">
-                {Object.entries(manifestSettings).map(([key, config]) => (
-                    <SettingField
-                        key={key}
-                        settingKey={key}
-                        config={config}
-                        value={settings[key]}
-                        onChange={handleSettingChange}
-                        readOnly={readOnly}
-                    />
-                ))}
+                {Object.entries(manifestSettings)
+                    .filter(([key, config]) => shouldShowField(key, config))
+                    .map(([key, config]) => (
+                        <SettingField
+                            key={key}
+                            settingKey={key}
+                            config={config}
+                            value={settings[key]}
+                            onChange={handleSettingChange}
+                            readOnly={readOnly}
+                        />
+                    ))}
             </div>
         );
     };

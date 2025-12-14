@@ -257,17 +257,29 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
         onSettingsChange(plugin.id, newSettings);
     };
 
+    // Определяем, какие поля показывать на основе условий
+    const shouldShowField = (key, config) => {
+        // Если есть поле actionsPreset, то поля enable* показываем только при custom
+        const actionsPresetValue = plugin.settings.actionsPreset;
+        if (actionsPresetValue !== undefined && key.startsWith('enable')) {
+            return actionsPresetValue === 'custom';
+        }
+        return true;
+    };
+
     return (
         <div className="space-y-6">
-            {Object.entries(plugin.manifest.settings).map(([key, config]) => (
-                <SettingField
-                    key={key}
-                    settingKey={key}
-                    config={config}
-                    value={plugin.settings[key]}
-                    onChange={handleFieldChange}
-                />
-            ))}
+            {Object.entries(plugin.manifest.settings)
+                .filter(([key, config]) => shouldShowField(key, config))
+                .map(([key, config]) => (
+                    <SettingField
+                        key={key}
+                        settingKey={key}
+                        config={config}
+                        value={plugin.settings[key]}
+                        onChange={handleFieldChange}
+                    />
+                ))}
         </div>
     );
 }
