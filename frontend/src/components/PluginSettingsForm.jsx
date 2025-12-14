@@ -197,6 +197,29 @@ function SettingField({ settingKey, config, value, onChange }) {
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
+        case 'select':
+            return (
+                <div className="space-y-2">
+                    <Label htmlFor={id}>{config.label}</Label>
+                    <Select value={value || config.default || ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
+                        <SelectTrigger id={id}>
+                            <SelectValue placeholder="Выберите значение" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {(config.options || []).map((option) => {
+                                const optionValue = typeof option === 'string' ? option : option.value;
+                                const optionLabel = typeof option === 'string' ? option : option.label;
+                                return (
+                                    <SelectItem key={optionValue} value={optionValue}>
+                                        {optionLabel}
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                    {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
+                </div>
+            );
         case 'json':
         case 'json_file':
              return (

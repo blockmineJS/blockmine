@@ -412,6 +412,26 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
         "defaultPath": "config/default.json"
       },
 
+      "mode": {
+        "type": "select",
+        "label": "Режим работы",
+        "description": "Выберите режим работы плагина",
+        "options": ["easy", "normal", "hard"],
+        "default": "normal"
+      },
+
+      "language": {
+        "type": "select",
+        "label": "Язык",
+        "description": "Выберите язык интерфейса",
+        "options": [
+          { "value": "ru", "label": "Русский" },
+          { "value": "en", "label": "English" },
+          { "value": "uk", "label": "Українська" }
+        ],
+        "default": "ru"
+      },
+
       "proxy": {
         "type": "proxy",
         "label": "Прокси для запросов",
@@ -434,6 +454,7 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 | `string[]` | Массив строк | `["a", "b"]` |
 | `json` | JSON объект | `{"key": "value"}` |
 | `json_file` | JSON из файла | Путь к файлу |
+| `select` | Выпадающий список | `"normal"` (строка или объект) |
 | `proxy` | Выбор прокси (из списка или вручную) | `{ enabled: true, host: "...", port: 1080 }` |
 
 ### Структура объекта proxy
@@ -453,6 +474,41 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 ```
 
 Если прокси отключен: `{ enabled: false }`
+
+### Структура настройки select
+
+Настройка типа `select` позволяет пользователю выбрать одно значение из предопределенного списка опций.
+
+**Формат options:**
+
+1. **Простой массив строк** - когда значение и label совпадают:
+```javascript
+"options": ["easy", "normal", "hard"]
+```
+
+2. **Массив объектов** - когда нужны разные value и label:
+```javascript
+"options": [
+    { "value": "ru", "label": "Русский" },
+    { "value": "en", "label": "English" },
+    { "value": "uk", "label": "Українська" }
+]
+```
+
+**Результат:**
+Сохраненное значение всегда будет строкой (например: `"normal"`, `"ru"`)
+
+**Пример использования в плагине:**
+```javascript
+module.exports = (bot, { settings }) => {
+    const mode = settings.mode; // "easy" | "normal" | "hard"
+    const language = settings.language; // "ru" | "en" | "uk"
+
+    if (mode === 'hard') {
+        console.log('Включён сложный режим');
+    }
+};
+```
 
 ### Доступ к настройкам
 
