@@ -9,6 +9,7 @@ import { Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import Editor from '@monaco-editor/react';
 import { useAppStore } from '@/stores/appStore';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -197,6 +198,29 @@ function SettingField({ settingKey, config, value, onChange }) {
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
+        case 'select':
+            return (
+                <div className="space-y-2">
+                    <Label htmlFor={id}>{config.label}</Label>
+                    <Select value={value ?? config.default ?? ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
+                        <SelectTrigger id={id}>
+                            <SelectValue placeholder="Выберите значение" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {(config.options || []).map((option) => {
+                                const optionValue = typeof option === 'string' ? option : option.value;
+                                const optionLabel = typeof option === 'string' ? option : option.label;
+                                return (
+                                    <SelectItem key={optionValue} value={optionValue}>
+                                        {optionLabel}
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                    {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
+                </div>
+            );
         case 'json':
         case 'json_file':
              return (
@@ -236,15 +260,17 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
 
     return (
         <div className="space-y-6">
-            {Object.entries(plugin.manifest.settings).map(([key, config]) => (
-                <SettingField
-                    key={key}
-                    settingKey={key}
-                    config={config}
-                    value={plugin.settings[key]}
-                    onChange={handleFieldChange}
-                />
-            ))}
+            {Object.entries(plugin.manifest.settings)
+                .filter(([key, config]) => shouldShowField(key, plugin.settings?.actionsPreset))
+                .map(([key, config]) => (
+                    <SettingField
+                        key={key}
+                        settingKey={key}
+                        config={config}
+                        value={plugin.settings[key]}
+                        onChange={handleFieldChange}
+                    />
+                ))}
         </div>
     );
 }

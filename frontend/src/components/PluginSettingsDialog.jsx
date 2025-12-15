@@ -15,6 +15,7 @@ import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppStore } from '@/stores/appStore';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -201,6 +202,29 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
+        case 'select':
+            return (
+                <div className="space-y-2">
+                    <Label htmlFor={id}>{config.label}</Label>
+                    <Select value={value ?? config.default ?? ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
+                        <SelectTrigger id={id}>
+                            <SelectValue placeholder="Выберите значение" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {(config.options || []).map((option) => {
+                                const optionValue = typeof option === 'string' ? option : option.value;
+                                const optionLabel = typeof option === 'string' ? option : option.label;
+                                return (
+                                    <SelectItem key={optionValue} value={optionValue}>
+                                        {optionLabel}
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                    {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
+                </div>
+            );
         case 'json_file':
             return (
                 <div className="space-y-2">
@@ -372,16 +396,19 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                         <AccordionItem key={categoryKey} value={categoryKey} className="border rounded-lg bg-muted/20 px-4">
                             <AccordionTrigger className="text-base font-semibold hover:no-underline">{categoryConfig.label}</AccordionTrigger>
                             <AccordionContent className="pt-4 border-t space-y-4">
-                                {Object.entries(categoryConfig).filter(([key]) => key !== 'label').map(([key, config]) => (
-                                     <SettingField
-                                        key={key}
-                                        settingKey={key}
-                                        config={config}
-                                        value={settings[key]}
-                                        onChange={handleSettingChange}
-                                        readOnly={readOnly}
-                                    />
-                                ))}
+                                {Object.entries(categoryConfig)
+                                    .filter(([key]) => key !== 'label')
+                                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
+                                    .map(([key, config]) => (
+                                        <SettingField
+                                            key={key}
+                                            settingKey={key}
+                                            config={config}
+                                            value={settings[key]}
+                                            onChange={handleSettingChange}
+                                            readOnly={readOnly}
+                                        />
+                                    ))}
                             </AccordionContent>
                         </AccordionItem>
                     ))}
@@ -391,16 +418,18 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
 
         return (
             <div className="space-y-4">
-                {Object.entries(manifestSettings).map(([key, config]) => (
-                    <SettingField
-                        key={key}
-                        settingKey={key}
-                        config={config}
-                        value={settings[key]}
-                        onChange={handleSettingChange}
-                        readOnly={readOnly}
-                    />
-                ))}
+                {Object.entries(manifestSettings)
+                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
+                    .map(([key, config]) => (
+                        <SettingField
+                            key={key}
+                            settingKey={key}
+                            config={config}
+                            value={settings[key]}
+                            onChange={handleSettingChange}
+                            readOnly={readOnly}
+                        />
+                    ))}
             </div>
         );
     };
