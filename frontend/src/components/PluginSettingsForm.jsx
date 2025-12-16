@@ -9,6 +9,7 @@ import { Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import Editor from '@monaco-editor/react';
 import { useAppStore } from '@/stores/appStore';
+import { shouldShowField } from '@/utils/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
@@ -257,20 +258,12 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
         onSettingsChange(plugin.id, newSettings);
     };
 
-    // Определяем, какие поля показывать на основе условий
-    const shouldShowField = (key, config) => {
-        // Если есть поле actionsPreset, то поля enable* показываем только при custom
-        const actionsPresetValue = plugin.settings.actionsPreset;
-        if (actionsPresetValue !== undefined && key.startsWith('enable')) {
-            return actionsPresetValue === 'custom';
-        }
-        return true;
-    };
+    // Функция для проверки зависимостей полей (импортирована из utils)
 
     return (
         <div className="space-y-6">
             {Object.entries(plugin.manifest.settings)
-                .filter(([key, config]) => shouldShowField(key, config))
+                .filter(([key, config]) => shouldShowField(key, config, plugin.settings))
                 .map(([key, config]) => (
                     <SettingField
                         key={key}

@@ -144,8 +144,25 @@ export default function BotForm({ bot, servers, proxies, onFormChange, onFormSub
             if (Array.isArray(dataToSubmit.owners)) {
                 dataToSubmit.owners = dataToSubmit.owners.join(',');
             }
+            // Удаляем пустые поля
             if (!dataToSubmit.password) delete dataToSubmit.password;
-            if (!dataToSubmit.proxyPassword) delete dataToSubmit.proxyPassword;
+            // Если используется прокси из списка (proxyId задан), очищаем кастомные поля
+            if (dataToSubmit.proxyId) {
+                delete dataToSubmit.proxyHost;
+                delete dataToSubmit.proxyPort;
+                delete dataToSubmit.proxyUsername;
+                if (!dataToSubmit.proxyPassword) delete dataToSubmit.proxyPassword;
+            }
+            // Если не используется кастомный прокси и нет proxyId, очищаем все поля прокси
+            if (!dataToSubmit.proxyId && !dataToSubmit.proxyHost) {
+                delete dataToSubmit.proxyHost;
+                delete dataToSubmit.proxyPort;
+                delete dataToSubmit.proxyUsername;
+                delete dataToSubmit.proxyPassword;
+            } else if (!dataToSubmit.proxyPassword) {
+                // Если используется кастомный прокси, но пароль пустой, удаляем его
+                delete dataToSubmit.proxyPassword;
+            }
             onFormSubmit(dataToSubmit);
         }
     };
