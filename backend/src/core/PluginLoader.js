@@ -246,8 +246,20 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                         const moduleMatch = error.message.match(/Cannot find module '([^']+)'/);
                         const missingModule = moduleMatch ? moduleMatch[1] : null;
                         if (missingModule) {
+                            const isFilePath = missingModule.startsWith('/') ||
+                                               missingModule.startsWith('./') ||
+                                               missingModule.startsWith('../') ||
+                                               missingModule.startsWith('\\') ||
+                                               /^[A-Za-z]:[\\/]/.test(missingModule) || // Windows absolute path
+                                               /\.(js|json|node|ts|mjs|cjs)$/i.test(missingModule);
+
+                            if (isFilePath) {
+                                sendLog(`[PluginLoader] [ERROR] Файл не найден: ${missingModule}`);
+                                sendLog(`[PluginLoader] [ERROR] Плагин ${plugin.name} содержит ошибку — отсутствует файл. Проверьте код плагина.`);
+                                throw error;
+                            }
+
                             try {
-                                // Диагностика текущего состояния резолва
                                 pluginRequire.resolve(missingModule);
                                 sendLog(`[PluginLoader] [DEBUG] ${missingModule} уже резолвится до установки? Это неожиданно.`);
                             } catch {
