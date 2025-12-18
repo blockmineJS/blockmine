@@ -9,7 +9,7 @@ import { Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import Editor from '@monaco-editor/react';
 import { useAppStore } from '@/stores/appStore';
-import { shouldShowField } from '@/utils/pluginSettingsUtils';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');

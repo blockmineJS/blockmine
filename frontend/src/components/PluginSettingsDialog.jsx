@@ -15,7 +15,7 @@ import { apiHelper } from '@/lib/api';
 import PluginDetailInfo from './PluginDetailInfo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppStore } from '@/stores/appStore';
-import { shouldShowField } from '@/utils/pluginSettingsUtils';
+import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const [jsonString, setJsonString] = useState('');
