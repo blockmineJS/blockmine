@@ -151,7 +151,7 @@ export default function BotForm({ bot, servers, proxies, onFormChange, onFormSub
                 delete dataToSubmit.proxyHost;
                 delete dataToSubmit.proxyPort;
                 delete dataToSubmit.proxyUsername;
-                if (!dataToSubmit.proxyPassword) delete dataToSubmit.proxyPassword;
+                delete dataToSubmit.proxyPassword;
             }
             // Если не используется кастомный прокси и нет proxyId, очищаем все поля прокси
             if (!dataToSubmit.proxyId && !dataToSubmit.proxyHost) {
