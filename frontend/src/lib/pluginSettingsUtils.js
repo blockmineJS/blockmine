@@ -12,7 +12,7 @@ export function shouldShowField(key, config, allSettings) {
   }
 
   // Если нет dependsOn, показываем поле
-  if (!config.dependsOn) return true;
+  if (!config?.dependsOn) return true;
 
   // Преобразуем dependsOn в массив условий для единообразной обработки
   const conditions = Array.isArray(config.dependsOn)
@@ -28,6 +28,7 @@ export function shouldShowField(key, config, allSettings) {
     let result;
 
     // Если targetValue - массив, проверяем, входит ли текущее значение в него
+    // Примечание: при использовании массива значений параметр operator игнорируется
     if (Array.isArray(targetValue)) {
       result = targetValue.includes(fieldValue);
     } else {
