@@ -202,7 +202,7 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Select value={value || config.default || ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
+                    <Select value={value ?? config.default ?? ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
                         <SelectTrigger id={id}>
                             <SelectValue placeholder="Выберите значение" />
                         </SelectTrigger>
@@ -257,8 +257,6 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
         };
         onSettingsChange(plugin.id, newSettings);
     };
-
-    // Функция для проверки зависимостей полей (импортирована из utils)
 
     return (
         <div className="space-y-6">

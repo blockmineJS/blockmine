@@ -206,7 +206,7 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Select value={value || config.default || ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
+                    <Select value={value ?? config.default ?? ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
                         <SelectTrigger id={id}>
                             <SelectValue placeholder="Выберите значение" />
                         </SelectTrigger>
@@ -384,9 +384,6 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             setIsSavingKey(null);
         }
     };
-
-    // Функция для проверки, показывать ли поле (импортирована из utils)
-    // shouldShowField теперь принимает settings как третий аргумент
 
     const renderSettings = () => {
         if (settings === null) return <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>;
