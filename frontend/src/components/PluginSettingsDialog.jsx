@@ -398,7 +398,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                             <AccordionContent className="pt-4 border-t space-y-4">
                                 {Object.entries(categoryConfig)
                                     .filter(([key]) => key !== 'label')
-                                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
+                                    .filter(([key, config]) => shouldShowField(key, config, settings))
                                     .map(([key, config]) => (
                                         <SettingField
                                             key={key}
@@ -419,7 +419,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         return (
             <div className="space-y-4">
                 {Object.entries(manifestSettings)
-                    .filter(([key, config]) => shouldShowField(key, settings?.actionsPreset))
+                    .filter(([key, config]) => shouldShowField(key, config, settings))
                     .map(([key, config]) => (
                         <SettingField
                             key={key}

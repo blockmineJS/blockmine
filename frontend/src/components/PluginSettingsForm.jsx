@@ -261,7 +261,7 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
     return (
         <div className="space-y-6">
             {Object.entries(plugin.manifest.settings)
-                .filter(([key, config]) => shouldShowField(key, plugin.settings?.actionsPreset))
+                .filter(([key, config]) => shouldShowField(key, config, plugin.settings))
                 .map(([key, config]) => (
                     <SettingField
                         key={key}

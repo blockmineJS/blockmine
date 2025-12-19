@@ -1,15 +1,63 @@
 /**
- * Определяет, должно ли поле настройки плагина отображаться
- * на основе условий (например, actionsPreset)
- *
- * @param {string} key - Ключ поля настройки
- * @param {any} actionsPresetValue - Значение поля actionsPreset (если есть)
- * @returns {boolean} - Должно ли поле отображаться
+ * Проверяет, должно ли поле быть показано, основываясь на зависимостях dependsOn
+ * @param {string} key - Ключ настройки
+ * @param {Object} config - Конфигурация поля из manifest
+ * @param {Object} allSettings - Все текущие значения настроек
+ * @returns {boolean} - true, если поле должно быть показано
  */
-export const shouldShowField = (key, actionsPresetValue) => {
-    // Если есть поле actionsPreset, то поля enable* показываем только при custom
-    if (actionsPresetValue !== undefined && key.startsWith('enable')) {
-        return actionsPresetValue === 'custom';
+export function shouldShowField(key, config, allSettings) {
+  // Старая логика для обратной совместимости с actionsPreset
+  if (allSettings?.actionsPreset !== undefined && key.startsWith('enable')) {
+    return allSettings.actionsPreset === 'custom';
+  }
+
+  // Если нет dependsOn, показываем поле
+  if (!config?.dependsOn) return true;
+
+  // Преобразуем dependsOn в массив условий для единообразной обработки
+  const conditions = Array.isArray(config.dependsOn)
+    ? config.dependsOn
+    : [config.dependsOn];
+
+  // Все условия должны быть выполнены (AND логика)
+  return conditions.every(condition => {
+    const fieldValue = allSettings?.[condition.field];
+    const targetValue = condition.value;
+    const operator = condition.operator || 'eq';
+
+    let result;
+
+    // Если targetValue - массив, проверяем, входит ли текущее значение в него
+    // Примечание: при использовании массива значений параметр operator игнорируется
+    if (Array.isArray(targetValue)) {
+      result = targetValue.includes(fieldValue);
+    } else {
+      // Проверка по оператору
+      switch (operator) {
+        case 'eq':  // равно (по умолчанию)
+          result = fieldValue === targetValue;
+          break;
+        case 'ne':  // не равно
+          result = fieldValue !== targetValue;
+          break;
+        case 'gt':  // больше
+          result = fieldValue > targetValue;
+          break;
+        case 'gte': // больше или равно
+          result = fieldValue >= targetValue;
+          break;
+        case 'lt':  // меньше
+          result = fieldValue < targetValue;
+          break;
+        case 'lte': // меньше или равно
+          result = fieldValue <= targetValue;
+          break;
+        default:
+          result = fieldValue === targetValue;
+      }
     }
-    return true;
-};
+
+    // Инвертируем результат, если указан флаг invert (NOT логика)
+    return condition.invert ? !result : result;
+  });
+}

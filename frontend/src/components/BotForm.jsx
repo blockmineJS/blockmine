@@ -145,7 +145,24 @@ export default function BotForm({ bot, servers, proxies, onFormChange, onFormSub
                 dataToSubmit.owners = dataToSubmit.owners.join(',');
             }
             if (!dataToSubmit.password) delete dataToSubmit.password;
-            if (!dataToSubmit.proxyPassword) delete dataToSubmit.proxyPassword;
+
+            // Обработка прокси
+            if (dataToSubmit.proxyId) {
+                // Используется прокси из списка — удаляем кастомные поля
+                delete dataToSubmit.proxyHost;
+                delete dataToSubmit.proxyPort;
+                delete dataToSubmit.proxyUsername;
+                delete dataToSubmit.proxyPassword;
+            } else if (!dataToSubmit.proxyHost) {
+                // Прокси не используется — удаляем все поля
+                delete dataToSubmit.proxyHost;
+                delete dataToSubmit.proxyPort;
+                delete dataToSubmit.proxyUsername;
+                delete dataToSubmit.proxyPassword;
+            } else if (!dataToSubmit.proxyPassword) {
+                // Кастомный прокси без пароля — удаляем только пароль
+                delete dataToSubmit.proxyPassword;
+            }
             onFormSubmit(dataToSubmit);
         }
     };

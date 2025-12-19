@@ -477,8 +477,21 @@ router.put('/:id', authenticateUniversal, checkBotAccess, authorize('bot:update'
             const proxyIdValue = dataToUpdate.proxyId;
             delete dataToUpdate.proxyId;
             if (proxyIdValue) {
+                // Используем прокси из списка - очищаем кастомные поля
                 dataToUpdate.proxy = { connect: { id: proxyIdValue } };
+                dataToUpdate.proxyHost = null;
+                dataToUpdate.proxyPort = null;
+                dataToUpdate.proxyUsername = null;
+                dataToUpdate.proxyPassword = null;
+            } else if (!dataToUpdate.proxyHost) {
+                // Отключаем прокси только если нет кастомного proxyHost
+                dataToUpdate.proxy = { disconnect: true };
+                dataToUpdate.proxyHost = null;
+                dataToUpdate.proxyPort = null;
+                dataToUpdate.proxyUsername = null;
+                dataToUpdate.proxyPassword = null;
             } else {
+                // Кастомный прокси: отключаем связь с proxy, но сохраняем кастомные поля
                 dataToUpdate.proxy = { disconnect: true };
             }
         }
