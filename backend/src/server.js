@@ -102,6 +102,16 @@ app.get(/^(?!\/api).*/, (req, res) => {
 
 async function runStartupMigrations() {
     try {
+        // Удаляем серверы с невалидными портами напрямую через SQL,
+        // потому что Prisma не может их прочитать если значение не помещается в INT
+        const result = await prisma.$executeRawUnsafe(
+            `DELETE FROM Server WHERE length(CAST(port AS TEXT)) > 5 OR port > 65535 OR port < 1`
+        );
+
+        if (result > 0) {
+            console.log(`[Migration] Удалено ${result} серверов с невалидными портами.`);
+        }
+
         const adminRole = await prisma.panelRole.findUnique({ where: { name: 'Admin' } });
         if (adminRole) {
             const permissions = JSON.parse(adminRole.permissions);
@@ -109,7 +119,7 @@ async function runStartupMigrations() {
                 const newPermissions = ALL_PERMISSIONS
                     .map(p => p.id)
                     .filter(id => id !== '*');
-                
+
                 await prisma.panelRole.update({
                     where: { id: adminRole.id },
                     data: { permissions: JSON.stringify(newPermissions) }

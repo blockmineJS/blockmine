@@ -39,8 +39,14 @@ router.post('/', authorize('server:create'), async (req, res) => {
         if (!name || !host || !version) {
             return res.status(400).json({ error: 'Имя, хост и версия сервера обязательны' });
         }
+
+        const portNumber = port ? parseInt(port, 10) : 25565;
+        if (isNaN(portNumber) || portNumber < 1 || portNumber > 65535) {
+            return res.status(400).json({ error: 'Порт должен быть числом от 1 до 65535 (максимум 5 цифр)' });
+        }
+
         const newServer = await prisma.server.create({
-            data: { name, host, port: port ? parseInt(port, 10) : 25565, version },
+            data: { name, host, port: portNumber, version },
         });
         res.status(201).json(newServer);
     } catch (error) {
@@ -58,7 +64,13 @@ router.put('/:id', authorize('server:create'), async (req, res) => {
         const dataToUpdate = {};
         if (name !== undefined) dataToUpdate.name = name;
         if (host !== undefined) dataToUpdate.host = host;
-        if (port !== undefined && port !== '') dataToUpdate.port = parseInt(port, 10);
+        if (port !== undefined && port !== '') {
+            const portNumber = parseInt(port, 10);
+            if (isNaN(portNumber) || portNumber < 1 || portNumber > 65535) {
+                return res.status(400).json({ error: 'Порт должен быть числом от 1 до 65535 (максимум 5 цифр)' });
+            }
+            dataToUpdate.port = portNumber;
+        }
         if (version !== undefined) dataToUpdate.version = version;
 
         Object.keys(dataToUpdate).forEach(k => { if (dataToUpdate[k] === undefined) delete dataToUpdate[k]; });
