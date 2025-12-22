@@ -147,8 +147,8 @@ class BotLifecycleService {
         return this.processManager.getProcess(botId);
     }
 
-    async restartBot(botId) {
-        const botConfig = this.processManager.getProcess(botId)?.botConfig;
+    async restartBot(botId, providedBotConfig = null) {
+        const botConfig = providedBotConfig || this.processManager.getProcess(botId)?.botConfig;
         if (!botConfig) {
             throw new Error('Bot configuration not found');
         }
@@ -228,6 +228,15 @@ class BotLifecycleService {
                         break;
                     case 'debug:check_step_mode':
                         await this._handleDebugStepModeCheck(botId, child, message);
+                        break;
+                    case 'update_credentials':
+                        await this._handleUpdateCredentials(botId, child, message);
+                        break;
+                    case 'restart_bot':
+                        await this._handleRestartBot(botId, child, message);
+                        break;
+                    case 'change_credentials':
+                        await this._handleChangeCredentials(botId, child, message);
                         break;
                 }
             } catch (error) {
@@ -827,6 +836,181 @@ class BotLifecycleService {
                 type: 'debug:breakpoint_response',
                 requestId,
                 overrides: null
+            });
+        }
+    }
+
+    /**
+     * Обработчик обновления credentials в БД (без рестарта)
+     */
+    async _handleUpdateCredentials(botId, child, message) {
+        const { requestId, payload } = message;
+        const { username, password } = payload;
+
+        try {
+            // Валидация входных данных
+            if (!username || username.trim().length === 0) {
+                throw new Error('Username не может быть пустым');
+            }
+
+            const existingBot = await this.botRepository.findByUsername(username);
+            if (existingBot && existingBot.id !== botId) {
+                throw new Error(`Username "${username}" уже используется другим ботом (ID: ${existingBot.id})`);
+            }
+
+            const { encrypt } = require('../utils/crypto');
+            const updateData = { username };
+
+            if (password !== undefined && password !== null) {
+                if (password.trim().length === 0) {
+                    throw new Error('Password не может быть пустым');
+                }
+                updateData.password = encrypt(password);
+            }
+
+            await this.botRepository.update(botId, updateData);
+
+            if (child.botConfig) {
+                child.botConfig.username = username;
+                if (password !== undefined && password !== null) {
+                    child.botConfig.password = updateData.password;
+                }
+            }
+
+            this.logger.info({ botId, username }, 'Credentials обновлены в БД');
+            this.appendLog(botId, `[API] Credentials обновлены: username="${username}"`);
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                payload: {
+                    success: true,
+                    message: 'Credentials успешно обновлены в БД'
+                }
+            });
+
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка обновления credentials');
+            this.appendLog(botId, `[API ERROR] Не удалось обновить credentials: ${error.message}`);
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Обработчик рестарта бота
+     */
+    async _handleRestartBot(botId, child, message) {
+        const { requestId } = message;
+
+        try {
+            this.logger.info({ botId }, 'Запрос на рестарт бота от плагина');
+            this.appendLog(botId, '[API] Получен запрос на рестарт бота от плагина');
+
+            const savedBotConfig = { ...child.botConfig };
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                payload: {
+                    success: true,
+                    message: 'Рестарт инициирован'
+                }
+            });
+
+            setTimeout(async () => {
+                try {
+                    await this.restartBot(botId, savedBotConfig);
+                    this.logger.info({ botId }, 'Бот успешно перезапущен');
+                } catch (error) {
+                    this.logger.error({ botId, error }, 'Ошибка при рестарте бота');
+                    this.appendLog(botId, `[API ERROR] Ошибка при рестарте: ${error.message}`);
+                }
+            }, 3000);
+
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка инициализации рестарта');
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Обработчик изменения credentials с автоматическим рестартом
+     */
+    async _handleChangeCredentials(botId, child, message) {
+        const { requestId, payload } = message;
+        const { username, password } = payload;
+
+        try {
+            if (!username || username.trim().length === 0) {
+                throw new Error('Username не может быть пустым');
+            }
+
+            const existingBot = await this.botRepository.findByUsername(username);
+            if (existingBot && existingBot.id !== botId) {
+                throw new Error(`Username "${username}" уже используется другим ботом (ID: ${existingBot.id})`);
+            }
+
+            const { encrypt } = require('../utils/crypto');
+            const updateData = { username };
+
+            if (password !== undefined && password !== null) {
+                if (password.trim().length === 0) {
+                    throw new Error('Password не может быть пустым');
+                }
+                updateData.password = encrypt(password);
+            }
+
+            await this.botRepository.update(botId, updateData);
+
+            if (child.botConfig) {
+                child.botConfig.username = username;
+                if (password !== undefined && password !== null) {
+                    child.botConfig.password = updateData.password;
+                }
+            }
+
+            const savedBotConfig = { ...child.botConfig };
+
+            this.logger.info({ botId, username }, 'Credentials обновлены, инициирован рестарт');
+            this.appendLog(botId, `[API] Credentials изменены: username="${username}". Выполняется рестарт...`);
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                payload: {
+                    success: true,
+                    message: 'Credentials обновлены, рестарт инициирован'
+                }
+            });
+
+            setTimeout(async () => {
+                try {
+                    await this.restartBot(botId, savedBotConfig);
+                    this.logger.info({ botId }, 'Бот успешно перезапущен с новыми credentials');
+                } catch (error) {
+                    this.logger.error({ botId, error }, 'Ошибка при рестарте бота после изменения credentials');
+                    this.appendLog(botId, `[API ERROR] Ошибка при рестарте: ${error.message}`);
+                }
+            }, 3000);
+
+        } catch (error) {
+            this.logger.error({ botId, error }, 'Ошибка изменения credentials');
+            this.appendLog(botId, `[API ERROR] Не удалось изменить credentials: ${error.message}`);
+
+            child.send({
+                type: 'credentials_operation_response',
+                requestId,
+                error: error.message
             });
         }
     }
