@@ -179,6 +179,16 @@ process.on('message', async (message) => {
             }
             pendingRequests.delete(message.requestId);
         }
+    } else if (message.type === 'credentials_operation_response') {
+        if (pendingRequests.has(message.requestId)) {
+            const { resolve, reject } = pendingRequests.get(message.requestId);
+            if (message.error) {
+                reject(new Error(message.error));
+            } else {
+                resolve(message.payload);
+            }
+            pendingRequests.delete(message.requestId);
+        }
     } else if (message.type === 'system:get_player_list') {
         const playerList = bot ? Object.keys(bot.players) : [];
         if (process.send) {
@@ -503,6 +513,9 @@ process.on('message', async (message) => {
             bot.sendLog = sendLog;
             bot.messageQueue = new MessageQueue(bot);
 
+            // Plugin Registry для экспорта API между плагинами
+            bot.pluginRegistry = new Map();
+
             const installedPluginNames = config.plugins.map(p => p.name);
             bot.api = {
                 Command: Command,
@@ -783,10 +796,92 @@ process.on('message', async (message) => {
                             payload: newState
                         });
                     }
+                },
+
+                // === Методы для управления credentials ===
+                updateCredentials: async ({ username, password }) => {
+                    return new Promise((resolve, reject) => {
+                        const requestId = uuidv4();
+                        pendingRequests.set(requestId, { resolve, reject });
+
+                        if (process.send) {
+                            process.send({
+                                type: 'update_credentials',
+                                requestId,
+                                payload: {
+                                    botId: bot.config.id,
+                                    username,
+                                    password
+                                }
+                            });
+                        } else {
+                            reject(new Error('IPC channel is not available.'));
+                        }
+
+                        setTimeout(() => {
+                            if (pendingRequests.has(requestId)) {
+                                reject(new Error('Request to update credentials timed out.'));
+                                pendingRequests.delete(requestId);
+                            }
+                        }, 10000);
+                    });
+                },
+
+                restart: async () => {
+                    return new Promise((resolve, reject) => {
+                        const requestId = uuidv4();
+                        pendingRequests.set(requestId, { resolve, reject });
+
+                        if (process.send) {
+                            process.send({
+                                type: 'restart_bot',
+                                requestId,
+                                payload: {
+                                    botId: bot.config.id
+                                }
+                            });
+                        } else {
+                            reject(new Error('IPC channel is not available.'));
+                        }
+
+                        setTimeout(() => {
+                            if (pendingRequests.has(requestId)) {
+                                reject(new Error('Request to restart bot timed out.'));
+                                pendingRequests.delete(requestId);
+                            }
+                        }, 10000);
+                    });
+                },
+
+                changeCredentials: async ({ username, password }) => {
+                    return new Promise((resolve, reject) => {
+                        const requestId = uuidv4();
+                        pendingRequests.set(requestId, { resolve, reject });
+
+                        if (process.send) {
+                            process.send({
+                                type: 'change_credentials',
+                                requestId,
+                                payload: {
+                                    botId: bot.config.id,
+                                    username,
+                                    password
+                                }
+                            });
+                        } else {
+                            reject(new Error('IPC channel is not available.'));
+                        }
+
+                        setTimeout(() => {
+                            if (pendingRequests.has(requestId)) {
+                                reject(new Error('Request to change credentials timed out.'));
+                                pendingRequests.delete(requestId);
+                            }
+                        }, 10000);
+                    });
                 }
             };
 
-            // Упрощенный alias для отправки сообщений (используется в командах и нодах)
             bot.sendMessage = (type, message, username) => {
                 bot.api.sendMessage(type, message, username);
             };
