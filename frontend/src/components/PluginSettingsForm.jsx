@@ -168,7 +168,12 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Input id={id} value={value || ''} onChange={(e) => onChange(settingKey, e.target.value)} />
+                    <Input
+                        id={id}
+                        type={config.secret ? "password" : "text"}
+                        value={value || ''}
+                        onChange={(e) => onChange(settingKey, e.target.value)}
+                    />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );

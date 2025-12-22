@@ -215,6 +215,16 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
                     } else {
                         sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
                     }
+
+                    if (pluginModule && pluginModule.exports && typeof pluginModule.exports === 'object') {
+                        if (bot.pluginRegistry) {
+                            bot.pluginRegistry.set(plugin.name, pluginModule.exports);
+                        }
+                    } else if (pluginModule && pluginModule.default && pluginModule.default.exports) {
+                        if (bot.pluginRegistry) {
+                            bot.pluginRegistry.set(plugin.name, pluginModule.default.exports);
+                        }
+                    }
                 };
 
                 sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version}) из ${normalizedPath}`);

@@ -48,6 +48,52 @@ class PluginManager {
         await fse.mkdir(PLUGINS_BASE_DIR, { recursive: true }).catch(console.error);
     }
 
+    /**
+     * Проверяет зависимости плагина из package.json
+     * @param {number} botId - ID бота
+     * @param {object} packageJson - package.json плагина
+     * @returns {Promise<{isValid: boolean, missing: string[], warnings: string[]}>}
+     */
+    async checkPluginDependencies(botId, packageJson) {
+        const result = {
+            isValid: true,
+            missing: [],
+            warnings: []
+        };
+
+        // Проверяем зависимости из botpanel.dependencies
+        const pluginDeps = packageJson.botpanel?.dependencies || {};
+        if (Object.keys(pluginDeps).length === 0) {
+            return result; // Нет зависимостей
+        }
+
+        const installedPlugins = await prisma.installedPlugin.findMany({
+            where: { botId },
+            select: { name: true, version: true }
+        });
+
+        const installedMap = new Map(installedPlugins.map(p => [p.name, p.version]));
+
+        for (const [depName, depVersion] of Object.entries(pluginDeps)) {
+            if (!installedMap.has(depName)) {
+                result.missing.push(`${depName} (требуется ${depVersion})`);
+                result.isValid = false;
+            } else {
+                const installedVersion = installedMap.get(depName);
+                if (depVersion.startsWith('^') || depVersion.startsWith('~')) {
+                    const requiredBase = depVersion.slice(1);
+                    if (!installedVersion.startsWith(requiredBase.split('.')[0])) {
+                        result.warnings.push(
+                            `${depName}: установлена v${installedVersion}, требуется ${depVersion}`
+                        );
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     async _installDependencies(pluginPath) {
         const packageJsonPath = path.join(pluginPath, 'package.json');
         try {
@@ -108,9 +154,22 @@ class PluginManager {
     }
 
     async installFromLocalPath(botId, directoryPath) {
+        // Проверяем зависимости плагина перед установкой
+        const packageJsonPath = path.join(directoryPath, 'package.json');
+        const packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
+
+        const depCheck = await this.checkPluginDependencies(botId, packageJson);
+        if (!depCheck.isValid) {
+            const missingList = depCheck.missing.join(', ');
+            console.warn(`[PluginManager] ⚠️ Плагин ${packageJson.name} требует: ${missingList}`);
+            console.warn(`[PluginManager] Плагин будет установлен, но может работать некорректно без зависимостей.`);
+        }
+        if (depCheck.warnings.length > 0) {
+            depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
+        }
+
         const newPlugin = await this.registerPlugin(botId, directoryPath, 'LOCAL', directoryPath);
         try {
-            const packageJson = JSON.parse(await fse.readFile(path.join(directoryPath, 'package.json'), 'utf-8'));
             reportPluginDownload(packageJson.name);
         } catch(e) {
             console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
@@ -118,11 +177,11 @@ class PluginManager {
 
         await this._installDependencies(directoryPath);
         await this.loadPluginGraphs(botId, newPlugin.id, directoryPath);
-        
+
         if (this.botManager) {
             await this.botManager.reloadPlugins(botId);
         }
-        
+
         return newPlugin;
     }
 
@@ -193,9 +252,20 @@ class PluginManager {
 
             await this._installDependencies(localPath);
 
-            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
-            
+
             const packageJson = JSON.parse(await fse.readFile(path.join(localPath, 'package.json'), 'utf-8'));
+            const depCheck = await this.checkPluginDependencies(botId, packageJson);
+            if (!depCheck.isValid) {
+                const missingList = depCheck.missing.join(', ');
+                console.warn(`[PluginManager] ⚠️ Плагин ${packageJson.name} требует: ${missingList}`);
+                console.warn(`[PluginManager] Плагин будет установлен, но может работать некорректно без зависимостей.`);
+            }
+            if (depCheck.warnings.length > 0) {
+                depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
+            }
+
+            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
+
             reportPluginDownload(packageJson.name);
 
             await this.loadPluginGraphs(botId, newPlugin.id, localPath);
