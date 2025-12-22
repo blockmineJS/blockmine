@@ -363,17 +363,19 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 
   "botpanel": {
     "icon": "Settings",
+    "categories": ["Core", "AI"],
     "dependencies": {
-      "required-plugin": "^1.0.0"
+      "ai-core": "^1.0.0"
     },
     "supportedHosts": ["mc.example.com"],
 
     "settings": {
       "apiToken": {
-        "type": "secret",
+        "type": "string",
         "label": "API Токен",
         "description": "Секретный токен API",
-        "default": ""
+        "default": "",
+        "secret": true
       },
 
       "enabled": {
@@ -450,12 +452,40 @@ bot.events.on('core:raw_message', (rawText, jsonMsg) => {
 | `string` | Строка | `"Hello"` |
 | `number` | Число | `42` |
 | `boolean` | Переключатель | `true` |
-| `secret` | Секретная строка (скрыта в UI) | `"api_key_123"` |
 | `string[]` | Массив строк | `["a", "b"]` |
 | `json` | JSON объект | `{"key": "value"}` |
 | `json_file` | JSON из файла | Путь к файлу |
 | `select` | Выпадающий список | `"normal"` (строка или объект) |
 | `proxy` | Выбор прокси (из списка или вручную) | `{ enabled: true, host: "...", port: 1080 }` |
+
+### Защита секретных данных
+
+Для защиты чувствительных данных (API ключи, токены, пароли) используйте поле `secret: true`:
+
+```json
+{
+  "apiKey": {
+    "type": "string",
+    "label": "API ключ",
+    "description": "Ваш секретный API ключ",
+    "default": "",
+    "secret": true
+  },
+  "apiKeys": {
+    "type": "string[]",
+    "label": "API ключи",
+    "description": "Список API ключей",
+    "default": [],
+    "secret": true
+  }
+}
+```
+
+**Как работает `secret: true`:**
+- В UI поле отображается как `<input type="password">` (скрыто точками)
+- Backend автоматически маскирует значения при отправке на фронтенд (`********`)
+- При сохранении маска не перезаписывает реальное значение
+- Работает с типами: `string`, `string[]`
 
 ### Структура объекта proxy
 
@@ -513,6 +543,188 @@ module.exports = (bot, { settings }) => {
 };
 ```
 
+### Условная зависимость настроек (dependsOn)
+
+Система `dependsOn` позволяет показывать/скрывать настройки в UI в зависимости от значений других полей. Это делает интерфейс настроек чище и понятнее.
+
+**Базовый синтаксис:**
+
+```json
+{
+  "provider": {
+    "type": "select",
+    "label": "Провайдер",
+    "options": ["openrouter", "google"],
+    "default": "openrouter"
+  },
+
+  "openrouterApiKey": {
+    "type": "string",
+    "label": "OpenRouter API Key",
+    "default": "",
+    "secret": true,
+    "dependsOn": { "field": "provider", "value": "openrouter" }
+  },
+
+  "googleApiKeys": {
+    "type": "string[]",
+    "label": "Google API Keys",
+    "default": [],
+    "secret": true,
+    "dependsOn": { "field": "provider", "value": "google" }
+  }
+}
+```
+
+**В этом примере:**
+- Поле `openrouterApiKey` отображается **только** когда `provider === "openrouter"`
+- Поле `googleApiKeys` отображается **только** когда `provider === "google"`
+
+**Поддерживаемые операторы сравнения:**
+
+```json
+{
+  "advancedMode": {
+    "type": "boolean",
+    "label": "Расширенный режим",
+    "default": false
+  },
+
+  "maxConnections": {
+    "type": "number",
+    "label": "Максимум подключений",
+    "default": 10,
+    "dependsOn": { "field": "advancedMode", "value": true }
+  },
+
+  "minAge": {
+    "type": "number",
+    "label": "Минимальный возраст",
+    "default": 18,
+    "dependsOn": { "field": "age", "operator": "gte", "value": 18 }
+  },
+
+  "specialFeature": {
+    "type": "boolean",
+    "label": "Специальная функция",
+    "default": false,
+    "dependsOn": { "field": "plan", "operator": "ne", "value": "free" }
+  }
+}
+```
+
+**Доступные операторы:**
+- `eq` или без оператора - равно (по умолчанию)
+- `ne` - не равно
+- `gt` - больше
+- `gte` - больше или равно
+- `lt` - меньше
+- `lte` - меньше или равно
+
+**Множественные условия (AND логика):**
+
+```json
+{
+  "sslCert": {
+    "type": "string",
+    "label": "SSL сертификат",
+    "default": "",
+    "dependsOn": [
+      { "field": "useSSL", "value": true },
+      { "field": "environment", "value": "production" }
+    ]
+  }
+}
+```
+
+Поле `sslCert` отобразится **только** когда `useSSL === true` **И** `environment === "production"`.
+
+**Инверсия условия (NOT логика):**
+
+```json
+{
+  "customEndpoint": {
+    "type": "string",
+    "label": "Кастомный endpoint",
+    "default": "",
+    "dependsOn": {
+      "field": "useDefaultEndpoint",
+      "value": false
+    }
+  }
+}
+```
+
+**Реальный пример из ai-core плагина:**
+
+```json
+{
+  "provider": {
+    "type": "select",
+    "label": "AI провайдер",
+    "options": [
+      { "value": "openrouter", "label": "OpenRouter" },
+      { "value": "google", "label": "Google Gemini" }
+    ],
+    "default": "openrouter"
+  },
+
+  "openrouterApiKey": {
+    "type": "string",
+    "label": "OpenRouter API Key",
+    "secret": true,
+    "dependsOn": { "field": "provider", "value": "openrouter" }
+  },
+
+  "openrouterModel": {
+    "type": "string",
+    "label": "Модель",
+    "default": "google/gemini-2.5-flash",
+    "dependsOn": { "field": "provider", "value": "openrouter" }
+  },
+
+  "openrouterApiEndpoint": {
+    "type": "string",
+    "label": "API Endpoint (опционально)",
+    "default": "",
+    "dependsOn": { "field": "provider", "value": "openrouter" }
+  },
+
+  "enableCostTracking": {
+    "type": "boolean",
+    "label": "Отслеживать стоимость",
+    "default": false,
+    "dependsOn": { "field": "provider", "value": "openrouter" }
+  },
+
+  "googleApiKeys": {
+    "type": "string[]",
+    "label": "Google AI API Keys",
+    "secret": true,
+    "dependsOn": { "field": "provider", "value": "google" }
+  },
+
+  "googleModel": {
+    "type": "string",
+    "label": "Google модель",
+    "default": "gemini-2.5-flash",
+    "dependsOn": { "field": "provider", "value": "google" }
+  }
+}
+```
+
+**Результат:**
+- При выборе "OpenRouter" → показываются: `openrouterApiKey`, `openrouterModel`, `openrouterApiEndpoint`, `enableCostTracking`
+- При выборе "Google Gemini" → показываются: `googleApiKeys`, `googleModel`
+
+**Best Practices:**
+- ✅ Используйте `dependsOn` для группировки связанных настроек по провайдерам/режимам
+- ✅ Делайте UI чище, показывая только релевантные поля
+- ✅ Комбинируйте с `secret: true` для защиты чувствительных данных
+- ✅ Используйте понятные значения в select для условий
+- ❌ Не создавайте циклические зависимости (A зависит от B, B зависит от A)
+- ❌ Не делайте слишком сложные цепочки зависимостей (максимум 2-3 уровня)
+
 ### Доступ к настройкам
 
 ```javascript
@@ -534,7 +746,382 @@ module.exports = (bot, { settings }) => {
 };
 ```
 
-## 7. ХРАНЕНИЕ ДАННЫХ (PluginStore)
+## 7. PLUGIN REGISTRY - ИСПОЛЬЗОВАНИЕ API ДРУГИХ ПЛАГИНОВ
+
+### Обзор
+
+Plugin Registry позволяет плагинам **экспортировать свой API** и **использовать функции других плагинов** без дублирования кода.
+
+**Основные концепции:**
+- ✅ Плагин экспортирует API через поле `exports` в module.exports
+- ✅ Другие плагины получают доступ через `bot.pluginRegistry.get(pluginName)`
+- ✅ Зависимости указываются в `botpanel.dependencies`
+- ✅ При установке система проверяет наличие зависимостей
+
+---
+
+### 7.1. Экспорт API из плагина
+
+Если твой плагин предоставляет переиспользуемый функционал (AI, база данных, утилиты), экспортируй API:
+
+```javascript
+// plugins/ai-core/index.js
+async function onLoad(bot, options) {
+    const { settings } = options;
+
+    // Инициализация плагина
+    const aiClient = initializeAIClient(settings);
+
+    // ... остальная логика ...
+}
+
+async function onUnload({ botId, prisma }) {
+    // Cleanup
+}
+
+// ✅ ЭКСПОРТ API ДЛЯ ДРУГИХ ПЛАГИНОВ
+module.exports = {
+    onLoad,
+    onUnload,
+    exports: {
+        /**
+         * Генерация текста через AI
+         * @param {Array<{role: string, content: string}>} messages - Массив сообщений
+         * @param {Object} [options] - Опции генерации
+         * @returns {Promise<{content: string, model: string, usage: Object}>}
+         */
+        generate: async (messages, options = {}) => {
+            return await aiClient.generate({ messages, options });
+        },
+
+        /**
+         * Проверить доступность AI сервиса
+         */
+        isAvailable: () => {
+            return !!aiClient;
+        },
+
+        /**
+         * Получить информацию о провайдере
+         */
+        getProviderInfo: () => {
+            return {
+                type: settings.provider,
+                model: settings.model
+            };
+        }
+    }
+};
+```
+
+**Важно:**
+- Экспортируй только PUBLIC API
+- Документируй каждую функцию через JSDoc
+- Обрабатывай ошибки внутри экспортируемых функций
+- Не экспортируй изменяемое состояние напрямую
+
+---
+
+### 7.2. Использование API другого плагина
+
+#### Шаг 1: Указать зависимость в package.json
+
+```json
+{
+  "name": "ai-code-reviewer",
+  "version": "1.0.0",
+  "botpanel": {
+    "dependencies": {
+      "ai-core": "^1.0.0"
+    }
+  }
+}
+```
+
+При установке система проверит:
+- ✅ Установлен ли плагин `ai-core`
+- ⚠️ Совместима ли версия (мажорная версия)
+- ❌ Если плагин не установлен - выведет предупреждение
+
+#### Шаг 2: Проверить доступность и использовать API
+
+```javascript
+// plugins/ai-code-reviewer/index.js
+async function onLoad(bot, options) {
+    const log = bot.sendLog;
+
+    // ✅ Получаем API плагина ai-core
+    const aiCoreAPI = bot.pluginRegistry.get('ai-core');
+
+    // Проверка доступности
+    if (!aiCoreAPI) {
+        log('[ai-code-reviewer] ❌ Требуется плагин ai-core!');
+        log('[ai-code-reviewer] Установите плагин ai-core v1.0.0+');
+        return; // Прерываем загрузку
+    }
+
+    if (!aiCoreAPI.isAvailable()) {
+        log('[ai-code-reviewer] ⚠️ AI сервис недоступен');
+        return;
+    }
+
+    log('[ai-code-reviewer] ✓ AI Core подключен');
+
+    // ✅ Используем API
+    const Command = bot.api.Command;
+
+    class ReviewCommand extends Command {
+        constructor() {
+            super({
+                name: 'review',
+                description: 'Отправить код на ревью AI',
+                owner: 'plugin:ai-code-reviewer'
+            });
+        }
+
+        async handler(bot, typeChat, user, args) {
+            const { code } = args;
+
+            try {
+                bot.api.sendMessage(typeChat, '🔍 Анализирую код...', user.username);
+
+                // ✅ Вызов API другого плагина
+                const messages = [
+                    {
+                        role: 'system',
+                        content: 'Ты код ревьюер. Дай краткие рекомендации (2-3 предложения).'
+                    },
+                    {
+                        role: 'user',
+                        content: `Проверь код:\n\n${code}`
+                    }
+                ];
+
+                const result = await aiCoreAPI.generate(messages);
+
+                bot.api.sendMessage(typeChat, `📝 ${result.content}`, user.username);
+
+            } catch (error) {
+                log(`[ai-code-reviewer] Ошибка: ${error.message}`);
+                bot.api.sendMessage(typeChat, '❌ Ошибка при ревью', user.username);
+            }
+        }
+    }
+
+    await bot.api.registerCommand(new ReviewCommand());
+}
+
+module.exports = { onLoad };
+```
+
+---
+
+### 7.3. Паттерны использования
+
+#### Паттерн 1: Stateless API (без истории)
+
+Плагин-потребитель сам управляет состоянием:
+
+```javascript
+// ai-code-reviewer - БЕЗ истории
+const messages = [
+    { role: 'system', content: 'Ты ревьюер' },
+    { role: 'user', content: code }
+];
+
+const result = await aiCoreAPI.generate(messages);
+```
+
+#### Паттерн 2: Stateful с PluginStore (с историей)
+
+Плагин-потребитель хранит историю в своём store:
+
+```javascript
+// ai-translator - С историей контекста
+async function translateHandler(bot, typeChat, user, args, store) {
+    const { text, targetLang } = args;
+
+    // 1. Загружаем историю из store
+    const historyKey = `translator:history:${user.username}`;
+    let history = await store.get(historyKey) || [];
+
+    // Ограничиваем последними 5 переводами
+    if (history.length > 10) {
+        history = history.slice(-10);
+    }
+
+    // 2. Формируем messages
+    const messages = [
+        { role: 'system', content: `Переводчик на ${targetLang}` },
+        ...history,
+        { role: 'user', content: text }
+    ];
+
+    // 3. Вызов AI Core
+    const result = await aiCoreAPI.generate(messages);
+
+    // 4. Сохраняем историю
+    history.push({ role: 'user', content: text });
+    history.push({ role: 'assistant', content: result.content });
+    await store.set(historyKey, history);
+
+    return result.content;
+}
+```
+
+#### Паттерн 3: Опциональная зависимость
+
+Плагин работает с AI и без него:
+
+```javascript
+async function onLoad(bot, options) {
+    const aiCoreAPI = bot.pluginRegistry.get('ai-core');
+    const useAI = !!aiCoreAPI;
+
+    if (useAI) {
+        log('✓ AI поддержка включена');
+    } else {
+        log('⚠️ AI поддержка отключена (плагин ai-core не установлен)');
+    }
+
+    // Плагин работает в обоих случаях
+    // ...
+}
+```
+
+#### Паттерн 4: Множественные зависимости
+
+```javascript
+async function onLoad(bot, options) {
+    const dependencies = {
+        ai: bot.pluginRegistry.get('ai-core'),
+        database: bot.pluginRegistry.get('database-manager'),
+        cache: bot.pluginRegistry.get('redis-cache')
+    };
+
+    // Проверяем все обязательные зависимости
+    const missing = Object.entries(dependencies)
+        .filter(([name, api]) => !api)
+        .map(([name]) => name);
+
+    if (missing.length > 0) {
+        log(`❌ Отсутствуют плагины: ${missing.join(', ')}`);
+        return;
+    }
+
+    // Все зависимости на месте
+    log('✓ Все зависимости загружены');
+}
+```
+
+---
+
+### 7.4. Проверка совместимости версий
+
+```javascript
+async function onLoad(bot, options) {
+    const aiCoreAPI = bot.pluginRegistry.get('ai-core');
+
+    if (!aiCoreAPI) {
+        log('❌ Требуется плагин ai-core');
+        return;
+    }
+
+    // Проверка наличия конкретного метода
+    if (typeof aiCoreAPI.generate !== 'function') {
+        log('❌ Несовместимая версия ai-core (нет метода generate)');
+        return;
+    }
+
+    // Проверка версии провайдера (если нужно)
+    const providerInfo = aiCoreAPI.getProviderInfo();
+    if (providerInfo.type !== 'openrouter') {
+        log('⚠️ Плагин оптимизирован для OpenRouter провайдера');
+    }
+}
+```
+
+---
+
+### 7.5. Экспорт нескольких сервисов
+
+Плагин может экспортировать несколько сервисов:
+
+```javascript
+module.exports = {
+    onLoad,
+    onUnload,
+    exports: {
+        // Сервис работы с AI
+        ai: {
+            generate: async (messages, options) => { ... },
+            isAvailable: () => true
+        },
+
+        // Сервис управления историей
+        history: {
+            get: async (userId) => { ... },
+            clear: async (userId) => { ... },
+            export: async (userId) => { ... }
+        },
+
+        // Утилиты
+        utils: {
+            cleanEmojis: (text) => { ... },
+            formatResponse: (text) => { ... },
+            estimateTokens: (text) => { ... }
+        }
+    }
+};
+
+// Использование
+const aiChatAPI = bot.pluginRegistry.get('ai-chat');
+await aiChatAPI.ai.generate(messages);
+await aiChatAPI.history.clear('user123');
+const clean = aiChatAPI.utils.cleanEmojis('🎉 text');
+```
+
+---
+
+### 7.6. Best Practices для Plugin Registry
+
+✅ **DO:**
+- Всегда проверяй наличие плагина перед использованием
+- Указывай зависимости в `botpanel.dependencies`
+- Обрабатывай ошибки при вызове API других плагинов
+- Документируй экспортируемые функции через JSDoc
+- Используй семантическое версионирование
+- Экспортируй только стабильное PUBLIC API
+
+❌ **DON'T:**
+- Не полагайся на порядок загрузки плагинов
+- Не модифицируй объекты других плагинов
+- Не создавай циклические зависимости (A → B → A)
+- Не экспортируй изменяемое состояние напрямую
+- Не захватывай контекст (closure) - передавай параметры явно
+
+---
+
+### 7.7. Отладка Plugin Registry
+
+#### Просмотр зарегистрированных плагинов
+
+```javascript
+// В любом плагине
+async function onLoad(bot, options) {
+    console.log('Зарегистрированные плагины с API:');
+
+    for (const [name, api] of bot.pluginRegistry.entries()) {
+        const methods = Object.keys(api).join(', ');
+        console.log(`- ${name}: ${methods}`);
+    }
+}
+```
+
+
+---
+
+## 8. ХРАНЕНИЕ ДАННЫХ (PluginStore)
 
 KV хранилище в базе данных:
 
@@ -895,6 +1482,8 @@ try {
 
 ## 16. BEST PRACTICES
 
+### Общие практики
+
 1. **Всегда используй PLUGIN_OWNER_ID** для команд, прав и групп
 2. **Очищай ресурсы в onUnload** - удаляй команды и права из БД
 3. **Обрабатывай ошибки** - не давай плагину крашить бота
@@ -905,3 +1494,14 @@ try {
 8. **Не дублируй логику** - выноси в lib/
 9. **Пиши понятные имена** - файлов, функций, переменных
 10. **Документируй** - README обязателен
+
+### Plugin Registry практики
+
+11. **Проверяй зависимости** - всегда проверяй `bot.pluginRegistry.get()` перед использованием
+12. **Указывай dependencies** - в `botpanel.dependencies` для автоматической проверки
+13. **Экспортируй только PUBLIC API** - внутренние функции не экспортируй
+14. **Документируй экспорты** - используй JSDoc для всех экспортируемых функций
+15. **Избегай циклических зависимостей** - плагин A не должен зависеть от B, который зависит от A
+16. **Версионируй правильно** - используй semver (major.minor.patch)
+17. **Не захватывай контекст** - экспортируемые функции должны получать все через параметры
+18. **Обрабатывай ошибки в exports** - не допускай чтобы ошибки вылетали наружу
