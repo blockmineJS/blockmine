@@ -1,6 +1,39 @@
 # История версий
 
 
+## [1.25.0](https://github.com/blockmineJS/blockmine/compare/v1.24.0...v1.25.0) (2025-12-22)
+
+
+### 🛠 Рефакторинг
+
+* исправлены замечания code review ([e340fbe](https://github.com/blockmineJS/blockmine/commit/e340fbe4f99629dc273eb1c1bef7382a10fb6fb7))
+* перемещена функция shouldShowField в lib для совместимости с master ([778e625](https://github.com/blockmineJS/blockmine/commit/778e625e31ef1235ae53fdad628f3012f1ef9602))
+* улучшена читаемость логики обработки прокси в BotForm ([59f8c0d](https://github.com/blockmineJS/blockmine/commit/59f8c0d9e3ecf45a0246a80216659bf3454f0ab5))
+
+
+### ✨ Новые возможности
+
+* добавлена поддержка типа select для настроек плагинов ([39aba61](https://github.com/blockmineJS/blockmine/commit/39aba618cbd095e6559b08633e8a6062aa77438e))
+* добавлена система зависимостей для настроек плагинов и исправлена проблема со сбросом прокси ([86f3472](https://github.com/blockmineJS/blockmine/commit/86f3472465cafcb926a1cd69b37f3f987d716aea))
+* использовать displayName вместо ID плагина ([1feb04c](https://github.com/blockmineJS/blockmine/commit/1feb04cb4c7aa22aa9f322da37612695cbabb0ae)), closes [#53](https://github.com/blockmineJS/blockmine/issues/53)
+* кликабельное название плагина для перехода к README ([4228b08](https://github.com/blockmineJS/blockmine/commit/4228b0827037733fe6e164008fd3aa26937ece4a)), closes [#56](https://github.com/blockmineJS/blockmine/issues/56)
+* плагины теперь могут менять имя бота и пароль ([dc5f26d](https://github.com/blockmineJS/blockmine/commit/dc5f26d357867b5a30e75c4c0e545c59be0092d8))
+* показ всех команд при наведении на +N badge ([63ebbba](https://github.com/blockmineJS/blockmine/commit/63ebbba6045e3e6e8dd0eb679d3fabd23a9330df)), closes [#54](https://github.com/blockmineJS/blockmine/issues/54)
+* условное отображение полей настроек плагинов ([264c5cf](https://github.com/blockmineJS/blockmine/commit/264c5cffcd573287ebd634b8e0f3a0482c8f5a7d))
+* эвейлабл english lagnauge ([72e1a9a](https://github.com/blockmineJS/blockmine/commit/72e1a9aaba3ee9d4fea6064ac96b09afb72af572))
+
+
+### 🐛 Исправления
+
+* безусловное удаление proxyPassword при использовании прокси из списка ([73ab092](https://github.com/blockmineJS/blockmine/commit/73ab0923641681ec8d315eec4ce3108a500b9264))
+* в дашборде кнопка предложить улучшение теперь ведёт куда надо ([575779c](https://github.com/blockmineJS/blockmine/commit/575779c92295a312b416f7b02bfa665d2c6d6b00))
+* добавлена валидация портов серверов и автоочистка ([c59a6c1](https://github.com/blockmineJS/blockmine/commit/c59a6c1dc5a79cecfb29c06231c7532bd332546c))
+* добавлена поддержка типа select в PluginSettingsDialog ([fe6cfb3](https://github.com/blockmineJS/blockmine/commit/fe6cfb3464a4a1bb21ac3d4a9884db2f7165f184))
+* зависимости для плагинов теперь точно автоматом загружаются перед запуском плагина ([284e4c3](https://github.com/blockmineJS/blockmine/commit/284e4c36d8210a3d73582b6320c4fb6720e6a8f2))
+* исправлена кнопка и функция рестарта ([9a7ce42](https://github.com/blockmineJS/blockmine/commit/9a7ce4288e910a058ec3e6be701b4f7974331f9f))
+* различать отсутствующие файлы и npm-пакеты в PluginLoader ([3540be1](https://github.com/blockmineJS/blockmine/commit/3540be10093449a8e28e99acbeba9699b40e14b8))
+* улучшена надежность shouldShowField ([d023413](https://github.com/blockmineJS/blockmine/commit/d02341390ff5ae52e682223a0de7f45ca1996939))
+
 ## [1.24.0](https://github.com/blockmineJS/blockmine/compare/v1.23.4...v1.24.0) (2025-12-07)
 
 
