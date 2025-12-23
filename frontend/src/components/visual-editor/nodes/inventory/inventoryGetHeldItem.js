@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const inventoryGetHeldItemDefinition = new NodeDefinition({
   type: 'inventory:get_held_item',
   category: 'inventory',
-  label: '✋ Предмет в руке',
+  label: '✋ Инвентарь: предмет в руке',
   description: 'Получает предмет который бот держит в руке',
 
   computeInputs: (data) => [

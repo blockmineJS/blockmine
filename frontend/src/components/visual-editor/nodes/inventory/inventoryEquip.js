@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const inventoryEquipDefinition = new NodeDefinition({
   type: 'inventory:equip',
   category: 'inventory',
-  label: '⚔️ Экипировать',
+  label: '⚔️ Инвентарь: экипировать',
   description: 'Экипирует предмет в руку или слот брони',
 
   computeInputs: (data) => [

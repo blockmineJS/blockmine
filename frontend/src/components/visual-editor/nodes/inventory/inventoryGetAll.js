@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const inventoryGetAllDefinition = new NodeDefinition({
   type: 'inventory:get_all',
   category: 'inventory',
-  label: '📦 Весь инвентарь',
+  label: '📦 Инвентарь: весь инвентарь',
   description: 'Возвращает весь инвентарь бота как массив предметов',
 
   computeInputs: (data) => [],
