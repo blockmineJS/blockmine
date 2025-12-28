@@ -400,15 +400,24 @@ router.post('/', authorize('bot:create'), async (req, res) => {
         const { username, password, prefix, serverId, note, proxyId, proxyHost, proxyPort, proxyUsername, proxyPassword } = req.body;
         if (!username || !serverId) return res.status(400).json({ error: 'Имя и сервер обязательны' });
 
+        // Проверка наличия авторизованного пользователя
+        if (!req.user || !req.user.username) {
+            return res.status(401).json({ error: 'Пользователь не авторизован' });
+        }
+
         const maxSortOrder = await prisma.bot.aggregate({
             _max: { sortOrder: true }
         });
         const nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1;
 
+        // Автоматически добавляем создателя как владельца бота
+        const currentOwner = req.user.username;
+
         const data = {
             username,
             prefix,
             note,
+            owners: currentOwner,
             serverId: parseInt(serverId, 10),
             password: password ? encrypt(password) : null,
             proxyId: proxyId ? parseInt(proxyId, 10) : null,
@@ -640,6 +649,33 @@ router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAcce
         const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
         res.status(201).json(newPlugin);
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+router.post('/:botId/plugins/install/github-url', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { url, token } = req.body;
+
+    // Валидация URL параметра
+    if (!url || typeof url !== 'string') {
+        return res.status(400).json({ message: 'URL обязателен и должен быть строкой' });
+    }
+
+    try {
+        // Проверка что URL указывает на GitHub
+        const parsedUrl = new URL(url);
+        if (!parsedUrl.hostname.endsWith('github.com')) {
+            return res.status(400).json({ message: 'Разрешены только URL с github.com' });
+        }
+
+        const newPlugin = await pluginManager.installFromGithubUrl(parseInt(botId), url, token);
+        res.status(201).json(newPlugin);
+    } catch (error) {
+        // Обрабатываем ошибки парсинга URL
+        if (error instanceof TypeError && error.message.includes('Invalid URL')) {
+            return res.status(400).json({ message: 'Некорректный URL' });
+        }
         res.status(500).json({ message: error.message });
     }
 });
