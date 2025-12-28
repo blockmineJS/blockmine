@@ -278,10 +278,25 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                                     {t('commands.edit')}
                                                 </Button>
                                             )}
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" title={t('commands.export')} onClick={e => { e.stopPropagation(); setCommandToShare(command); }}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                title={t('commands.export')}
+                                                aria-label={t('commands.export')}
+                                                onClick={e => { e.stopPropagation(); setCommandToShare(command); }}
+                                            >
                                                 <Share2 className="h-3 w-3" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title={t('commands.delete')} onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 hover:text-destructive"
+                                                title={t('commands.delete')}
+                                                aria-label={t('commands.delete')}
+                                                disabled={command.owner === OWNER_TYPES.SYSTEM}
+                                                onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}
+                                            >
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
                                         </div>

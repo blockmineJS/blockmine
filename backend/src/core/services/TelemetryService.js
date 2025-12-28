@@ -77,6 +77,9 @@ class TelemetryService {
     async sendHeartbeat() {
         if (!this.config.telemetry?.enabled || !this.instanceId) return;
 
+        let timeout = null;
+        let timeout2 = null;
+
         try {
             const processes = this.processManager.getAllProcesses();
             const runningBots = Array.from(processes.values())
@@ -91,47 +94,59 @@ class TelemetryService {
 
             // AbortController для таймаута
             const abortController = new AbortController();
-            const timeout = setTimeout(() => abortController.abort(), 5000); // 5 секунд
+            timeout = setTimeout(() => abortController.abort(), 5000); // 5 секунд
 
-            try {
-                const challengeRes = await fetch(`${this.STATS_SERVER_URL}/api/challenge?uuid=${this.instanceId}`, {
-                    signal: abortController.signal
-                });
-                clearTimeout(timeout);
+            const challengeRes = await fetch(`${this.STATS_SERVER_URL}/api/challenge?uuid=${this.instanceId}`, {
+                signal: abortController.signal
+            });
+            clearTimeout(timeout);
+            timeout = null;
 
-                if (!challengeRes.ok) throw new Error(`Challenge server error: ${challengeRes.statusText}`);
+            if (!challengeRes.ok) throw new Error(`Challenge server error: ${challengeRes.statusText}`);
 
-                const { challenge, difficulty, prefix } = await challengeRes.json();
+            const { challenge, difficulty, prefix } = await challengeRes.json();
 
-                // Proof of work
-                let nonce = 0;
-                let hash = '';
-                do {
-                    nonce++;
-                    hash = crypto.createHash('sha256').update(prefix + challenge + nonce).digest('hex');
-                } while (!hash.startsWith('0'.repeat(difficulty)));
+            // Защита от DoS: ограничиваем сложность PoW
+            const maxDifficulty = 6;
+            const safeDifficulty = Math.min(difficulty, maxDifficulty);
 
-                const packageJson = require('../../../../package.json');
-                const abortController2 = new AbortController();
-                const timeout2 = setTimeout(() => abortController2.abort(), 5000);
-
-                await fetch(`${this.STATS_SERVER_URL}/api/heartbeat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        instanceUuid: this.instanceId,
-                        appVersion: packageJson.version,
-                        bots: runningBots,
-                        nonce: nonce
-                    }),
-                    signal: abortController2.signal
-                });
-                clearTimeout(timeout2);
-
-                this.logger.debug('Heartbeat отправлен успешно');
-            } finally {
-                clearTimeout(timeout);
+            if (difficulty > maxDifficulty) {
+                this.logger.warn(`PoW difficulty ${difficulty} превышает максимум ${maxDifficulty}, используем ${safeDifficulty}`);
             }
+
+            // Proof of work с ограничением итераций
+            const maxIterations = 10000000; // 10M итераций максимум
+            let nonce = 0;
+            let hash = '';
+            const targetPrefix = '0'.repeat(safeDifficulty);
+
+            do {
+                nonce++;
+                if (nonce > maxIterations) {
+                    throw new Error(`PoW превысил лимит итераций (${maxIterations})`);
+                }
+                hash = crypto.createHash('sha256').update(prefix + challenge + nonce).digest('hex');
+            } while (!hash.startsWith(targetPrefix));
+
+            const packageJson = require('../../../../package.json');
+            const abortController2 = new AbortController();
+            timeout2 = setTimeout(() => abortController2.abort(), 5000);
+
+            await fetch(`${this.STATS_SERVER_URL}/api/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instanceUuid: this.instanceId,
+                    appVersion: packageJson.version,
+                    bots: runningBots,
+                    nonce: nonce
+                }),
+                signal: abortController2.signal
+            });
+            clearTimeout(timeout2);
+            timeout2 = null;
+
+            this.logger.debug('Heartbeat отправлен успешно');
         } catch (error) {
             // Уменьшаем уровень логирования для ошибок телеметрии
             if (error.name === 'AbortError') {
@@ -139,6 +154,10 @@ class TelemetryService {
             } else {
                 this.logger.debug({ error: error.message }, 'Не удалось отправить heartbeat');
             }
+        } finally {
+            // Очищаем оба таймера в любом случае
+            if (timeout) clearTimeout(timeout);
+            if (timeout2) clearTimeout(timeout2);
         }
     }
 }

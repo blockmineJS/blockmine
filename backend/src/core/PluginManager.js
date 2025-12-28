@@ -127,26 +127,11 @@ class PluginManager {
     }
 
     async installFromGithubUrl(botId, repoUrl, token = null) {
-        // Используем существующий метод installFromGithub, но с поддержкой токена
-        // Временно сохраняем токен в процессе для использования в fetch
-        const originalFetch = global.fetch;
-
-        if (token) {
-            global.fetch = async (url, options = {}) => {
-                const headers = { ...options.headers, 'Authorization': `token ${token}` };
-                return originalFetch(url, { ...options, headers });
-            };
-        }
-
-        try {
-            const newPlugin = await this.installFromGithub(botId, repoUrl);
-            return newPlugin;
-        } finally {
-            global.fetch = originalFetch;
-        }
+        // Передаем токен напрямую в installFromGithub без изменения global.fetch
+        return await this.installFromGithub(botId, repoUrl, prisma, false, null, token);
     }
 
-    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
+    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null, token = null) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
 
@@ -158,15 +143,20 @@ class PluginManager {
         try {
             const url = new URL(repoUrl);
             const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
-            
+
+            // Создаем опции для fetch с токеном, если он передан
+            const fetchOptions = token ? {
+                headers: { 'Authorization': `token ${token}` }
+            } : {};
+
             let response;
-            
+
             // Если указан тег - скачиваем конкретный релиз
             if (tag) {
                 const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
                 console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
                 try {
-                    response = await fetch(archiveUrlTag);
+                    response = await fetch(archiveUrlTag, fetchOptions);
                 } catch (err) {
                     throw new Error(`Ошибка сети при скачивании релиза ${tag}: ${err.message || err}`);
                 }
@@ -178,10 +168,10 @@ class PluginManager {
                 const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
                 const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
 
-                response = await fetch(archiveUrlMain);
+                response = await fetch(archiveUrlMain, fetchOptions);
                 if (!response.ok) {
                     console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
-                    response = await fetch(archiveUrlMaster);
+                    response = await fetch(archiveUrlMaster, fetchOptions);
                     if (!response.ok) {
                         throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
                     }
