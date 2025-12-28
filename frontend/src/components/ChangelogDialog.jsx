@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -114,7 +113,7 @@ export default function ChangelogDialog() {
                     <DialogTitle>{t('changelog.title', { version: appVersion })}</DialogTitle>
                 </DialogHeader>
 
-                <div className="flex items-center justify-end border rounded-lg p-3">
+                <div className="flex items-center justify-end p-3">
                     <Select value={selectedVersion} onValueChange={handleJumpToVersion}>
                         <SelectTrigger className="w-44">
                             <SelectValue placeholder={t('changelog.selectVersion')} />
@@ -127,7 +126,7 @@ export default function ChangelogDialog() {
                     </Select>
                 </div>
 
-                <ScrollArea className="flex-1 w-full rounded-md border p-2 md:p-3">
+                <div className="flex-1 w-full p-2 md:p-3 overflow-y-auto scrollbar-hide">
                     {releases.length === 0 ? (
                         <div className="text-center py-16 text-muted-foreground">{t('changelog.noData')}</div>
                     ) : (
@@ -204,7 +203,7 @@ export default function ChangelogDialog() {
                             ))}
                         </Accordion>
                     )}
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     );

@@ -118,12 +118,32 @@ class PluginManager {
 
         await this._installDependencies(directoryPath);
         await this.loadPluginGraphs(botId, newPlugin.id, directoryPath);
-        
+
         if (this.botManager) {
             await this.botManager.reloadPlugins(botId);
         }
-        
+
         return newPlugin;
+    }
+
+    async installFromGithubUrl(botId, repoUrl, token = null) {
+        // Используем существующий метод installFromGithub, но с поддержкой токена
+        // Временно сохраняем токен в процессе для использования в fetch
+        const originalFetch = global.fetch;
+
+        if (token) {
+            global.fetch = async (url, options = {}) => {
+                const headers = { ...options.headers, 'Authorization': `token ${token}` };
+                return originalFetch(url, { ...options, headers });
+            };
+        }
+
+        try {
+            const newPlugin = await this.installFromGithub(botId, repoUrl);
+            return newPlugin;
+        } finally {
+            global.fetch = originalFetch;
+        }
     }
 
     async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
@@ -228,6 +248,14 @@ class PluginManager {
             throw new Error('package.json не содержит обязательных полей name и version');
         }
         
+        // Объединяем данные из packageJson.botpanel с автором из packageJson
+        const manifestData = packageJson.botpanel || {};
+        if (!manifestData.author && packageJson.author) {
+            manifestData.author = typeof packageJson.author === 'string'
+                ? packageJson.author
+                : packageJson.author.name || packageJson.author.email || 'Неизвестный автор';
+        }
+
         const pluginData = {
             botId,
             name: packageJson.name,
@@ -236,7 +264,7 @@ class PluginManager {
             path: directoryPath,
             sourceType,
             sourceUri: sourceUri || directoryPath,
-            manifest: JSON.stringify(packageJson.botpanel || {}),
+            manifest: JSON.stringify(manifestData),
         };
         
         return prismaClient.installedPlugin.upsert({

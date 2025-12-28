@@ -89,34 +89,56 @@ class TelemetryService {
 
             if (runningBots.length === 0) return;
 
-            const challengeRes = await fetch(`${this.STATS_SERVER_URL}/api/challenge?uuid=${this.instanceId}`);
-            if (!challengeRes.ok) throw new Error(`Challenge server error: ${challengeRes.statusText}`);
+            // AbortController для таймаута
+            const abortController = new AbortController();
+            const timeout = setTimeout(() => abortController.abort(), 5000); // 5 секунд
 
-            const { challenge, difficulty, prefix } = await challengeRes.json();
+            try {
+                const challengeRes = await fetch(`${this.STATS_SERVER_URL}/api/challenge?uuid=${this.instanceId}`, {
+                    signal: abortController.signal
+                });
+                clearTimeout(timeout);
 
-            // Proof of work
-            let nonce = 0;
-            let hash = '';
-            do {
-                nonce++;
-                hash = crypto.createHash('sha256').update(prefix + challenge + nonce).digest('hex');
-            } while (!hash.startsWith('0'.repeat(difficulty)));
+                if (!challengeRes.ok) throw new Error(`Challenge server error: ${challengeRes.statusText}`);
 
-            const packageJson = require('../../../../package.json');
-            await fetch(`${this.STATS_SERVER_URL}/api/heartbeat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instanceUuid: this.instanceId,
-                    appVersion: packageJson.version,
-                    bots: runningBots,
-                    nonce: nonce
-                })
-            });
+                const { challenge, difficulty, prefix } = await challengeRes.json();
 
-            this.logger.debug('Heartbeat отправлен успешно');
+                // Proof of work
+                let nonce = 0;
+                let hash = '';
+                do {
+                    nonce++;
+                    hash = crypto.createHash('sha256').update(prefix + challenge + nonce).digest('hex');
+                } while (!hash.startsWith('0'.repeat(difficulty)));
+
+                const packageJson = require('../../../../package.json');
+                const abortController2 = new AbortController();
+                const timeout2 = setTimeout(() => abortController2.abort(), 5000);
+
+                await fetch(`${this.STATS_SERVER_URL}/api/heartbeat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instanceUuid: this.instanceId,
+                        appVersion: packageJson.version,
+                        bots: runningBots,
+                        nonce: nonce
+                    }),
+                    signal: abortController2.signal
+                });
+                clearTimeout(timeout2);
+
+                this.logger.debug('Heartbeat отправлен успешно');
+            } finally {
+                clearTimeout(timeout);
+            }
         } catch (error) {
-            this.logger.error({ error }, 'Не удалось отправить heartbeat');
+            // Уменьшаем уровень логирования для ошибок телеметрии
+            if (error.name === 'AbortError') {
+                this.logger.debug('Таймаут отправки heartbeat (5s)');
+            } else {
+                this.logger.debug({ error: error.message }, 'Не удалось отправить heartbeat');
+            }
         }
     }
 }

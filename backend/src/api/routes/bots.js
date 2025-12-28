@@ -405,10 +405,14 @@ router.post('/', authorize('bot:create'), async (req, res) => {
         });
         const nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1;
 
+        // Автоматически добавляем создателя как владельца бота
+        const currentOwner = req.user?.username || '';
+
         const data = {
             username,
             prefix,
             note,
+            owners: currentOwner,
             serverId: parseInt(serverId, 10),
             password: password ? encrypt(password) : null,
             proxyId: proxyId ? parseInt(proxyId, 10) : null,
@@ -638,6 +642,17 @@ router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAcce
     const { path } = req.body;
     try {
         const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
+        res.status(201).json(newPlugin);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+router.post('/:botId/plugins/install/github-url', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { url, token } = req.body;
+    try {
+        const newPlugin = await pluginManager.installFromGithubUrl(parseInt(botId), url, token);
         res.status(201).json(newPlugin);
     } catch (error) {
         res.status(500).json({ message: error.message });

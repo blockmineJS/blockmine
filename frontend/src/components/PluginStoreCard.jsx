@@ -119,9 +119,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                                     <Badge variant="outline" className="text-xs cursor-help">
                                         <Server className="h-3 w-3 mr-1" />
                                         {plugin.supportedHosts.length <= 2 ? (
-                                            plugin.supportedHosts.map(host => (
-                                                <span key={host} className="font-mono">{host}</span>
-                                            ))
+                                            <span className="font-mono">{plugin.supportedHosts.join(', ')}</span>
                                         ) : (
                                             `${plugin.supportedHosts.length} серверов`
                                         )}
