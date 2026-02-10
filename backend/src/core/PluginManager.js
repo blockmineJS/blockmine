@@ -185,7 +185,12 @@ class PluginManager {
         return newPlugin;
     }
 
-    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
+    async installFromGithubUrl(botId, repoUrl, token = null) {
+        // Передаем токен напрямую в installFromGithub без изменения global.fetch
+        return await this.installFromGithub(botId, repoUrl, prisma, false, null, token);
+    }
+
+    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null, token = null) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
 
@@ -197,15 +202,20 @@ class PluginManager {
         try {
             const url = new URL(repoUrl);
             const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
-            
+
+            // Создаем опции для fetch с токеном, если он передан
+            const fetchOptions = token ? {
+                headers: { 'Authorization': `token ${token}` }
+            } : {};
+
             let response;
-            
+
             // Если указан тег - скачиваем конкретный релиз
             if (tag) {
                 const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
                 console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
                 try {
-                    response = await fetch(archiveUrlTag);
+                    response = await fetch(archiveUrlTag, fetchOptions);
                 } catch (err) {
                     throw new Error(`Ошибка сети при скачивании релиза ${tag}: ${err.message || err}`);
                 }
@@ -217,10 +227,10 @@ class PluginManager {
                 const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
                 const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
 
-                response = await fetch(archiveUrlMain);
+                response = await fetch(archiveUrlMain, fetchOptions);
                 if (!response.ok) {
                     console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
-                    response = await fetch(archiveUrlMaster);
+                    response = await fetch(archiveUrlMaster, fetchOptions);
                     if (!response.ok) {
                         throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
                     }
@@ -298,6 +308,14 @@ class PluginManager {
             throw new Error('package.json не содержит обязательных полей name и version');
         }
         
+        // Объединяем данные из packageJson.botpanel с автором из packageJson
+        const manifestData = packageJson.botpanel || {};
+        if (!manifestData.author && packageJson.author) {
+            manifestData.author = typeof packageJson.author === 'string'
+                ? packageJson.author
+                : packageJson.author.name || packageJson.author.email || 'Неизвестный автор';
+        }
+
         const pluginData = {
             botId,
             name: packageJson.name,
@@ -306,7 +324,7 @@ class PluginManager {
             path: directoryPath,
             sourceType,
             sourceUri: sourceUri || directoryPath,
-            manifest: JSON.stringify(packageJson.botpanel || {}),
+            manifest: JSON.stringify(manifestData),
         };
         
         return prismaClient.installedPlugin.upsert({

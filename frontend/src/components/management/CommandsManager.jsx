@@ -266,22 +266,40 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                                         {command.cooldown}s
                                     </TableCell>
                                     <TableCell>
-                                        {(command.isVisual || (command.graphJson && command.graphJson !== 'null')) ? (
-                                            <div className="flex items-center justify-end gap-1">
+                                        <div className="flex items-center justify-end gap-1">
+                                            {(command.isVisual || (command.graphJson && command.graphJson !== 'null')) ? (
                                                 <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); navigate(`/bots/${botId}/commands/visual/${command.id}`); }}>
                                                     <FilePenLine className="h-3 w-3 mr-1" />
                                                     {t('commands.open')}
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" title={t('commands.export')} onClick={e => { e.stopPropagation(); setCommandToShare(command); }}>
-                                                    <Share2 className="h-3 w-3" />
+                                            ) : (
+                                                <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); handleOpenModal(command); }}>
+                                                    <FilePenLine className="h-3 w-3 mr-1" />
+                                                    {t('commands.edit')}
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title={t('commands.delete')} onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}>
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <span className="text-muted-foreground text-xs">-</span>
-                                        )}
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                title={t('commands.export')}
+                                                aria-label={t('commands.export')}
+                                                onClick={e => { e.stopPropagation(); setCommandToShare(command); }}
+                                            >
+                                                <Share2 className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 hover:text-destructive"
+                                                title={t('commands.delete')}
+                                                aria-label={t('commands.delete')}
+                                                disabled={command.owner === OWNER_TYPES.SYSTEM}
+                                                onClick={e => { e.stopPropagation(); setCommandToDelete(command); setIsDeleteDialogOpen(true); }}
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))

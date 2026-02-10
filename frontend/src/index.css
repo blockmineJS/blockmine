@@ -96,6 +96,16 @@
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
+/* Hide scrollbar completely while keeping scroll functionality */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /* React Flow Performance Optimizations */
 .react-flow__node {
   will-change: transform;
