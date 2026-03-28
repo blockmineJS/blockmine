@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Download, CheckCircle, Loader2, Github, ArrowLeft, Star, Users, Clock, GitBranch, Package, Shield, TrendingUp, Code2, FileText, ExternalLink, Heart, Share2, Sparkles, Settings, Trash2, Terminal, Activity, Power, Server } from 'lucide-react';
+import { Download, Loader2, Github, ArrowLeft, Clock, GitBranch, Package, Shield, TrendingUp, FileText, Settings, Trash2, Terminal, Activity, Power, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import * as Icons from 'lucide-react';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from "@/components/ui/dialog";
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import GitHubReadmeContent from '@/components/GitHubReadmeContent';
 
 const IconComponent = ({ name, ...props }) => {
     if (!name) return <Package {...props} />;
@@ -32,6 +33,7 @@ export default function PluginDetailPage() {
     const navigate = useNavigate();
 
     const allInstalledPlugins = useAppStore(state => state.installedPlugins);
+    const pluginCatalog = useAppStore(state => state.pluginCatalog);
     const installPluginFromRepo = useAppStore(state => state.installPluginFromRepo);
     const fetchInstalledPlugins = useAppStore(state => state.fetchInstalledPlugins);
     const forkPlugin = useAppStore(state => state.forkPlugin);
@@ -39,6 +41,10 @@ export default function PluginDetailPage() {
     const deletePlugin = useAppStore(state => state.deletePlugin);
 
     const installedPluginsForBot = useMemo(() => allInstalledPlugins[intBotId] || [], [allInstalledPlugins, intBotId]);
+    const cachedCatalogPlugin = useMemo(
+        () => pluginCatalog.find(p => p.name === pluginName) || null,
+        [pluginCatalog, pluginName]
+    );
 
     const [plugin, setPlugin] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +52,6 @@ export default function PluginDetailPage() {
     const [isForking, setIsForking] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [changelog, setChangelog] = useState('');
-    const [readme, setReadme] = useState('');
     const [selectedPlugin, setSelectedPlugin] = useState(null);
     const [pluginToDelete, setPluginToDelete] = useState(null);
     const { toast } = useToast();
@@ -62,65 +67,72 @@ export default function PluginDetailPage() {
                 const response = await fetch(`/api/plugins/catalog/${pluginName}`);
                 if (!response.ok) throw new Error(t('notFound.title'));
                 const data = await response.json();
-                
-                try {
-                    const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
-                    if (statsResponse.ok) {
-                        const statsData = await statsResponse.json();
-                        const pluginStats = statsData?.plugins?.find(p => p.pluginName === data.name);
-                        if (pluginStats) {
-                            data.downloads = pluginStats.downloadCount;
-                        }
-                    }
-                } catch (statsError) {
-                    console.warn('Failed to load stats:', statsError.message);
-                }
-                
                 setPlugin(data);
-                
-                try {
-                    const urlParts = new URL(data.repoUrl);
-                    const pathParts = urlParts.pathname.split('/').filter(p => p);
-
-                    if (pathParts.length >= 2) {
-                        const owner = pathParts[0];
-                        const repo = pathParts[1].replace('.git', '');
-
-                        // Load changelog
-                        const releasesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
-                        if (releasesResponse.ok) {
-                            const releaseData = await releasesResponse.json();
-                            if (releaseData.body) {
-                                setChangelog(releaseData.body);
-                            }
-                        }
-
-                        // Load README
-                        const readmeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-                            headers: { 'Accept': 'application/vnd.github.v3.raw' }
-                        });
-                        if (readmeResponse.ok) {
-                            const readmeText = await readmeResponse.text();
-                            setReadme(readmeText);
-                        }
-                    }
-                } catch (releaseError) {
-                    console.warn('Failed to load GitHub data:', releaseError.message);
-                }
             } catch (error) {
                 toast({ variant: 'destructive', title: t('messages.error'), description: error.message });
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchPluginDetails();
-    }, [pluginName, toast]);
+
+        const hasCachedPluginDetails = cachedCatalogPlugin?.readmeHtml || cachedCatalogPlugin?.readme;
+
+        if (cachedCatalogPlugin) {
+            setPlugin(current => current && current.name === cachedCatalogPlugin.name
+                ? { ...cachedCatalogPlugin, ...current }
+                : cachedCatalogPlugin);
+            setIsLoading(false);
+        }
+
+        if (!hasCachedPluginDetails) {
+            fetchPluginDetails();
+        }
+    }, [cachedCatalogPlugin, pluginName, t, toast]);
+
+    useEffect(() => {
+        if (activeTab !== 'changelog' || changelog || !plugin?.repoUrl) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const fetchChangelog = async () => {
+            try {
+                const urlParts = new URL(plugin.repoUrl);
+                const pathParts = urlParts.pathname.split('/').filter(p => p);
+
+                if (pathParts.length < 2) {
+                    return;
+                }
+
+                const owner = pathParts[0];
+                const repo = pathParts[1].replace('.git', '');
+                const releasesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
+                if (!releasesResponse.ok) {
+                    return;
+                }
+
+                const releaseData = await releasesResponse.json();
+                if (!cancelled && releaseData.body) {
+                    setChangelog(releaseData.body);
+                }
+            } catch (releaseError) {
+                console.warn('Failed to load GitHub changelog:', releaseError.message);
+            }
+        };
+
+        fetchChangelog();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab, changelog, plugin?.repoUrl]);
     
     useEffect(() => {
-        if (botId) {
+        if (botId && !allInstalledPlugins[intBotId]) {
             fetchInstalledPlugins(intBotId);
         }
-    }, [botId, fetchInstalledPlugins, intBotId]);
+    }, [allInstalledPlugins, botId, fetchInstalledPlugins, intBotId]);
 
     const installedPlugin = useMemo(() => {
         if (!plugin) return null;
@@ -376,14 +388,19 @@ export default function PluginDetailPage() {
                             <div className="md:col-span-2">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>{readme ? 'README' : t('overview.description')}</CardTitle>
+                                        <CardTitle>{plugin.readmeHtml ? 'README' : t('overview.description')}</CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="prose prose-invert max-w-none">
-                                            <ReactMarkdown>
-                                                {readme || plugin.fullDescription || plugin.description || t('overview.noDescription')}
-                                            </ReactMarkdown>
-                                        </div>
+                                        <GitHubReadmeContent
+                                            html={plugin.readmeHtml}
+                                            fallback={
+                                                <div className="prose prose-invert max-w-none">
+                                                    <ReactMarkdown>
+                                                        {plugin.fullDescription || plugin.description || t('overview.noDescription')}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            }
+                                        />
                                     </CardContent>
                                 </Card>
                             </div>

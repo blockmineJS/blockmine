@@ -4,132 +4,138 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Download, CheckCircle, Loader2, Github, ExternalLink, GitMerge, Check, Star, Users, TrendingUp, Sparkles, Server, Globe } from 'lucide-react';
+import { Download, CheckCircle, Loader2, Github, GitMerge, Check, Users, TrendingUp, Sparkles, Server, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const [isHovered, setIsHovered] = useState(false);
-    
+
     return (
         <TooltipProvider delayDuration={100}>
-            <Card 
+            <Card
                 className={cn(
-                    "relative overflow-hidden transition-all duration-300 plugin-card-hover group",
+                    "group relative flex h-full flex-col overflow-hidden transition-all duration-300 plugin-card-hover",
                     "hover:border-primary/50 hover:shadow-xl",
                     isInstalled && "border-green-600/50"
                 )}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                <div className={cn(
-                    "absolute inset-0 opacity-0 transition-opacity duration-300",
-                    "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
-                    isHovered && "opacity-100"
-                )} />
-                
-                {isInstalled && (
-                    <div className="absolute top-2 right-2 bg-green-600 text-white p-2 rounded-full shadow-lg z-10">
-                        <Check className="h-4 w-4" />
-                    </div>
-                )}
-                
+                <div
+                    className={cn(
+                        "absolute inset-0 opacity-0 transition-opacity duration-300",
+                        "bg-gradient-to-br from-primary/10 via-transparent to-purple-600/10",
+                        isHovered && "opacity-100"
+                    )}
+                />
+
                 {plugin.isTop3 && (
-                    <div className="absolute top-2 left-2 z-10">
-                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
-                            <TrendingUp className="h-3 w-3 mr-1" />
+                    <div className="absolute left-0 top-0 z-10 flex flex-col items-start gap-1">
+                        <Badge className="rounded-none rounded-br-md border-0 bg-gradient-to-r from-orange-500 to-red-500 px-2 py-0.5 text-[10px] text-white shadow-sm">
+                            <TrendingUp className="mr-1 h-3 w-3" />
                             Популярное
                         </Badge>
                     </div>
                 )}
-                
-                <CardHeader className="relative z-10">
-                    <div className="flex justify-between items-start">
-                        <div className="flex-grow mr-2">
-                            <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group">
-                                <CardTitle className="flex items-center gap-2 text-xl group-hover:text-primary transition-colors">
-                                    <span className={cn(
-                                        "transition-all duration-300",
-                                        isHovered && "gradient-text"
-                                    )}>{plugin.displayName || plugin.name}</span>
-                                    {plugin.verified && (
-                                        <Sparkles className="h-4 w-4 text-blue-500" />
-                                    )}
+
+                <CardHeader className="relative z-10 px-5 pb-2 pt-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group/title">
+                                <CardTitle className="flex items-start gap-2 text-[1.15rem] leading-tight transition-colors group-hover/title:text-primary">
+                                    <span
+                                        className={cn(
+                                            "line-clamp-2 min-w-0 break-words transition-all duration-300",
+                                            isHovered && "gradient-text"
+                                        )}
+                                    >
+                                        {plugin.displayName || plugin.name}
+                                    </span>
+                                    {plugin.verified && <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />}
                                 </CardTitle>
                             </Link>
+
                             <CardDescription className="mt-1">
                                 <span>by {plugin.author}</span>
                             </CardDescription>
                         </div>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <a 
-                                    href={plugin.repoUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
-                                >
-                                    <Github className="h-5 w-5" />
-                                </a>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Открыть репозиторий</p>
-                            </TooltipContent>
-                        </Tooltip>
+
+                        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <a
+                                        href={plugin.repoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="rounded-md p-1 text-muted-foreground transition-all hover:scale-110 hover:text-foreground"
+                                    >
+                                        <Github className="h-5 w-5" />
+                                    </a>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Открыть репозиторий</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            {isInstalled && (
+                                <div className="rounded-full bg-green-600 p-2 text-white shadow-lg">
+                                    <Check className="h-4 w-4" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </CardHeader>
-                
-                <CardContent className="relative z-10 space-y-4">
-                    <p className="text-sm text-muted-foreground line-clamp-3">
+
+                <CardContent className="relative z-10 flex flex-1 flex-col gap-3 px-5 pb-0">
+                    <p className="min-h-[40px] line-clamp-2 text-sm text-muted-foreground">
                         {plugin.description}
                     </p>
-                    
-                    <div className="flex flex-wrap gap-1">
+
+                    <div className="flex min-h-[26px] flex-wrap content-start gap-1">
                         {plugin.categories?.map(tag => (
-                            <Badge 
-                                key={tag} 
-                                variant="secondary" 
-                                className="text-xs hover:bg-primary hover:text-primary-foreground transition-colors cursor-default"
+                            <Badge
+                                key={tag}
+                                variant="secondary"
+                                className="cursor-default text-xs transition-colors hover:bg-primary hover:text-primary-foreground"
                             >
                                 {tag}
                             </Badge>
                         ))}
                     </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+
+                    <div className="flex h-4 items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             <span>{plugin.downloads || 0}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Download className="h-3 w-3" />
-                            <span>v{plugin.latestTag.replace('v','')}</span>
+                            <span>v{plugin.latestTag.replace('v', '')}</span>
                         </div>
                     </div>
-                    
-                    <div className="flex flex-wrap gap-1">
+
+                    <div className="flex min-h-[24px] flex-wrap content-start gap-1">
                         {!plugin.supportedHosts || plugin.supportedHosts.length === 0 ? (
                             <Badge variant="outline" className="text-xs">
-                                <Globe className="h-3 w-3 mr-1" />
+                                <Globe className="mr-1 h-3 w-3" />
                                 Любой сервер
                             </Badge>
                         ) : (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs cursor-help">
-                                        <Server className="h-3 w-3 mr-1" />
-                                        {plugin.supportedHosts.length <= 2 ? (
-                                            plugin.supportedHosts.map(host => (
+                                    <Badge variant="outline" className="cursor-help text-xs">
+                                        <Server className="mr-1 h-3 w-3" />
+                                        {plugin.supportedHosts.length <= 2
+                                            ? plugin.supportedHosts.map(host => (
                                                 <span key={host} className="font-mono">{host}</span>
                                             ))
-                                        ) : (
-                                            `${plugin.supportedHosts.length} серверов`
-                                        )}
+                                            : `${plugin.supportedHosts.length} серверов`}
                                     </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="font-semibold mb-1">Протестировано на:</p>
-                                    <ul className="list-disc list-inside text-sm">
+                                    <p className="mb-1 font-semibold">Протестировано на:</p>
+                                    <ul className="list-inside list-disc text-sm">
                                         {plugin.supportedHosts.map(host => <li key={host}>{host}</li>)}
                                     </ul>
                                 </TooltipContent>
@@ -137,55 +143,55 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                         )}
                     </div>
                 </CardContent>
-                
-                <CardFooter className="relative z-10 flex flex-col items-start gap-3 mt-auto pt-4 border-t">
-                    {hasDependencies && (
-                        <div className="w-full">
+
+                <CardFooter className="relative z-10 mt-auto flex min-h-[84px] flex-col items-start justify-end gap-2 border-t px-5 pb-4 pt-3">
+                    <div className="min-h-[22px] w-full">
+                        {hasDependencies && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div className="flex items-center gap-2 text-xs">
                                         <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600">
-                                            <GitMerge className="h-3 w-3 mr-1"/>
+                                            <GitMerge className="mr-1 h-3 w-3" />
                                             Требует {plugin.dependencies.length} зависимост{plugin.dependencies.length === 1 ? 'ь' : 'и'}
                                         </Badge>
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="font-semibold mb-1">Требуются плагины:</p>
-                                    <ul className="list-disc list-inside text-sm">
+                                    <p className="mb-1 font-semibold">Требуются плагины:</p>
+                                    <ul className="list-inside list-disc text-sm">
                                         {plugin.dependencies.map(dep => <li key={dep}>{dep}</li>)}
                                     </ul>
                                 </TooltipContent>
                             </Tooltip>
-                        </div>
-                    )}
-                    
-                    <Button 
+                        )}
+                    </div>
+
+                    <Button
                         className={cn(
-                            "w-full relative overflow-hidden transition-all",
+                            "relative h-11 w-full justify-center rounded-lg px-4 text-[15px] font-semibold leading-none transition-all",
                             isInstalled && "bg-green-600 hover:bg-green-700",
-                            isInstalling && "shimmer"
+                            isInstalling && "overflow-hidden shimmer"
                         )}
                         disabled={isInstalled || isInstalling}
                         onClick={() => onInstall(plugin)}
                     >
                         {isInstalling ? (
-                            <>
+                            <span className="flex w-full items-center justify-center">
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Установка...
-                            </>
+                            </span>
                         ) : isInstalled ? (
-                            <>
+                            <span className="flex w-full items-center justify-center">
                                 <CheckCircle className="mr-2 h-4 w-4" />
                                 Установлен
-                            </>
+                            </span>
                         ) : (
-                            <>
+                            <span className="flex w-full items-center justify-center">
                                 <Download className="mr-2 h-4 w-4" />
                                 Установить
-                            </>
+                            </span>
                         )}
-                        
+
                         {isInstalling && (
                             <div className="install-progress">
                                 <div className="install-progress-bar" />

@@ -5,7 +5,7 @@ import { produce } from 'immer';
 const executePluginOperation = async (get, botId, apiEndpoint, params, successMessage) => {
     try {
         const result = await apiHelper(apiEndpoint, params, successMessage);
-        await get().fetchInstalledPlugins(botId);
+        await get().fetchInstalledPlugins(botId, true);
         return result;
     } catch (error) {
         console.error(`[PluginOperation] Failed: ${apiEndpoint}`, {
@@ -19,7 +19,22 @@ const executePluginOperation = async (get, botId, apiEndpoint, params, successMe
     }
 };
 
+const enrichCatalog = (catalogData = [], statsMap = new Map()) =>
+    catalogData
+        .map(plugin => ({
+            ...plugin,
+            downloads: statsMap.get(plugin.name) || plugin.downloads || 0,
+        }))
+        .sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
+        .map((plugin, index) => ({
+            ...plugin,
+            isTop3: index < 3,
+            topPosition: index + 1,
+        }));
+
 export const createPluginSlice = (set, get) => {
+    const INSTALLED_PLUGINS_CACHE_TTL = 30 * 1000;
+
     const initLastUpdateCheck = () => {
         const result = {};
         for (let i = 0; i < localStorage.length; i++) {
@@ -37,6 +52,7 @@ export const createPluginSlice = (set, get) => {
 
     return {
         installedPlugins: {},
+        installedPluginsFetchedAt: {},
         pluginUpdates: {},
         pluginCatalog: [],
         isCatalogLoading: true,
@@ -51,61 +67,56 @@ export const createPluginSlice = (set, get) => {
             });
         },
 
-        fetchPluginCatalog: async () => {
-            if (get().pluginCatalog.length > 0) {
+        fetchPluginCatalog: async (force = false) => {
+            if (!force && get().pluginCatalog.length > 0) {
                 set({ isCatalogLoading: false });
                 return;
             }
             set({ isCatalogLoading: true });
-            
+
             try {
                 const catalogData = await apiHelper('/api/plugins/catalog');
-                
-                let statsMap = new Map();
-                try {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    const statsResponse = await fetch('http://185.65.200.184:3000/api/stats');
-                    if (statsResponse.ok) {
-                        const statsData = await statsResponse.json();
-                        statsMap = new Map((statsData?.plugins || []).map(p => [p.pluginName, p.downloadCount]));
-                    }
-                } catch (statsError) {
-                    console.warn("Не удалось загрузить статистику скачиваний плагинов:", statsError.message);
-                }
+                set({ pluginCatalog: enrichCatalog(catalogData), isCatalogLoading: false });
 
-                const sortedPlugins = (catalogData || []).map(plugin => ({
-                    ...plugin,
-                    downloads: statsMap.get(plugin.name) || 0,
-                })).sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
-
-                const enrichedCatalog = sortedPlugins.map((plugin, index) => ({
-                    ...plugin,
-                    isTop3: index < 3,
-                    topPosition: index + 1,
-                }));
-
-                set({ pluginCatalog: enrichedCatalog, isCatalogLoading: false });
+                fetch('http://185.65.200.184:3000/api/stats')
+                    .then(response => response.ok ? response.json() : null)
+                    .then(statsData => {
+                        if (!statsData) return;
+                        const statsMap = new Map((statsData?.plugins || []).map(p => [p.pluginName, p.downloadCount]));
+                        set({ pluginCatalog: enrichCatalog(catalogData, statsMap) });
+                    })
+                    .catch(statsError => {
+                        console.warn("Не удалось загрузить статистику скачиваний плагинов:", statsError.message);
+                    });
             } catch (error) {
                 console.error("Не удалось загрузить каталог плагинов:", error.message);
                 set({ pluginCatalog: [], isCatalogLoading: false });
             }
         },
 
-        fetchInstalledPlugins: async (botId) => {
+        fetchInstalledPlugins: async (botId, force = false) => {
             try {
+                const lastFetchedAt = get().installedPluginsFetchedAt[botId];
+                const hasCachedPlugins = Object.prototype.hasOwnProperty.call(get().installedPlugins, botId);
+
+                if (!force && hasCachedPlugins && lastFetchedAt && (Date.now() - lastFetchedAt) < INSTALLED_PLUGINS_CACHE_TTL) {
+                    return;
+                }
+
                 const pluginsData = await apiHelper(`/api/plugins/bot/${botId}`);
-                
+                const catalogByName = new Map(get().pluginCatalog.map(plugin => [plugin.name, plugin]));
+
                 const parsedAndEnrichedPlugins = pluginsData.map(p => {
                     let manifest;
                     try {
                         manifest = p.manifest ? JSON.parse(p.manifest) : {};
-                    } catch(e) {
+                    } catch (e) {
                         console.error(`Ошибка парсинга манифеста для плагина ${p.name}`);
                         manifest = {};
                     }
-                    
-                    const catalogPlugin = get().pluginCatalog.find(cat_p => cat_p.name === p.name);
-                    
+
+                    const catalogPlugin = catalogByName.get(p.name);
+
                     return {
                         ...p,
                         manifest,
@@ -119,10 +130,14 @@ export const createPluginSlice = (set, get) => {
 
                 set(state => {
                     state.installedPlugins[botId] = parsedAndEnrichedPlugins;
+                    state.installedPluginsFetchedAt[botId] = Date.now();
                 });
             } catch (error) {
                 console.error("Не удалось загрузить плагины для бота", botId, error);
-                set(state => { state.installedPlugins[botId] = [] });
+                set(state => {
+                    state.installedPlugins[botId] = [];
+                    state.installedPluginsFetchedAt[botId] = Date.now();
+                });
             }
         },
 
@@ -132,92 +147,88 @@ export const createPluginSlice = (set, get) => {
                 { method: 'PUT', body: JSON.stringify({ isEnabled }) },
                 'Статус плагина обновлен.'
             );
-            await get().fetchInstalledPlugins(botId);
+            await get().fetchInstalledPlugins(botId, true);
         },
 
         deletePlugin: async (botId, pluginId, pluginName) => {
             await apiHelper(`/api/bots/${botId}/plugins/${pluginId}`, { method: 'DELETE' }, `Плагин "${pluginName}" удален.`);
-            await get().fetchInstalledPlugins(botId);
+            await get().fetchInstalledPlugins(botId, true);
         },
 
-        installPluginFromRepo: async (botId, repoUrl, pluginName) => {
+        installPluginFromRepo: async (botId, repoUrl, pluginName, tag = null) => {
             if (pluginName) {
                 get().optimisticallyIncrementDownloadCount(pluginName);
             }
-            
+
             try {
                 const data = await apiHelper(
                     `/api/bots/${botId}/plugins/install/github`,
-                    { method: 'POST', body: JSON.stringify({ repoUrl }) }
+                    { method: 'POST', body: JSON.stringify({ repoUrl, tag }) }
                 );
                 toast({ title: 'Успех!', description: `Плагин "${data.name}" успешно установлен.` });
-                await get().fetchInstalledPlugins(botId);
+                await get().fetchInstalledPlugins(botId, true);
                 return data;
             } catch (error) {
-                await get().fetchPluginCatalog(); 
+                await get().fetchPluginCatalog(true);
                 throw error;
             }
         },
 
         installPluginFromPath: async (botId, path) => {
-             try {
+            try {
                 const data = await apiHelper(
                     `/api/bots/${botId}/plugins/install/local`,
                     { method: 'POST', body: JSON.stringify({ path }) }
                 );
-                 toast({ title: "Успех!", description: `Плагин "${data.name}" успешно установлен.` });
-                 return data;
-             } catch(error) {
-                 throw error;
-             } finally {
-                await get().fetchInstalledPlugins(botId);
-                await get().fetchPluginCatalog();
-             }
+                toast({ title: 'Успех!', description: `Плагин "${data.name}" успешно установлен.` });
+                return data;
+            } catch (error) {
+                throw error;
+            } finally {
+                await get().fetchInstalledPlugins(botId, true);
+                await get().fetchPluginCatalog(true);
+            }
         },
 
         checkForUpdates: async (botId, forceCheck = false) => {
             try {
                 const now = Date.now();
-                
                 const storageKey = `plugin_update_check_${botId}`;
                 const lastCheck = localStorage.getItem(storageKey);
                 const lastCheckTime = lastCheck ? parseInt(lastCheck, 10) : null;
-                
                 const cooldownPeriod = 10 * 60 * 1000;
-                
+
                 if (!forceCheck && lastCheckTime && (now - lastCheckTime) < cooldownPeriod) {
                     return;
                 }
-                
+
                 const updatesData = await apiHelper(`/api/plugins/check-updates/${botId}`, { method: 'POST' });
                 const updatesMap = updatesData.reduce((acc, u) => ({ ...acc, [u.sourceUri]: u }), {});
-                
+
                 localStorage.setItem(storageKey, now.toString());
-                
+
                 set(state => {
                     state.pluginUpdates[botId] = updatesMap;
                     state.lastUpdateCheck[botId] = now;
                 });
-                
-                toast({ title: "Проверка завершена", description: `Найдено обновлений: ${updatesData.length}` });
+
+                toast({ title: 'Проверка завершена', description: `Найдено обновлений: ${updatesData.length}` });
             } catch (error) {
-                console.error("Ошибка проверки обновлений:", error);
+                console.error('Ошибка проверки обновлений:', error);
             }
         },
 
         updatePlugin: async (pluginId, botId) => {
             const pluginToUpdate = get().installedPlugins[botId]?.find(p => p.id === pluginId);
-            
-            // Получаем информацию об обновлении, включая тег
             const updateInfo = pluginToUpdate ? get().pluginUpdates[botId]?.[pluginToUpdate.sourceUri] : null;
             const targetTag = updateInfo?.latestTag || null;
 
             await apiHelper(
-                `/api/plugins/update/${pluginId}`, 
-                { 
+                `/api/plugins/update/${pluginId}`,
+                {
                     method: 'POST',
                     body: JSON.stringify({ targetTag })
-                }, 
+                },
                 'Плагин обновлен. Перезапустите бота.'
             );
 
@@ -228,22 +239,20 @@ export const createPluginSlice = (set, get) => {
                     }
                 }));
             }
-            
-            await get().fetchInstalledPlugins(botId);
+
+            await get().fetchInstalledPlugins(botId, true);
         },
 
-        createIdePlugin: async (botId, { name, template }) => {
-            return executePluginOperation(
-                get,
-                botId,
-                `/api/bots/${botId}/plugins/ide/create`,
-                {
-                    method: 'POST',
-                    body: JSON.stringify({ name, template })
-                },
-                `Плагин "${name}" успешно создан.`
-            );
-        },
+        createIdePlugin: async (botId, { name, template }) => executePluginOperation(
+            get,
+            botId,
+            `/api/bots/${botId}/plugins/ide/create`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ name, template })
+            },
+            `Плагин "${name}" успешно создан.`
+        ),
 
         updatePluginManifest: async (botId, pluginName, manifestData) => {
             set(produce((draft) => {
@@ -256,15 +265,13 @@ export const createPluginSlice = (set, get) => {
             }));
         },
 
-        forkPlugin: async (botId, pluginName) => {
-            return executePluginOperation(
-                get,
-                botId,
-                `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
-                { method: 'POST' },
-                `Плагин "${pluginName}" успешно превращен в локальный.`
-            );
-        },
+        forkPlugin: async (botId, pluginName) => executePluginOperation(
+            get,
+            botId,
+            `/api/bots/${botId}/plugins/ide/${pluginName}/fork`,
+            { method: 'POST' },
+            `Плагин "${pluginName}" успешно превращен в локальный.`
+        ),
 
         reloadLocalPlugin: async (botId, pluginId) => {
             await apiHelper(
@@ -272,7 +279,7 @@ export const createPluginSlice = (set, get) => {
                 { method: 'POST' },
                 'Плагин перезагружен, настройки сброшены.'
             );
-            await get().fetchInstalledPlugins(botId);
+            await get().fetchInstalledPlugins(botId, true);
         },
     };
 };

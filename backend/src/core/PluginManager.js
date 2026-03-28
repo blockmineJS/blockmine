@@ -188,6 +188,8 @@ class PluginManager {
     async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
+        let sourceRefType = tag ? 'tag' : 'branch';
+        let sourceRef = tag || 'main';
 
         if (!isUpdate) {
         const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
@@ -220,6 +222,7 @@ class PluginManager {
                 response = await fetch(archiveUrlMain);
                 if (!response.ok) {
                     console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
+                    sourceRef = 'master';
                     response = await fetch(archiveUrlMaster);
                     if (!response.ok) {
                         throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
@@ -264,7 +267,10 @@ class PluginManager {
                 depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
             }
 
-            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
+            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient, {
+                sourceRefType,
+                sourceRef
+            });
 
             reportPluginDownload(packageJson.name);
 
@@ -285,7 +291,7 @@ class PluginManager {
         }
     }
 
-    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = prisma) {
+    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = prisma, extraData = {}) {
         const packageJsonPath = path.join(directoryPath, 'package.json');
         let packageJson;
         try {
@@ -307,6 +313,7 @@ class PluginManager {
             sourceType,
             sourceUri: sourceUri || directoryPath,
             manifest: JSON.stringify(packageJson.botpanel || {}),
+            ...extraData,
         };
         
         return prismaClient.installedPlugin.upsert({

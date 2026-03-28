@@ -98,7 +98,7 @@ const SortableBotItem = ({ bot, isCollapsed, botStatuses, onLinkClick, isDraggin
                 onClick={handleClick} 
                 data-bot-id={bot.id} 
                 className={({ isActive }) => cn(
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 relative",
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors duration-200 relative",
                     isActive 
                         ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
                         : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -136,7 +136,7 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
             onClick={onLinkClick} 
             data-bot-id={bot.id} 
             className={({ isActive }) => cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 relative",
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors duration-200 relative",
                 isActive 
                     ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
                     : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -165,6 +165,14 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
         </NavLink>
     );
 };
+
+const OutletViewport = React.memo(function OutletViewport() {
+    return (
+        <main className="min-w-0 overflow-y-auto" style={{ contain: 'layout paint' }}>
+            <Outlet />
+        </main>
+    );
+});
 
 const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const { t } = useTranslation(['sidebar', 'common']);
@@ -336,7 +344,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     }, [isDragging, isSheetOpen]);
 
     const navLinkClasses = ({ isActive }) => cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 relative",
         isActive ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" : "text-muted-foreground hover:text-foreground hover:bg-accent",
         isCollapsed && "justify-center"
     );
@@ -379,7 +387,7 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                     <Button
                         variant="ghost"
                         className={cn(
-                            "w-full justify-start flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                            "w-full justify-start flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             isCollapsed && "justify-center"
                         )}
                         onClick={() => {
@@ -396,12 +404,11 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
             <Button 
                 variant="ghost"
                 className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    "w-full justify-start flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-accent",
                     isCollapsed && "justify-center"
                 )}
                 onClick={async () => {
-                    await useAppStore.getState().fetchChangelog();
-                    useAppStore.setState({ showChangelogDialog: true });
+                    await useAppStore.getState().openChangelogDialog();
                     onLinkClick();
                 }}
             >
@@ -593,7 +600,7 @@ export default function Layout() {
                         to="/admin" 
                         onClick={() => setIsSheetOpen(false)} 
                         className={({ isActive }) => cn(
-                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 relative",
                             isActive 
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r" 
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -609,7 +616,7 @@ export default function Layout() {
                         to="/servers"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 relative",
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -626,7 +633,7 @@ export default function Layout() {
                         to="/proxies"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all relative",
+                            "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 relative",
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -690,7 +697,7 @@ export default function Layout() {
                 <Button 
                     variant="ghost" 
                     className={cn(
-                        "w-full transition-all",
+                        "w-full transition-colors duration-200",
                         isCollapsed ? "h-9 w-9 p-0 justify-center" : "h-9 justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )} 
                     onClick={handleLogout}
@@ -699,7 +706,7 @@ export default function Layout() {
                     {!isCollapsed && t('logout')}
                 </Button>
 
-                <div className={cn("pt-2 border-t text-center text-xs text-muted-foreground", isCollapsed && "hidden")}>
+                <div className={cn("pt-2 border-t text-xs text-muted-foreground flex flex-col items-start", isCollapsed && "hidden")}>
                     <a
                         href="https://github.com/blockmineJS/blockmine"
                         target="_blank"
@@ -709,27 +716,31 @@ export default function Layout() {
                         <Github className="h-4 w-4" />
                         <span>BlockMine v{appVersion}</span>
                     </a>
-                    <Button
-                        variant="link"
-                        size="sm"
-                        className="text-xs h-auto p-0 mt-1 text-muted-foreground hover:text-primary"
-                        onClick={async () => {
-                            await useAppStore.getState().fetchChangelog();
-                            useAppStore.setState({ showChangelogDialog: true });
-                        }}
-                    >
-                        {t('whatsNew')}
-                    </Button>
+                    <div className="mt-1">
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
+                            onClick={async () => {
+                                await useAppStore.getState().openChangelogDialog();
+                            }}
+                        >
+                            {t('whatsNew')}
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 
     return (
-        <div className={cn(
-            "grid h-[100dvh] md:h-screen transition-[grid-template-columns] duration-300 ease-in-out",
-            isSidebarCollapsed ? "md:grid-cols-[80px_1fr]" : "md:grid-cols-[280px_1fr]"
-        )}>
+        <div
+            className={cn(
+                "grid h-[100dvh] md:h-screen transition-[grid-template-columns] duration-300 ease-out",
+                isSidebarCollapsed ? "md:grid-cols-[80px_1fr]" : "md:grid-cols-[280px_1fr]"
+            )}
+            style={{ willChange: 'grid-template-columns' }}
+        >
             <div className="fixed z-40 flex items-center gap-2" style={{ top: 'max(8px, env(safe-area-inset-top))', right: 'max(8px, env(safe-area-inset-right))' }}>
             <GlobalSearch />
                 <PresenceButton />
@@ -752,13 +763,11 @@ export default function Layout() {
                 </Sheet>
             </div>
 
-            <aside className="hidden md:block border-r">
+            <aside className="hidden overflow-hidden border-r md:block">
                 {sidebarContent(isSidebarCollapsed)}
             </aside>
 
-            <main className="overflow-y-auto">
-                <Outlet />
-            </main>
+            <OutletViewport />
             
             <ChangelogDialog />
         </div>

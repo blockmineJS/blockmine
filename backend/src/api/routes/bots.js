@@ -27,6 +27,108 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
+function parseGithubRepoUrl(repoUrl) {
+    if (typeof repoUrl !== 'string') {
+        throw new Error('Repository URL is required.');
+    }
+
+    const trimmed = repoUrl.trim();
+    if (!trimmed) {
+        throw new Error('Repository URL is required.');
+    }
+
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(trimmed);
+    } catch (error) {
+        throw new Error('Invalid GitHub repository URL.');
+    }
+
+    if (!['github.com', 'www.github.com'].includes(parsedUrl.hostname)) {
+        throw new Error('Only GitHub repository links are supported.');
+    }
+
+    const pathParts = parsedUrl.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+    if (pathParts.length < 2) {
+        throw new Error('GitHub repository URL must include owner and repository name.');
+    }
+
+    const owner = pathParts[0];
+    const repo = pathParts[1].replace(/\.git$/i, '');
+
+    if (!owner || !repo) {
+        throw new Error('GitHub repository URL must include owner and repository name.');
+    }
+
+    return {
+        owner,
+        repo,
+        normalizedUrl: `https://github.com/${owner}/${repo}`
+    };
+}
+
+function normalizeGithubRepoUrl(repoUrl) {
+    return parseGithubRepoUrl(repoUrl).normalizedUrl;
+}
+
+async function fetchGithubJson(url) {
+    const response = await fetch(url, {
+        headers: {
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'BlockMine'
+        }
+    });
+
+    if (!response.ok) {
+        const error = new Error(`GitHub API request failed with status ${response.status}.`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return response.json();
+}
+
+async function fetchGithubReadme(owner, repo) {
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+        headers: {
+            'Accept': 'application/vnd.github.raw+json',
+            'User-Agent': 'BlockMine'
+        }
+    });
+
+    if (!response.ok) {
+        return null;
+    }
+
+    return response.text();
+}
+
+async function renderGithubMarkdown(markdown, owner, repo) {
+    if (!markdown) {
+        return null;
+    }
+
+    const response = await fetch('https://api.github.com/markdown', {
+        method: 'POST',
+        headers: {
+            'Accept': 'text/html',
+            'Content-Type': 'application/json',
+            'User-Agent': 'BlockMine'
+        },
+        body: JSON.stringify({
+            text: markdown,
+            mode: 'gfm',
+            context: `${owner}/${repo}`
+        })
+    });
+
+    if (!response.ok) {
+        return null;
+    }
+
+    return response.text();
+}
+
 const conditionalRestartAuth = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
         console.log('[Debug] Роут перезапуска бота доступен без проверки прав');
@@ -622,14 +724,97 @@ router.get('/:botId/plugins', authenticateUniversal, checkBotAccess, authorize('
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
+router.post('/:botId/plugins/install/github/preview', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+    const { repoUrl } = req.body;
+
+    try {
+        const { owner, repo, normalizedUrl } = parseGithubRepoUrl(repoUrl);
+        const repoInfo = await fetchGithubJson(`https://api.github.com/repos/${owner}/${repo}`);
+
+        let tags = [];
+        let latestRelease = null;
+        let readme = null;
+        let readmeHtml = null;
+
+        try {
+            const tagsData = await fetchGithubJson(`https://api.github.com/repos/${owner}/${repo}/tags?per_page=20`);
+            tags = Array.isArray(tagsData) ? tagsData.map(tag => ({
+                name: tag.name,
+                sha: tag.commit?.sha || null
+            })) : [];
+        } catch (error) {}
+
+        try {
+            latestRelease = await fetchGithubJson(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
+        } catch (error) {}
+
+        try {
+            readme = await fetchGithubReadme(owner, repo);
+        } catch (error) {}
+
+        try {
+            readmeHtml = await renderGithubMarkdown(readme, owner, repo);
+        } catch (error) {}
+
+        res.json({
+            repo: {
+                name: repoInfo.name,
+                fullName: repoInfo.full_name,
+                description: repoInfo.description || '',
+                defaultBranch: repoInfo.default_branch,
+                stars: repoInfo.stargazers_count || 0,
+                htmlUrl: repoInfo.html_url || normalizedUrl,
+                visibility: repoInfo.private ? 'private' : 'public'
+            },
+            latestReleaseTag: latestRelease?.tag_name || null,
+            tags,
+            readme,
+            readmeHtml
+        });
+    } catch (error) {
+        if (error.status === 404) {
+            return res.status(404).json({ message: 'GitHub repository not found or it is private.' });
+        }
+        if (error.status === 403) {
+            return res.status(503).json({ message: 'GitHub API rate limit exceeded. Try again a bit later.' });
+        }
+        const status = error.status || (/required|invalid|only github|must include/i.test(error.message) ? 400 : 500);
+        res.status(status).json({ message: error.message });
+    }
+});
+
 router.post('/:botId/plugins/install/github', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
-    const { repoUrl } = req.body;
+    const { repoUrl, tag } = req.body;
+    let normalizedRepoUrl = repoUrl;
+    const normalizedTag = typeof tag === 'string' && tag.trim() ? tag.trim() : null;
     try {
-        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), repoUrl);
+        normalizedRepoUrl = normalizeGithubRepoUrl(repoUrl);
+        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), normalizedRepoUrl, prisma, false, normalizedTag);
         res.status(201).json(newPlugin);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        let status = /required|invalid|only github|must include/i.test(error.message) ? 400 : 500;
+        let message = error.message;
+
+        if (/status:\s*404|статус:\s*404/i.test(message)) {
+            status = 404;
+            message = normalizedTag
+                ? `GitHub tag "${normalizedTag}" was not found in ${normalizedRepoUrl}.`
+                : `GitHub repository was not found or is private: ${normalizedRepoUrl}.`;
+        } else if (/status:\s*403|статус:\s*403/i.test(message)) {
+            status = 503;
+            message = 'GitHub temporarily refused the request or rate limit was exceeded. Try again later.';
+        } else if (/package\.json/i.test(message)) {
+            status = 400;
+            message = 'The GitHub repository does not contain a valid plugin package.json.';
+        } else if (/fetch/i.test(message)) {
+            status = 502;
+            message = normalizedTag
+                ? `Failed to connect to GitHub while downloading tag "${normalizedTag}".`
+                : 'Failed to connect to GitHub while downloading the repository.';
+        }
+
+        res.status(status).json({ message });
     }
 });
 

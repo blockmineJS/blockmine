@@ -79,6 +79,8 @@ model InstalledPlugin {
   description String?
   sourceType  String
   sourceUri   String?
+  sourceRefType String?
+  sourceRef   String?
   path        String
   isEnabled   Boolean @default(true)
 

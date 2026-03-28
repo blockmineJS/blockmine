@@ -1,0 +1,278 @@
+.github-readme-shell {
+    background: transparent;
+    scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.github-readme-body.markdown-body {
+    --base-size-4: 0.25rem;
+    --base-size-8: 0.5rem;
+    --base-size-12: 0.75rem;
+    --base-size-16: 1rem;
+    --base-size-20: 1.25rem;
+    --base-size-24: 1.5rem;
+    --base-size-32: 2rem;
+    --fgColor-default: hsl(var(--foreground));
+    --fgColor-muted: hsl(var(--muted-foreground));
+    --fgColor-accent: hsl(var(--primary));
+    --fgColor-success: hsl(var(--foreground));
+    --fgColor-attention: hsl(var(--foreground));
+    --fgColor-danger: hsl(var(--destructive));
+    --borderColor-default: hsl(var(--border));
+    --borderColor-muted: hsl(var(--border));
+    --borderColor-accent-emphasis: hsl(var(--primary));
+    --bgColor-default: transparent;
+    --bgColor-muted: hsl(var(--muted));
+    --bgColor-neutral-muted: hsl(var(--muted));
+    --bgColor-accent-muted: hsl(var(--accent));
+    --bgColor-attention-muted: hsl(var(--accent));
+    --bgColor-success-muted: hsl(var(--accent));
+    --bgColor-danger-muted: hsl(var(--accent));
+    --control-transparent-bgColor-hover: hsl(var(--accent));
+    --control-transparent-bgColor-active: hsl(var(--accent));
+    --button-default-bgColor-rest: hsl(var(--secondary));
+    --button-default-fgColor-rest: hsl(var(--secondary-foreground));
+    color: hsl(var(--foreground));
+    background: transparent;
+    box-sizing: border-box;
+    max-width: none;
+    min-height: 100%;
+    margin: 0;
+    padding: 24px;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.github-readme-body.markdown-body > *:first-child {
+    margin-top: 0 !important;
+}
+
+.github-readme-body.markdown-body > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+.github-readme-body.markdown-body h1,
+.github-readme-body.markdown-body h2,
+.github-readme-body.markdown-body h3,
+.github-readme-body.markdown-body h4,
+.github-readme-body.markdown-body h5,
+.github-readme-body.markdown-body h6 {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.github-readme-body.markdown-body h1 {
+    font-size: 2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.github-readme-body.markdown-body h2 {
+    font-size: 1.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.github-readme-body.markdown-body h3 {
+    font-size: 1.25rem;
+}
+
+.github-readme-body.markdown-body h4 {
+    font-size: 1.05rem;
+}
+
+.github-readme-body.markdown-body p,
+.github-readme-body.markdown-body ul,
+.github-readme-body.markdown-body ol,
+.github-readme-body.markdown-body blockquote,
+.github-readme-body.markdown-body table,
+.github-readme-body.markdown-body pre,
+.github-readme-body.markdown-body details {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.github-readme-body.markdown-body a {
+    color: hsl(var(--primary));
+    text-decoration: none;
+}
+
+.github-readme-body.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+.github-readme-body.markdown-body hr,
+.github-readme-body.markdown-body table tr,
+.github-readme-body.markdown-body table th,
+.github-readme-body.markdown-body table td {
+    border-color: hsl(var(--border));
+}
+
+.github-readme-body.markdown-body table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-spacing: 0;
+    border-collapse: collapse;
+    border-radius: calc(var(--radius) + 2px);
+}
+
+.github-readme-body.markdown-body table thead tr {
+    background: hsl(var(--accent) / 0.55);
+}
+
+.github-readme-body.markdown-body table tbody tr {
+    background: transparent;
+}
+
+.github-readme-body.markdown-body table tbody tr:nth-child(2n) {
+    background: hsl(var(--accent) / 0.25);
+}
+
+.github-readme-body.markdown-body table th,
+.github-readme-body.markdown-body table td {
+    padding: 0.75rem 1rem;
+    vertical-align: top;
+}
+
+.github-readme-body.markdown-body code,
+.github-readme-body.markdown-body pre,
+.github-readme-body.markdown-body kbd,
+.github-readme-body.markdown-body samp {
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+}
+
+.github-readme-body.markdown-body code:not(pre code) {
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) - 2px);
+    padding: 0.18rem 0.45rem;
+    font-size: 0.875em;
+    white-space: break-spaces;
+}
+
+.github-readme-body.markdown-body pre {
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) + 2px);
+    padding: 1rem;
+    overflow-x: auto;
+    scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.github-readme-body.markdown-body pre code {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: inherit;
+    font-size: 0.9rem;
+    white-space: pre;
+}
+
+.github-readme-body.markdown-body blockquote {
+    color: hsl(var(--muted-foreground));
+    border-left: 4px solid hsl(var(--border));
+    padding-left: 1rem;
+    margin-left: 0;
+}
+
+.github-readme-body.markdown-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: calc(var(--radius) + 2px);
+}
+
+.github-readme-body.markdown-body ul,
+.github-readme-body.markdown-body ol {
+    padding-left: 1.4rem;
+}
+
+.github-readme-body.markdown-body li + li {
+    margin-top: 0.25rem;
+}
+
+.github-readme-body.markdown-body input[type="checkbox"] {
+    accent-color: hsl(var(--primary));
+}
+
+.github-readme-body.markdown-body details {
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) + 2px);
+    padding: 0.75rem 1rem;
+    background: hsl(var(--accent) / 0.18);
+}
+
+.github-readme-body.markdown-body summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.github-readme-body.markdown-body .highlight pre,
+.github-readme-body.markdown-body .highlight code {
+    background: transparent;
+}
+
+.github-readme-body.markdown-body .task-list-item {
+    list-style: none;
+}
+
+.github-readme-body.markdown-body .task-list-item input {
+    margin: 0 0.5rem 0.1rem -1.4rem;
+}
+
+.github-readme-shell::-webkit-scrollbar,
+.github-readme-body.markdown-body::-webkit-scrollbar,
+.github-readme-body.markdown-body pre::-webkit-scrollbar,
+.github-readme-body.markdown-body table::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.github-readme-shell::-webkit-scrollbar-track,
+.github-readme-body.markdown-body::-webkit-scrollbar-track,
+.github-readme-body.markdown-body pre::-webkit-scrollbar-track,
+.github-readme-body.markdown-body table::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.github-readme-shell::-webkit-scrollbar-thumb,
+.github-readme-body.markdown-body::-webkit-scrollbar-thumb,
+.github-readme-body.markdown-body pre::-webkit-scrollbar-thumb,
+.github-readme-body.markdown-body table::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+}
+
+.github-readme-shell::-webkit-scrollbar-thumb:hover,
+.github-readme-body.markdown-body::-webkit-scrollbar-thumb:hover,
+.github-readme-body.markdown-body pre::-webkit-scrollbar-thumb:hover,
+.github-readme-body.markdown-body table::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+@media (max-width: 768px) {
+    .github-readme-body.markdown-body {
+        padding: 16px;
+        font-size: 0.92rem;
+    }
+
+    .github-readme-body.markdown-body h1 {
+        font-size: 1.7rem;
+    }
+
+    .github-readme-body.markdown-body h2 {
+        font-size: 1.3rem;
+    }
+
+    .github-readme-body.markdown-body table th,
+    .github-readme-body.markdown-body table td {
+        padding: 0.65rem 0.75rem;
+    }
+}

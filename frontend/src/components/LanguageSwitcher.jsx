@@ -28,26 +28,28 @@ export default function LanguageSwitcher({ isCollapsed }) {
         <Button
           variant="ghost"
           className={cn(
-            "w-full transition-all",
+            "w-full transition-colors duration-200",
             isCollapsed
               ? "h-9 w-9 p-0 justify-center"
-              : "justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              : "h-9 justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
           )}
         >
           {isCollapsed ? (
             <img
               src={currentLang.flagSrc}
               alt={currentLang.name}
-              className="w-6 h-4 object-cover rounded-sm shadow-sm"
+              className="w-4 h-3 object-cover rounded-sm shadow-sm"
             />
           ) : (
             <>
-              <img
-                src={currentLang.flagSrc}
-                alt={currentLang.name}
-                className="w-6 h-4 object-cover rounded-sm shadow-sm"
-              />
-              <span className="ml-2">{currentLang.name}</span>
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center mr-2">
+                <img
+                  src={currentLang.flagSrc}
+                  alt={currentLang.name}
+                  className="h-3.5 w-4 object-cover rounded-sm shadow-sm"
+                />
+              </span>
+              <span className="truncate">{currentLang.name}</span>
             </>
           )}
         </Button>

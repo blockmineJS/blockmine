@@ -33,7 +33,7 @@ const SORT_OPTIONS = {
     downloads: { label: "По загрузкам", icon: Icons.Download }
 };
 
-export default function PluginBrowserView({ botId, installedPlugins, onInstallSuccess }) {
+export default function PluginBrowserView({ botId, isActive, installedPlugins, onInstallSuccess }) {
     const catalog = useAppStore(state => state.pluginCatalog);
     const isLoading = useAppStore(state => state.isCatalogLoading);
     const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
@@ -55,8 +55,9 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     const [size, setSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
+        if (!isActive) return;
         fetchPluginCatalog();
-    }, [fetchPluginCatalog]);
+    }, [isActive, fetchPluginCatalog]);
 
     useEffect(() => {
         localStorage.setItem('plugin-browser-view-mode', viewMode);
@@ -99,7 +100,7 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
 
         const installedPluginNames = new Set(installedPlugins.map(p => p.name));
         const catalogMapByName = new Map(catalog.map(p => [p.name, p]));
-        
+
         const allDepsWithStatus = requiredDepNames
             .map(depName => {
                 const pluginInfo = catalogMapByName.get(depName);
@@ -108,17 +109,17 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
             .filter(Boolean);
 
         const missingDeps = allDepsWithStatus.filter(dep => !dep.isInstalled);
-        
+
         if (missingDeps.length > 0) {
             setDependencyDialogState({
                 isOpen: true, mainPlugin: pluginToInstall, dependencies: allDepsWithStatus,
             });
             return;
         }
-        
+
         await installSinglePlugin(pluginToInstall);
     };
-    
+
     const confirmAndInstallAll = async () => {
         const { mainPlugin, dependencies } = dependencyDialogState;
         const toInstall = dependencies.filter(dep => !dep.isInstalled);
@@ -134,19 +135,19 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
 
     const installedPluginUrls = useMemo(() => new Set(installedPlugins.map(p => p.sourceUri)), [installedPlugins]);
     const installedPluginNames = useMemo(() => new Set(installedPlugins.map(p => p.name)), [installedPlugins]);
-    
+
     const filteredAndSortedCatalog = useMemo(() => {
         let filtered = catalog.filter(plugin => {
             const searchLower = searchQuery.toLowerCase();
             const matchesCategory = selectedCategory === 'Все плагины' || (plugin.categories && plugin.categories.includes(selectedCategory));
-            const matchesSearch = !searchQuery || 
-                (plugin.displayName || plugin.name).toLowerCase().includes(searchLower) || 
+            const matchesSearch = !searchQuery ||
+                (plugin.displayName || plugin.name).toLowerCase().includes(searchLower) ||
                 plugin.description.toLowerCase().includes(searchLower) ||
                 plugin.author.toLowerCase().includes(searchLower);
             return matchesCategory && matchesSearch;
         });
 
-        switch(sortBy) {
+        switch (sortBy) {
             case 'newest':
                 filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
                 break;
@@ -182,13 +183,13 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
     const columnCount = useMemo(() => (isXl ? 4 : isLg ? 3 : isMd ? 2 : 1), [isXl, isLg, isMd]);
     const gridRowCount = Math.ceil(filteredAndSortedCatalog.length / columnCount);
     const columnWidth = size.width > 0 ? size.width / columnCount : 0;
-    const gridRowHeight = 420;
+    const gridRowHeight = 404;
 
     const Row = ({ index, style }) => {
         const plugin = filteredAndSortedCatalog[index];
         return (
             <div style={style} className="py-1 px-4">
-                <PluginListItem 
+                <PluginListItem
                     key={plugin.id}
                     plugin={plugin}
                     botId={botId}
@@ -331,8 +332,8 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                         <p className="text-sm mt-2 max-w-md">
                             В категории "{selectedCategory}" нет плагинов, соответствующих вашему запросу "{searchQuery}".
                         </p>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             className="mt-4"
                             onClick={() => {
                                 setSearchQuery('');
@@ -346,12 +347,12 @@ export default function PluginBrowserView({ botId, installedPlugins, onInstallSu
                 )}
             </div>
 
-            <Dialog 
-                open={dependencyDialogState.isOpen} 
+            <Dialog
+                open={dependencyDialogState.isOpen}
                 onOpenChange={(isOpen) => !isOpen && setDependencyDialogState({ isOpen: false, mainPlugin: null, dependencies: [] })}
             >
                 {dependencyDialogState.mainPlugin && (
-                    <DependencyDialog 
+                    <DependencyDialog
                         mainPlugin={dependencyDialogState.mainPlugin}
                         dependencies={dependencyDialogState.dependencies}
                         onConfirm={confirmAndInstallAll}

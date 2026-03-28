@@ -77,7 +77,7 @@ export default function BotView() {
         <>
             <div className="flex flex-col h-full w-full overflow-hidden">
                 <header className="shrink-0 p-4 border-b">
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center justify-between gap-3 mb-3 md:pr-12 lg:pr-16 xl:pr-20">
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">

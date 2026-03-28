@@ -31,6 +31,36 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
+const formatPluginSourceRef = (plugin) => {
+    if (!plugin?.sourceRef) return null;
+    if (plugin.sourceRefType === 'tag') return `tag:${plugin.sourceRef}`;
+    if (plugin.sourceRefType === 'branch') return `branch:${plugin.sourceRef}`;
+    return plugin.sourceRef;
+};
+
+const getInstalledMetaBadges = (plugin) => {
+    const badges = [
+        { key: 'version', label: `v${plugin.version}`, variant: 'outline' },
+        {
+            key: 'source',
+            label: plugin.sourceType,
+            variant: plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE' ? 'secondary' : 'outline',
+            icon: plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE' ? Code : GitBranch,
+        },
+    ];
+
+    const sourceRef = formatPluginSourceRef(plugin);
+    if (sourceRef) {
+        badges.push({ key: 'source-ref', label: sourceRef, variant: 'outline' });
+    }
+
+    for (const category of plugin.manifest?.categories || []) {
+        badges.push({ key: `category-${category}`, label: category, variant: 'secondary' });
+    }
+
+    return badges;
+};
+
 function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, onUpdate, onOpenSettings, onFork, onReload, viewMode = 'grid' }) {
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(false);
@@ -58,6 +88,69 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
         if (days < 30) return `${Math.floor(days / 7)} недель назад`;
         return `${Math.floor(days / 30)} месяцев назад`;
     }, [plugin.updatedAt]);
+
+    const metaBadges = useMemo(() => getInstalledMetaBadges(plugin), [plugin]);
+    const visibleMetaBadges = metaBadges.slice(0, 4);
+    const hiddenMetaBadgeCount = Math.max(0, metaBadges.length - visibleMetaBadges.length);
+
+    const actionButtons = useMemo(() => {
+        const actions = [];
+
+        if (isEditable && onFork) {
+            actions.push({
+                key: 'edit',
+                icon: Code,
+                tooltip: 'Редактировать код',
+                onClick: () => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`),
+            });
+        }
+
+        if (isEditable && onReload) {
+            actions.push({
+                key: 'reload',
+                icon: RefreshCw,
+                tooltip: 'Перезагрузить',
+                onClick: () => onReload(plugin),
+            });
+        }
+
+        if (isForkable && onFork) {
+            actions.push({
+                key: 'fork',
+                icon: Copy,
+                tooltip: 'Сделать локальным',
+                onClick: () => onFork(plugin),
+            });
+        }
+
+        if (hasSettings && onOpenSettings) {
+            actions.push({
+                key: 'settings',
+                icon: Settings,
+                tooltip: 'Настройки',
+                onClick: () => onOpenSettings(plugin),
+            });
+        }
+
+        if (onDelete) {
+            actions.push({
+                key: 'delete',
+                icon: Trash2,
+                tooltip: 'Удалить',
+                onClick: () => onDelete(plugin),
+                disabled: plugin.isEnabled,
+                destructive: true,
+            });
+        }
+
+        return actions;
+    }, [botId, hasSettings, isEditable, isForkable, navigate, onDelete, onFork, onOpenSettings, onReload, plugin]);
+
+    const actionGridClass = actionButtons.length <= 2
+        ? 'grid-cols-2'
+        : actionButtons.length === 3
+            ? 'grid-cols-3'
+            : 'grid-cols-2';
 
     if (viewMode === 'list') {
         return (
@@ -123,17 +216,42 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     </p>
                     <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{plugin.description || 'Нет описания.'}</p>
                     
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
-                        <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'outline'} className="text-xs">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="h-5 px-2 text-xs">v{plugin.version}</Badge>
+                        <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'outline'} className="h-5 px-2 text-xs">
                             {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
                             {plugin.sourceType}
                         </Badge>
+                        {formatPluginSourceRef(plugin) && (
+                            <Badge variant="outline" className="h-5 px-2 text-xs">
+                                {formatPluginSourceRef(plugin)}
+                            </Badge>
+                        )}
                         {plugin.manifest?.categories?.slice(0, 2).map(category => (
-                            <Badge key={category} variant="secondary" className="text-xs">
+                            <Badge key={category} variant="secondary" className="h-5 px-2 text-xs">
                                 {category}
                             </Badge>
                         ))}
+                        {updateInfo && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Badge
+                                        className="h-5 cursor-pointer border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 text-xs text-white animate-pulse"
+                                        onClick={() => onUpdate?.handle(plugin.id)}
+                                    >
+                                        {isUpdatingThisPlugin ? (
+                                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <ArrowUpCircle className="mr-1 h-3 w-3" />
+                                        )}
+                                        v{updateInfo.recommendedVersion}
+                                    </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {isUpdatingThisPlugin ? 'Обновление...' : `Обновить до ${updateInfo.recommendedVersion}`}
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
                         {lastUpdated && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
@@ -144,7 +262,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 ml-4">
-                    {updateInfo && onUpdate && (
+                    {false && updateInfo && onUpdate && (
                         <Button 
                             size="sm" 
                             onClick={() => onUpdate.handle(plugin.id)} 
@@ -238,15 +356,15 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             )}
             
             {(isNew || updateInfo) && (
-                <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                <div className="absolute left-0 top-0 z-10 flex flex-col items-start gap-1">
                     {isNew && (
-                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
+                        <Badge className="rounded-none rounded-br-md border-0 bg-gradient-to-r from-green-500 to-emerald-500 px-2 py-0.5 text-[10px] text-white shadow-sm">
                             <Sparkles className="h-3 w-3 mr-1" />
                             Новое
                         </Badge>
                     )}
                     {updateInfo && (
-                        <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 text-xs animate-pulse">
+                        <Badge className="rounded-none rounded-br-md border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 py-0.5 text-[10px] text-white shadow-sm animate-pulse">
                             <ArrowUpCircle className="h-3 w-3 mr-1" />
                             Обновление
                         </Badge>
@@ -254,7 +372,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 </div>
             )}
             
-            <CardHeader className={cardStyles.header}>
+            <CardHeader className="pb-2 pt-5">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="relative shrink-0">
@@ -266,9 +384,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                     isHovered && "scale-110"
                                 )} 
                             />
-                            {isNew && (
-                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                            )}
                         </div>
                         <div className="min-w-0 flex-1">
                             <Tooltip>
@@ -277,7 +392,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                         to={`/bots/${botId}/plugins/view/${plugin.name}`}
                                         className="block"
                                     >
-                                        <CardTitle className="text-lg truncate hover:text-primary transition-colors cursor-pointer">
+                                        <CardTitle className="line-clamp-2 text-lg leading-tight hover:text-primary transition-colors cursor-pointer">
                                             {plugin.displayName || plugin.name}
                                         </CardTitle>
                                     </Link>
@@ -294,31 +409,69 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             </CardDescription>
                         </div>
                     </div>
-                    <Switch
-                        checked={plugin.isEnabled}
-                        onCheckedChange={onToggle ? ((checked) => onToggle(plugin, checked)) : undefined}
-                        disabled={!onToggle}
-                        className="shrink-0"
-                    />
+                    <div className="flex shrink-0 items-center gap-2">
+                        {updateInfo && onUpdate && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-full border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                                        onClick={() => onUpdate.handle(plugin.id)}
+                                        disabled={isUpdatingThisPlugin}
+                                    >
+                                        {isUpdatingThisPlugin ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <ArrowUpCircle className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {isUpdatingThisPlugin ? 'Обновление...' : `Обновить до ${updateInfo.recommendedVersion}`}
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                        <Switch
+                            checked={plugin.isEnabled}
+                            onCheckedChange={onToggle ? ((checked) => onToggle(plugin, checked)) : undefined}
+                            disabled={!onToggle}
+                            className="shrink-0"
+                        />
+                    </div>
                 </div>
             </CardHeader>
             
-            <CardContent className={cardStyles.content}>
+            <CardContent className="space-y-3 pb-2">
                 <p className="text-sm text-muted-foreground line-clamp-2">
                     {plugin.description || 'Нет описания.'}
                 </p>
                 
                 <div className="flex flex-wrap gap-1">
-                    <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
-                    <Badge variant={plugin.sourceType === 'LOCAL' ? 'secondary' : 'outline'} className="text-xs">
-                        {plugin.sourceType === 'LOCAL' ? <Code className="h-3 w-3 mr-1" /> : <GitBranch className="h-3 w-3 mr-1" />}
-                        {plugin.sourceType}
-                    </Badge>
-                    {plugin.manifest?.categories?.slice(0, 1).map(category => (
-                        <Badge key={category} variant="secondary" className="text-xs">
-                            {category}
+                    {visibleMetaBadges.map(({ key, label, variant, icon: Icon }) => (
+                        <Badge key={key} variant={variant} className="max-w-full text-xs">
+                            {Icon ? <Icon className="mr-1 h-3 w-3" /> : null}
+                            <span className="truncate">{label}</span>
                         </Badge>
                     ))}
+                    {hiddenMetaBadgeCount > 0 && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant="outline" className="cursor-help text-xs hover:bg-muted">
+                                    +{hiddenMetaBadgeCount}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                                <div className="flex flex-wrap gap-1">
+                                    {metaBadges.slice(visibleMetaBadges.length).map(({ key, label }) => (
+                                        <Badge key={key} variant="secondary" className="text-xs">
+                                            {label}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
                 </div>
                 
                 {(plugin.commands?.length > 0 || plugin.eventGraphs?.length > 0) && (
@@ -330,21 +483,21 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                     Команды: {plugin.commands.length}
                                 </span>
                                 <div className="flex flex-wrap gap-1">
-                                    {plugin.commands.slice(0, 3).map(cmd => (
+                                    {plugin.commands.slice(0, 2).map(cmd => (
                                         <Badge key={cmd.id} variant="outline" className="text-xs">
                                             {cmd.name}
                                         </Badge>
                                     ))}
-                                    {plugin.commands.length > 3 && (
+                                    {plugin.commands.length > 2 && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
-                                                    +{plugin.commands.length - 3}
+                                                    +{plugin.commands.length - 2}
                                                 </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent className="max-w-xs">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {plugin.commands.slice(3).map(cmd => (
+                                                    {plugin.commands.slice(2).map(cmd => (
                                                         <Badge key={cmd.id} variant="secondary" className="text-xs">
                                                             {cmd.name}
                                                         </Badge>
@@ -364,21 +517,21 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                                     Графы событий: {plugin.eventGraphs.length}
                                 </span>
                                 <div className="flex flex-wrap gap-1">
-                                    {plugin.eventGraphs.slice(0, 3).map(graph => (
+                                    {plugin.eventGraphs.slice(0, 2).map(graph => (
                                         <Badge key={graph.id} variant="outline" className="text-xs">
                                             {graph.name}
                                         </Badge>
                                     ))}
-                                    {plugin.eventGraphs.length > 3 && (
+                                    {plugin.eventGraphs.length > 2 && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
-                                                    +{plugin.eventGraphs.length - 3}
+                                                    +{plugin.eventGraphs.length - 2}
                                                 </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent className="max-w-xs">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {plugin.eventGraphs.slice(3).map(graph => (
+                                                    {plugin.eventGraphs.slice(2).map(graph => (
                                                         <Badge key={graph.id} variant="secondary" className="text-xs">
                                                             {graph.name}
                                                         </Badge>
@@ -401,10 +554,10 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 )}
             </CardContent>
             
-            <CardFooter className={cardStyles.footer}>
-                {updateInfo && onUpdate && (
+            <CardFooter className="mt-auto border-t pt-2">
+                {false && updateInfo && onUpdate && (
                     <Button 
-                        className="w-full"
+                        className="h-9 w-full justify-center text-sm"
                         size="sm"
                         onClick={() => onUpdate.handle(plugin.id)} 
                         disabled={isUpdatingThisPlugin}
@@ -423,11 +576,11 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     </Button>
                 )}
                 
-                <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="flex w-full items-center gap-2">
                     {isEditable && onFork && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
+                                <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1" onClick={() => navigate(`/bots/${botId}/plugins/edit/${plugin.name}`)}>
                                     <Code className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -437,7 +590,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {isEditable && onReload && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => onReload(plugin)}>
+                                <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1" onClick={() => onReload(plugin)}>
                                     <RefreshCw className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -447,7 +600,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {isForkable && onFork && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => onFork(plugin)}>
+                                <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1" onClick={() => onFork(plugin)}>
                                     <Code className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -457,7 +610,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {hasSettings && onOpenSettings && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => onOpenSettings(plugin)}>
+                                <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1" onClick={() => onOpenSettings(plugin)}>
                                     <Settings className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -467,7 +620,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                     {onDelete && (
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
+                            <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1" onClick={() => onDelete(plugin)} disabled={plugin.isEnabled}>
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
@@ -557,7 +710,7 @@ export default function InstalledPluginsView({
     const columnCount = useMemo(() => (isXl ? 4 : isLg ? 3 : isMd ? 2 : 1), [isXl, isLg, isMd]);
     const rowCount = Math.ceil(sortedAndFilteredPlugins.length / columnCount);
     const columnWidth = size.width > 0 ? size.width / columnCount : 0;
-    const rowHeight = 420; 
+    const rowHeight = 388; 
 
     useEffect(() => {
         localStorage.setItem('installed-plugins-view-mode', viewMode);
@@ -729,7 +882,7 @@ export default function InstalledPluginsView({
                                 height={size.height}
                                 width={size.width}
                                 itemCount={sortedAndFilteredPlugins.length}
-                                itemSize={195}
+                            itemSize={150}
                                 overscanCount={5}
                             >
                                 {Row}

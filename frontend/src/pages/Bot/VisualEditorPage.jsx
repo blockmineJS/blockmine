@@ -728,7 +728,7 @@ function BotVisualEditorPage() {
                                     handlePaneInteraction(e, openMenu);
                                 }}
                             >
-                                <Controls />
+                                <Controls className="visual-editor-flow-controls" />
                                 <Background />
                             </ReactFlow>
 

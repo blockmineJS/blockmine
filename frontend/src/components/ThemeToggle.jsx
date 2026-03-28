@@ -16,7 +16,7 @@ export default function ThemeToggle({ isCollapsed }) {
         <Button 
           variant="ghost" 
           className={cn(
-            "w-full transition-all",
+            "w-full transition-colors duration-200",
             isCollapsed 
               ? "h-9 w-9 p-0 justify-center" 
               : "justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"

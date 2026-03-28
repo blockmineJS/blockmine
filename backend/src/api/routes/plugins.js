@@ -6,21 +6,119 @@ const { pluginManager } = require('../../core/services');
 
 const prisma = new PrismaClient();
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
+const CATALOG_TTL_MS = 5 * 60 * 1000;
+const PLUGIN_DETAIL_TTL_MS = 10 * 60 * 1000;
 
-const getCacheBustedUrl = (url) => `${url}?t=${new Date().getTime()}`;
+let catalogCache = {
+    data: null,
+    expiresAt: 0,
+    pending: null,
+};
 
+const pluginDetailCache = new Map();
 
-router.get('/catalog', async (req, res) => {
-    try {
-        const response = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        
+async function fetchOfficialCatalog(force = false) {
+    const now = Date.now();
+
+    if (!force && catalogCache.data && catalogCache.expiresAt > now) {
+        return catalogCache.data;
+    }
+
+    if (catalogCache.pending) {
+        return catalogCache.pending;
+    }
+
+    catalogCache.pending = (async () => {
+        const response = await fetch(OFFICIAL_CATALOG_URL);
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`[API Error] Failed to fetch catalog from GitHub. Status: ${response.status}, Response: ${errorText}`);
             throw new Error(`GitHub returned status ${response.status}`);
         }
-        
-        res.json(await response.json());
+
+        const data = await response.json();
+        catalogCache = {
+            data,
+            expiresAt: Date.now() + CATALOG_TTL_MS,
+            pending: null,
+        };
+        return data;
+    })();
+
+    try {
+        return await catalogCache.pending;
+    } catch (error) {
+        catalogCache.pending = null;
+        throw error;
+    }
+}
+
+function getCachedPluginDetail(pluginName) {
+    const cached = pluginDetailCache.get(pluginName);
+    if (!cached) return null;
+    if (cached.expiresAt <= Date.now()) {
+        pluginDetailCache.delete(pluginName);
+        return null;
+    }
+    return cached.data;
+}
+
+function setCachedPluginDetail(pluginName, data) {
+    pluginDetailCache.set(pluginName, {
+        data,
+        expiresAt: Date.now() + PLUGIN_DETAIL_TTL_MS,
+    });
+}
+
+async function fetchGithubReadme(owner, repo) {
+    const readmeUrls = [
+        `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
+        `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`,
+        `https://raw.githubusercontent.com/${owner}/${repo}/main/readme.md`,
+        `https://raw.githubusercontent.com/${owner}/${repo}/master/readme.md`,
+    ];
+
+    for (const url of readmeUrls) {
+        const readmeResponse = await fetch(url);
+        if (readmeResponse.ok) {
+            return readmeResponse.text();
+        }
+    }
+
+    return null;
+}
+
+async function renderGithubMarkdown(markdown, owner, repo) {
+    if (!markdown) {
+        return null;
+    }
+
+    const response = await fetch('https://api.github.com/markdown', {
+        method: 'POST',
+        headers: {
+            'Accept': 'text/html',
+            'Content-Type': 'application/json',
+            'User-Agent': 'BlockMine'
+        },
+        body: JSON.stringify({
+            text: markdown,
+            mode: 'gfm',
+            context: `${owner}/${repo}`
+        })
+    });
+
+    if (!response.ok) {
+        return null;
+    }
+
+    return response.text();
+}
+
+
+router.get('/catalog', async (req, res) => {
+    try {
+        res.json(await fetchOfficialCatalog());
     } catch (error) {
         console.error(`[API Error] Could not fetch catalog URL. Reason: ${error.message}`);
         res.status(500).json({ error: 'Не удалось загрузить каталог плагинов.' });
@@ -31,9 +129,7 @@ router.post('/check-updates/:botId', authenticateUniversal, authorize('plugin:up
     try {
         const botId = parseInt(req.params.botId);
         
-        const catalogResponse = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        if (!catalogResponse.ok) throw new Error('Не удалось загрузить каталог для проверки обновлений.');
-        const catalog = await catalogResponse.json();
+        const catalog = await fetchOfficialCatalog();
 
         const updates = await pluginManager.checkForUpdates(botId, catalog);
         res.json(updates);
@@ -92,6 +188,8 @@ router.get('/:id/info', authenticateUniversal, authorize('plugin:list'), async (
                 description: true,
                 sourceType: true,
                 sourceUri: true,
+                sourceRefType: true,
+                sourceRef: true,
                 isEnabled: true,
                 manifest: true,
                 settings: true,
@@ -142,6 +240,8 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
                 description: true,
                 sourceType: true,
                 sourceUri: true,
+                sourceRefType: true,
+                sourceRef: true,
                 isEnabled: true,
                 manifest: true,
                 settings: true,
@@ -179,11 +279,13 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
 router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;
+        const cachedDetail = getCachedPluginDetail(pluginName);
 
-        const catalogResponse = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        if (!catalogResponse.ok) throw new Error(`Failed to fetch catalog, status: ${catalogResponse.status}`);
+        if (cachedDetail) {
+            return res.json(cachedDetail);
+        }
 
-        const catalog = await catalogResponse.json();
+        const catalog = await fetchOfficialCatalog();
         const pluginInfo = catalog.find(p => p.name === pluginName);
 
         if (!pluginInfo) {
@@ -191,6 +293,7 @@ router.get('/catalog/:name', async (req, res) => {
         }
 
         let readmeContent = pluginInfo.description || 'Описание для этого плагина не предоставлено.';
+        let readmeHtml = null;
 
         try {
             const urlParts = new URL(pluginInfo.repoUrl);
@@ -200,19 +303,10 @@ router.get('/catalog/:name', async (req, res) => {
                 const owner = pathParts[0];
                 const repo = pathParts[1].replace('.git', '');
 
-                const readmeUrls = [
-                    `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/main/readme.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/master/readme.md`,
-                ];
-
-                for (const url of readmeUrls) {
-                    const readmeResponse = await fetch(getCacheBustedUrl(url));
-                    if (readmeResponse.ok) {
-                        readmeContent = await readmeResponse.text();
-                        break;
-                    }
+                const fetchedReadme = await fetchGithubReadme(owner, repo);
+                if (fetchedReadme) {
+                    readmeContent = fetchedReadme;
+                    readmeHtml = await renderGithubMarkdown(fetchedReadme, owner, repo);
                 }
             }
         } catch (readmeError) {
@@ -221,9 +315,11 @@ router.get('/catalog/:name', async (req, res) => {
 
         const finalPluginData = {
             ...pluginInfo,
-            fullDescription: readmeContent
+            fullDescription: readmeContent,
+            readmeHtml
         };
 
+        setCachedPluginDetail(pluginName, finalPluginData);
         res.json(finalPluginData);
     } catch (error) {
         console.error(`[API Error] /catalog/:name :`, error);

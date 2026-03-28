@@ -5,9 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap, Github } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
+import GitHubInstallDialog from '@/components/GitHubInstallDialog';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
@@ -34,7 +35,7 @@ export default function PluginsTab() {
     const deletePlugin = useAppStore(state => state.deletePlugin);
     const updatePlugin = useAppStore(state => state.updatePlugin);
     const installPluginFromPath = useAppStore(state => state.installPluginFromPath);
-    const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
+    const installPluginFromRepo = useAppStore(state => state.installPluginFromRepo);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
     const reloadLocalPlugin = useAppStore(state => state.reloadLocalPlugin);
@@ -42,6 +43,8 @@ export default function PluginsTab() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
     const [isUpdating, setIsUpdating] = useState(null);
+    const [isGithubInstallOpen, setIsGithubInstallOpen] = useState(false);
+    const [isGithubInstalling, setIsGithubInstalling] = useState(false);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -55,14 +58,13 @@ export default function PluginsTab() {
     useEffect(() => {
         const loadInitialData = async () => {
             setIsLoading(true);
-            await fetchPluginCatalog();
             await fetchInstalledPlugins(intBotId);
             setIsLoading(false);
         };
         if (bot) {
             loadInitialData();
         }
-    }, [bot, intBotId, fetchInstalledPlugins, fetchPluginCatalog]);
+    }, [bot, intBotId, fetchInstalledPlugins]);
 
     useEffect(() => {
         if (activeTab === 'installed' && bot && installedPlugins.length > 0 && !isLoading) {
@@ -119,6 +121,16 @@ export default function PluginsTab() {
             setIsLocalInstallOpen(false);
         } finally {
             setIsLocalInstalling(false);
+        }
+    };
+
+    const handleGithubInstall = async (repoUrl, tag = null) => {
+        setIsGithubInstalling(true);
+        try {
+            await installPluginFromRepo(intBotId, repoUrl, null, tag);
+            setIsGithubInstallOpen(false);
+        } finally {
+            setIsGithubInstalling(false);
         }
     };
     
@@ -183,6 +195,15 @@ export default function PluginsTab() {
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
+                        <Dialog open={isGithubInstallOpen} onOpenChange={setIsGithubInstallOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <Github className="h-4 w-4" />
+                                    <span className="ml-2">{t('actions.installGithub')}</span>
+                                </Button>
+                            </DialogTrigger>
+                            <GitHubInstallDialog botId={intBotId} onInstall={handleGithubInstall} onCancel={() => setIsGithubInstallOpen(false)} isInstalling={isGithubInstalling} />
+                        </Dialog>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
                             <span className="ml-2">{t('actions.createPlugin')}</span>
@@ -212,6 +233,7 @@ export default function PluginsTab() {
             <TabsContent value="browser" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
                 <PluginBrowserView 
                     botId={intBotId}
+                    isActive={activeTab === 'browser'}
                     installedPlugins={installedPlugins}
                     onInstallSuccess={handlePluginOperationSuccess}
                 />
