@@ -32,6 +32,8 @@ const enrichCatalog = (catalogData = [], statsMap = new Map()) =>
             topPosition: index + 1,
         }));
 
+const PLUGIN_STATS_URL = (import.meta.env.VITE_PLUGIN_STATS_URL || '/api/stats').trim();
+
 export const createPluginSlice = (set, get) => {
     const INSTALLED_PLUGINS_CACHE_TTL = 30 * 1000;
 
@@ -78,7 +80,7 @@ export const createPluginSlice = (set, get) => {
                 const catalogData = await apiHelper('/api/plugins/catalog');
                 set({ pluginCatalog: enrichCatalog(catalogData), isCatalogLoading: false });
 
-                fetch('http://185.65.200.184:3000/api/stats')
+                fetch(PLUGIN_STATS_URL)
                     .then(response => response.ok ? response.json() : null)
                     .then(statsData => {
                         if (!statsData) return;

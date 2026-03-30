@@ -216,7 +216,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             </>
                         )}
                     </Button>
-                    <span className="text-xs text-muted-foreground">v{plugin.latestTag.replace('v', '')}</span>
+                    <span className="text-xs text-muted-foreground">v{(plugin.latestTag || '0.0.0').replace(/^v/i, '')}</span>
                 </div>
 
             </div>

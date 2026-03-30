@@ -75,7 +75,11 @@ export default function PluginDetailPage() {
             }
         };
 
-        const hasCachedPluginDetails = cachedCatalogPlugin?.readmeHtml || cachedCatalogPlugin?.readme;
+        const hasCachedPluginDetails = Boolean(
+            cachedCatalogPlugin?.readmeHtml ||
+            cachedCatalogPlugin?.fullDescription ||
+            cachedCatalogPlugin?.readme
+        );
 
         if (cachedCatalogPlugin) {
             setPlugin(current => current && current.name === cachedCatalogPlugin.name
@@ -244,7 +248,7 @@ export default function PluginDetailPage() {
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                                 <span>{t('by')} {plugin.author}</span>
                                 <Separator orientation="vertical" className="h-4" />
-                                <span>v{plugin.latestTag.replace('v','')}</span>
+                                <span>v{(plugin.latestTag || '0.0.0').replace(/^v/i, '')}</span>
                             </div>
                             
                             <div className="flex flex-wrap gap-2 mb-6">
@@ -318,12 +322,14 @@ export default function PluginDetailPage() {
                             )}
 
                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="flex-1" asChild>
-                                    <a href={plugin.repoUrl} target="_blank" rel="noopener noreferrer">
-                                        <Github className="mr-2 h-4 w-4" />
-                                        GitHub
-                                    </a>
-                                </Button>
+                                {plugin.repoUrl && (
+                                    <Button variant="outline" size="sm" className="flex-1" asChild>
+                                        <a href={plugin.repoUrl} target="_blank" rel="noopener noreferrer">
+                                            <Github className="mr-2 h-4 w-4" />
+                                            GitHub
+                                        </a>
+                                    </Button>
+                                )}
                                 {installedPlugin && (
                                     <Button
                                         variant="outline"

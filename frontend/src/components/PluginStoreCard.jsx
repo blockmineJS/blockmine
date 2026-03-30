@@ -7,6 +7,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Download, CheckCircle, Loader2, Github, GitMerge, Check, Users, TrendingUp, Sparkles, Server, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const getDependencyLabel = (count) => {
+    if (count % 10 === 1 && count % 100 !== 11) return 'зависимость';
+    if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return 'зависимости';
+    return 'зависимостей';
+};
+
+const getLatestVersion = (tag) => (tag || '0.0.0').replace(/^v/i, '');
+
 export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onInstall, botId }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const [isHovered, setIsHovered] = useState(false);
@@ -62,21 +70,23 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2 pt-0.5">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <a
-                                        href={plugin.repoUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="rounded-md p-1 text-muted-foreground transition-all hover:scale-110 hover:text-foreground"
-                                    >
-                                        <Github className="h-5 w-5" />
-                                    </a>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Открыть репозиторий</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            {plugin.repoUrl && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <a
+                                            href={plugin.repoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="rounded-md p-1 text-muted-foreground transition-all hover:scale-110 hover:text-foreground"
+                                        >
+                                            <Github className="h-5 w-5" />
+                                        </a>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Открыть репозиторий</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
 
                             {isInstalled && (
                                 <div className="rounded-full bg-green-600 p-2 text-white shadow-lg">
@@ -111,7 +121,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                         </div>
                         <div className="flex items-center gap-1">
                             <Download className="h-3 w-3" />
-                            <span>v{plugin.latestTag.replace('v', '')}</span>
+                            <span>v{getLatestVersion(plugin.latestTag)}</span>
                         </div>
                     </div>
 
@@ -127,9 +137,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                                     <Badge variant="outline" className="cursor-help text-xs">
                                         <Server className="mr-1 h-3 w-3" />
                                         {plugin.supportedHosts.length <= 2
-                                            ? plugin.supportedHosts.map(host => (
-                                                <span key={host} className="font-mono">{host}</span>
-                                            ))
+                                            ? plugin.supportedHosts.join(', ')
                                             : `${plugin.supportedHosts.length} серверов`}
                                     </Badge>
                                 </TooltipTrigger>
@@ -152,7 +160,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
                                     <div className="flex items-center gap-2 text-xs">
                                         <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600">
                                             <GitMerge className="mr-1 h-3 w-3" />
-                                            Требует {plugin.dependencies.length} зависимост{plugin.dependencies.length === 1 ? 'ь' : 'и'}
+                                            Требует {plugin.dependencies.length} {getDependencyLabel(plugin.dependencies.length)}
                                         </Badge>
                                     </div>
                                 </TooltipTrigger>

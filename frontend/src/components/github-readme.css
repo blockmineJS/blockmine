@@ -141,7 +141,7 @@
 .github-readme-body.markdown-body pre,
 .github-readme-body.markdown-body kbd,
 .github-readme-body.markdown-body samp {
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+    font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 }
 
 .github-readme-body.markdown-body code:not(pre code) {

@@ -10,6 +10,17 @@ import { apiHelper } from '@/lib/api';
 import { ArrowLeft, ExternalLink, Github, Loader2, Star } from 'lucide-react';
 import GitHubReadmeContent from '@/components/GitHubReadmeContent';
 
+const isValidGithubRepoUrl = (value) => {
+    try {
+        const url = new URL(value);
+        if (!['github.com', 'www.github.com'].includes(url.hostname)) return false;
+        const parts = url.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+        return parts.length >= 2;
+    } catch {
+        return false;
+    }
+};
+
 export default function GitHubInstallDialog({ botId, onInstall, onCancel, isInstalling }) {
     const { t } = useTranslation('plugins');
     const [step, setStep] = useState('url');
@@ -55,7 +66,12 @@ export default function GitHubInstallDialog({ botId, onInstall, onCancel, isInst
 
     const handleLoadPreview = async (e) => {
         e.preventDefault();
-        if (!repoUrl.trim()) {
+        const normalizedUrl = repoUrl.trim();
+        if (!normalizedUrl) {
+            return;
+        }
+        if (!isValidGithubRepoUrl(normalizedUrl)) {
+            setPreviewError(t('githubInstall.urlHint'));
             return;
         }
 
@@ -67,7 +83,7 @@ export default function GitHubInstallDialog({ botId, onInstall, onCancel, isInst
         try {
             const data = await apiHelper(`/api/bots/${botId}/plugins/install/github/preview`, {
                 method: 'POST',
-                body: { repoUrl: repoUrl.trim() }
+                body: { repoUrl: normalizedUrl }
             });
             setPreview(data);
             setStep('preview');

@@ -169,7 +169,7 @@ export function getEntityMaterial(blockName) {
                 texture.minFilter = THREE.NearestFilter;
                 if ('colorSpace' in texture) {
                     texture.colorSpace = SRGB_COLOR_SPACE;
-                } else if ('encoding' in texture && THREE.sRGBEncoding) {
+                } else if (THREE.sRGBEncoding) {
                     texture.encoding = THREE.sRGBEncoding;
                 }
                 material.map = texture;

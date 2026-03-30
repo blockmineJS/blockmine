@@ -16,6 +16,31 @@ let catalogCache = {
 };
 
 const pluginDetailCache = new Map();
+const GITHUB_REQUEST_TIMEOUT_MS = 10000;
+
+function getGithubHeaders(extra = {}) {
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'BlockMine',
+        ...extra
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    return headers;
+}
+
+async function fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 async function fetchOfficialCatalog(force = false) {
     const now = Date.now();
@@ -80,7 +105,7 @@ async function fetchGithubReadme(owner, repo) {
     ];
 
     for (const url of readmeUrls) {
-        const readmeResponse = await fetch(url);
+        const readmeResponse = await fetchWithTimeout(url, { headers: getGithubHeaders() });
         if (readmeResponse.ok) {
             return readmeResponse.text();
         }
@@ -94,13 +119,12 @@ async function renderGithubMarkdown(markdown, owner, repo) {
         return null;
     }
 
-    const response = await fetch('https://api.github.com/markdown', {
+    const response = await fetchWithTimeout('https://api.github.com/markdown', {
         method: 'POST',
-        headers: {
+        headers: getGithubHeaders({
             'Accept': 'text/html',
-            'Content-Type': 'application/json',
-            'User-Agent': 'BlockMine'
-        },
+            'Content-Type': 'application/json'
+        }),
         body: JSON.stringify({
             text: markdown,
             mode: 'gfm',
@@ -109,6 +133,12 @@ async function renderGithubMarkdown(markdown, owner, repo) {
     });
 
     if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub Markdown] Rate limit reached while rendering ${owner}/${repo}.`);
+            }
+        }
         return null;
     }
 

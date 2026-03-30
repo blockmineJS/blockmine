@@ -1,7 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
-import { shallow } from 'zustand/shallow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,7 +13,6 @@ const VariablesPanel = () => {
     const updateVariable = useVisualEditorStore(state => state.updateVariable);
     const removeVariable = useVisualEditorStore(state => state.removeVariable);
     
-    const editorType = useVisualEditorStore(state => state.editorType);
     const variables = command?.variables || [];
 
     return (

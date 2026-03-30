@@ -129,6 +129,8 @@ export default function PluginsTab() {
         try {
             await installPluginFromRepo(intBotId, repoUrl, null, tag);
             setIsGithubInstallOpen(false);
+        } catch (error) {
+            console.error('[PluginsTab] GitHub install failed:', error);
         } finally {
             setIsGithubInstalling(false);
         }

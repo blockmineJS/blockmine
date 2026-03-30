@@ -146,12 +146,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
         return actions;
     }, [botId, hasSettings, isEditable, isForkable, navigate, onDelete, onFork, onOpenSettings, onReload, plugin]);
 
-    const actionGridClass = actionButtons.length <= 2
-        ? 'grid-cols-2'
-        : actionButtons.length === 3
-            ? 'grid-cols-3'
-            : 'grid-cols-2';
-
     if (viewMode === 'list') {
         return (
             <div 
@@ -262,22 +256,6 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 ml-4">
-                    {false && updateInfo && onUpdate && (
-                        <Button 
-                            size="sm" 
-                            onClick={() => onUpdate.handle(plugin.id)} 
-                            disabled={isUpdatingThisPlugin}
-                        >
-                            {isUpdatingThisPlugin ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <>
-                                    <ArrowUpCircle className="h-4 w-4 mr-1" />
-                                    v{updateInfo.recommendedVersion}
-                                </>
-                            )}
-                        </Button>
-                    )}
                     <div className="flex gap-1">
                         {isEditable && onFork && (
                             <Tooltip>
@@ -555,7 +533,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
             </CardContent>
             
             <CardFooter className="mt-auto border-t pt-2">
-                {false && updateInfo && onUpdate && (
+                {updateInfo && onUpdate && (
                     <Button 
                         className="h-9 w-full justify-center text-sm"
                         size="sm"

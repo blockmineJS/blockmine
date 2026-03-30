@@ -17,6 +17,7 @@ const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
 const { filterSecretSettings, prepareSettingsForSave, isGroupedSettings } = require('../../core/utils/secretsFilter');
 const PluginHooks = require('../../core/PluginHooks');
+const rateLimit = require('express-rate-limit');
 
 const multer = require('multer');
 const archiver = require('archiver');
@@ -26,6 +27,38 @@ const os = require('os');
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
+const GITHUB_REQUEST_TIMEOUT_MS = 10000;
+const GITHUB_OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
+const githubPreviewLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many GitHub preview requests. Try again later.' },
+});
+
+const githubInstallLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many GitHub install requests. Try again later.' },
+});
+
+function getGithubHeaders(extra = {}) {
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'BlockMine',
+        ...extra
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    return headers;
+}
 
 function parseGithubRepoUrl(repoUrl) {
     if (typeof repoUrl !== 'string') {
@@ -59,6 +92,9 @@ function parseGithubRepoUrl(repoUrl) {
     if (!owner || !repo) {
         throw new Error('GitHub repository URL must include owner and repository name.');
     }
+    if (!GITHUB_OWNER_REPO_PATTERN.test(owner) || !GITHUB_OWNER_REPO_PATTERN.test(repo)) {
+        throw new Error('GitHub repository URL contains unsupported owner or repository characters.');
+    }
 
     return {
         owner,
@@ -72,12 +108,17 @@ function normalizeGithubRepoUrl(repoUrl) {
 }
 
 async function fetchGithubJson(url) {
-    const response = await fetch(url, {
-        headers: {
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'BlockMine'
-        }
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+        response = await fetch(url, {
+            headers: getGithubHeaders(),
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
         const error = new Error(`GitHub API request failed with status ${response.status}.`);
@@ -89,12 +130,17 @@ async function fetchGithubJson(url) {
 }
 
 async function fetchGithubReadme(owner, repo) {
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-        headers: {
-            'Accept': 'application/vnd.github.raw+json',
-            'User-Agent': 'BlockMine'
-        }
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+        response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+            headers: getGithubHeaders({ 'Accept': 'application/vnd.github.raw+json' }),
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
         return null;
@@ -108,19 +154,26 @@ async function renderGithubMarkdown(markdown, owner, repo) {
         return null;
     }
 
-    const response = await fetch('https://api.github.com/markdown', {
-        method: 'POST',
-        headers: {
-            'Accept': 'text/html',
-            'Content-Type': 'application/json',
-            'User-Agent': 'BlockMine'
-        },
-        body: JSON.stringify({
-            text: markdown,
-            mode: 'gfm',
-            context: `${owner}/${repo}`
-        })
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+        response = await fetch('https://api.github.com/markdown', {
+            method: 'POST',
+            headers: getGithubHeaders({
+                'Accept': 'text/html',
+                'Content-Type': 'application/json',
+            }),
+            signal: controller.signal,
+            body: JSON.stringify({
+                text: markdown,
+                mode: 'gfm',
+                context: `${owner}/${repo}`
+            })
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
         return null;
@@ -724,7 +777,7 @@ router.get('/:botId/plugins', authenticateUniversal, checkBotAccess, authorize('
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
-router.post('/:botId/plugins/install/github/preview', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/github/preview', githubPreviewLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { repoUrl } = req.body;
 
     try {
@@ -742,19 +795,27 @@ router.post('/:botId/plugins/install/github/preview', authenticateUniversal, che
                 name: tag.name,
                 sha: tag.commit?.sha || null
             })) : [];
-        } catch (error) {}
+        } catch (error) {
+            console.warn(`[GitHub Preview] Failed to load tags for ${owner}/${repo}:`, error.message);
+        }
 
         try {
             latestRelease = await fetchGithubJson(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
-        } catch (error) {}
+        } catch (error) {
+            console.warn(`[GitHub Preview] Failed to load latest release for ${owner}/${repo}:`, error.message);
+        }
 
         try {
             readme = await fetchGithubReadme(owner, repo);
-        } catch (error) {}
+        } catch (error) {
+            console.warn(`[GitHub Preview] Failed to load README for ${owner}/${repo}:`, error.message);
+        }
 
         try {
             readmeHtml = await renderGithubMarkdown(readme, owner, repo);
-        } catch (error) {}
+        } catch (error) {
+            console.warn(`[GitHub Preview] Failed to render README for ${owner}/${repo}:`, error.message);
+        }
 
         res.json({
             repo: {
@@ -772,18 +833,21 @@ router.post('/:botId/plugins/install/github/preview', authenticateUniversal, che
             readmeHtml
         });
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return res.status(504).json({ message: 'GitHub request timed out. Please try again.' });
+        }
         if (error.status === 404) {
             return res.status(404).json({ message: 'GitHub repository not found or it is private.' });
         }
         if (error.status === 403) {
             return res.status(503).json({ message: 'GitHub API rate limit exceeded. Try again a bit later.' });
         }
-        const status = error.status || (/required|invalid|only github|must include/i.test(error.message) ? 400 : 500);
+        const status = error.status || (/required|invalid|only github|must include|unsupported/i.test(error.message) ? 400 : 500);
         res.status(status).json({ message: error.message });
     }
 });
 
-router.post('/:botId/plugins/install/github', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+router.post('/:botId/plugins/install/github', githubInstallLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { repoUrl, tag } = req.body;
     let normalizedRepoUrl = repoUrl;
@@ -793,7 +857,7 @@ router.post('/:botId/plugins/install/github', authenticateUniversal, checkBotAcc
         const newPlugin = await pluginManager.installFromGithub(parseInt(botId), normalizedRepoUrl, prisma, false, normalizedTag);
         res.status(201).json(newPlugin);
     } catch (error) {
-        let status = /required|invalid|only github|must include/i.test(error.message) ? 400 : 500;
+        let status = /required|invalid|only github|must include|unsupported/i.test(error.message) ? 400 : 500;
         let message = error.message;
 
         if (/status:\s*404|статус:\s*404/i.test(message)) {

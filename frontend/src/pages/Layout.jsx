@@ -408,8 +408,8 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                     isCollapsed && "justify-center"
                 )}
                 onClick={async () => {
-                    await useAppStore.getState().openChangelogDialog();
                     onLinkClick();
+                    await useAppStore.getState().openChangelogDialog();
                 }}
             >
                 {iconAndText(<Github className="h-4 w-4 flex-shrink-0" />, t('changelog'))}
@@ -722,6 +722,7 @@ export default function Layout() {
                             size="sm"
                             className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
                             onClick={async () => {
+                                setIsSheetOpen(false);
                                 await useAppStore.getState().openChangelogDialog();
                             }}
                         >
