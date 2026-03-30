@@ -199,7 +199,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             </Badge>
                         )}
                         {updateInfo && (
-                            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 text-xs animate-pulse">
+                            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 text-xs">
                                 <ArrowUpCircle className="h-3 w-3 mr-1" />
                                 Обновление
                             </Badge>
@@ -230,7 +230,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Badge
-                                        className="h-5 cursor-pointer border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 text-xs text-white animate-pulse"
+                                        className="h-5 cursor-pointer border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 text-xs text-white whitespace-nowrap"
                                         onClick={() => onUpdate?.handle(plugin.id)}
                                     >
                                         {isUpdatingThisPlugin ? (
@@ -342,7 +342,7 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                         </Badge>
                     )}
                     {updateInfo && (
-                        <Badge className="rounded-none rounded-br-md border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 py-0.5 text-[10px] text-white shadow-sm animate-pulse">
+                        <Badge className="rounded-none rounded-br-md border-0 bg-gradient-to-r from-blue-500 to-cyan-500 px-2 py-0.5 text-[10px] text-white shadow-sm">
                             <ArrowUpCircle className="h-3 w-3 mr-1" />
                             Обновление
                         </Badge>
@@ -387,14 +387,14 @@ function InstalledPluginCard({ plugin, botId, updateInfo, onToggle, onDelete, on
                             </CardDescription>
                         </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-3">
                         {updateInfo && onUpdate && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant="outline"
                                         size="icon"
-                                        className="h-8 w-8 rounded-full border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                                        className="h-8 w-8 rounded-full border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 mr-1"
                                         onClick={() => onUpdate.handle(plugin.id)}
                                         disabled={isUpdatingThisPlugin}
                                     >

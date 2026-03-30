@@ -2,7 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download as DownloadIcon, CheckCircle as CheckCircleIcon, Loader as LoaderIcon, GitMerge as GitMergeIcon, Server as ServerIcon, Globe as GlobeIcon, Github as GithubIcon, Puzzle as PuzzleIcon, ArrowDownToLine, Star as StarIcon, Sparkles as SparklesIcon, TrendingUp as TrendingUpIcon } from 'lucide-react';
+import {
+    Download as DownloadIcon,
+    CheckCircle as CheckCircleIcon,
+    Loader as LoaderIcon,
+    GitMerge as GitMergeIcon,
+    Server as ServerIcon,
+    Globe as GlobeIcon,
+    Github as GithubIcon,
+    Puzzle as PuzzleIcon,
+    ArrowDownToLine,
+    Sparkles as SparklesIcon,
+    TrendingUp as TrendingUpIcon
+} from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -20,62 +32,57 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
+const getLatestVersion = (tag) => (tag || '0.0.0').replace(/^v/i, '');
+
 export default function PluginListItem({ plugin, isInstalled, isInstalling, onInstall, botId }) {
     const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
     const hasSupportedHosts = plugin.supportedHosts && plugin.supportedHosts.length > 0;
-
     const [isAnimating, setIsAnimating] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const prevDownloads = useRef(plugin.downloads);
-
     const isPopular = plugin.isTop3;
 
     useEffect(() => {
         if (plugin.downloads > prevDownloads.current) {
             setIsAnimating(true);
             const timer = setTimeout(() => setIsAnimating(false), 400);
-            
             prevDownloads.current = plugin.downloads;
-
             return () => clearTimeout(timer);
-        } else if (plugin.downloads !== prevDownloads.current) {
+        }
+        if (plugin.downloads !== prevDownloads.current) {
             prevDownloads.current = plugin.downloads;
         }
     }, [plugin.downloads]);
 
     return (
         <TooltipProvider delayDuration={100}>
-            <div 
+            <div
                 className={cn(
-                    "relative flex items-start gap-4 p-4 border rounded-lg transition-all duration-300",
-                    "hover:border-primary/50 hover:bg-muted/50 hover:shadow-md",
-                    isInstalled && "border-green-600/30 bg-green-950/20",
-                    isHovered && "transform scale-[1.01]"
+                    "relative flex items-start gap-4 rounded-lg border p-4 antialiased [text-rendering:optimizeLegibility] transition-colors duration-200",
+                    "hover:border-primary/50 hover:bg-muted/50",
+                    isInstalled && "border-green-600/30 bg-green-950/20"
                 )}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
                 <div className={cn(
-                    "relative shrink-0 mt-1 transition-transform duration-300",
-                    isHovered && "scale-110 rotate-3"
+                    "relative mt-1 shrink-0 transition-transform duration-200",
+                    isHovered && "scale-105"
                 )}>
-                    <IconComponent 
-                        name={plugin.icon} 
+                    <IconComponent
+                        name={plugin.icon}
                         className={cn(
                             "h-12 w-12 text-primary",
                             isHovered && "drop-shadow-glow"
-                        )} 
+                        )}
                     />
                 </div>
-                
-                <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-start mb-2">
+
+                <div className="min-w-0 flex-grow">
+                    <div className="mb-2 flex items-start justify-between">
                         <div className="min-w-0 flex-grow">
                             <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group">
-                                <h3 className={cn(
-                                    "font-semibold text-lg group-hover:text-primary transition-colors inline-flex items-center gap-2",
-                                    isHovered && "gradient-text"
-                                )}>
+                                <h3 className="inline-flex items-center gap-2 text-lg font-semibold transition-colors group-hover:text-primary">
                                     {plugin.displayName || plugin.name}
                                     {plugin.verified && (
                                         <SparklesIcon className="h-4 w-4 text-blue-500" />
@@ -86,55 +93,37 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                                 <span>от <span className="font-medium text-primary/90">{plugin.author}</span></span>
                             </div>
                         </div>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <a 
-                                    href={plugin.repoUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
-                                >
-                                    <GithubIcon className="h-5 w-5" />
-                                </a>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Открыть репозиторий</p>
-                            </TooltipContent>
-                        </Tooltip>
                     </div>
 
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{plugin.description}</p>
-                    
+                    <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{plugin.description}</p>
+
                     <div className="flex flex-wrap items-center gap-2">
-                        {plugin.categories && plugin.categories.slice(0, 3).map(category => (
-                            <Badge 
-                                key={category} 
-                                variant="secondary" 
-                                className="text-xs hover:bg-primary hover:text-primary-foreground transition-colors"
+                        {plugin.categories?.slice(0, 3).map(category => (
+                            <Badge
+                                key={category}
+                                variant="secondary"
+                                className="text-xs transition-colors hover:bg-primary hover:text-primary-foreground"
                             >
                                 {category}
                             </Badge>
                         ))}
-                        {plugin.categories && plugin.categories.length > 3 && (
+                        {(plugin.categories?.length || 0) > 3 && (
                             <Badge variant="outline" className="text-xs">
                                 +{plugin.categories.length - 3}
                             </Badge>
                         )}
-                        
+
                         {isPopular && (
-                            <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs">
-                                <TrendingUpIcon className="h-3 w-3 mr-1" />
+                            <Badge className="border-0 bg-gradient-to-r from-orange-500 to-red-500 text-xs text-white">
+                                <TrendingUpIcon className="mr-1 h-3 w-3" />
                                 Популярное
                             </Badge>
                         )}
-                        
+
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <div className={cn(
-                                    "transition-all duration-300",
-                                    isAnimating && "animate-bounce"
-                                )}>
-                                    <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-help">
+                                <div className={cn("transition-all duration-200", isAnimating && "animate-bounce")}>
+                                    <Badge variant="outline" className="flex cursor-help items-center gap-1.5 px-2 py-0.5 text-xs">
                                         <ArrowDownToLine className="h-3 w-3" />
                                         <span className="font-semibold">{plugin.downloads || 0}</span>
                                     </Badge>
@@ -144,27 +133,27 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                                 <p>Всего загрузок: {plugin.downloads || 0}</p>
                             </TooltipContent>
                         </Tooltip>
-                        
+
                         {hasDependencies && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="cursor-help border-orange-600/50 text-orange-600 text-xs">
-                                        <GitMergeIcon className="h-3 w-3 mr-1" />
+                                    <Badge variant="outline" className="cursor-help border-orange-600/50 text-xs text-orange-600">
+                                        <GitMergeIcon className="mr-1 h-3 w-3" />
                                         {plugin.dependencies.length}
                                     </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="font-semibold">Требуются плагины:</p>
-                                    <ul className="list-disc list-inside text-sm mt-1">
+                                    <ul className="mt-1 list-inside list-disc text-sm">
                                         {plugin.dependencies.map(dep => <li key={dep}>{dep}</li>)}
                                     </ul>
                                 </TooltipContent>
                             </Tooltip>
                         )}
-                        
+
                         {!hasSupportedHosts || plugin.supportedHosts.length === 0 ? (
                             <Badge variant="outline" className="text-xs">
-                                <GlobeIcon className="h-3 w-3 mr-1" />
+                                <GlobeIcon className="mr-1 h-3 w-3" />
                                 Любой
                             </Badge>
                         ) : plugin.supportedHosts.length <= 3 ? (
@@ -177,13 +166,13 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Badge variant="outline" className="cursor-help text-xs">
-                                        <ServerIcon className="h-3 w-3 mr-1" />
+                                        <ServerIcon className="mr-1 h-3 w-3" />
                                         {plugin.supportedHosts.length}
                                     </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="font-semibold">Протестировано на:</p>
-                                    <ul className="list-disc list-inside text-sm mt-1">
+                                    <ul className="mt-1 list-inside list-disc text-sm">
                                         {plugin.supportedHosts.map(host => <li key={host}>{host}</li>)}
                                     </ul>
                                 </TooltipContent>
@@ -191,34 +180,53 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
                         )}
                     </div>
                 </div>
-<div className="flex flex-col items-end gap-2 shrink-0 ml-4">
-                    <Button
-                        size="sm"
-                        variant={isInstalled ? "secondary" : "default"}
-                        disabled={isInstalled || isInstalling}
-                        onClick={() => onInstall(plugin)}
-                        className="min-w-[120px]"
-                    >
-                        {isInstalling ? (
-                            <>
-                                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
-                                Установка
-                            </>
-                        ) : isInstalled ? (
-                            <>
-                                <CheckCircleIcon className="mr-2 h-4 w-4" />
-                                Установлен
-                            </>
-                        ) : (
-                            <>
-                                <DownloadIcon className="mr-2 h-4 w-4" />
-                                Установить
-                            </>
-                        )}
-                    </Button>
-                    <span className="text-xs text-muted-foreground">v{(plugin.latestTag || '0.0.0').replace(/^v/i, '')}</span>
-                </div>
 
+                <div className="ml-4 flex shrink-0 flex-col items-end justify-center gap-2">
+                    <div className="flex items-center gap-2">
+                        {plugin.repoUrl && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <a
+                                        href={plugin.repoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        <GithubIcon className="h-5 w-5" />
+                                    </a>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Открыть репозиторий</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                        <Button
+                            size="sm"
+                            variant={isInstalled ? "secondary" : "default"}
+                            disabled={isInstalled || isInstalling}
+                            onClick={() => onInstall(plugin)}
+                            className="min-w-[132px]"
+                        >
+                            {isInstalling ? (
+                                <>
+                                    <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                                    Установка
+                                </>
+                            ) : isInstalled ? (
+                                <>
+                                    <CheckCircleIcon className="mr-2 h-4 w-4" />
+                                    Установлен
+                                </>
+                            ) : (
+                                <>
+                                    <DownloadIcon className="mr-2 h-4 w-4" />
+                                    Установить
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    <span className="text-xs text-muted-foreground">v{getLatestVersion(plugin.latestTag)}</span>
+                </div>
             </div>
         </TooltipProvider>
     );
