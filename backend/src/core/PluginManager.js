@@ -15,6 +15,114 @@ const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 const TELEMETRY_ENABLED = true;
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
+function normalizeGithubRepoUrl(repoUrl) {
+    if (!repoUrl || typeof repoUrl !== 'string') return null;
+
+    let trimmed = repoUrl.trim();
+    if (!trimmed) return null;
+
+    try {
+        trimmed = trimmed.replace(/^git\+/i, '');
+        if (/^github\.com\//i.test(trimmed)) {
+            trimmed = `https://${trimmed}`;
+        }
+
+        const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+        if (sshMatch) {
+            const owner = sshMatch[1].toLowerCase();
+            const repo = sshMatch[2].toLowerCase();
+            return `https://github.com/${owner}/${repo}`;
+        }
+
+        const parsed = new URL(trimmed);
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'github.com' && hostname !== 'www.github.com') return null;
+
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        if (pathParts.length < 2) return null;
+
+        const owner = pathParts[0].toLowerCase();
+        const repo = pathParts[1].replace(/\.git$/i, '').toLowerCase();
+        return `https://github.com/${owner}/${repo}`;
+    } catch {
+        return null;
+    }
+}
+
+function parseGithubOwnerRepo(repoUrl) {
+    const normalized = normalizeGithubRepoUrl(repoUrl);
+    if (!normalized) return null;
+    try {
+        const parsed = new URL(normalized);
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        if (parts.length < 2) return null;
+        return { owner: parts[0], repo: parts[1] };
+    } catch {
+        return null;
+    }
+}
+
+function getGithubRepoName(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    return ownerRepo?.repo || null;
+}
+
+function getGithubHeaders(extra = {}) {
+    const headers = {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'BlockMine',
+        ...extra
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    return headers;
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { headers: getGithubHeaders(), signal: controller.signal });
+        if (!response.ok) {
+            return null;
+        }
+        return response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchLatestGithubVersionTag(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    const releaseData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/releases/latest`);
+    const releaseTag = typeof releaseData?.tag_name === 'string' ? releaseData.tag_name : null;
+    if (releaseTag) return releaseTag;
+
+    const tagsData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/tags?per_page=20`);
+    if (!Array.isArray(tagsData) || tagsData.length === 0) return null;
+
+    const semverTags = tagsData
+        .map(item => item?.name)
+        .filter(Boolean)
+        .map(tag => ({ tag, normalized: semver.coerce(tag)?.version || null }))
+        .filter(item => item.normalized);
+
+    if (semverTags.length > 0) {
+        semverTags.sort((a, b) => semver.rcompare(a.normalized, b.normalized));
+        return semverTags[0].tag;
+    }
+
+    const firstTag = tagsData[0]?.name;
+    return typeof firstTag === 'string' ? firstTag : null;
+}
+
 function reportPluginDownload(pluginName) {
     if (!TELEMETRY_ENABLED) return;
 
@@ -404,24 +512,69 @@ class PluginManager {
             where: { botId, sourceType: 'GITHUB' }
         });
         const updatesAvailable = [];
-        const catalogMap = new Map(catalog.map(item => [item.repoUrl, item]));
+        const catalogMapByRepo = new Map();
+        const catalogMapByName = new Map();
+        const catalogMapByRepoName = new Map();
+        const latestTagCache = new Map();
+
+        for (const item of catalog) {
+            const normalizedRepoUrl = normalizeGithubRepoUrl(item.repoUrl);
+            if (normalizedRepoUrl) {
+                catalogMapByRepo.set(normalizedRepoUrl, item);
+                const repoName = getGithubRepoName(normalizedRepoUrl);
+                if (repoName && !catalogMapByRepoName.has(repoName)) {
+                    catalogMapByRepoName.set(repoName, item);
+                }
+            }
+            if (item?.name) {
+                catalogMapByName.set(String(item.name).toLowerCase(), item);
+            }
+        }
 
         for (const plugin of githubPlugins) {
             try {
-                const catalogInfo = catalogMap.get(plugin.sourceUri);
-                if (!catalogInfo || !catalogInfo.latestTag) continue;
-                
-                const localVersion = semver.coerce(plugin.version)?.version || plugin.version;
-                const recommendedVersion = semver.coerce(catalogInfo.latestTag)?.version || catalogInfo.latestTag;
+                const normalizedSourceUri = normalizeGithubRepoUrl(plugin.sourceUri);
+                const repoName = getGithubRepoName(normalizedSourceUri || plugin.sourceUri);
+                const catalogInfo =
+                    (normalizedSourceUri ? catalogMapByRepo.get(normalizedSourceUri) : null) ||
+                    catalogMapByName.get(String(plugin.name).toLowerCase()) ||
+                    (repoName ? catalogMapByRepoName.get(repoName) : null);
 
-                if (semver.gt(recommendedVersion, localVersion)) {
+                let latestTagRaw =
+                    catalogInfo?.latestTag ||
+                    catalogInfo?.recommendedVersion ||
+                    catalogInfo?.version ||
+                    catalogInfo?.latestVersion ||
+                    catalogInfo?.tag;
+
+                if (!catalogInfo) continue;
+
+                if (!latestTagRaw) {
+                    const cacheKey = normalizedSourceUri || plugin.sourceUri || plugin.name;
+                    if (latestTagCache.has(cacheKey)) {
+                        latestTagRaw = latestTagCache.get(cacheKey);
+                    } else {
+                        const fetchedTag = catalogInfo.repoUrl ? await fetchLatestGithubVersionTag(catalogInfo.repoUrl) : null;
+                        latestTagCache.set(cacheKey, fetchedTag);
+                        latestTagRaw = fetchedTag;
+                    }
+                }
+
+                if (!latestTagRaw) continue;
+                
+                const localSemver = semver.coerce(plugin.version);
+                const remoteSemver = semver.coerce(latestTagRaw);
+                if (!localSemver || !remoteSemver) continue;
+
+                if (semver.gt(remoteSemver.version, localSemver.version)) {
                     updatesAvailable.push({
                         id: plugin.id,
                         name: plugin.name,
                         sourceUri: plugin.sourceUri,
-                        currentVersion: localVersion,
-                        recommendedVersion: recommendedVersion,
-                        latestTag: catalogInfo.latestTag, // 🏷️ Добавляем тег для использования при обновлении
+                        currentVersion: localSemver.version,
+                        recommendedVersion: remoteSemver.version,
+                        latestTag: catalogInfo?.latestTag || latestTagRaw, // 🏷️ Добавляем тег для использования при обновлении
+                        targetRepoUrl: catalogInfo?.repoUrl || plugin.sourceUri,
                     });
                 }
             } catch (error) {
@@ -431,7 +584,7 @@ class PluginManager {
         return updatesAvailable;
     }
 
-    async updatePlugin(pluginId, targetTag = null) {
+    async updatePlugin(pluginId, targetTag = null, targetRepoUrl = null) {
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin || plugin.sourceType !== 'GITHUB') {
             throw new Error('Плагин не найден или не является GitHub-плагином.');
@@ -439,7 +592,7 @@ class PluginManager {
 
         console.log(`[PluginManager] Начало обновления плагина ${plugin.name}${targetTag ? ` до версии ${targetTag}` : ''}...`);
 
-        const repoUrl = plugin.sourceUri;
+        const repoUrl = targetRepoUrl || plugin.sourceUri;
         const botId = plugin.botId;
         const oldVersion = plugin.version;
 

@@ -105,9 +105,9 @@ export default function ChangelogDialog() {
                     <DialogTitle>{t('changelog.title', { version: appVersion })}</DialogTitle>
                 </DialogHeader>
 
-                <div className="flex items-center justify-end border rounded-lg p-3">
+                <div className="flex items-center border rounded-lg p-3">
                     <Select value={selectedVersion} onValueChange={handleJumpToVersion}>
-                        <SelectTrigger className="w-44">
+                        <SelectTrigger className="w-full">
                             <SelectValue placeholder={t('changelog.selectVersion')} />
                         </SelectTrigger>
                         <SelectContent>

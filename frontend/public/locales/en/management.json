@@ -12,7 +12,85 @@
     "error": "Error",
     "commandCreated": "Command \"{{name}}\" created successfully.",
     "commandCreateError": "Failed to create command",
-    "loadError": "Failed to load management data."
+    "loadError": "Failed to load management data.",
+    "criticalError": "Critical error"
+  },
+  "dynamicInput": {
+    "placeholder": "Add item...",
+    "add": "Add"
+  },
+  "users": {
+    "title": "Users",
+    "description": "List of all users who interacted with the bot.",
+    "searchPlaceholder": "Search by nickname...",
+    "blacklisted": "Blacklisted",
+    "table": {
+      "username": "Username",
+      "groups": "Groups",
+      "status": "Status",
+      "actions": "Actions",
+      "loading": "Loading..."
+    },
+    "pagination": {
+      "showing": "Showing {{from}} - {{to}} of {{total}} users",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} of {{totalPages}}"
+    },
+    "toast": {
+      "updated": "User {{name}} updated."
+    }
+  },
+  "groups": {
+    "title": "Groups",
+    "description": "List of all groups and their permissions for this bot.",
+    "create": "Create group",
+    "table": {
+      "name": "Name",
+      "permissions": "Permissions",
+      "actions": "Actions",
+      "loading": "Loading..."
+    },
+    "toast": {
+      "saved": "Group successfully {{action}}.",
+      "deleted": "Group deleted."
+    },
+    "actions": {
+      "created": "created",
+      "updated": "updated"
+    },
+    "errors": {
+      "missingBotId": "Failed to determine bot ID.",
+      "deleteSource": "Cannot delete a group with source \"{{owner}}\"."
+    },
+    "deleteDialog": {
+      "title": "Delete group \"{{name}}\"?",
+      "description": "This action cannot be undone. Users in this group will lose the corresponding permissions.",
+      "confirm": "Yes, delete group"
+    }
+  },
+  "permissionsSection": {
+    "title": "Permissions",
+    "description": "Complete list of all permissions registered for this bot.",
+    "create": "Create permission",
+    "table": {
+      "permission": "Permission",
+      "description": "Description",
+      "source": "Source",
+      "loading": "Loading..."
+    },
+    "toast": {
+      "created": "New permission created successfully."
+    },
+    "createDialog": {
+      "title": "Create new permission",
+      "description": "Permissions are used for fine-grained access control to commands.",
+      "nameLabel": "Permission name (for example, plugin.name.action)",
+      "descriptionLabel": "Description",
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating..."
+    }
   },
   "commandEdit": {
     "title": "Edit command: {{name}}",

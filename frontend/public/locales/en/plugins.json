@@ -19,7 +19,9 @@
     "fork": "Fork",
     "reload": "Reload",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "open": "Open",
+    "unavailable": "Unavailable"
   },
   "ui": {
     "error": "Error",
@@ -72,10 +74,10 @@
     "deleting": "Deleting..."
   },
   "localInstall": {
-    "title": "Install local plugin",
-    "description": "Enter the path to the plugin folder on the server",
-    "pathLabel": "Plugin path",
-    "pathPlaceholder": "/path/to/plugin/folder",
+    "title": "Install plugin locally",
+    "description": "Specify the full path to the plugin folder on the server where the panel is running. The folder must contain a valid package.json.",
+    "pathLabel": "Plugin folder path",
+    "pathPlaceholder": "For example, /home/user/my-bot-plugins/super-plugin",
     "install": "Install"
   },
   "githubInstall": {
@@ -123,14 +125,205 @@
     "search": "Search plugins...",
     "categories": "Categories",
     "all": "All",
-    "noResults": "No plugins found"
+    "noResults": "No plugins found",
+    "viewGrid": "Grid view",
+    "viewList": "List view",
+    "total": "Total: {{count}}",
+    "loadingCatalog": "Loading plugin catalog...",
+    "emptyTitle": "No plugins found",
+    "emptyDescription": "There are no plugins in the \"{{category}}\" category matching \"{{query}}\".",
+    "emptyDescriptionNoQuery": "There are no plugins in the \"{{category}}\" category.",
+    "resetFilters": "Reset filters",
+    "sort": {
+      "popular": "Popular",
+      "newest": "Newest",
+      "alphabetical": "Alphabetical",
+      "downloads": "By downloads"
+    }
+  },
+  "categories": {
+    "allPlugins": "All plugins",
+    "core": "Core",
+    "clan": "Clan",
+    "chat": "Chat",
+    "automation": "Automation",
+    "security": "Security",
+    "commands": "Commands",
+    "utilities": "Utilities",
+    "permissions": "Permissions"
+  },
+  "sources": {
+    "github": "GitHub",
+    "local": "Local",
+    "localIde": "Local IDE"
+  },
+  "badges": {
+    "popular": "Popular",
+    "new": "New",
+    "update": "Update"
+  },
+  "labels": {
+    "by": "by",
+    "unknownAuthor": "Unknown author",
+    "noDescription": "No description.",
+    "any": "Any",
+    "anyServer": "Any server",
+    "serversCount": "{{count}} servers",
+    "pluginId": "Plugin ID:",
+    "totalDownloads": "Total downloads: {{count}}",
+    "requiredPlugins": "Required plugins:",
+    "requiresDependencies": "Requires {{count}} dependencies",
+    "testedOn": "Tested on:",
+    "commandsCount": "Commands: {{count}}",
+    "eventGraphsCount": "Event graphs: {{count}}",
+    "updateAvailable": "Update available"
+  },
+  "tooltips": {
+    "openRepository": "Open repository",
+    "editCode": "Edit code",
+    "reload": "Reload",
+    "reloadFromPackage": "Reload from package.json",
+    "makeLocal": "Make local",
+    "settings": "Settings",
+    "delete": "Delete",
+    "updateTo": "Update to {{version}}",
+    "updateAvailable": "Update available"
+  },
+  "dependencyDialog": {
+    "title": "Dependency check",
+    "description": "Installing {{name}} requires a few additional components.",
+    "toInstall": "Need to install:",
+    "alreadyInstalled": "Already installed:",
+    "installMissing": "Install missing ({{count}})",
+    "installing": "Installing..."
+  },
+  "installed": {
+    "filters": {
+      "all": "All ({{count}})",
+      "enabled": "Enabled ({{count}})",
+      "disabled": "Disabled ({{count}})",
+      "updates": "Updates ({{count}})",
+      "local": "Local ({{count}})",
+      "github": "GitHub ({{count}})"
+    },
+    "searchPlaceholder": "Search...",
+    "emptyTitle": "No plugins",
+    "emptyAll": "You don't have any installed plugins yet.",
+    "emptyFiltered": "No plugins match the selected filter.",
+    "showAll": "Show all plugins",
+    "confirmDeleteTitle": "Delete plugin \"{{name}}\"?",
+    "confirmDeleteDescription": "This action cannot be undone. All plugin files and settings will be removed for this bot.",
+    "confirmDeleteAction": "Yes, delete plugin",
+    "lastUpdated": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "daysAgo": "{{count}} days ago",
+      "weeksAgo": "{{count}} weeks ago",
+      "monthsAgo": "{{count}} months ago"
+    },
+    "updateInProgress": "Updating...",
+    "updateButton": "Update",
+    "updateButtonTo": "Update to v{{version}}"
+  },
+  "settingsDialog": {
+    "title": "Plugin: {{name}}",
+    "description": "Manage plugin settings and information",
+    "emptySettings": "This plugin has no settings.",
+    "clearData": "Clear data",
+    "selectPlaceholder": "Select a value",
+    "unknownSettingType": "Unknown setting type: {{type}}",
+    "confirmClearData": "Are you sure you want to delete all data for plugin \"{{name}}\"? This action cannot be undone.",
+    "confirmDeleteKey": "Delete key \"{{key}}\"?",
+    "tabs": {
+      "settings": "Settings",
+      "data": "Data",
+      "info": "Information"
+    },
+    "jsonEditor": {
+      "title": "JSON configuration editor",
+      "description": "Make changes and save them.",
+      "descriptionWithSyntax": "Make changes and save them. The editor will highlight syntax errors.",
+      "invalidJson": "Error: Invalid JSON. Check the syntax.",
+      "apply": "Apply",
+      "applyAndSave": "Apply and save"
+    },
+    "proxy": {
+      "selectPlaceholder": "Select a proxy",
+      "none": "No proxy",
+      "custom": "Configure manually",
+      "host": "Host",
+      "port": "Port",
+      "type": "Type",
+      "username": "Username",
+      "password": "Password",
+      "optional": "Optional"
+    },
+    "permissions": {
+      "addEntries": "Not enough permissions to add entries",
+      "generic": "Not enough permissions",
+      "editData": "Not enough permissions to modify data",
+      "save": "Not enough permissions to save settings"
+    },
+    "validation": {
+      "emptyKey": "Key cannot be empty",
+      "invalidJsonValue": "Value must be valid JSON"
+    },
+    "data": {
+      "searchPlaceholder": "Search by key",
+      "refresh": "Refresh",
+      "addEntry": "Add entry",
+      "empty": "No data",
+      "editEntry": "Edit entry",
+      "newEntry": "New entry",
+      "editEntryDescription": "Change the JSON value and save.",
+      "newEntryDescription": "Specify a key and a JSON value.",
+      "keyLabel": "Key",
+      "keyPlaceholder": "For example, state",
+      "jsonValue": "JSON value",
+      "columns": {
+        "key": "Key",
+        "updated": "Updated",
+        "actions": "Actions"
+      }
+    },
+    "toasts": {
+      "savedSettings": "Plugin settings saved.",
+      "clearedData": "Plugin data cleared successfully.",
+      "entryDeleted": "Entry deleted.",
+      "entrySaved": "Entry saved."
+    },
+    "loadError": "Failed to load plugin settings."
+  },
+  "toasts": {
+    "statusUpdating": "Updating plugin status...",
+    "statusUpdated": "Plugin status updated.",
+    "pluginDeleted": "Plugin \"{{name}}\" deleted.",
+    "pluginInstalled": "Plugin \"{{name}}\" installed successfully.",
+    "updateCheckCompleted": "Update check completed",
+    "updateCheckFound": "Updates found: {{count}}",
+    "pluginUpdated": "Plugin updated. Restart the bot.",
+    "pluginCreated": "Plugin \"{{name}}\" created successfully.",
+    "pluginForked": "Plugin \"{{name}}\" was converted to a local plugin.",
+    "pluginReloaded": "Plugin reloaded, settings reset."
   },
   "details": {
+    "title": "Plugin information",
+    "name": "Name",
     "version": "Version",
     "author": "Author",
     "description": "Description",
     "dependencies": "Dependencies",
     "commands": "Commands",
-    "events": "Events"
+    "events": "Event graphs",
+    "source": "Source",
+    "status": "Status",
+    "visual": "Visual",
+    "aliases": "Aliases:",
+    "created": "Created:",
+    "updated": "Updated:",
+    "noCommands": "No commands",
+    "noCommandsDescription": "This plugin does not provide commands",
+    "noEvents": "No event graphs",
+    "noEventsDescription": "This plugin does not provide event graphs"
   }
 }

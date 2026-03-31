@@ -10,11 +10,20 @@
     "installing": "Installing...",
     "installed": "Installed",
     "install": "Install",
-    "fork": "Fork"
+    "fork": "Fork",
+    "settings": "Settings",
+    "delete": "Delete"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "title": "Plugin status"
   },
   "stats": {
     "totalDownloads": "Total downloads",
-    "updated": "Updated"
+    "updated": "Updated",
+    "commands": "Commands",
+    "events": "Events"
   },
   "dates": {
     "today": "Today",
@@ -25,14 +34,25 @@
   },
   "tabs": {
     "overview": "Overview",
-    "changelog": "Changelog"
+    "changelog": "Changelog",
+    "commands": "Commands"
   },
   "overview": {
     "description": "Description",
     "noDescription": "No description available.",
     "info": "Information",
     "version": "Version",
-    "dependencies": "Dependencies"
+    "dependencies": "Dependencies",
+    "supportedServers": "Supported servers"
+  },
+  "sections": {
+    "pluginCommands": "Plugin commands",
+    "eventGraphs": "Event graphs"
+  },
+  "deleteDialog": {
+    "title": "Delete plugin \"{{name}}\"?",
+    "description": "This action cannot be undone. All plugin files and settings will be removed for this bot.",
+    "confirm": "Yes, delete plugin"
   },
   "changelog": {
     "title": "Release notes",

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +13,9 @@ import { useAppStore } from '@/stores/appStore';
 import { shouldShowField } from '@/lib/pluginSettingsUtils';
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
+    const { t } = useTranslation('plugins');
     const [jsonString, setJsonString] = useState('');
-    
+
     useEffect(() => {
         try {
             const formatted = JSON.stringify(initialValue, null, 2);
@@ -27,20 +29,24 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
         try {
             const parsed = JSON.parse(jsonString);
             onSave(parsed);
-        } catch (e) {
-            alert('Ошибка: Невалидный JSON. Проверьте синтаксис.');
+        } catch {
+            alert(t('settingsDialog.jsonEditor.invalidJson', {
+                defaultValue: 'Ошибка: Невалидный JSON. Проверьте синтаксис.',
+            }));
         }
     };
-    
+
     return (
         <DialogContent className="max-w-3xl">
             <DialogHeader>
-                <DialogTitle>Редактор конфигурации JSON</DialogTitle>
+                <DialogTitle>{t('settingsDialog.jsonEditor.title', { defaultValue: 'Редактор конфигурации JSON' })}</DialogTitle>
                 <DialogDescription>
-                    Внесите изменения и сохраните. Редактор подсветит синтаксические ошибки.
+                    {t('settingsDialog.jsonEditor.descriptionWithSyntax', {
+                        defaultValue: 'Внесите изменения и сохраните. Редактор подсветит синтаксические ошибки.',
+                    })}
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4 relative">
+            <div className="relative py-4">
                 <Editor
                     height="60vh"
                     language="json"
@@ -56,15 +62,19 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
                 />
             </div>
             <DialogFooter>
-                <Button variant="ghost" onClick={onCancel}>Отмена</Button>
-                <Button onClick={handleSave}>Применить и сохранить</Button>
+                <Button variant="ghost" onClick={onCancel}>
+                    {t('actions.cancel', { defaultValue: 'Отмена' })}
+                </Button>
+                <Button onClick={handleSave}>
+                    {t('settingsDialog.jsonEditor.applyAndSave', { defaultValue: 'Применить и сохранить' })}
+                </Button>
             </DialogFooter>
         </DialogContent>
     );
 }
 
-
-function ProxySettingField({ settingKey, config, value, onChange }) {
+function ProxySettingField({ settingKey, config, value, onChange, readOnly }) {
+    const { t } = useTranslation('plugins');
     const proxies = useAppStore((state) => state.proxies);
     const [isCustom, setIsCustom] = useState(() => {
         return value?.enabled && !value?.proxyId && value?.host;
@@ -73,6 +83,8 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
     const proxyValue = value || { enabled: false };
 
     const handleSelectChange = (selectValue) => {
+        if (readOnly) return;
+
         if (selectValue === 'none') {
             onChange(settingKey, { enabled: false });
             setIsCustom(false);
@@ -80,7 +92,7 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
             onChange(settingKey, { enabled: true, host: '', port: '', type: 'socks5', username: '', password: '' });
             setIsCustom(true);
         } else {
-            const selectedProxy = proxies.find(p => p.id.toString() === selectValue);
+            const selectedProxy = proxies.find((proxy) => proxy.id.toString() === selectValue);
             if (selectedProxy) {
                 onChange(settingKey, {
                     enabled: true,
@@ -89,7 +101,7 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
                     port: selectedProxy.port,
                     type: selectedProxy.type || 'socks5',
                     username: selectedProxy.username || '',
-                    password: selectedProxy.password || ''
+                    password: selectedProxy.password || '',
                 });
             }
             setIsCustom(false);
@@ -97,6 +109,7 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
     };
 
     const handleFieldChange = (field, fieldValue) => {
+        if (readOnly) return;
         onChange(settingKey, { ...proxyValue, [field]: fieldValue });
     };
 
@@ -109,14 +122,14 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
                 {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
             </div>
 
-            <Select value={currentSelectValue} onValueChange={handleSelectChange}>
+            <Select value={currentSelectValue} onValueChange={handleSelectChange} disabled={readOnly}>
                 <SelectTrigger>
-                    <SelectValue placeholder="Выберите прокси" />
+                    <SelectValue placeholder={t('settingsDialog.proxy.selectPlaceholder', { defaultValue: 'Выберите прокси' })} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="none">Без прокси</SelectItem>
-                    <SelectItem value="custom">Настроить вручную</SelectItem>
-                    {proxies?.map(proxy => (
+                    <SelectItem value="none">{t('settingsDialog.proxy.none', { defaultValue: 'Без прокси' })}</SelectItem>
+                    <SelectItem value="custom">{t('settingsDialog.proxy.custom', { defaultValue: 'Настроить вручную' })}</SelectItem>
+                    {proxies?.map((proxy) => (
                         <SelectItem key={proxy.id} value={proxy.id.toString()}>
                             {proxy.name} ({proxy.host}:{proxy.port})
                         </SelectItem>
@@ -127,17 +140,19 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
             {proxyValue.enabled && isCustom && (
                 <div className="grid grid-cols-2 gap-4 pt-2">
                     <div className="space-y-2">
-                        <Label>Хост</Label>
-                        <Input value={proxyValue.host || ''} onChange={(e) => handleFieldChange('host', e.target.value)} placeholder="127.0.0.1" />
+                        <Label>{t('settingsDialog.proxy.host', { defaultValue: 'Хост' })}</Label>
+                        <Input value={proxyValue.host || ''} onChange={(e) => handleFieldChange('host', e.target.value)} placeholder="127.0.0.1" disabled={readOnly} />
                     </div>
                     <div className="space-y-2">
-                        <Label>Порт</Label>
-                        <Input type="number" value={proxyValue.port || ''} onChange={(e) => handleFieldChange('port', e.target.value)} placeholder="1080" />
+                        <Label>{t('settingsDialog.proxy.port', { defaultValue: 'Порт' })}</Label>
+                        <Input type="number" value={proxyValue.port || ''} onChange={(e) => handleFieldChange('port', e.target.value)} placeholder="1080" disabled={readOnly} />
                     </div>
                     <div className="space-y-2">
-                        <Label>Тип</Label>
-                        <Select value={proxyValue.type || 'socks5'} onValueChange={(v) => handleFieldChange('type', v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                        <Label>{t('settingsDialog.proxy.type', { defaultValue: 'Тип' })}</Label>
+                        <Select value={proxyValue.type || 'socks5'} onValueChange={(newValue) => handleFieldChange('type', newValue)} disabled={readOnly}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="socks5">SOCKS5</SelectItem>
                                 <SelectItem value="socks4">SOCKS4</SelectItem>
@@ -146,12 +161,23 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label>Имя пользователя</Label>
-                        <Input value={proxyValue.username || ''} onChange={(e) => handleFieldChange('username', e.target.value)} placeholder="Опционально" />
+                        <Label>{t('settingsDialog.proxy.username', { defaultValue: 'Имя пользователя' })}</Label>
+                        <Input
+                            value={proxyValue.username || ''}
+                            onChange={(e) => handleFieldChange('username', e.target.value)}
+                            placeholder={t('settingsDialog.proxy.optional', { defaultValue: 'Опционально' })}
+                            disabled={readOnly}
+                        />
                     </div>
                     <div className="col-span-2 space-y-2">
-                        <Label>Пароль</Label>
-                        <Input type="password" value={proxyValue.password || ''} onChange={(e) => handleFieldChange('password', e.target.value)} placeholder="Опционально" />
+                        <Label>{t('settingsDialog.proxy.password', { defaultValue: 'Пароль' })}</Label>
+                        <Input
+                            type="password"
+                            value={proxyValue.password || ''}
+                            onChange={(e) => handleFieldChange('password', e.target.value)}
+                            placeholder={t('settingsDialog.proxy.optional', { defaultValue: 'Опционально' })}
+                            disabled={readOnly}
+                        />
                     </div>
                 </div>
             )}
@@ -159,8 +185,9 @@ function ProxySettingField({ settingKey, config, value, onChange }) {
     );
 }
 
-function SettingField({ settingKey, config, value, onChange }) {
-    const id = `${settingKey}-${Math.random()}`;
+function SettingField({ settingKey, config, value, onChange, readOnly }) {
+    const { t } = useTranslation('plugins');
+    const id = `${settingKey}-config-field`;
     const [isJsonEditorOpen, setIsJsonEditorOpen] = useState(false);
 
     switch (config.type) {
@@ -173,33 +200,46 @@ function SettingField({ settingKey, config, value, onChange }) {
                         type={config.secret ? "password" : "text"}
                         value={value || ''}
                         onChange={(e) => onChange(settingKey, e.target.value)}
+                        disabled={readOnly}
                     />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
         case 'string[]':
-             return (
+            return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Textarea id={id} value={Array.isArray(value) ? value.join('\n') : ''} onChange={(e) => onChange(settingKey, e.target.value.split('\n'))} rows={3} />
+                    <Textarea
+                        id={id}
+                        value={Array.isArray(value) ? value.join('\n') : ''}
+                        onChange={(e) => onChange(settingKey, e.target.value.split('\n'))}
+                        rows={3}
+                        disabled={readOnly}
+                    />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
         case 'boolean':
-             return (
+            return (
                 <div className="flex items-center justify-between rounded-lg border p-3">
                     <div className="space-y-0.5">
                         <Label htmlFor={id} className="cursor-pointer">{config.label}</Label>
                         {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                     </div>
-                    <Switch id={id} checked={!!value} onCheckedChange={(checked) => onChange(settingKey, checked)} />
+                    <Switch id={id} checked={!!value} onCheckedChange={readOnly ? undefined : ((checked) => onChange(settingKey, checked))} disabled={readOnly} />
                 </div>
             );
         case 'number':
             return (
-                 <div className="space-y-2">
+                <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Input id={id} type="number" value={value ?? ''} onChange={(e) => onChange(settingKey, e.target.value === '' ? null : e.target.valueAsNumber)} />
+                    <Input
+                        id={id}
+                        type="number"
+                        value={value ?? ''}
+                        onChange={(e) => onChange(settingKey, e.target.value === '' ? null : e.target.valueAsNumber)}
+                        disabled={readOnly}
+                    />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );
@@ -207,9 +247,9 @@ function SettingField({ settingKey, config, value, onChange }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Select value={value ?? config.default ?? ''} onValueChange={(newValue) => onChange(settingKey, newValue)}>
+                    <Select value={value ?? config.default ?? ''} onValueChange={readOnly ? undefined : ((newValue) => onChange(settingKey, newValue))} disabled={readOnly}>
                         <SelectTrigger id={id}>
-                            <SelectValue placeholder="Выберите значение" />
+                            <SelectValue placeholder={t('settingsDialog.selectPlaceholder', { defaultValue: 'Выберите значение' })} />
                         </SelectTrigger>
                         <SelectContent>
                             {(config.options || []).map((option) => {
@@ -228,38 +268,47 @@ function SettingField({ settingKey, config, value, onChange }) {
             );
         case 'json':
         case 'json_file':
-             return (
+            return (
                 <div className="space-y-2">
                     <Label>{config.label}</Label>
                     <div className="flex items-center justify-between rounded-lg border p-3">
-                         <p className="text-sm text-muted-foreground">{config.description}</p>
-                         <Dialog open={isJsonEditorOpen} onOpenChange={setIsJsonEditorOpen}>
+                        <p className="text-sm text-muted-foreground">{config.description}</p>
+                        <Dialog open={isJsonEditorOpen} onOpenChange={setIsJsonEditorOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Редактировать</Button>
+                                <span>
+                                    <Button variant="outline" disabled={readOnly}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        {t('actions.edit', { defaultValue: 'Редактировать' })}
+                                    </Button>
+                                </span>
                             </DialogTrigger>
-                            <JsonEditorDialog
-                                initialValue={value}
-                                onSave={(newValue) => { onChange(settingKey, newValue); setIsJsonEditorOpen(false); }}
-                                onCancel={() => setIsJsonEditorOpen(false)}
-                            />
+                            {!readOnly && (
+                                <JsonEditorDialog
+                                    initialValue={value}
+                                    onSave={(newValue) => { onChange(settingKey, newValue); setIsJsonEditorOpen(false); }}
+                                    onCancel={() => setIsJsonEditorOpen(false)}
+                                />
+                            )}
                         </Dialog>
                     </div>
                 </div>
             );
         case 'proxy':
-            return <ProxySettingField settingKey={settingKey} config={config} value={value} onChange={onChange} />;
+            return <ProxySettingField settingKey={settingKey} config={config} value={value} onChange={onChange} readOnly={readOnly} />;
         default:
-            return <p className="text-destructive">Неизвестный тип настройки: {config.type}</p>;
+            return <p className="text-destructive">{t('settingsDialog.unknownSettingType', { type: config.type, defaultValue: 'Неизвестный тип настройки: {{type}}' })}</p>;
     }
 }
 
-
-export default function PluginSettingsForm({ plugin, onSettingsChange }) {
+export default function PluginSettingsForm({ plugin, onSettingsChange, readOnly = false }) {
     const handleFieldChange = (key, value) => {
+        if (readOnly) return;
+
         const newSettings = {
             ...plugin.settings,
-            [key]: value
+            [key]: value,
         };
+
         onSettingsChange(plugin.id, newSettings);
     };
 
@@ -274,6 +323,7 @@ export default function PluginSettingsForm({ plugin, onSettingsChange }) {
                         config={config}
                         value={plugin.settings[key]}
                         onChange={handleFieldChange}
+                        readOnly={readOnly}
                     />
                 ))}
         </div>

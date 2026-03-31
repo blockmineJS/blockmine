@@ -11,9 +11,59 @@ import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
 
 const EMPTY_EXTENSIONS = [];
+const UI_EXTENSION_LABEL_TRANSLATIONS = {
+    'Модерация': {
+        ru: 'Модерация',
+        en: 'Moderation',
+    },
+};
+const TRANSLATABLE_BOT_STATUSES = new Set(['running', 'stopped', 'starting', 'stopping', 'restarting']);
+
+function resolveUiExtensionLabel(extension, language) {
+    const currentLanguage = language?.split('-')[0] || 'ru';
+    const fallbackLanguage = currentLanguage === 'ru' ? 'en' : 'ru';
+
+    const tryLocalizedValue = (value) => {
+        if (!value) return null;
+        if (typeof value === 'string') {
+            const mapped = UI_EXTENSION_LABEL_TRANSLATIONS[value.trim()];
+            return mapped?.[currentLanguage] || mapped?.[fallbackLanguage] || value;
+        }
+        if (typeof value === 'object') {
+            return (
+                value[currentLanguage] ||
+                value[language] ||
+                value[fallbackLanguage] ||
+                value.en ||
+                value.ru ||
+                Object.values(value).find((item) => typeof item === 'string') ||
+                null
+            );
+        }
+        return null;
+    };
+
+    return (
+        tryLocalizedValue(extension?.label) ||
+        tryLocalizedValue(extension?.labels) ||
+        tryLocalizedValue(extension?.title) ||
+        tryLocalizedValue(extension?.name) ||
+        ''
+    );
+}
+
+function resolveBotStatusLabel(status, t) {
+    const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim().toLowerCase() : 'stopped';
+
+    if (TRANSLATABLE_BOT_STATUSES.has(normalizedStatus)) {
+        return t(`status.${normalizedStatus}`, { defaultValue: normalizedStatus });
+    }
+
+    return normalizedStatus;
+}
 
 export default function BotView() {
-    const { t } = useTranslation('bots');
+    const { t, i18n } = useTranslation('bots');
     const { botId } = useParams();
     const navigate = useNavigate();
     
@@ -71,7 +121,9 @@ export default function BotView() {
         );
     }
 
-    const isRunning = botStatuses[bot.id] === 'running';
+    const rawBotStatus = botStatuses[bot.id] || 'stopped';
+    const isRunning = rawBotStatus === 'running';
+    const botStatusLabel = resolveBotStatusLabel(rawBotStatus, t);
 
     return (
         <>
@@ -81,15 +133,15 @@ export default function BotView() {
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h1 className="text-xl font-bold tracking-tight truncate">
+                                    <h1 className="text-xl font-bold tracking-tight leading-none truncate">
                                         {bot.username}
                                     </h1>
-                                    <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="inline-flex h-6 shrink-0 translate-y-[2px] items-center gap-1 self-center text-xs leading-none text-muted-foreground">
+                                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500 animate-pulse" />
                                         {bot.server.host}:{bot.server.port}
                                     </span>
                                     {bot.note && (
-                                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                                        <span className="inline-flex h-6 max-w-[200px] shrink-0 translate-y-[2px] items-center rounded-full bg-muted px-2 text-xs leading-none truncate">
                                             {bot.note}
                                         </span>
                                     )}
@@ -107,7 +159,7 @@ export default function BotView() {
                                 isRunning ? "bg-green-500 animate-pulse" : "bg-red-500"
                             )} />
                             <span className="uppercase font-bold">
-                                {botStatuses[bot.id] || 'stopped'}
+                                {botStatusLabel}
                             </span>
                         </div>
                     </div>
@@ -140,6 +192,7 @@ export default function BotView() {
                             </NavLink>
                             <NavLink
                                 to="plugins" 
+                                end
                                 className={({isActive}) => cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
                                     isActive 
@@ -152,6 +205,7 @@ export default function BotView() {
                             </NavLink>
                              {uiExtensions.map(ext => {
                                 const IconComponent = Icons[ext.icon] || Icons.Puzzle;
+                                const extensionLabel = resolveUiExtensionLabel(ext, i18n.language);
                                 return (
                                     <NavLink
                                         key={ext.id}
@@ -164,7 +218,7 @@ export default function BotView() {
                                         )}
                                     >
                                         <IconComponent className="h-4 w-4" />
-                                        {ext.label}
+                                        {extensionLabel}
                                     </NavLink>
                                 );
                             })}

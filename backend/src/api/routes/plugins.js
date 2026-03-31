@@ -173,7 +173,7 @@ router.post('/update/:pluginId', authenticateUniversal, authorize('plugin:update
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { targetTag } = req.body; // Получаем тег из тела запроса (если указан)
-        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag);
+        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag, req.body?.targetRepoUrl);
         res.json(updatedPlugin);
     } catch (error) {
         res.status(500).json({ error: error.message });

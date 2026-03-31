@@ -68,13 +68,13 @@ export default function PluginsTab() {
 
     useEffect(() => {
         if (activeTab === 'installed' && bot && installedPlugins.length > 0 && !isLoading) {
-            checkForUpdates(intBotId, false);
+            checkForUpdates(intBotId);
         }
     }, [installedPlugins.length, isLoading, activeTab, bot, intBotId, checkForUpdates]);
 
     const handleCheckForUpdates = async () => {
         setIsCheckingUpdates(true);
-        await checkForUpdates(intBotId, true);
+        await checkForUpdates(intBotId);
         setIsCheckingUpdates(false);
     };
 

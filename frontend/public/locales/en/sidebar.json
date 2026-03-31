@@ -16,6 +16,12 @@
   "logout": "Logout",
   "whatsNew": "What's New?",
   "openMenu": "Open Menu",
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "botImported": "Bot \"{{name}}\" imported successfully.",
   "botOrderError": "Failed to update bot order",
   "contribute": {

@@ -21,7 +21,10 @@
   },
   "status": {
     "running": "Запущен",
-    "stopped": "Остановлен"
+    "stopped": "Остановлен",
+    "starting": "Запуск",
+    "stopping": "Остановка",
+    "restarting": "Перезапуск"
   },
   "deleteDialog": {
     "title": "Удалить бота {{username}}?",

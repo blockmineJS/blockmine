@@ -16,6 +16,12 @@
   "logout": "Выйти",
   "whatsNew": "Что нового?",
   "openMenu": "Открыть меню",
+  "theme": {
+    "label": "Тема",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Системная"
+  },
   "botImported": "Бот \"{{name}}\" успешно импортирован.",
   "botOrderError": "Не удалось обновить порядок ботов",
   "contribute": {

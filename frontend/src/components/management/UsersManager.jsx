@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ export default function UsersManager({
     sortConfig,
     onSortChange
 }) {
+    const { t } = useTranslation('management');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -51,7 +53,7 @@ export default function UsersManager({
             await apiHelper(`/api/bots/${botId}/users/${editingUser.username}`, {
                 method: 'PUT',
                 body: JSON.stringify(userData),
-            }, `Данные пользователя ${editingUser.username} обновлены.`);
+            }, t('users.toast.updated', { name: editingUser.username }));
             
             handleCloseModal();
             onDataChange();
@@ -65,13 +67,13 @@ export default function UsersManager({
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                <CardTitle>Пользователи</CardTitle>
-                <CardDescription>Список всех пользователей, которые взаимодействовали с ботом.</CardDescription>
+                <CardTitle>{t('users.title')}</CardTitle>
+                <CardDescription>{t('users.description')}</CardDescription>
                     </div>
                     <div className="relative w-full max-w-sm">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input 
-                            placeholder="Поиск по никнейму..." 
+                            placeholder={t('users.searchPlaceholder')} 
                             className="pl-8"
                             value={searchQuery}
                             onChange={(e) => onSearchQueryChange(e.target.value)}
@@ -85,28 +87,28 @@ export default function UsersManager({
                         <TableRow>
                             <TableHead>
                                 <Button variant="ghost" onClick={() => requestSort('username')}>
-                                    Никнейм
+                                    {t('users.table.username')}
                                     <ArrowUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
                             <TableHead>
                                 <Button variant="ghost" onClick={() => requestSort('groups')}>
-                                    Группы
+                                    {t('users.table.groups')}
                                     <ArrowUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
                             <TableHead>
                                 <Button variant="ghost" onClick={() => requestSort('isBlacklisted')}>
-                                    Статус
+                                    {t('users.table.status')}
                                     <ArrowUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
-                            <TableHead className="text-right">Действия</TableHead>
+                            <TableHead className="text-right">{t('users.table.actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={4} className="text-center">Загрузка...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={4} className="text-center">{t('users.table.loading')}</TableCell></TableRow>
                         ) : (
                             (users || []).map(user => (
                                 <TableRow key={user.id}>
@@ -117,7 +119,7 @@ export default function UsersManager({
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        {user.isBlacklisted && <Badge variant="destructive">В черном списке</Badge>}
+                                        {user.isBlacklisted && <Badge variant="destructive">{t('users.blacklisted')}</Badge>}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" onClick={() => handleOpenModal(user)}>
@@ -133,7 +135,11 @@ export default function UsersManager({
             {pagination && (
                 <div className="flex items-center justify-between px-6 py-3 border-t">
                     <div className="text-sm text-muted-foreground">
-                        Показано {((pagination.page - 1) * pagination.pageSize) + 1} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} из {pagination.total} пользователей
+                        {t('users.pagination.showing', {
+                            from: ((pagination.page - 1) * pagination.pageSize) + 1,
+                            to: Math.min(pagination.page * pagination.pageSize, pagination.total),
+                            total: pagination.total,
+                        })}
                     </div>
                     <div className="flex items-center space-x-2">
                         <Button 
@@ -142,10 +148,10 @@ export default function UsersManager({
                             onClick={() => onPageChange(pagination.page - 1)}
                             disabled={pagination.page <= 1 || isLoading}
                         >
-                            Назад
+                            {t('users.pagination.previous')}
                         </Button>
                         <span className="text-sm">
-                            Страница {pagination.page} из {pagination.totalPages}
+                            {t('users.pagination.page', { page: pagination.page, totalPages: pagination.totalPages })}
                         </span>
                         <Button 
                             variant="outline" 
@@ -153,7 +159,7 @@ export default function UsersManager({
                             onClick={() => onPageChange(pagination.page + 1)}
                             disabled={pagination.page >= pagination.totalPages || isLoading}
                         >
-                            Вперед
+                            {t('users.pagination.next')}
                         </Button>
                     </div>
                 </div>
