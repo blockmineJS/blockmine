@@ -16,7 +16,7 @@ function initializeBotApiNamespace(io) {
         console.log(`[Bot API] Клиент подключился к боту ID: ${socket.botId} (ключ: ${socket.keyPrefix})`);
 
         socket.join(`bot_${socket.botId}`);
-
+        socket.join(`key_${socket.keyId}`);
 
         const isOnline = botManager.isBotRunning(socket.botId);
         socket.emit('bot:status', { online: isOnline });

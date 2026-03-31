@@ -163,6 +163,14 @@ router.delete('/:keyId', authorize('bot:update'), async (req, res) => {
         const botId = parseInt(req.params.botId, 10);
         const keyId = parseInt(req.params.keyId, 10);
 
+        const { getIO } = require('../../real-time/socketHandler');
+
+        const io = getIO();
+
+        io.of("/bot-api")
+            .in(`key_${keyId}`)
+            .disconnectSockets(true)
+
         const result = await prisma.botApiKey.deleteMany({
             where: { id: keyId, botId },
         });
