@@ -75,15 +75,16 @@ export default function LanguageSelectModal() {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent
-        className="sm:max-w-md border-0 bg-gradient-to-br from-background via-background to-muted/30 shadow-2xl"
+        className="sm:max-w-md overflow-hidden border border-border/60 bg-background shadow-2xl"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         {/* Декоративные элементы */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background/95" />
         <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
         <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
 
-        <DialogHeader className="text-center space-y-4 relative">
+        <DialogHeader className="relative space-y-4 text-center">
           {/* Флаги */}
           <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-lg overflow-hidden">
             {selectedLang ? (
@@ -120,13 +121,13 @@ export default function LanguageSelectModal() {
         </DialogHeader>
 
         {/* Карточки языков */}
-        <div className="grid grid-cols-2 gap-4 py-6">
+        <div className="relative grid grid-cols-2 gap-4 py-6">
           {languages.map((lang) => (
             <button
               key={lang.code}
               onClick={() => handleSelectLanguage(lang.code)}
               className={cn(
-                "relative group p-4 rounded-xl border-2 transition-all duration-300",
+                "relative group flex flex-col items-center p-4 rounded-xl border-2 transition-all duration-300",
                 "hover:scale-[1.02] hover:shadow-lg",
                 "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background",
                 selectedLang === lang.code
@@ -143,7 +144,7 @@ export default function LanguageSelectModal() {
 
               {/* Флаг */}
               <div className={cn(
-                "mb-3 transition-transform duration-300",
+                "mb-3 flex w-full justify-center transition-transform duration-300",
                 "group-hover:scale-110",
                 selectedLang === lang.code && "scale-110"
               )}>
@@ -155,7 +156,7 @@ export default function LanguageSelectModal() {
               </div>
 
               {/* Название */}
-              <div className="space-y-1">
+              <div className="space-y-1 text-center">
                 <div className={cn(
                   "font-semibold text-lg transition-colors",
                   selectedLang === lang.code ? "text-primary" : "text-foreground"
@@ -192,7 +193,7 @@ export default function LanguageSelectModal() {
           onClick={handleConfirm}
           disabled={!selectedLang || isAnimating}
           className={cn(
-            "w-full h-12 text-base font-medium transition-all duration-300",
+            "relative w-full h-12 text-base font-medium transition-all duration-300",
             "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70",
             "shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30",
             !selectedLang && "opacity-50 cursor-not-allowed"
@@ -211,7 +212,7 @@ export default function LanguageSelectModal() {
         </Button>
 
         {/* Подсказка */}
-        <p className="text-xs text-center text-muted-foreground/60">
+        <p className="relative text-xs text-center text-muted-foreground/60">
           You can change the language later in settings
           <br />
           <span className="text-muted-foreground/40">Вы можете изменить язык позже в настройках</span>
