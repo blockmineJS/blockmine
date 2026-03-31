@@ -48,6 +48,9 @@ function resolveUiExtensionLabel(extension, language) {
         tryLocalizedValue(extension?.labels) ||
         tryLocalizedValue(extension?.title) ||
         tryLocalizedValue(extension?.name) ||
+        extension?.id ||
+        extension?.identifier ||
+        `unknown-extension:${extension?.type || 'unknown'}` ||
         ''
     );
 }

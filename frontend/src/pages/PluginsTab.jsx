@@ -74,8 +74,11 @@ export default function PluginsTab() {
 
     const handleCheckForUpdates = async () => {
         setIsCheckingUpdates(true);
-        await checkForUpdates(intBotId);
-        setIsCheckingUpdates(false);
+        try {
+            await checkForUpdates(intBotId);
+        } finally {
+            setIsCheckingUpdates(false);
+        }
     };
 
     const handleTabChange = (value) => {

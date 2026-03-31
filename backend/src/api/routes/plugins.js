@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 const PLUGIN_DETAIL_TTL_MS = 10 * 60 * 1000;
+const PLUGIN_CHANGELOG_TTL_MS = 10 * 60 * 1000;
 
 let catalogCache = {
     data: null,
@@ -16,6 +17,7 @@ let catalogCache = {
 };
 
 const pluginDetailCache = new Map();
+const pluginChangelogCache = new Map();
 const GITHUB_REQUEST_TIMEOUT_MS = 10000;
 
 function getGithubHeaders(extra = {}) {
@@ -79,21 +81,63 @@ async function fetchOfficialCatalog(force = false) {
     }
 }
 
-function getCachedPluginDetail(pluginName) {
-    const cached = pluginDetailCache.get(pluginName);
+function getCachedTimedValue(cache, key) {
+    const cached = cache.get(key);
     if (!cached) return null;
     if (cached.expiresAt <= Date.now()) {
-        pluginDetailCache.delete(pluginName);
+        cache.delete(key);
         return null;
     }
     return cached.data;
 }
 
-function setCachedPluginDetail(pluginName, data) {
-    pluginDetailCache.set(pluginName, {
+function setCachedTimedValue(cache, key, data, ttlMs) {
+    cache.set(key, {
         data,
-        expiresAt: Date.now() + PLUGIN_DETAIL_TTL_MS,
+        expiresAt: Date.now() + ttlMs,
     });
+}
+
+function getCachedPluginDetail(pluginName) {
+    return getCachedTimedValue(pluginDetailCache, pluginName);
+}
+
+function setCachedPluginDetail(pluginName, data) {
+    setCachedTimedValue(pluginDetailCache, pluginName, data, PLUGIN_DETAIL_TTL_MS);
+}
+
+function getCachedPluginChangelog(pluginName) {
+    return getCachedTimedValue(pluginChangelogCache, pluginName);
+}
+
+function setCachedPluginChangelog(pluginName, data) {
+    setCachedTimedValue(pluginChangelogCache, pluginName, data, PLUGIN_CHANGELOG_TTL_MS);
+}
+
+function parseGithubRepoInfo(repoUrl) {
+    if (typeof repoUrl !== 'string') {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(repoUrl);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (!['github.com', 'www.github.com'].includes(hostname)) {
+            return null;
+        }
+
+        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+        if (pathParts.length < 2) {
+            return null;
+        }
+
+        return {
+            owner: pathParts[0],
+            repo: pathParts[1].replace(/\.git$/i, '')
+        };
+    } catch {
+        return null;
+    }
 }
 
 async function fetchGithubReadme(owner, repo) {
@@ -143,6 +187,31 @@ async function renderGithubMarkdown(markdown, owner, repo) {
     }
 
     return response.text();
+}
+
+async function fetchLatestGithubReleaseBody(repoUrl) {
+    const repoInfo = parseGithubRepoInfo(repoUrl);
+    if (!repoInfo) {
+        return null;
+    }
+
+    const response = await fetchWithTimeout(
+        `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/releases/latest`,
+        { headers: getGithubHeaders() }
+    );
+
+    if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub Releases] Rate limit reached while loading changelog for ${repoInfo.owner}/${repoInfo.repo}.`);
+            }
+        }
+        return null;
+    }
+
+    const release = await response.json();
+    return typeof release?.body === 'string' ? release.body : null;
 }
 
 
@@ -303,6 +372,32 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
     } catch (error) {
         console.error(`[API Error] /plugins/bot/:botId:`, error);
         res.status(500).json({ error: 'Не удалось получить список плагинов.' });
+    }
+});
+
+router.get('/catalog/:name/changelog', async (req, res) => {
+    try {
+        const pluginName = req.params.name;
+        const cachedChangelog = getCachedPluginChangelog(pluginName);
+
+        if (cachedChangelog !== null) {
+            return res.json({ body: cachedChangelog });
+        }
+
+        const catalog = await fetchOfficialCatalog();
+        const pluginInfo = catalog.find((plugin) => plugin.name === pluginName);
+
+        if (!pluginInfo) {
+            return res.status(404).json({ error: 'Plugin not found in catalog.' });
+        }
+
+        const changelogBody = (await fetchLatestGithubReleaseBody(pluginInfo.repoUrl)) || '';
+        setCachedPluginChangelog(pluginName, changelogBody);
+
+        return res.json({ body: changelogBody });
+    } catch (error) {
+        console.error(`[API Error] /catalog/:name/changelog:`, error);
+        return res.status(500).json({ error: 'Failed to load plugin changelog.' });
     }
 });
 

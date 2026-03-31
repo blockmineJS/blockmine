@@ -121,16 +121,27 @@ export default function PluginDetailPage() {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchPluginDetails = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/plugins/catalog/${pluginName}`);
+        const response = await fetch(`/api/plugins/catalog/${encodeURIComponent(pluginName)}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error(t('notFound.title'));
         const data = await response.json();
+        if (controller.signal.aborted) return;
         setPlugin(data);
       } catch (error) {
+        if (controller.signal.aborted || error?.name === 'AbortError') {
+          return;
+        }
         toast({ variant: 'destructive', title: t('messages.error'), description: error.message });
       } finally {
+        if (controller.signal.aborted) {
+          return;
+        }
         setIsLoading(false);
       }
     };
@@ -149,6 +160,10 @@ export default function PluginDetailPage() {
     if (!hasCachedPluginDetails) {
       fetchPluginDetails();
     }
+
+    return () => {
+      controller.abort();
+    };
   }, [cachedCatalogPlugin, pluginName, t, toast]);
 
   useEffect(() => {
@@ -156,32 +171,31 @@ export default function PluginDetailPage() {
   }, [pluginName]);
 
   useEffect(() => {
-    if (activeTab !== 'changelog' || changelog || !safeRepoUrl) {
+    if (activeTab !== 'changelog' || changelog || !pluginName) {
       return undefined;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const fetchChangelog = async () => {
       try {
-        const urlParts = new URL(safeRepoUrl);
-        const pathParts = urlParts.pathname.split('/').filter(Boolean);
-        if (pathParts.length < 2) {
+        const response = await fetch(`/api/plugins/catalog/${encodeURIComponent(pluginName)}/changelog`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
           return;
         }
 
-        const owner = pathParts[0];
-        const repo = pathParts[1].replace('.git', '');
-        const releasesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
-        if (!releasesResponse.ok) {
+        const data = await response.json();
+        if (controller.signal.aborted) {
           return;
         }
 
-        const releaseData = await releasesResponse.json();
-        if (!cancelled && releaseData.body) {
-          setChangelog(releaseData.body);
-        }
+        setChangelog(data?.body || '');
       } catch (error) {
+        if (controller.signal.aborted || error?.name === 'AbortError') {
+          return;
+        }
         console.warn('Failed to load GitHub changelog:', error.message);
       }
     };
@@ -189,9 +203,9 @@ export default function PluginDetailPage() {
     fetchChangelog();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [activeTab, changelog, safeRepoUrl]);
+  }, [activeTab, changelog, pluginName]);
 
   useEffect(() => {
     if (botId && !allInstalledPlugins[intBotId]) {
@@ -584,9 +598,11 @@ export default function PluginDetailPage() {
                         <div key={graph.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
                           <div className="mb-2 flex items-center gap-2">
                             <Badge variant="outline">{graph.name}</Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {graph.eventType}
-                            </Badge>
+                            {graph.eventType && (
+                              <Badge variant="secondary" className="text-xs">
+                                {graph.eventType}
+                              </Badge>
+                            )}
                           </div>
                           {graph.description && <p className="text-sm text-muted-foreground">{graph.description}</p>}
                         </div>
