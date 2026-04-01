@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Heart, Upload, Search, Settings, ShoppingBag } from 'lucide-react';
 import { api } from '@/lib/api';
+import FadeTransition from '@/components/FadeTransition';
 
 const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
@@ -421,9 +422,13 @@ export default function GraphStorePage() {
                 </CardContent>
             </Card>
 
-            {loading ? (
-                <div className="text-center py-8 text-muted-foreground">{t('loading')}</div>
-            ) : graphs.length === 0 ? (
+            <FadeTransition
+                transitionKey={`graph-store-${selectedCategory}-${selectedType}-${searchQuery}`}
+                ready={!loading}
+                duration={0.22}
+                fallback={<div className="text-center py-8 text-muted-foreground">{t('loading')}</div>}
+            >
+            {graphs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">{t('empty')}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -472,6 +477,7 @@ export default function GraphStorePage() {
                     ))}
                 </div>
             )}
+            </FadeTransition>
 
             <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
                 <DialogContent className="max-w-md">

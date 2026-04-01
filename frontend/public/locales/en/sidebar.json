@@ -14,13 +14,160 @@
   "createBotDescription": "Fill in the information below to add a new bot to the panel.",
   "importBot": "Import Bot",
   "logout": "Logout",
+  "brandToggle": {
+    "hide": "Hide logo",
+    "show": "Show logo"
+  },
+  "logoutDialog": {
+    "title": "Log out of your account?",
+    "description": "Your current session will end and you will need to enter your password again to sign in.",
+    "cancel": "Cancel",
+    "confirm": "Log out"
+  },
   "whatsNew": "What's New?",
   "openMenu": "Open Menu",
   "theme": {
     "label": "Theme",
     "light": "Light",
     "dark": "Dark",
-    "system": "System"
+    "system": "System",
+    "custom": "Custom",
+    "editor": {
+      "title": "Custom theme",
+      "description": "Adjust the core panel colors without touching status accents or plugin-specific success colors.",
+      "sections": {
+        "surface": {
+          "title": "Surface",
+          "description": "These colors define the page background, cards, popovers, and the main readable text."
+        },
+        "brand": {
+          "title": "Brand",
+          "description": "These colors control the main accent, active buttons, focus rings, and highlighted actions."
+        },
+        "ui": {
+          "title": "Interface",
+          "description": "Tune supporting blocks, muted text, borders, form inputs, and secondary surfaces."
+        },
+        "scrollbar": {
+          "title": "Scrollbars",
+          "description": "Fine-tune scrollbar thumb and button colors to keep the panel consistent."
+        }
+      },
+      "preview": {
+        "title": "Live preview",
+        "description": "Changes are applied instantly while custom theme mode is active.",
+        "active": "Custom active",
+        "inactive": "Preview only",
+        "cardTitle": "Interface card",
+        "cardDescription": "A quick look at how your main UI tokens work together.",
+        "primaryBadge": "Primary",
+        "secondary": "Secondary",
+        "muted": "Muted",
+        "accent": "Accent"
+      },
+      "baseTheme": {
+        "title": "Base mode",
+        "description": "Choose whether custom theme should inherit light or dark structural styles. Use the presets below if you want to replace the whole palette."
+      },
+      "actions": {
+        "resetCurrent": "Reset current palette",
+        "useDarkPreset": "Use dark preset",
+        "useLightPreset": "Use light preset"
+      },
+      "note": {
+        "title": "What changes here",
+        "description": "This editor affects the main panel palette: background, cards, buttons, borders, inputs, muted blocks, and scrollbars. Feature-specific colors like installed plugin green stay untouched."
+      },
+      "picker": {
+        "title": "Color picker",
+        "description": "Use quick swatches or fine-tune the color with HSL sliders.",
+        "hue": "Hue",
+        "saturation": "Saturation",
+        "lightness": "Lightness"
+      },
+      "colors": {
+        "background": {
+          "label": "Background",
+          "description": "Main application backdrop."
+        },
+        "foreground": {
+          "label": "Main text",
+          "description": "Primary readable text color."
+        },
+        "card": {
+          "label": "Card background",
+          "description": "Cards, blocks, and panels."
+        },
+        "cardForeground": {
+          "label": "Card text",
+          "description": "Readable text placed on cards."
+        },
+        "popover": {
+          "label": "Popup background",
+          "description": "Dropdowns, menus, and overlays."
+        },
+        "popoverForeground": {
+          "label": "Popup text",
+          "description": "Readable text inside dropdowns and popovers."
+        },
+        "primary": {
+          "label": "Primary accent",
+          "description": "Main brand button and selected state."
+        },
+        "primaryForeground": {
+          "label": "Primary text",
+          "description": "Text placed on primary buttons."
+        },
+        "secondary": {
+          "label": "Secondary surface",
+          "description": "Supporting buttons and softer blocks."
+        },
+        "secondaryForeground": {
+          "label": "Secondary text",
+          "description": "Text placed on secondary surfaces."
+        },
+        "muted": {
+          "label": "Muted surface",
+          "description": "Subtle containers and supporting backgrounds."
+        },
+        "mutedForeground": {
+          "label": "Muted text",
+          "description": "Secondary descriptions and helper text."
+        },
+        "accent": {
+          "label": "Accent surface",
+          "description": "Hover states and highlighted UI zones."
+        },
+        "accentForeground": {
+          "label": "Accent text",
+          "description": "Text placed on accent surfaces."
+        },
+        "border": {
+          "label": "Border",
+          "description": "Card outlines and separators."
+        },
+        "input": {
+          "label": "Input border",
+          "description": "Text fields, selects, and control outlines."
+        },
+        "ring": {
+          "label": "Focus ring",
+          "description": "Keyboard focus and active input outline."
+        },
+        "scrollbarThumb": {
+          "label": "Scrollbar thumb",
+          "description": "Main draggable scrollbar element."
+        },
+        "scrollbarThumbHover": {
+          "label": "Scrollbar hover",
+          "description": "Scrollbar color on hover."
+        },
+        "scrollbarButtonBg": {
+          "label": "Scrollbar button",
+          "description": "Arrow button background on classic scrollbars."
+        }
+      }
+    }
   },
   "botImported": "Bot \"{{name}}\" imported successfully.",
   "botOrderError": "Failed to update bot order",

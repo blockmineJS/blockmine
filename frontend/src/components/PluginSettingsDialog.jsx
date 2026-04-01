@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -153,7 +154,7 @@ function ProxySettingField({ settingKey, config, value, onChange, readOnly }) {
                     </div>
                     <div className="col-span-2 space-y-2">
                         <Label>{t('settingsDialog.proxy.password')}</Label>
-                        <Input type="password" value={proxyValue.password || ''} onChange={(e) => handleFieldChange('password', e.target.value)} placeholder={t('settingsDialog.proxy.optional')} disabled={readOnly} />
+                        <PasswordInput value={proxyValue.password || ''} onChange={(e) => handleFieldChange('password', e.target.value)} placeholder={t('settingsDialog.proxy.optional')} disabled={readOnly} />
                     </div>
                 </div>
             )}

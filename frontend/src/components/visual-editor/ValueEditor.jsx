@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -25,9 +26,10 @@ const ValueEditor = ({
   onClose,
   value,
   onSave,
-  title = 'Редактировать значение',
+  title,
   pinName = ''
 }) => {
+  const { t } = useTranslation('visual-editor');
   const [editedValue, setEditedValue] = useState(() => {
     if (typeof value === 'object' && value !== null) {
       return JSON.stringify(value, null, 2);
@@ -49,7 +51,7 @@ const ValueEditor = ({
         onSave(parsed);
         onClose();
       } catch (e) {
-        setError('Некорректный JSON: ' + e.message);
+        setError(t('valueEditor.invalidJson', { message: e.message }));
       }
     } else {
       // Простое значение
@@ -73,7 +75,7 @@ const ValueEditor = ({
       <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-white">
-            {title}
+            {title || t('valueEditor.title')}
             {pinName && <span className="text-slate-400 font-mono ml-2">({pinName})</span>}
           </DialogTitle>
         </DialogHeader>
@@ -82,7 +84,7 @@ const ValueEditor = ({
           {isObject ? (
             <div>
               <Label className="text-xs text-slate-400 mb-2 block">
-                JSON объект/массив
+                {t('valueEditor.jsonObjectArray')}
               </Label>
               <Textarea
                 value={editedValue}
@@ -91,22 +93,22 @@ const ValueEditor = ({
                 placeholder='{"key": "value"}'
               />
               <p className="text-xs text-slate-500 mt-2">
-                💡 Используйте корректный JSON формат
+                {t('valueEditor.jsonHint')}
               </p>
             </div>
           ) : (
             <div>
               <Label className="text-xs text-slate-400 mb-2 block">
-                Значение
+                {t('valueEditor.value')}
               </Label>
               <Input
                 value={editedValue}
                 onChange={(e) => setEditedValue(e.target.value)}
                 className="font-mono text-sm bg-slate-800 border-slate-600 text-white"
-                placeholder="Введите значение"
+                placeholder={t('valueEditor.placeholder')}
               />
               <p className="text-xs text-slate-500 mt-2">
-                💡 Поддерживаются: строки, числа, true/false, null
+                {t('valueEditor.scalarHint')}
               </p>
             </div>
           )}
@@ -119,11 +121,11 @@ const ValueEditor = ({
           )}
 
           <div className="bg-slate-800 p-3 rounded border border-slate-700">
-            <div className="text-xs text-slate-400 mb-1">Текущее значение:</div>
+            <div className="text-xs text-slate-400 mb-1">{t('valueEditor.currentValue')}</div>
             <code className="text-xs text-slate-300">
               {typeof value === 'object' && value !== null
                 ? JSON.stringify(value, null, 2)
-                : String(value ?? '(пусто)')}
+                : String(value ?? t('valueEditor.empty'))}
             </code>
           </div>
         </div>
@@ -134,10 +136,10 @@ const ValueEditor = ({
             onClick={onClose}
             className="border-slate-600 text-slate-300"
           >
-            Отмена
+            {t('valueEditor.cancel')}
           </Button>
           <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-            Сохранить
+            {t('valueEditor.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

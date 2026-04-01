@@ -1,24 +1,27 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Настройки для ноды flow:for_each
  */
 function FlowForEachSettings({ nodeId, data, updateNodeData }) {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">
-        <p>Цикл <strong>For Each</strong> проходит по каждому элементу массива.</p>
+        <p>{t('nodeHelp.flowForEach.intro')}</p>
         <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Подключите массив к входу <strong>Array</strong></li>
-          <li>Используйте выход <strong>Element</strong> для получения текущего элемента</li>
-          <li>Используйте выход <strong>Index</strong> для получения индекса</li>
-          <li>Тело цикла выполняется для каждого элемента</li>
-          <li>После завершения срабатывает выход <strong>Completed</strong></li>
+          <li>{t('nodeHelp.flowForEach.item1')}</li>
+          <li>{t('nodeHelp.flowForEach.item2')}</li>
+          <li>{t('nodeHelp.flowForEach.item3')}</li>
+          <li>{t('nodeHelp.flowForEach.item4')}</li>
+          <li>{t('nodeHelp.flowForEach.item5')}</li>
         </ul>
       </div>
 
       <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-        <strong>Примечание:</strong> Цикл можно прервать с помощью ноды <strong>Break</strong>
+        {t('nodeHelp.flowForEach.note')}
       </div>
     </div>
   );

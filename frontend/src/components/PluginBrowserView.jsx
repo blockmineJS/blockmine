@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/appStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import FadeTransition from '@/components/FadeTransition';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import DependencyDialog from '@/components/DependencyDialog';
@@ -37,6 +38,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('plugin-browser-view-mode') || 'grid');
+  const [isCatalogReady, setIsCatalogReady] = useState(false);
   const [dependencyDialogState, setDependencyDialogState] = useState({
     isOpen: false,
     mainPlugin: null,
@@ -48,7 +50,20 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
 
   useEffect(() => {
     if (!isActive) return;
-    fetchPluginCatalog();
+
+    let isMounted = true;
+    setIsCatalogReady(false);
+
+    Promise.resolve(fetchPluginCatalog()).finally(() => {
+      if (isMounted) {
+        setIsCatalogReady(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      setIsCatalogReady(false);
+    };
   }, [fetchPluginCatalog, isActive]);
 
   useEffect(() => {
@@ -183,6 +198,9 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   const gridRowCount = Math.ceil(filteredAndSortedCatalog.length / columnCount);
   const columnWidth = size.width > 0 ? size.width / columnCount : 0;
   const gridRowHeight = 404;
+  const hasMeasuredViewport = size.width > 0 && size.height > 0;
+  const canRenderCatalogContent = filteredAndSortedCatalog.length === 0 || hasMeasuredViewport;
+  const isCatalogContentReady = isCatalogReady && !isLoading && canRenderCatalogContent;
 
   const Row = ({ index, style }) => {
     const plugin = filteredAndSortedCatalog[index];
@@ -281,7 +299,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
                 <Button
                   key={id}
                   variant={selectedCategory === id ? 'default' : 'outline'}
-                  className="h-8 whitespace-nowrap px-3"
+                  className="h-8 whitespace-nowrap px-3 transition-[background-color,color,border-color,box-shadow,opacity] duration-200 ease-out"
                   onClick={() => setSelectedCategory(id)}
                 >
                   <Icon className={color ? 'mr-2 h-4 w-4' : 'mr-2 h-4 w-4'} />
@@ -298,12 +316,19 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
       </div>
 
       <div className="flex-1 overflow-hidden" ref={containerRef}>
-        {isLoading ? (
-          <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-            <Icons.Loader2 className="mb-4 h-12 w-12 animate-spin" />
-            <p className="text-lg">{t('browser.loadingCatalog', { defaultValue: 'Загрузка каталога плагинов...' })}</p>
-          </div>
-        ) : filteredAndSortedCatalog.length > 0 && size.width > 0 ? (
+        <FadeTransition
+          transitionKey={`${viewMode}-${selectedCategory}-${sortBy}`}
+          className="h-full"
+          duration={0.22}
+          ready={isCatalogContentReady}
+          fallback={
+            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+              <Icons.Loader2 className="mb-4 h-12 w-12 animate-spin" />
+              <p className="text-lg">{t('browser.loadingCatalog', { defaultValue: 'Загрузка каталога плагинов...' })}</p>
+            </div>
+          }
+        >
+        {filteredAndSortedCatalog.length > 0 && size.width > 0 ? (
           viewMode === 'grid' ? (
             <FixedSizeGrid
               height={size.height}
@@ -357,6 +382,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
             </Button>
           </div>
         )}
+        </FadeTransition>
       </div>
 
       <Dialog

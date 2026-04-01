@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
+import FadeTransition from '@/components/FadeTransition';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
 import {
@@ -277,7 +278,12 @@ function InstalledPluginCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className={cn('absolute left-0 top-0 h-full w-1 rounded-l-lg bg-green-500', displayEnabled ? 'opacity-100' : 'opacity-0')} />
+        <div
+          className={cn(
+            'absolute left-0 top-0 h-full w-1 rounded-l-lg bg-green-500 transition-[opacity,transform] duration-300 ease-out',
+            displayEnabled ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'
+          )}
+        />
 
         <div className="relative mt-1 shrink-0">
           <IconComponent
@@ -379,7 +385,7 @@ function InstalledPluginCard({
             checked={displayEnabled}
             onCheckedChange={handleToggleChange}
             disabled={isTogglePending || !onToggle}
-            className="ml-2 disabled:opacity-100"
+            className="ml-2 disabled:cursor-default disabled:opacity-100"
           />
         </div>
       </div>
@@ -392,7 +398,12 @@ function InstalledPluginCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={cn('absolute left-0 top-0 h-1 w-full bg-green-500', displayEnabled ? 'opacity-100' : 'opacity-0')} />
+      <div
+        className={cn(
+          'absolute left-0 top-0 h-1 w-full bg-green-500 transition-[opacity,transform] duration-300 ease-out',
+          displayEnabled ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'
+        )}
+      />
 
       {(isNew || updateInfo) && (
         <div className="absolute left-0 top-0 z-10 flex flex-col items-start gap-1">
@@ -462,7 +473,7 @@ function InstalledPluginCard({
                 <TooltipContent>{renderUpdateTooltip()}</TooltipContent>
               </Tooltip>
             )}
-            <Switch checked={displayEnabled} onCheckedChange={handleToggleChange} disabled={isTogglePending || !onToggle} className="shrink-0 disabled:opacity-100" />
+            <Switch checked={displayEnabled} onCheckedChange={handleToggleChange} disabled={isTogglePending || !onToggle} className="shrink-0 disabled:cursor-default disabled:opacity-100" />
           </div>
         </div>
       </CardHeader>
@@ -690,7 +701,10 @@ export default function InstalledPluginsView({
                   variant={filter === 'updates' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setFilter('updates')}
-                  className={cn(stats.updates > 0 && filter !== 'updates' && 'text-blue-500')}
+                  className={cn(
+                    stats.updates > 0 && filter !== 'updates' && 'text-blue-500',
+                    'transition-[background-color,color,border-color,box-shadow,opacity] duration-200 ease-out'
+                  )}
                 >
                   <ArrowUpCircle className="mr-1.5 h-3.5 w-3.5" />
                   {t('installed.filters.updates', { count: stats.updates, defaultValue: 'Обновления ({{count}})' })}
@@ -732,6 +746,7 @@ export default function InstalledPluginsView({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          <FadeTransition transitionKey={`${viewMode}-${filter}`} className="h-full" duration={0.2}>
           {sortedAndFilteredPlugins.length > 0 ? (
             viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -788,6 +803,7 @@ export default function InstalledPluginsView({
               )}
             </div>
           )}
+          </FadeTransition>
         </div>
       </div>
 

@@ -1,6 +1,24 @@
 import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 
+const toLegacyNodeTranslationKey = (nodeType) => {
+  if (!nodeType) return nodeType;
+
+  return String(nodeType)
+    .split(':')
+    .map((segment, index) => {
+      if (index === 0) return segment;
+      return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+    })
+    .join(':');
+};
+
+const buildNodeTypeKeys = (nodeType) => {
+  const exactKey = String(nodeType || '');
+  const legacyKey = toLegacyNodeTranslationKey(exactKey);
+  return legacyKey !== exactKey ? [exactKey, legacyKey] : [exactKey];
+};
+
 /**
  * Hook для получения переводов нод
  *
@@ -16,9 +34,19 @@ export function useNodeTranslation() {
    * @returns {object} - объект с переведёнными label и description
    */
   const getNodeTranslation = useCallback((nodeType) => {
-    // Используем nsSeparator: false чтобы двоеточие в типе ноды не интерпретировалось как разделитель namespace
-    const label = t(`${nodeType}.label`, { defaultValue: '', nsSeparator: false });
-    const description = t(`${nodeType}.description`, { defaultValue: '', nsSeparator: false });
+    const keys = buildNodeTypeKeys(nodeType);
+    let label = '';
+    let description = '';
+
+    for (const key of keys) {
+      label = t(`${key}.label`, { defaultValue: '', nsSeparator: false });
+      if (label) break;
+    }
+
+    for (const key of keys) {
+      description = t(`${key}.description`, { defaultValue: '', nsSeparator: false });
+      if (description) break;
+    }
 
     return {
       label: label || undefined,
@@ -34,9 +62,10 @@ export function useNodeTranslation() {
    * @returns {string} - переведённое имя пина
    */
   const getPinName = useCallback((nodeType, pinId, fallback) => {
-    // Сначала пробуем найти в pins конкретной ноды
-    const nodePinName = t(`${nodeType}.pins.${pinId}`, { defaultValue: '', nsSeparator: false });
-    if (nodePinName) return nodePinName;
+    for (const key of buildNodeTypeKeys(nodeType)) {
+      const nodePinName = t(`${key}.pins.${pinId}`, { defaultValue: '', nsSeparator: false });
+      if (nodePinName) return nodePinName;
+    }
 
     // Затем пробуем в common.pins
     const commonPinName = t(`common.pins.${pinId}`, { defaultValue: '', nsSeparator: false });
@@ -53,8 +82,12 @@ export function useNodeTranslation() {
    * @returns {string|undefined} - переведённое описание пина
    */
   const getPinDescription = useCallback((nodeType, pinId, fallback) => {
-    const desc = t(`${nodeType}.pins.${pinId}_desc`, { defaultValue: '', nsSeparator: false });
-    return desc || fallback;
+    for (const key of buildNodeTypeKeys(nodeType)) {
+      const desc = t(`${key}.pins.${pinId}_desc`, { defaultValue: '', nsSeparator: false });
+      if (desc) return desc;
+    }
+
+    return fallback;
   }, [t]);
 
   /**
@@ -65,9 +98,10 @@ export function useNodeTranslation() {
    * @returns {string} - переведённый placeholder
    */
   const getPlaceholder = useCallback((nodeType, pinId, fallback) => {
-    // Сначала в placeholders конкретной ноды
-    const nodePlaceholder = t(`${nodeType}.placeholders.${pinId}`, { defaultValue: '', nsSeparator: false });
-    if (nodePlaceholder) return nodePlaceholder;
+    for (const key of buildNodeTypeKeys(nodeType)) {
+      const nodePlaceholder = t(`${key}.placeholders.${pinId}`, { defaultValue: '', nsSeparator: false });
+      if (nodePlaceholder) return nodePlaceholder;
+    }
 
     // Затем в common.placeholders
     const commonPlaceholder = t(`common.placeholders.${pinId}`, { defaultValue: '', nsSeparator: false });

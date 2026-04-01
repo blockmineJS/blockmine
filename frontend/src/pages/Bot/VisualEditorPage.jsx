@@ -36,6 +36,9 @@ import { apiHelper } from '@/lib/api';
 import CollaborativeUsersHeader from '@/components/visual-editor/CollaborativeUsersHeader';
 import CollaborativeCursors from '@/components/visual-editor/CollaborativeCursors';
 import CollaborativeConnections from '@/components/visual-editor/CollaborativeConnections';
+import { useNodeTranslation } from '@/components/visual-editor/hooks/useNodeTranslation';
+import { normalizeVisualEditorCategory } from '@/components/visual-editor/categoryUtils';
+import FadeTransition from '@/components/FadeTransition';
 
 initializeVisualEditor();
 
@@ -67,6 +70,7 @@ function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
     const { t } = useTranslation('visual-editor');
+    const { getNodeTranslation } = useNodeTranslation();
 
     const [botName, setBotName] = useState(null);
     const appSocket = useAppStore(state => state.socket);
@@ -101,6 +105,7 @@ function BotVisualEditorPage() {
     const pasteNodes = useVisualEditorStore(state => state.pasteNodes);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
+    const [isRouteReady, setIsRouteReady] = useState(false);
     const reactFlowWrapper = useRef(null);
     const [publishDialogOpen, setPublishDialogOpen] = useState(false);
     const [showEventTypeDialog, setShowEventTypeDialog] = useState(false);
@@ -118,11 +123,21 @@ function BotVisualEditorPage() {
     const entityId = editorType === 'command' ? commandId : eventId;
 
     useEffect(() => {
+        let isMounted = true;
+
+        setIsRouteReady(false);
+
         if (botId && entityId) {
-            init(botId, entityId, editorType);
+            init(botId, entityId, editorType).finally(() => {
+                if (isMounted) {
+                    setIsRouteReady(true);
+                }
+            });
         }
 
         return () => {
+            isMounted = false;
+            setIsRouteReady(false);
             flushSaveGraph();
             // Отключаемся от collaborative socket при уходе со страницы
             const disconnectGraphSocket = useVisualEditorStore.getState().disconnectGraphSocket;
@@ -136,11 +151,11 @@ function BotVisualEditorPage() {
 
         const bot = bots.find(b => b.id === parseInt(botId));
         if (bot) {
-            setBotName(bot.username || bot.name || `Бот ${botId}`);
+            setBotName(bot.username || bot.name || t('editor.botFallback', { id: botId }));
         } else {
-            setBotName(`Бот ${botId}`);
+            setBotName(t('editor.botFallback', { id: botId }));
         }
-    }, [botId, bots]);
+    }, [botId, bots, t]);
 
     // Отправляем метаданные для presence (название графа и бота)
     useEffect(() => {
@@ -319,7 +334,7 @@ function BotVisualEditorPage() {
                 if (eventNodes.length > 1) {
                     const types = eventNodes.map(n => ({
                         type: n.type.replace('event:', ''),
-                        label: NodeRegistry.get(n.type)?.label || n.type
+                        label: getNodeTranslation(n.type).label || NodeRegistry.get(n.type)?.label || n.type
                     }));
                     setAvailableEventTypes(types);
                     setShowEventTypeDialog(true);
@@ -470,15 +485,15 @@ function BotVisualEditorPage() {
         }
 
         const staticGroups = Object.entries(availableNodes).map(([category, nodes]) => ({
-            label: category,
+            label: t(`nodePanel.categories.${normalizeVisualEditorCategory(category)}`, { defaultValue: category }),
             children: nodes.map(node => ({
-                label: node.label,
+                label: getNodeTranslation(node.type).label || node.label,
                 type: node.type,
             }))
         }));
 
         return [...dynamicGroups, ...staticGroups];
-    }, [availableNodes, variables, commandArguments]);
+    }, [availableNodes, variables, commandArguments, getNodeTranslation, t]);
 
     const handleMenuItemSelect = (item) => {
         const { menuPosition, addNode, closeMenu, socket, command } = useVisualEditorStore.getState();
@@ -576,16 +591,23 @@ function BotVisualEditorPage() {
         addNode(type, position);
     };
 
-    if (isLoading || Object.keys(availableNodes).length === 0) {
-        return <div className="flex items-center justify-center h-full">{t('loading')}</div>;
-    }
-
     return (
-        <ReactFlowProvider>
-            <div
-                className="h-full w-full flex flex-col"
-                onContextMenu={(e) => e.preventDefault()}
-            >
+        <FadeTransition
+            transitionKey={`${editorType}-${entityId}`}
+            ready={isRouteReady && !isLoading && Object.keys(availableNodes).length > 0}
+            duration={0.22}
+            className="h-full"
+            fallback={
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                    {t('loading')}
+                </div>
+            }
+        >
+            <ReactFlowProvider>
+                <div
+                    className="h-full w-full flex flex-col"
+                    onContextMenu={(e) => e.preventDefault()}
+                >
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">{t('editor.title')}: {command?.name}</h1>
                     <div className="flex gap-2 items-center">
@@ -680,7 +702,7 @@ function BotVisualEditorPage() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                        <Button onClick={handleSave} disabled={isSaving}>
+                        <Button size="sm" onClick={handleSave} disabled={isSaving}>
                             {isSaving ? t('save.saving') : t('save.button')}
                         </Button>
                     </div>
@@ -760,8 +782,9 @@ function BotVisualEditorPage() {
                 />}
                 <TraceViewer />
                 <DebugControls />
-            </div>
-        </ReactFlowProvider>
+                </div>
+            </ReactFlowProvider>
+        </FadeTransition>
     );
 }
 

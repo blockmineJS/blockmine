@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -77,26 +78,37 @@ export default function SetupPage() {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
+                                autoComplete="username"
+                                className="auth-input bg-card"
+                                syncAutofill
                             />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">{t('password')}</Label>
-                            <Input
+                            <PasswordInput
                                 id="password"
-                                type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
+                                autoComplete="new-password"
+                                showLabel={t('showPassword')}
+                                hideLabel={t('hidePassword')}
+                                inputClassName="auth-input bg-card"
+                                syncAutofill
                             />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
-                            <Input
+                            <PasswordInput
                                 id="confirmPassword"
-                                type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
+                                autoComplete="new-password"
+                                showLabel={t('showPassword')}
+                                hideLabel={t('hidePassword')}
+                                inputClassName="auth-input bg-card"
+                                syncAutofill
                             />
                         </div>
                         {error && <p className="text-sm text-destructive">{error}</p>}

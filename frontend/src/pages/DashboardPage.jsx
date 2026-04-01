@@ -4,15 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-    Bot, 
-    Play, 
-    Square, 
-    Upload, 
-    Activity, 
-    Zap, 
-    Clock, 
-    TrendingUp, 
+import {
+    Bot,
+    Play,
+    Square,
+    Upload,
+    Activity,
+    Zap,
+    Clock,
+    TrendingUp,
     Server,
     ArrowRight,
     Circle,
@@ -73,7 +73,7 @@ export default function DashboardPage() {
         const totalMemory = Object.values(resourceUsage).reduce((sum, usage) => sum + (usage.memory || 0), 0);
         const avgCpu = running > 0 ? (totalCpu / running).toFixed(1) : 0;
         const avgMemory = running > 0 ? (totalMemory / running).toFixed(0) : 0;
-        
+
         return {
             totalBots: bots.length,
             runningBots: running,
@@ -94,7 +94,7 @@ export default function DashboardPage() {
     // Реальная активность - боты, которые недавно изменили статус
     const recentActivity = useMemo(() => {
         const activities = [];
-        
+
         // Сначала добавляем запущенные боты
         bots.filter(bot => botStatuses[bot.id] === 'running')
             .slice(0, 3)
@@ -107,7 +107,7 @@ export default function DashboardPage() {
                     type: 'status'
                 });
             });
-        
+
         // Затем остановленные
         bots.filter(bot => botStatuses[bot.id] === 'stopped')
             .slice(0, 2)
@@ -120,7 +120,7 @@ export default function DashboardPage() {
                     type: 'status'
                 });
             });
-        
+
         return activities.slice(0, 5);
     }, [bots, botStatuses]);
 
@@ -155,7 +155,7 @@ export default function DashboardPage() {
 
         checkHealth();
         const interval = setInterval(checkHealth, 30000); // Проверяем каждые 30 сек
-        
+
         return () => clearInterval(interval);
     }, [bots]);
 
@@ -164,7 +164,7 @@ export default function DashboardPage() {
             ? t('actions.start')
             : t('actions.stop');
         if (!window.confirm(t('confirmMassAction', { action: actionName }))) return;
-        
+
         if (action === 'start') {
             await startAllBots();
         } else {
@@ -196,7 +196,7 @@ export default function DashboardPage() {
                                 {t('subtitle')}
                             </p>
                         </div>
-                        
+
                         <div className="flex flex-wrap gap-2">
                             {hasPermission('bot:import') && (
                                 <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
@@ -212,11 +212,11 @@ export default function DashboardPage() {
 
                             {hasPermission('bot:start_stop') && (
                                 <>
-                                    <Button onClick={() => handleMassAction('start')} variant="outline" size="sm">
+                                    <Button onClick={() => handleMassAction('start')} variant="outline">
                                         <Play className="mr-2 h-3.5 w-3.5" />
                                         {t('startAll')}
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleMassAction('stop')}>
+                                    <Button variant="outline" onClick={() => handleMassAction('stop')}>
                                         <Square className="mr-2 h-3.5 w-3.5" />
                                         {t('stopAll')}
                                     </Button>
@@ -225,44 +225,44 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                        {/* Key Metrics */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <MetricCard
-                                label={t('metrics.totalBots')}
-                                value={stats.totalBots}
-                                icon={Bot}
-                                trend={stats.totalBots > 0 ? 'neutral' : 'down'}
-                            />
-                            <MetricCard
-                                label={t('metrics.active')}
-                                value={stats.runningBots}
-                                icon={Activity}
-                                trend={stats.runningBots > 0 ? 'up' : 'down'}
-                                accentColor="text-green-500"
-                            />
-                            <MetricCard
-                                label={t('metrics.systemCpu')}
-                                value={`${stats.systemCpu.toFixed(1)}%`}
-                                icon={Cpu}
-                                trend={stats.systemCpu > 80 ? 'up' : 'neutral'}
-                                accentColor={stats.systemCpu > 80 ? 'text-red-500' : undefined}
-                            />
-                            <MetricCard
-                                label={t('metrics.systemRam')}
-                                value={`${stats.systemMemoryPercent}%`}
-                                icon={MemoryStick}
-                                trend={stats.systemMemoryPercent > 80 ? 'up' : 'neutral'}
-                                accentColor={stats.systemMemoryPercent > 80 ? 'text-red-500' : undefined}
-                            />
-                        </div>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <MetricCard
+                            label={t('metrics.totalBots')}
+                            value={stats.totalBots}
+                            icon={Bot}
+                            trend={stats.totalBots > 0 ? 'neutral' : 'down'}
+                        />
+                        <MetricCard
+                            label={t('metrics.active')}
+                            value={stats.runningBots}
+                            icon={Activity}
+                            trend={stats.runningBots > 0 ? 'up' : 'down'}
+                            accentColor="text-green-500"
+                        />
+                        <MetricCard
+                            label={t('metrics.systemCpu')}
+                            value={`${stats.systemCpu.toFixed(1)}%`}
+                            icon={Cpu}
+                            trend={stats.systemCpu > 80 ? 'up' : 'neutral'}
+                            accentColor={stats.systemCpu > 80 ? 'text-red-500' : undefined}
+                        />
+                        <MetricCard
+                            label={t('metrics.systemRam')}
+                            value={`${stats.systemMemoryPercent}%`}
+                            icon={MemoryStick}
+                            trend={stats.systemMemoryPercent > 80 ? 'up' : 'neutral'}
+                            accentColor={stats.systemMemoryPercent > 80 ? 'text-red-500' : undefined}
+                        />
+                    </div>
                 </div>
             </div>
 
-                {/* Main Content */}
-                <div className="flex-1 p-6 sm:p-8 min-h-0 overflow-y-auto">
-                    <div className="grid gap-6 lg:grid-cols-12 h-full">
-                        {/* Left Column - Activity */}
-                        <div className="lg:col-span-8 space-y-6 flex flex-col min-h-0">
+            {/* Main Content */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-2 sm:px-8 sm:pt-8 sm:pb-4">
+                <div className="grid items-start gap-6 lg:grid-cols-12">
+                    {/* Left Column - Activity */}
+                    <div className="lg:col-span-8 flex flex-col gap-6">
                         {/* Мониторинг ресурсов ботов */}
                         <Card>
                             <CardHeader>
@@ -280,63 +280,63 @@ export default function DashboardPage() {
                         </Card>
 
                         {/* Quick Actions */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
+                        <Card className="flex flex-col lg:min-h-[320px]">
+                            <CardHeader className="p-4 pb-3">
+                                <div className="flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>{t('quickActions.title')}</CardTitle>
                                         <CardDescription>{t('quickActions.description')}</CardDescription>
                                     </div>
-                                    <Zap className="h-5 w-5 text-primary" />
                                 </div>
                             </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                        <QuickActionButton
-                                            icon={<CalendarClock className="h-5 w-5" />}
-                                            label={t('quickActions.scheduler')}
-                                            onClick={() => navigate('/tasks')}
-                                        />
-                                        <QuickActionButton
-                                            icon={<Settings className="h-5 w-5" />}
-                                            label={t('quickActions.settings')}
-                                            onClick={() => hasPermission('panel:user:list') && navigate('/admin')}
-                                            disabled={!hasPermission('panel:user:list')}
-                                        />
-                                        <QuickActionButton
-                                            icon={<MessageSquarePlus className="h-5 w-5" />}
-                                            label={t('quickActions.suggest')}
-                                            onClick={() => window.open('https://github.com/blockmineJS/blockmine/issues/new/choose')}
-                                        />
-                                        <QuickActionButton
-                                            icon={<Info className="h-5 w-5" />}
-                                            label={`v${appVersion || '...'}`}
-                                            description={t('quickActions.currentVersion')}
-                                            onClick={async () => {
-                                                if (!changelog) await fetchChangelog();
-                                                setShowChangelogDialog(true);
-                                            }}
-                                        />
-                                        <QuickActionButton
-                                            icon={<FileText className="h-5 w-5" />}
-                                            label={t('quickActions.changelog')}
-                                            onClick={async () => {
-                                                if (!changelog) await fetchChangelog();
-                                                setShowChangelogDialog(true);
-                                            }}
-                                        />
-                                        <QuickActionButton
-                                            icon={<Server className="h-5 w-5" />}
-                                            label={t('quickActions.servers')}
-                                            onClick={() => navigate('/servers')}
-                                        />
-                                    </div>
-                                </CardContent>
+                            <CardContent className="flex flex-1 p-4 pt-0">
+                                <div className="grid h-full flex-1 auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3">
+                                    <QuickActionButton
+                                        icon={<CalendarClock className="h-5 w-5" />}
+                                        label={t('quickActions.scheduler')}
+                                        onClick={() => navigate('/tasks')}
+                                    />
+                                    <QuickActionButton
+                                        icon={<Settings className="h-5 w-5" />}
+                                        label={t('quickActions.settings')}
+                                        onClick={() => hasPermission('panel:user:list') && navigate('/admin')}
+                                        disabled={!hasPermission('panel:user:list')}
+                                    />
+                                    <QuickActionButton
+                                        icon={<MessageSquarePlus className="h-5 w-5" />}
+                                        label={t('quickActions.suggest')}
+                                        onClick={() => window.open('https://github.com/blockmineJS/blockmine/issues/new/choose')}
+                                    />
+                                    <QuickActionButton
+                                        icon={<Info className="h-5 w-5" />}
+                                        label={`v${appVersion || '...'}`}
+                                        description={t('quickActions.currentVersion')}
+                                        onClick={async () => {
+                                            if (!changelog) await fetchChangelog();
+                                            setShowChangelogDialog(true);
+                                        }}
+                                    />
+                                    <QuickActionButton
+                                        icon={<FileText className="h-5 w-5" />}
+                                        label={t('quickActions.changelog')}
+                                        onClick={async () => {
+                                            if (!changelog) await fetchChangelog();
+                                            setShowChangelogDialog(true);
+                                        }}
+                                    />
+                                    <QuickActionButton
+                                        icon={<Server className="h-5 w-5" />}
+                                        label={t('quickActions.servers')}
+                                        onClick={() => navigate('/servers')}
+                                    />
+                                </div>
+                            </CardContent>
                         </Card>
                     </div>
 
                     {/* Right Column - Stats & System */}
-                    <div className="lg:col-span-4 space-y-4">
+                    <div className="lg:col-span-4 flex flex-col gap-4">
                         {/* System Health */}
                         <Card>
                             <CardHeader>
@@ -368,43 +368,43 @@ export default function DashboardPage() {
                             </CardContent>
                         </Card>
 
-                            {/* Resource Overview */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">{t('resources.title')}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <ResourceBar
-                                        label="CPU"
-                                        value={stats.systemCpu}
-                                        max={100}
-                                        unit="%"
-                                    />
-                                    <ResourceBar
-                                        label="RAM"
-                                        value={stats.systemMemory}
-                                        max={stats.systemMemoryTotal || 1000}
-                                        unit="MB"
-                                    />
-                                    <div className="pt-2 border-t space-y-2">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-muted-foreground">{t('resources.activeBots')}</span>
-                                            <span className="font-medium">{stats.runningBots}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-muted-foreground">{t('resources.totalMemory')}</span>
-                                            <span className="font-medium">{stats.systemMemoryTotal}MB</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                        {/* Bot Distribution */}
+                        {/* Resource Overview */}
                         <Card>
                             <CardHeader>
+                                <CardTitle className="text-base">{t('resources.title')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <ResourceBar
+                                    label="CPU"
+                                    value={stats.systemCpu}
+                                    max={100}
+                                    unit="%"
+                                />
+                                <ResourceBar
+                                    label="RAM"
+                                    value={stats.systemMemory}
+                                    max={stats.systemMemoryTotal || 1000}
+                                    unit="MB"
+                                />
+                                <div className="pt-2 border-t space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">{t('resources.activeBots')}</span>
+                                        <span className="font-medium">{stats.runningBots}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">{t('resources.totalMemory')}</span>
+                                        <span className="font-medium">{stats.systemMemoryTotal}MB</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Bot Distribution */}
+                        <Card className="flex flex-col">
+                            <CardHeader className="p-4 pb-3">
                                 <CardTitle className="text-base">{t('botDistribution.title')}</CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-4 pt-0">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -422,7 +422,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="pt-2 border-t">
                                         <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                            <div 
+                                            <div
                                                 className="h-full bg-primary transition-all duration-500"
                                                 style={{ width: `${stats.totalBots > 0 ? (stats.runningBots / stats.totalBots) * 100 : 0}%` }}
                                             />
@@ -462,7 +462,7 @@ function QuickActionButton({ icon, label, description, onClick, disabled, count 
         <button
             onClick={onClick}
             disabled={disabled}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+            className="group relative flex h-full min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg border bg-card p-4 transition-all duration-200 hover:border-primary/50 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
             {count !== undefined && count > 0 && (
                 <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
@@ -518,7 +518,7 @@ function ActivityItem({ activity, navigate }) {
 
 function SystemStatusItem({ label, status, value }) {
     const isOperational = status === 'operational';
-    
+
     return (
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ function ResourceBar({ label, value, max, unit }) {
     const percentage = (value / max) * 100;
     const isHigh = percentage > 80;
     const isMedium = percentage > 50;
-    
+
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
@@ -554,7 +554,7 @@ function ResourceBar({ label, value, max, unit }) {
                 <span className="font-medium">{value}{unit}</span>
             </div>
             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                     className={cn(
                         "h-full transition-all duration-500",
                         isHigh ? "bg-red-500" : isMedium ? "bg-yellow-500" : "bg-primary"

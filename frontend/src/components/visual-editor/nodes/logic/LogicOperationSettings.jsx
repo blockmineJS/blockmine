@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,11 @@ import { Button } from '@/components/ui/button';
  * Компонент настроек для logic:operation ноды
  */
 const LogicOperationSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
-      <Label>Операция:</Label>
+      <Label>{t('nodeSettings.operator')}</Label>
       <Select
         value={data.operation || 'AND'}
         onValueChange={(value) => {
@@ -21,9 +24,9 @@ const LogicOperationSettings = ({ nodeId, data, updateNodeData }) => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="AND">И (AND)</SelectItem>
-          <SelectItem value="OR">ИЛИ (OR)</SelectItem>
-          <SelectItem value="NOT">НЕ (NOT)</SelectItem>
+          <SelectItem value="AND">{t('nodeSettings.logicAnd')}</SelectItem>
+          <SelectItem value="OR">{t('nodeSettings.logicOr')}</SelectItem>
+          <SelectItem value="NOT">{t('nodeSettings.logicNot')}</SelectItem>
         </SelectContent>
       </Select>
       {data.operation !== 'NOT' && (
@@ -33,7 +36,7 @@ const LogicOperationSettings = ({ nodeId, data, updateNodeData }) => {
             variant="ghost"
             onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 2) + 1 })}
           >
-            Добавить
+            {t('nodeSettings.add')}
           </Button>
           {(data.pinCount || 0) > 2 && (
             <Button
@@ -41,7 +44,7 @@ const LogicOperationSettings = ({ nodeId, data, updateNodeData }) => {
               variant="destructive"
               onClick={() => updateNodeData(nodeId, { pinCount: Math.max(2, (data.pinCount || 2) - 1) })}
             >
-              Удалить
+              {t('nodeSettings.remove')}
             </Button>
           )}
         </div>

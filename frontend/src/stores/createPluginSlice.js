@@ -6,6 +6,28 @@ import { produce } from 'immer';
 const translatePlugins = (key, defaultValue, options = {}) =>
   i18n.t(key, { ns: 'plugins', defaultValue, ...options });
 
+const PLUGIN_UPDATE_COUNT_STORAGE_KEY = 'blockmine-plugin-update-counts';
+
+const loadStoredPluginUpdateCounts = () => {
+  try {
+    const raw = localStorage.getItem(PLUGIN_UPDATE_COUNT_STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const persistPluginUpdateCounts = (counts) => {
+  try {
+    localStorage.setItem(PLUGIN_UPDATE_COUNT_STORAGE_KEY, JSON.stringify(counts));
+  } catch {
+    // noop
+  }
+};
+
 const getGithubAuthorFromUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
 
@@ -75,6 +97,7 @@ export const createPluginSlice = (set, get) => {
     installedPluginsFetchedAt: {},
     pluginTogglePending: {},
     pluginUpdates: {},
+    pluginUpdateCounts: loadStoredPluginUpdateCounts(),
     pluginCatalog: [],
     isCatalogLoading: true,
 
@@ -304,17 +327,24 @@ export const createPluginSlice = (set, get) => {
       try {
         const updatesData = await apiHelper(`/api/plugins/check-updates/${botId}`, { method: 'POST' });
         const updatesMap = updatesData.reduce((accumulator, update) => ({ ...accumulator, [update.id]: update }), {});
+        const updatesCount = updatesData.length;
+        const previousCount = get().pluginUpdateCounts?.[botId];
 
         set((state) => {
           state.pluginUpdates[botId] = updatesMap;
+          state.pluginUpdateCounts[botId] = updatesCount;
         });
 
-        toast({
-          title: translatePlugins('toasts.updateCheckCompleted', 'Проверка завершена'),
-          description: translatePlugins('toasts.updateCheckFound', 'Найдено обновлений: {{count}}', {
-            count: updatesData.length,
-          }),
-        });
+        persistPluginUpdateCounts(get().pluginUpdateCounts);
+
+        if (typeof previousCount === 'number' && previousCount !== updatesCount) {
+          toast({
+            title: translatePlugins('toasts.updateCheckCompleted', 'Проверка завершена'),
+            description: translatePlugins('toasts.updateCheckFound', 'Найдено обновлений: {{count}}', {
+              count: updatesCount,
+            }),
+          });
+        }
       } catch (error) {
         console.error('Ошибка проверки обновлений:', error);
       }

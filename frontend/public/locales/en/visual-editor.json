@@ -2,7 +2,8 @@
   "loading": "Loading editor...",
   "loadingSettings": "Loading settings...",
   "editor": {
-    "title": "Editor"
+    "title": "Editor",
+    "botFallback": "Bot {{id}}"
   },
   "createGraph": {
     "title": "Create new event graph",
@@ -103,7 +104,58 @@
     "advanced": "Advanced",
     "operator": "Operator:",
     "addPin": "Add pin",
-    "httpMethod": "HTTP Method:"
+    "httpMethod": "HTTP Method:",
+    "value": "Value:",
+    "number": "Number:",
+    "targetType": "Target type:",
+    "selectType": "Select type...",
+    "checkType": "Check type:",
+    "add": "Add",
+    "remove": "Remove",
+    "addField": "Add field",
+    "removeField": "Remove field",
+    "cases": "Cases:",
+    "comparePlaceholder": "Comparison value",
+    "autoCompareHint": "Automatically detects comparison type: numbers, strings, arrays, objects",
+    "selectIn3dViewer": "Pick in 3D Viewer",
+    "selectContainerIn3dViewer": "Pick container in 3D Viewer",
+    "selectFurnaceIn3dViewer": "Pick furnace in 3D Viewer",
+    "jsonObject": "JSON object:",
+    "minimumDefault": "Minimum (default)",
+    "maximumDefault": "Maximum (default)",
+    "usedWhenPinDisconnected": "Used when pin {{pin}} is not connected",
+    "selectOperation": "Select operation...",
+    "booleanTrue": "True",
+    "booleanFalse": "False",
+    "castString": "String (Text)",
+    "castNumber": "Number",
+    "castBoolean": "Boolean",
+    "typeString": "String",
+    "typeNumber": "Number",
+    "typeNumericString": "Numeric string (\"100\")",
+    "typeBoolean": "Boolean",
+    "typeArray": "Array",
+    "typeObject": "Object",
+    "typeNull": "Null / Undefined",
+    "compareEquals": "Equals (==)",
+    "compareNotEquals": "Not equals (!=)",
+    "compareGreater": "Greater than (>)",
+    "compareLess": "Less than (<)",
+    "compareGreaterOrEqual": "Greater or equal (>=)",
+    "compareLessOrEqual": "Less or equal (<=)",
+    "logicAnd": "AND",
+    "logicOr": "OR",
+    "logicNot": "NOT",
+    "mathAdd": "Addition (+)",
+    "mathSubtract": "Subtraction (-)",
+    "mathMultiply": "Multiplication (*)",
+    "mathDivide": "Division (/)",
+    "timeBefore": "Before (<)",
+    "timeAfter": "After (>)",
+    "timeEqual": "Equal (=)",
+    "timeBeforeOrEqual": "Before or equal (≤)",
+    "timeAfterOrEqual": "After or equal (≥)",
+    "stringLiteralPlaceholder": "Hello, {username}!"
   },
   "contextMenu": {
     "searchPlaceholder": "Type a command or search...",
@@ -134,8 +186,13 @@
       "navigation": "🧭 Navigation",
       "container": "📦 Containers",
       "furnace": "🔥 Furnace",
-      "event": "📡 Events"
+      "event": "📡 Events",
+      "websocket": "🔌 WebSocket API"
     }
+  },
+  "collaboration": {
+    "online": "Online ({{count}})",
+    "editing": "Editing"
   },
   "debugControls": {
     "paused": "Paused",
@@ -179,6 +236,75 @@
     "time": "Time:",
     "inputs": "Inputs:",
     "outputs": "Outputs:"
+  },
+  "traceStepInfo": {
+    "title": "Step details",
+    "empty": "Select a step to view details",
+    "stepOf": "Step {{step}} of {{total}}",
+    "node": "Node",
+    "name": "Name:",
+    "type": "Type:",
+    "id": "ID:",
+    "unknown": "Unknown",
+    "status": "Status",
+    "result": "Result:",
+    "success": "Success",
+    "error": "Error",
+    "time": "Time:",
+    "inputs": "Input data",
+    "outputs": "Output data",
+    "path": "Execution path"
+  },
+  "valueEditor": {
+    "title": "Edit value",
+    "jsonObjectArray": "JSON object / array",
+    "jsonHint": "💡 Use valid JSON format",
+    "value": "Value",
+    "placeholder": "Enter a value",
+    "scalarHint": "💡 Supported: strings, numbers, true/false, null",
+    "currentValue": "Current value:",
+    "empty": "(empty)",
+    "cancel": "Cancel",
+    "save": "Save",
+    "invalidJson": "Invalid JSON: {{message}}"
+  },
+  "nodeHelp": {
+    "flowBreak": {
+      "intro": "The Break node interrupts loop execution.",
+      "item1": "Used inside For Each and While loops",
+      "item2": "Interrupts the loop immediately when executed",
+      "item3": "Control continues from the loop's Completed output",
+      "note": "Note: this node has no output pins because execution continues from the parent loop Completed output."
+    },
+    "flowDelay": {
+      "label": "Delay in milliseconds (default)",
+      "intro": "The Delay node pauses graph execution.",
+      "item1": "1000 ms = 1 second",
+      "item2": "You can set the delay via the pin or in settings",
+      "item3": "If the value is negative or invalid, the delay becomes 0 ms",
+      "note": "Note: delay is asynchronous and does not block other application processes."
+    },
+    "flowForEach": {
+      "intro": "The For Each loop iterates over every array element.",
+      "item1": "Connect an array to the Array input",
+      "item2": "Use the Element output to get the current element",
+      "item3": "Use the Index output to get the current index",
+      "item4": "The loop body runs for each element",
+      "item5": "The Completed output fires after the loop finishes",
+      "note": "Note: you can interrupt the loop with the Break node."
+    },
+    "flowWhile": {
+      "intro": "The While loop runs while its condition is true.",
+      "item1": "Connect a boolean value to the Condition input",
+      "item2": "Use the Iteration output to get the current iteration number",
+      "item3": "The loop body runs on each iteration",
+      "item4": "The Completed output fires after the loop finishes",
+      "warning": "⚠️ Important: the maximum iteration count is 1000. Make sure the condition can become false, otherwise the loop will be interrupted.",
+      "note": "Note: you can stop the loop early with the Break node."
+    },
+    "mathRandom": {
+      "note": "Note: if min or max contains a dot or comma, a floating-point number will be generated; otherwise it will be an integer."
+    }
   },
   "whatIfEditor": {
     "title": "Execution paused",

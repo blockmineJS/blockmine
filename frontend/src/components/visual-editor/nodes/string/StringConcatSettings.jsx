@@ -1,10 +1,13 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
 /**
  * Компонент настроек для string:concat ноды
  */
 const StringConcatSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700 flex items-center justify-center gap-2">
       <Button
@@ -14,7 +17,7 @@ const StringConcatSettings = ({ nodeId, data, updateNodeData }) => {
         }}
         className="h-8 rounded-md px-3 text-xs"
       >
-        Добавить
+        {t('nodeSettings.add')}
       </Button>
       {((data.pinCount ?? 2) > 2) && (
         <Button
@@ -22,7 +25,7 @@ const StringConcatSettings = ({ nodeId, data, updateNodeData }) => {
           variant="destructive"
           className="h-8 rounded-md px-3 text-xs"
         >
-          Удалить
+          {t('nodeSettings.remove')}
         </Button>
       )}
     </div>

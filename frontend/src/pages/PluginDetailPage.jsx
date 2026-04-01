@@ -16,6 +16,7 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import GitHubReadmeContent from '@/components/GitHubReadmeContent';
 import { cn } from '@/lib/utils';
 import { translatePluginCategory } from '@/utils/pluginPresentation';
+import FadeTransition from '@/components/FadeTransition';
 import {
   Activity,
   ArrowLeft,
@@ -276,16 +277,19 @@ export default function PluginDetailPage() {
     return t('dates.monthsAgo', { count: Math.floor(days / 30) });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!plugin) {
-    return (
+  return (
+    <FadeTransition
+      transitionKey={`plugin-detail-${pluginName}`}
+      ready={!isLoading}
+      duration={0.22}
+      className="h-full"
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+    {!plugin ? (
       <div className="p-8 text-center">
         <h2 className="text-2xl font-bold text-destructive">{t('notFound.title')}</h2>
         <p className="mt-2 text-muted-foreground">{t('notFound.description')}</p>
@@ -294,10 +298,7 @@ export default function PluginDetailPage() {
           {t('notFound.back')}
         </Button>
       </div>
-    );
-  }
-
-  return (
+    ) : (
     <div className="h-full overflow-y-auto">
       <div className="relative border-b bg-muted/30 p-8">
         <div className="relative mx-auto max-w-6xl">
@@ -644,5 +645,7 @@ export default function PluginDetailPage() {
         />
       )}
     </div>
+    )}
+    </FadeTransition>
   );
 }

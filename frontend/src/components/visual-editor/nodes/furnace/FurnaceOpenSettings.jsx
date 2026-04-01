@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
 import CoordinatePickerDialog from '@/components/minecraft/CoordinatePickerDialog';
@@ -8,6 +9,7 @@ import CoordinatePickerDialog from '@/components/minecraft/CoordinatePickerDialo
  * Включает кнопку для выбора координат печки в 3D Viewer
  */
 const FurnaceOpenSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleCoordinateSelect = (coords) => {
@@ -29,7 +31,7 @@ const FurnaceOpenSettings = ({ nodeId, data, updateNodeData }) => {
         onClick={() => setPickerOpen(true)}
       >
         <MapPin className="w-4 h-4 mr-2" />
-        Выбрать печку в 3D viewer
+        {t('nodeSettings.selectFurnaceIn3dViewer')}
       </Button>
 
       {hasCoords && (

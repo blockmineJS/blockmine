@@ -3,13 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useNodeTranslation } from './hooks/useNodeTranslation';
+import { normalizeVisualEditorCategory } from './categoryUtils';
 
 const NodePanel = () => {
   const { t } = useTranslation('visual-editor');
   const { availableNodes } = useVisualEditorStore();
   const { getNodeTranslation } = useNodeTranslation();
 
-  const getCategoryLabel = (category) => t(`nodePanel.categories.${category}`, category);
+  const getCategoryLabel = (category) =>
+    t(`nodePanel.categories.${normalizeVisualEditorCategory(category)}`, { defaultValue: category });
 
   const getNodeLabel = (node) => {
     const translation = getNodeTranslation(node.type);
@@ -27,7 +29,9 @@ const NodePanel = () => {
         <Accordion type="multiple" className="w-full" defaultValue={Object.keys(availableNodes)}>
             {Object.entries(availableNodes).map(([category, nodes]) => (
                 <AccordionItem value={category} key={category}>
-                    <AccordionTrigger>{getCategoryLabel(category)}</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline focus-visible:no-underline">
+                      {getCategoryLabel(category)}
+                    </AccordionTrigger>
                     <AccordionContent>
                         <div className="space-y-2">
                         {nodes.map((node) => (

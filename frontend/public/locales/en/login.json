@@ -3,6 +3,8 @@
   "description": "Enter your credentials to access the panel.",
   "username": "Username",
   "password": "Password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
   "submit": "Sign in",
   "forgotPassword": "Forgot password?",
   "loginError": "Failed to sign in.",

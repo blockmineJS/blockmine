@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { PROVIDERS, OPENROUTER_MODELS, GOOGLE_MODELS, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from '../utils/constants';
 
@@ -50,8 +51,7 @@ export function SettingsPanel({ settings, onSave }) {
 
             <div>
                 <label className="text-sm font-medium mb-1 block">API Ключ</label>
-                <Input
-                    type="password"
+                <PasswordInput
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder={provider === PROVIDERS.GOOGLE ? 'Google API Key' : 'OpenRouter API Key'}

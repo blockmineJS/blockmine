@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
+import FadeTransition from '@/components/FadeTransition';
 
 export default function PanelApiKeysPage() {
     const { t } = useTranslation('api-keys');
@@ -126,71 +127,76 @@ export default function PanelApiKeysPage() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t('table.title')}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>{t('table.name')}</TableHead>
-                                <TableHead>{t('table.prefix')}</TableHead>
-                                <TableHead>{t('table.lastUsed')}</TableHead>
-                                <TableHead>{t('table.created')}</TableHead>
-                                <TableHead>{t('table.status')}</TableHead>
-                                <TableHead className="text-right">{t('table.actions')}</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? (
+            <FadeTransition
+                transitionKey="panel-api-keys"
+                ready={!loading}
+                duration={0.22}
+                fallback={
+                    <div className="rounded-lg border bg-card p-10 text-center text-muted-foreground">
+                        {t('table.loading')}
+                    </div>
+                }
+            >
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('table.title')}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center">
-                                        {t('table.loading')}
-                                    </TableCell>
+                                    <TableHead>{t('table.name')}</TableHead>
+                                    <TableHead>{t('table.prefix')}</TableHead>
+                                    <TableHead>{t('table.lastUsed')}</TableHead>
+                                    <TableHead>{t('table.created')}</TableHead>
+                                    <TableHead>{t('table.status')}</TableHead>
+                                    <TableHead className="text-right">{t('table.actions')}</TableHead>
                                 </TableRow>
-                            ) : keys.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                                        {t('table.empty')}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                keys.map((key) => (
-                                    <TableRow key={key.id}>
-                                        <TableCell className="font-medium">{key.name}</TableCell>
-                                        <TableCell>
-                                            <code className="text-sm bg-muted px-2 py-1 rounded">
-                                                {key.prefix}...
-                                            </code>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {formatDate(key.lastUsedAt)}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {formatDate(key.createdAt)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={key.isActive ? "default" : "secondary"}>
-                                                {key.isActive ? t('table.active') : t('table.inactive')}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="destructive"
-                                                size="sm"
-                                                onClick={() => handleDeleteKey(key.id)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                            </TableHeader>
+                            <TableBody>
+                                {keys.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                            {t('table.empty')}
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                ) : (
+                                    keys.map((key) => (
+                                        <TableRow key={key.id}>
+                                            <TableCell className="font-medium">{key.name}</TableCell>
+                                            <TableCell>
+                                                <code className="text-sm bg-muted px-2 py-1 rounded">
+                                                    {key.prefix}...
+                                                </code>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {formatDate(key.lastUsedAt)}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {formatDate(key.createdAt)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={key.isActive ? "default" : "secondary"}>
+                                                    {key.isActive ? t('table.active') : t('table.inactive')}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteKey(key.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </FadeTransition>
 
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogContent>

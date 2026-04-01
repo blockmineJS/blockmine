@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useTranslation } from 'react-i18next';
 import {
   Command,
   CommandEmpty,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/command"
 
 export default function CommandMenu({ items, onClose, position, onSelect }) {
+  const { t } = useTranslation('visual-editor');
   const menuRef = React.useRef(null);
   const inputRef = React.useRef(null);
 
@@ -34,9 +36,9 @@ export default function CommandMenu({ items, onClose, position, onSelect }) {
         style={{ top: position.top, left: position.left }}
       >
         <Command className="rounded-lg border shadow-md w-64">
-          <CommandInput ref={inputRef} placeholder="Search..." />
+          <CommandInput ref={inputRef} placeholder={t('contextMenu.searchPlaceholder')} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{t('contextMenu.noResults')}</CommandEmpty>
             {items.map((group) => (
               <CommandGroup key={group.label} heading={group.label}>
                 {group.children.map((item) => (

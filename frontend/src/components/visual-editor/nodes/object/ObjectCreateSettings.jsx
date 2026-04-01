@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,12 @@ import { Button } from '@/components/ui/button';
  * Компонент настроек для object:create ноды
  */
 const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
       <div className="flex items-center justify-between mb-2">
-        <Label>Режим:</Label>
+        <Label>{t('nodeSettings.mode')}</Label>
         <Select
           value={data.advanced ? 'advanced' : 'simple'}
           onValueChange={(value) => updateNodeData(nodeId, { advanced: value === 'advanced' })}
@@ -19,14 +22,14 @@ const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="simple">Простой</SelectItem>
-            <SelectItem value="advanced">Продвинутый</SelectItem>
+            <SelectItem value="simple">{t('nodeSettings.simple')}</SelectItem>
+            <SelectItem value="advanced">{t('nodeSettings.advanced')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       {data.advanced ? (
         <div>
-          <Label>JSON объект:</Label>
+          <Label>{t('nodeSettings.jsonObject')}</Label>
           <textarea
             className="nodrag w-full h-32 bg-slate-900 border-slate-500 rounded-md p-2 text-sm font-mono resize-none"
             value={data.jsonValue || '{}'}
@@ -40,7 +43,7 @@ const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
             onClick={() => updateNodeData(nodeId, { pinCount: (data.pinCount || 0) + 1 })}
             className="h-8 rounded-md px-3 text-xs"
           >
-            Добавить
+            {t('nodeSettings.add')}
           </Button>
           {(data.pinCount || 0) > 0 && (
             <Button
@@ -48,7 +51,7 @@ const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
               variant="destructive"
               className="h-8 rounded-md px-3 text-xs"
             >
-              Удалить
+              {t('nodeSettings.remove')}
             </Button>
           )}
         </div>

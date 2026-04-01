@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -171,8 +172,7 @@ function ProxySettingField({ settingKey, config, value, onChange, readOnly }) {
                     </div>
                     <div className="col-span-2 space-y-2">
                         <Label>{t('settingsDialog.proxy.password', { defaultValue: 'Пароль' })}</Label>
-                        <Input
-                            type="password"
+                        <PasswordInput
                             value={proxyValue.password || ''}
                             onChange={(e) => handleFieldChange('password', e.target.value)}
                             placeholder={t('settingsDialog.proxy.optional', { defaultValue: 'Опционально' })}
@@ -195,13 +195,22 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Input
-                        id={id}
-                        type={config.secret ? "password" : "text"}
-                        value={value || ''}
-                        onChange={(e) => onChange(settingKey, e.target.value)}
-                        disabled={readOnly}
-                    />
+                    {config.secret ? (
+                        <PasswordInput
+                            id={id}
+                            value={value || ''}
+                            onChange={(e) => onChange(settingKey, e.target.value)}
+                            disabled={readOnly}
+                        />
+                    ) : (
+                        <Input
+                            id={id}
+                            type="text"
+                            value={value || ''}
+                            onChange={(e) => onChange(settingKey, e.target.value)}
+                            disabled={readOnly}
+                        />
+                    )}
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );

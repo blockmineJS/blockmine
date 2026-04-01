@@ -16,6 +16,7 @@ import CustomNode from './CustomNode.new';
 import CollaborativeCursors from './CollaborativeCursors';
 import CollaborativeConnections from './CollaborativeConnections';
 import { useNodeTranslation } from './hooks/useNodeTranslation';
+import { normalizeVisualEditorCategory } from './categoryUtils';
 
 const VisualEditorCanvas = () => {
   const { t } = useTranslation('visual-editor');
@@ -273,7 +274,10 @@ const VisualEditorCanvas = () => {
 
                   {/* Обычные ноды */}
                   {Object.entries(filteredNodes).map(([category, nodes]) => (
-                    <CommandGroup key={category} heading={t(`nodePanel.categories.${category}`, category)}>
+                    <CommandGroup
+                      key={category}
+                      heading={t(`nodePanel.categories.${normalizeVisualEditorCategory(category)}`, { defaultValue: category })}
+                    >
                       {nodes.map(node => {
                         const nodeLabel = getNodeTranslation(node.type).label || node.label;
                         return (

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useParams, NavLink, useNavigate, useLocation, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi, Gamepad2 } from 'lucide-react';
@@ -9,6 +9,7 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
+import FadeTransition from '@/components/FadeTransition';
 
 const EMPTY_EXTENSIONS = [];
 const UI_EXTENSION_LABEL_TRANSLATIONS = {
@@ -69,6 +70,8 @@ export default function BotView() {
     const { t, i18n } = useTranslation('bots');
     const { botId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const outlet = useOutlet();
     
     if (!botId) {
         return null;
@@ -127,6 +130,14 @@ export default function BotView() {
     const rawBotStatus = botStatuses[bot.id] || 'stopped';
     const isRunning = rawBotStatus === 'running';
     const botStatusLabel = resolveBotStatusLabel(rawBotStatus, t);
+    const tabTransitionKey = location.pathname.split('/').slice(3).join('/') || 'default';
+    const botTabLinkClasses = ({ isActive }) =>
+        cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium shrink-0 transition-[background-color,color,box-shadow,opacity] duration-200 ease-out",
+            isActive
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+        );
 
     return (
         <>
@@ -171,24 +182,14 @@ export default function BotView() {
                         <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1 overflow-x-auto whitespace-nowrap -mx-2 px-2 md:mx-0 md:px-1">
                             <NavLink
                                 to="console"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Terminal className="h-4 w-4" />
                                 {t('tabs.console')}
                             </NavLink>
                             <NavLink
                                 to="minecraft-viewer"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Gamepad2 className="h-4 w-4" />
                                 {t('tabs.minecraftViewer')}
@@ -196,12 +197,7 @@ export default function BotView() {
                             <NavLink
                                 to="plugins" 
                                 end
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Puzzle className="h-4 w-4" />
                                 {t('tabs.plugins')}
@@ -213,12 +209,7 @@ export default function BotView() {
                                     <NavLink
                                         key={ext.id}
                                         to={`plugins/ui/${ext.pluginName}/${ext.path}`}
-                                        className={({isActive}) => cn(
-                                            "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                            isActive 
-                                                ? "bg-background text-foreground shadow-sm" 
-                                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                        )}
+                                        className={botTabLinkClasses}
                                     >
                                         <IconComponent className="h-4 w-4" />
                                         {extensionLabel}
@@ -227,48 +218,28 @@ export default function BotView() {
                             })}
                             <NavLink 
                                 to="settings" 
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Settings className="h-4 w-4" />
                                 {t('tabs.settings')}
                             </NavLink>
                             <NavLink
                                 to="events" 
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Zap className="h-4 w-4" />
                                 {t('tabs.events')}
                             </NavLink>
                             <NavLink
                                 to="management"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Users className="h-4 w-4" />
                                 {t('tabs.management')}
                             </NavLink>
                             <NavLink
                                 to="websocket"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Wifi className="h-4 w-4" />
                                 {t('tabs.websocket')}
@@ -341,8 +312,10 @@ export default function BotView() {
                     </div>
                 </header>
 
-                <main className="flex-grow min-h-0 flex flex-col overflow-hidden">
-                    <Outlet />
+                <main className="relative flex-grow min-h-0 overflow-hidden">
+                    <FadeTransition transitionKey={tabTransitionKey} className="absolute inset-0">
+                        {outlet}
+                    </FadeTransition>
                 </main>
             </div>
 

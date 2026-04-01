@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import FadeTransition from '@/components/FadeTransition';
 import { Copy, Eye, EyeOff, Key, Plus, Trash2, AlertTriangle, CheckCircle2, Settings, Activity, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -28,6 +29,7 @@ const WebSocketTab = () => {
     const [loading, setLoading] = useState(true);
     const [logsLoading, setLogsLoading] = useState(false);
     const [connectedClients, setConnectedClients] = useState(0);
+    const [activeTab, setActiveTab] = useState('keys');
 
     // Создание ключа
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -186,15 +188,13 @@ const WebSocketTab = () => {
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-end gap-3">
-                <Card className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        <Users className="h-5 w-5 text-green-500" />
-                        <div>
-                            <p className="text-2xl font-bold text-green-500">{connectedClients}</p>
-                            <p className="text-xs text-muted-foreground">{t('clients')}</p>
-                        </div>
+                <div className="inline-flex h-10 items-center gap-3 rounded-lg border border-border/70 bg-card/90 px-4 shadow-sm transition-[background-color,border-color,color] duration-200">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Users className="h-4 w-4 text-green-500" />
+                        <span>{t('clients')}</span>
                     </div>
-                </Card>
+                    <span className="text-sm font-semibold text-green-500">{connectedClients}</span>
+                </div>
                 <Button onClick={() => {
                     setNewKeyName('');
                     setNewKeyPermissions('ReadWrite');
@@ -206,7 +206,7 @@ const WebSocketTab = () => {
                 </Button>
             </div>
 
-            <Tabs defaultValue="keys" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="keys">
                         <Key className="mr-2 h-4 w-4" />
@@ -223,7 +223,17 @@ const WebSocketTab = () => {
                 </TabsList>
 
                 {/* Вкладка: API Ключи */}
-                <TabsContent value="keys" className="space-y-4">
+                <TabsContent value="keys" className="space-y-4 data-[state=active]:animate-none">
+                    <FadeTransition
+                        transitionKey={activeTab}
+                        duration={0.22}
+                        ready={!loading}
+                        fallback={
+                            <div className="flex h-full items-center justify-center py-8 text-muted-foreground">
+                                {t('keys.loading')}
+                            </div>
+                        }
+                    >
                     <Card>
                         <CardHeader>
                             <CardTitle>{t('keys.title')}</CardTitle>
@@ -232,9 +242,7 @@ const WebSocketTab = () => {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {loading ? (
-                                <div className="text-center py-8">{t('keys.loading')}</div>
-                            ) : keys.length === 0 ? (
+                            {keys.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Key className="mx-auto h-12 w-12 mb-4 opacity-50" />
                                     <p>{t('keys.empty')}</p>
@@ -284,10 +292,21 @@ const WebSocketTab = () => {
                             )}
                         </CardContent>
                     </Card>
+                    </FadeTransition>
                 </TabsContent>
 
                 {/* Вкладка: Логи подключений */}
-                <TabsContent value="logs" className="space-y-4">
+                <TabsContent value="logs" className="space-y-4 data-[state=active]:animate-none">
+                    <FadeTransition
+                        transitionKey={activeTab}
+                        duration={0.22}
+                        ready={!logsLoading}
+                        fallback={
+                            <div className="flex h-full items-center justify-center py-8 text-muted-foreground">
+                                {t('keys.loading')}
+                            </div>
+                        }
+                    >
                     <Card>
                         <CardHeader>
                             <CardTitle>{t('logs.title')}</CardTitle>
@@ -296,9 +315,7 @@ const WebSocketTab = () => {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {logsLoading ? (
-                                <div className="text-center py-8">{t('keys.loading')}</div>
-                            ) : logs.length === 0 ? (
+                            {logs.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Activity className="mx-auto h-12 w-12 mb-4 opacity-50" />
                                     <p>{t('logs.empty')}</p>
@@ -337,10 +354,12 @@ const WebSocketTab = () => {
                             )}
                         </CardContent>
                     </Card>
+                    </FadeTransition>
                 </TabsContent>
 
                 {/* Вкладка: Документация */}
-                <TabsContent value="docs" className="space-y-4">
+                <TabsContent value="docs" className="space-y-4 data-[state=active]:animate-none">
+                    <FadeTransition transitionKey={activeTab} duration={0.22}>
                     <Alert className="bg-primary/10 border-primary/20">
                         <Settings className="h-4 w-4" />
                         <AlertDescription>
@@ -642,6 +661,7 @@ socket.on('action:result', (data) => {
                             </ScrollArea>
                         </CardContent>
                     </Card>
+                    </FadeTransition>
                 </TabsContent>
             </Tabs>
 
