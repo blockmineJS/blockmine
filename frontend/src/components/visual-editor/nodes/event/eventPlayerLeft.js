@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventPlayerLeftDefinition = new NodeDefinition({
   type: 'event:playerLeft',
   category: 'event',
-  label: '🚪 Игрок вышел',
+  label: 'Игрок вышел',
   description: 'Срабатывает, когда игрок покидает сервер',
 
   computeInputs: (data) => [],

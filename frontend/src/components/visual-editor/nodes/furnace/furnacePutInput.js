@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const furnacePutInputDefinition = new NodeDefinition({
   type: 'furnace:put_input',
   category: 'furnace',
-  label: '🔥 Печка: положить для плавки',
+  label: 'Печка: положить для плавки',
   description: 'Кладёт предмет в слот плавки печки',
 
   computeInputs: (data) => [

@@ -39,7 +39,7 @@ const NodePanel = () => {
                                 key={node.type}
                                 onDragStart={(event) => onDragStart(event, node.type)}
                                 draggable
-                                className="p-2 border rounded-md cursor-grab bg-slate-700 hover:bg-slate-600 transition-colors"
+                                className="visual-editor-node-panel-item cursor-grab rounded-md border p-2 text-white"
                             >
                                 {getNodeLabel(node)}
                             </div>

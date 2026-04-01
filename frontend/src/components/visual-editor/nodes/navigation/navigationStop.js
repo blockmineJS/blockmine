@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const navigationStopDefinition = new NodeDefinition({
   type: 'navigation:stop',
   category: 'navigation',
-  label: '🛑 Остановиться',
+  label: 'Остановиться',
   description: 'Останавливает текущее движение/следование бота',
 
   computeInputs: (data) => [

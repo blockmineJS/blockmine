@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const flowForEachDefinition = new NodeDefinition({
   type: 'flow:for_each',
   category: 'flow',
-  label: '🔁 Перебор массива (цикл)',
+  label: 'Перебор массива (цикл)',
   description: 'Выполняет "Тело цикла" для каждого элемента в "Массиве"',
 
   computeInputs: (data) => [

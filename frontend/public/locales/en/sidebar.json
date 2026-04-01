@@ -48,6 +48,10 @@
           "title": "Interface",
           "description": "Tune supporting blocks, muted text, borders, form inputs, and secondary surfaces."
         },
+        "graphEditor": {
+          "title": "Graph editor",
+          "description": "These colors control visual editor node headers, node bodies, and the draggable node palette on the left."
+        },
         "scrollbar": {
           "title": "Scrollbars",
           "description": "Fine-tune scrollbar thumb and button colors to keep the panel consistent."
@@ -76,7 +80,7 @@
       },
       "note": {
         "title": "What changes here",
-        "description": "This editor affects the main panel palette: background, cards, buttons, borders, inputs, muted blocks, and scrollbars. Feature-specific colors like installed plugin green stay untouched."
+        "description": "This editor affects the main panel palette, visual editor node colors, buttons, borders, inputs, muted blocks, and scrollbars. Feature-specific colors like installed plugin green stay untouched."
       },
       "picker": {
         "title": "Color picker",
@@ -153,6 +157,18 @@
         "ring": {
           "label": "Focus ring",
           "description": "Keyboard focus and active input outline."
+        },
+        "graphHeader": {
+          "label": "Node header",
+          "description": "Header color for graph nodes and the draggable node tiles in the left palette."
+        },
+        "graphSurface": {
+          "label": "Node body",
+          "description": "Main body color of graph nodes inside the visual editor."
+        },
+        "graphInput": {
+          "label": "Node input",
+          "description": "Input and select field color inside graph nodes and their settings."
         },
         "scrollbarThumb": {
           "label": "Scrollbar thumb",

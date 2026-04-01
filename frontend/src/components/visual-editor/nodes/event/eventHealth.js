@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventHealthDefinition = new NodeDefinition({
   type: 'event:health',
   category: 'event',
-  label: '❤️ Здоровье/Голод изменилось',
+  label: 'Здоровье/Голод изменилось',
   description: 'Срабатывает при изменении здоровья, голода или насыщения бота',
 
   computeInputs: (data) => [],

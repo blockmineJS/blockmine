@@ -743,7 +743,7 @@ export default function Layout() {
                             <DialogTrigger asChild>
                                 <Button
                                     className={cn(
-                                        "w-full transition-[padding,gap] " + SIDEBAR_TRANSITION,
+                                        "w-full transition-[padding,gap,background-color,box-shadow] duration-200 ease-out hover:shadow-md " + SIDEBAR_TRANSITION,
                                         isCollapsed ? "mx-auto h-9 w-9 justify-center px-0 gap-0 self-center" : "justify-center"
                                     )}
                                     size="sm"
@@ -769,7 +769,7 @@ export default function Layout() {
                                 <Button
                                     variant="outline"
                                     className={cn(
-                                        "w-full transition-[padding,gap] " + SIDEBAR_TRANSITION,
+                                        "w-full transition-[padding,gap,background-color,border-color,box-shadow] duration-200 ease-out hover:shadow-md " + SIDEBAR_TRANSITION,
                                         isCollapsed ? "mx-auto h-9 w-9 justify-center px-0 gap-0 self-center" : "justify-center"
                                     )}
                                     size="sm"

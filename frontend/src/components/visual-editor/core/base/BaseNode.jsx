@@ -68,6 +68,12 @@ const Pin = React.memo(({
 
   let isCompatible = false;
   let isIncompatible = false;
+  const isActiveConnectingHandle =
+    !!connectingPin &&
+    connectingPin.nodeId === nodeId &&
+    connectingPin.handleId === pin.id &&
+    ((connectingPin.handleType === 'source' && !isInput) ||
+      (connectingPin.handleType === 'target' && isInput));
 
   if (connectingPin) {
     if (connectingPin.nodeId !== nodeId) {
@@ -92,18 +98,27 @@ const Pin = React.memo(({
   }
 
   const baseColor = pinColors[pin.type] || '#333';
+  const isExecPin = pin.type === 'Exec';
+  const shouldUseConnectHighlight = isCompatible || isActiveConnectingHandle;
   const style = {
-    background: baseColor,
-    width: isCompatible ? '20px' : '16px',
-    height: isCompatible ? '20px' : '16px',
-    boxShadow: isCompatible ? `0 0 12px 2px ${baseColor}, 0 0 20px 4px rgba(34, 197, 94, 0.6)` : 'none',
+    background: shouldUseConnectHighlight ? '#22c55e' : baseColor,
+    width: '16px',
+    height: '16px',
+    top: '50%',
+    left: isInput ? (isExecPin ? '0px' : '-4px') : 'auto',
+    right: isInput ? 'auto' : '-4px',
+    marginTop: '-8px',
+    transform: 'none',
+    boxShadow: shouldUseConnectHighlight
+      ? `0 0 0 2px rgba(34, 197, 94, 0.82), 0 0 14px 3px rgba(34, 197, 94, 0.72), 0 0 24px 6px rgba(34, 197, 94, 0.42)`
+      : 'none',
     opacity: isIncompatible ? 0.3 : 1,
-    transition: 'all 0.2s ease',
-    border: isCompatible ? '2px solid rgba(34, 197, 94, 0.8)' : 'none',
+    transition: 'opacity 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
+    border: 'none',
   };
 
   const handleClassName = cn(
-    isCompatible && "animate-[pulse_1.5s_ease-in-out_infinite]"
+    shouldUseConnectHighlight && "animate-[pulse_1.5s_ease-in-out_infinite]"
   );
 
   // Проверяем есть ли подключение к этому пину
@@ -118,7 +133,12 @@ const Pin = React.memo(({
   const hasInlineField = pin.inlineField && isInput && !hasConnection && traceValue === undefined;
 
   const pinContent = (
-    <div className="relative p-2 flex items-center">
+    <div
+      className={cn(
+        "relative flex w-full items-center py-2",
+        isInput ? "pl-1 pr-2" : "justify-end pl-2 pr-1 text-right"
+      )}
+    >
       {/* Для output пинов иконка слева от текста */}
       {!isInput && pin.description && (
         <Tooltip>
@@ -137,7 +157,14 @@ const Pin = React.memo(({
         style={style}
         className={handleClassName}
       />
-      <span className={isInput ? 'pl-4' : 'pr-4'}>{pin.name}</span>
+      <span className={cn(
+        "text-sm leading-none",
+        isInput
+          ? (isExecPin ? "pl-6" : "pl-5")
+          : "pr-5 text-right"
+      )}>
+        {pin.name}
+      </span>
       {/* Отображаем значение из трассировки, если есть */}
       {traceValue !== undefined && (
         <Tooltip>
@@ -222,7 +249,7 @@ const Pin = React.memo(({
       : String(pin.defaultValue ?? options[0]?.value ?? '');
 
     return (
-      <div className="relative p-2 flex items-center w-full">
+      <div className="relative flex items-center w-full gap-2 py-2 pl-1 pr-2">
         {pinContent}
         <Select
           value={selectValue}
@@ -231,7 +258,7 @@ const Pin = React.memo(({
             updateNodeData(nodeId, { [pin.id]: parsedValue });
           }}
         >
-          <SelectTrigger className="nodrag w-[120px] h-8 bg-slate-900 border-slate-500 text-sm">
+          <SelectTrigger className="visual-editor-node-input nodrag h-8 w-[120px] text-sm">
             <SelectValue placeholder={t('common.placeholders.select')} />
           </SelectTrigger>
           <SelectContent>
@@ -248,10 +275,10 @@ const Pin = React.memo(({
 
   // Обычное текстовое инлайн-поле
   return (
-    <div className="relative p-2 flex items-center w-full">
+      <div className="relative flex items-center w-full gap-2 py-2 pl-1 pr-2">
       {pinContent}
       <AutosizeInput
-        className="nodrag bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
+        className="visual-editor-node-input nodrag rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
         value={data[pin.id] ?? ''}
         onChange={(e) => updateNodeData(nodeId, { [pin.id]: e.target.value })}
         placeholder={pin.placeholder || ''}
@@ -337,6 +364,7 @@ const BaseNode = ({
 
   // Определяем, нужно ли затемнить ноду (trace активен, но нода не выполнялась)
   const shouldDim = isTraceActive && !isHighlighted && !isActiveNode;
+  const shouldUseDefaultGraphAccent = !isHighlighted && !isActiveNode && !isPausedNode;
 
   // Обработчик правого клика для контекстного меню
   const handleContextMenu = (e) => {
@@ -410,24 +438,29 @@ const BaseNode = ({
     <TooltipProvider delayDuration={200}>
       <Card
         className={cn(
-          "min-w-64 bg-slate-800 border-slate-600 text-white transition-all duration-300",
+          "min-w-[20rem] !transform-none text-white transition-[box-shadow,border-color,background-color,opacity] duration-200 ease-out hover:!translate-y-0 hover:shadow-sm",
           isHighlighted && !isActiveNode && !isPausedNode && "border-green-500 border-2 shadow-lg shadow-green-500/50",
           isActiveNode && !isPausedNode && "border-green-400 border-[3px] shadow-xl shadow-green-400/70 ring-2 ring-green-400/30",
           isPausedNode && "border-amber-500 border-[3px] shadow-xl shadow-amber-500/70 ring-2 ring-amber-500/30",
           shouldDim && "opacity-40"
         )}
+        style={{
+          backgroundColor: 'hsl(var(--graph-surface))',
+          ...(shouldUseDefaultGraphAccent ? { borderColor: 'hsl(var(--graph-header) / 0.72)' } : null),
+        }}
         onContextMenu={handleContextMenu}
       >
         <CardHeader className={cn(
-          "bg-slate-700 p-2 rounded-t-lg relative",
+          "p-2 rounded-t-lg relative",
           isHighlighted && !isActiveNode && !isPausedNode && "bg-green-900/30",
           isActiveNode && !isPausedNode && "bg-green-800/50",
           isPausedNode && "bg-amber-900/50"
-        )}>
+        )}
+        style={shouldUseDefaultGraphAccent ? { backgroundColor: 'hsl(var(--graph-header))' } : undefined}>
           {/* Breakpoint click zone - только в Live режиме */}
           {debugMode === 'live' && (
             <div
-              className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-pointer hover:bg-slate-600/50 rounded-l-lg z-10"
+              className="absolute left-0 top-0 bottom-0 z-10 flex w-6 items-center justify-center rounded-l-lg cursor-pointer hover:bg-white/10"
               onClick={(e) => {
                 e.stopPropagation();
                 if (breakpoint) {
@@ -497,11 +530,11 @@ const BaseNode = ({
             </p>
           )}
         </CardHeader>
-        <CardContent className="p-2 flex flex-col">
+        <CardContent className="px-3 py-2 flex flex-col">
           {/* Pins Section */}
-          <div className="flex justify-between w-full">
+          <div className="flex w-full justify-between gap-5">
             {/* Input Pins */}
-            <div className="inputs flex flex-col items-start">
+            <div className="inputs flex min-w-[9.5rem] flex-1 flex-col items-start pl-3">
               {execInputs.map(pin => (
                 <Pin
                   key={pin.id}
@@ -537,7 +570,7 @@ const BaseNode = ({
             </div>
 
             {/* Output Pins */}
-            <div className="outputs flex flex-col items-end">
+            <div className="outputs flex min-w-[8.5rem] shrink-0 flex-col items-end pr-4">
               {execOutputs.map(pin => (
                 <Pin
                   key={pin.id}

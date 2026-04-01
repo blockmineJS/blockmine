@@ -191,6 +191,12 @@ export const useVisualEditorStore = create(
         });
 
         // Если произошли миграции, автосохраняем граф
+        const invalidNodeCount = initialNodes.filter(node => !node?.type || node.type === 'default').length;
+        if (invalidNodeCount > 0) {
+          console.warn(`[VisualEditor] Filtered ${invalidNodeCount} invalid node(s) with empty/default type during init`);
+          initialNodes = initialNodes.filter(node => node?.type && node.type !== 'default');
+        }
+
         if (hasMigrations) {
           setTimeout(() => {
             const saveFunc = type === 'command' ? get().saveCommand : get().saveEventGraph;
@@ -537,7 +543,11 @@ export const useVisualEditorStore = create(
     },
 
     addNode: (type, position, shouldUpdateState = true) => {
-      const definition = NodeRegistry.get(type);
+      const definition = type ? NodeRegistry.get(type) : null;
+      if (!type || type === 'default' || !definition) {
+        console.error('[VisualEditor] Attempted to add invalid node type:', type);
+        return null;
+      }
       const defaultData = definition?.defaultData ? { ...definition.defaultData } : {};
 
       if (type === 'string:concat' || type === 'logic:operation' || type === 'flow:sequence') {
@@ -903,6 +913,9 @@ export const useVisualEditorStore = create(
         const targetPin = (targetNodeConfig.pins?.inputs || targetNodeConfig.inputs || []).find(p => p.type === sourcePin.type || p.type === 'Wildcard' || sourcePin.type === 'Wildcard');
 
         const newNode = addNode(nodeType, position, false);
+        if (!newNode) {
+          return;
+        }
 
         if (sourcePin && targetPin) {
           const newConnection = {

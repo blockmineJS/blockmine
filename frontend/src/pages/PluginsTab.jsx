@@ -44,6 +44,7 @@ export default function PluginsTab() {
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
     const [isUpdating, setIsUpdating] = useState(null);
     const [isGithubInstallOpen, setIsGithubInstallOpen] = useState(false);
+    const [githubInstallDialogKey, setGithubInstallDialogKey] = useState(0);
     const [isGithubInstalling, setIsGithubInstalling] = useState(false);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
@@ -84,6 +85,13 @@ export default function PluginsTab() {
     const handleTabChange = (value) => {
         setActiveTab(value);
         localStorage.setItem('plugins-active-tab', value);
+    };
+
+    const handleGithubDialogOpenChange = (open) => {
+        if (open) {
+            setGithubInstallDialogKey((current) => current + 1);
+        }
+        setIsGithubInstallOpen(open);
     };
     
     const handleCreatePlugin = async ({ name, template }) => {
@@ -200,14 +208,14 @@ export default function PluginsTab() {
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
-                        <Dialog open={isGithubInstallOpen} onOpenChange={setIsGithubInstallOpen}>
+                        <Dialog open={isGithubInstallOpen} onOpenChange={handleGithubDialogOpenChange}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" disabled={!canInstall}>
                                     <Github className="h-4 w-4" />
                                     <span className="ml-2">{t('actions.installGithub')}</span>
                                 </Button>
                             </DialogTrigger>
-                            <GitHubInstallDialog botId={intBotId} onInstall={handleGithubInstall} onCancel={() => setIsGithubInstallOpen(false)} isInstalling={isGithubInstalling} />
+                            <GitHubInstallDialog key={githubInstallDialogKey} botId={intBotId} onInstall={handleGithubInstall} onCancel={() => setIsGithubInstallOpen(false)} isInstalling={isGithubInstalling} />
                         </Dialog>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />

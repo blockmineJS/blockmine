@@ -2,12 +2,47 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef(({ className, type, syncAutofill = false, onAnimationStart, onChange, ...props }, ref) => {
+const isTransparentColor = (value) => !value || value === "transparent" || value === "rgba(0, 0, 0, 0)"
+
+const syncAutofillSurfaceVars = (node) => {
+  if (!node || typeof window === "undefined") {
+    return
+  }
+
+  const inputStyles = window.getComputedStyle(node)
+  let autofillBackground = inputStyles.backgroundColor
+  let surfaceNode = node.parentElement
+
+  while (isTransparentColor(autofillBackground) && surfaceNode) {
+    const surfaceStyles = window.getComputedStyle(surfaceNode)
+    if (!isTransparentColor(surfaceStyles.backgroundColor)) {
+      autofillBackground = surfaceStyles.backgroundColor
+      break
+    }
+    surfaceNode = surfaceNode.parentElement
+  }
+
+  node.style.setProperty("--panel-autofill-bg", autofillBackground)
+  node.style.setProperty("--panel-autofill-font-family", inputStyles.fontFamily)
+  node.style.setProperty("--panel-autofill-font-size", inputStyles.fontSize)
+  node.style.setProperty("--panel-autofill-line-height", inputStyles.lineHeight)
+  node.style.setProperty("--panel-autofill-font-style", inputStyles.fontStyle)
+  node.style.setProperty("--panel-autofill-font-weight", inputStyles.fontWeight)
+  node.style.setProperty("--panel-autofill-letter-spacing", inputStyles.letterSpacing)
+}
+
+const Input = React.forwardRef(({ className, type, syncAutofill = true, onAnimationStart, onChange, ...props }, ref) => {
   const innerRef = React.useRef(null)
 
   const setRefs = React.useCallback(
     (node) => {
       innerRef.current = node
+
+      if (node) {
+        requestAnimationFrame(() => {
+          syncAutofillSurfaceVars(node)
+        })
+      }
 
       if (typeof ref === "function") {
         ref(node)
@@ -22,7 +57,7 @@ const Input = React.forwardRef(({ className, type, syncAutofill = false, onAnima
     (event) => {
       onAnimationStart?.(event)
 
-      if (!syncAutofill || event.animationName !== "auth-input-autofill") {
+      if (!syncAutofill || event.animationName !== "panel-input-autofill") {
         return
       }
 
@@ -32,6 +67,7 @@ const Input = React.forwardRef(({ className, type, syncAutofill = false, onAnima
       }
 
       requestAnimationFrame(() => {
+        syncAutofillSurfaceVars(node)
         onChange({
           target: node,
           currentTarget: node,
@@ -45,7 +81,7 @@ const Input = React.forwardRef(({ className, type, syncAutofill = false, onAnima
     <input
       type={type}
       className={cn(
-        "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base text-foreground shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "panel-input flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base font-normal text-foreground shadow-sm transition-[border-color,box-shadow,background-color,color] duration-200 ease-out file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
         className
       )}
       ref={setRefs}

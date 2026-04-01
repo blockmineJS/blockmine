@@ -18,7 +18,7 @@ const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
           value={data.advanced ? 'advanced' : 'simple'}
           onValueChange={(value) => updateNodeData(nodeId, { advanced: value === 'advanced' })}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="visual-editor-node-input w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -31,7 +31,7 @@ const ObjectCreateSettings = ({ nodeId, data, updateNodeData }) => {
         <div>
           <Label>{t('nodeSettings.jsonObject')}</Label>
           <textarea
-            className="nodrag w-full h-32 bg-slate-900 border-slate-500 rounded-md p-2 text-sm font-mono resize-none"
+            className="visual-editor-node-input nodrag h-32 w-full rounded-md p-2 text-sm font-mono resize-none"
             value={data.jsonValue || '{}'}
             onChange={(e) => updateNodeData(nodeId, { jsonValue: e.target.value })}
             placeholder='{"key": "value", "nested": {"inner": 123}}'

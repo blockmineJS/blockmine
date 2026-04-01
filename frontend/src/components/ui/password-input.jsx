@@ -13,7 +13,7 @@ const PasswordInput = React.forwardRef(
       buttonClassName,
       showLabel = "Show password",
       hideLabel = "Hide password",
-      syncAutofill = false,
+      syncAutofill = true,
       ...props
     },
     ref

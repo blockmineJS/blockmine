@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const furnaceTakeOutputDefinition = new NodeDefinition({
   type: 'furnace:take_output',
   category: 'furnace',
-  label: '🔥 Печка: забрать результат',
+  label: 'Печка: забрать результат',
   description: 'Забирает готовый предмет из слота результата печки',
 
   computeInputs: (data) => [

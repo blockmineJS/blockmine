@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -98,6 +99,8 @@ const getInstalledMetaBadges = (plugin, t) => {
 };
 
 const TOGGLE_LOCK_MS = 220;
+const FILTER_LAYOUT_TRANSITION = { type: 'spring', stiffness: 420, damping: 34, mass: 0.72 };
+const FILTER_FADE_TRANSITION = { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
 
 function InstalledPluginCard({
   plugin,
@@ -629,6 +632,9 @@ export default function InstalledPluginsView({
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('installed-plugins-view-mode') || 'grid');
   const [pluginToDelete, setPluginToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const updatesFilterContentRef = useRef(null);
+  const [updatesFilterWidth, setUpdatesFilterWidth] = useState(0);
+  const [skipUpdatesIntroAnimation, setSkipUpdatesIntroAnimation] = useState(true);
 
   const stats = useMemo(() => {
     const enabled = installedPlugins.filter((plugin) => plugin.isEnabled).length;
@@ -677,50 +683,113 @@ export default function InstalledPluginsView({
     localStorage.setItem('installed-plugins-view-mode', viewMode);
   }, [viewMode]);
 
+  React.useLayoutEffect(() => {
+    if (!updatesFilterContentRef.current) return;
+    setUpdatesFilterWidth(updatesFilterContentRef.current.scrollWidth);
+  }, [stats.updates, t]);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setSkipUpdatesIntroAnimation(false);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
+  const baseFilterButtonClassName =
+    'tabular-nums whitespace-nowrap transition-[background-color,color,border-color,box-shadow,opacity] duration-200 ease-out';
+
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between gap-4 border-b bg-background/30 px-6 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => setFilter('all')} variant={filter === 'all' ? 'default' : 'ghost'}>
+          <motion.div layout transition={FILTER_LAYOUT_TRANSITION} className="flex flex-wrap items-center gap-2">
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION}>
+            <Button size="sm" onClick={() => setFilter('all')} variant={filter === 'all' ? 'default' : 'ghost'} className={baseFilterButtonClassName}>
               {t('installed.filters.all', { count: stats.total, defaultValue: 'Все ({{count}})' })}
             </Button>
-            <div className="h-4 w-px bg-border" />
-            <Button size="sm" onClick={() => setFilter('enabled')} variant={filter === 'enabled' ? 'default' : 'ghost'}>
+            </motion.div>
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION} className="h-4 w-px bg-border" />
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION}>
+            <Button size="sm" onClick={() => setFilter('enabled')} variant={filter === 'enabled' ? 'default' : 'ghost'} className={baseFilterButtonClassName}>
               <Power className="mr-1.5 h-3.5 w-3.5" />
               {t('installed.filters.enabled', { count: stats.enabled, defaultValue: 'Активно ({{count}})' })}
             </Button>
-            <Button size="sm" onClick={() => setFilter('disabled')} variant={filter === 'disabled' ? 'default' : 'ghost'}>
+            </motion.div>
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION}>
+            <Button size="sm" onClick={() => setFilter('disabled')} variant={filter === 'disabled' ? 'default' : 'ghost'} className={baseFilterButtonClassName}>
               <PowerOff className="mr-1.5 h-3.5 w-3.5" />
               {t('installed.filters.disabled', { count: stats.disabled, defaultValue: 'Выкл ({{count}})' })}
             </Button>
-            {stats.updates > 0 && (
-              <>
-                <div className="h-4 w-px bg-border" />
+            </motion.div>
+            <motion.div
+              layout
+              initial={false}
+              transition={{
+                layout: FILTER_LAYOUT_TRANSITION,
+                width: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+                opacity: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+              }}
+              animate={{
+                width: stats.updates > 0 ? updatesFilterWidth : 0,
+                opacity: stats.updates > 0 ? 1 : 0,
+              }}
+              className="flex overflow-hidden whitespace-nowrap"
+              style={{ originX: 0 }}
+            >
+              <motion.div
+                ref={updatesFilterContentRef}
+                layout
+                transition={{
+                  layout: FILTER_LAYOUT_TRANSITION,
+                  opacity: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+                  scale: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+                }}
+                animate={{ opacity: stats.updates > 0 ? 1 : 0, scale: stats.updates > 0 ? 1 : 0.98 }}
+                className="flex shrink-0 items-center gap-2"
+              >
+                <motion.div
+                  layout
+                  transition={{
+                    layout: FILTER_LAYOUT_TRANSITION,
+                    opacity: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+                    scaleX: skipUpdatesIntroAnimation ? { duration: 0 } : FILTER_FADE_TRANSITION,
+                  }}
+                  animate={{ opacity: stats.updates > 0 ? 1 : 0, scaleX: stats.updates > 0 ? 1 : 0.7 }}
+                  className="h-4 w-px shrink-0 origin-center bg-border"
+                />
                 <Button
                   variant={filter === 'updates' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setFilter('updates')}
+                  disabled={stats.updates === 0}
+                  tabIndex={stats.updates > 0 ? 0 : -1}
+                  aria-hidden={stats.updates === 0}
                   className={cn(
                     stats.updates > 0 && filter !== 'updates' && 'text-blue-500',
-                    'transition-[background-color,color,border-color,box-shadow,opacity] duration-200 ease-out'
+                    baseFilterButtonClassName,
+                    stats.updates === 0 && 'pointer-events-none'
                   )}
                 >
                   <ArrowUpCircle className="mr-1.5 h-3.5 w-3.5" />
                   {t('installed.filters.updates', { count: stats.updates, defaultValue: 'Обновления ({{count}})' })}
                 </Button>
-              </>
-            )}
-            <div className="h-4 w-px bg-border" />
-            <Button size="sm" onClick={() => setFilter('local')} variant={filter === 'local' ? 'default' : 'ghost'}>
+              </motion.div>
+              </motion.div>
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION} className="h-4 w-px bg-border" />
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION}>
+            <Button size="sm" onClick={() => setFilter('local')} variant={filter === 'local' ? 'default' : 'ghost'} className={baseFilterButtonClassName}>
               <Code className="mr-1.5 h-3.5 w-3.5" />
               {t('installed.filters.local', { count: stats.local, defaultValue: 'Локальные ({{count}})' })}
             </Button>
-            <Button size="sm" onClick={() => setFilter('github')} variant={filter === 'github' ? 'default' : 'ghost'}>
+            </motion.div>
+            <motion.div layout transition={FILTER_LAYOUT_TRANSITION}>
+            <Button size="sm" onClick={() => setFilter('github')} variant={filter === 'github' ? 'default' : 'ghost'} className={baseFilterButtonClassName}>
               <GitBranch className="mr-1.5 h-3.5 w-3.5" />
               {t('installed.filters.github', { count: stats.github, defaultValue: 'GitHub ({{count}})' })}
             </Button>
-          </div>
+            </motion.div>
+          </motion.div>
 
           <div className="flex items-center gap-2">
             <div className="relative w-48">

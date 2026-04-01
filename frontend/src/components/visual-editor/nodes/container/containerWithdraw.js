@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const containerWithdrawDefinition = new NodeDefinition({
   type: 'container:withdraw',
   category: 'container',
-  label: '📦 Контейнер: забрать',
+  label: 'Контейнер: забрать',
   description: 'Забирает предмет из контейнера в инвентарь',
 
   computeInputs: (data) => [

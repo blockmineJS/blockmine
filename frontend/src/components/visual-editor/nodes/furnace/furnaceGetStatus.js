@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const furnaceGetStatusDefinition = new NodeDefinition({
   type: 'furnace:get_status',
   category: 'furnace',
-  label: '🔥 Печка: статус',
+  label: 'Печка: статус',
   description: 'Получает текущий статус печки (топливо, прогресс, предметы в слотах)',
 
   computeInputs: (data) => [],

@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventWebsocketCallDefinition = new NodeDefinition({
   type: 'event:websocket_call',
   category: 'event',
-  label: '📡 Вызов из WebSocket API',
+  label: 'Вызов из WebSocket API',
   description: 'Срабатывает, когда граф вызывается через WebSocket API методом callGraph()',
 
   computeInputs: (data) => [],

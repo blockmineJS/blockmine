@@ -8,7 +8,7 @@ import FurnaceOpenSettings from './FurnaceOpenSettings';
 export const furnaceOpenDefinition = new NodeDefinition({
   type: 'furnace:open',
   category: 'furnace',
-  label: '🔥 Печка: открыть',
+  label: 'Печка: открыть',
   description: 'Открывает печку (обычную, плавильную, коптильню) по координатам',
 
   computeInputs: (data) => [

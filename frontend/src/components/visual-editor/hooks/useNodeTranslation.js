@@ -110,6 +110,15 @@ export function useNodeTranslation() {
     return fallback;
   }, [t]);
 
+  const getInlineOptionLabel = useCallback((nodeType, pinId, optionValue, fallback) => {
+    for (const key of buildNodeTypeKeys(nodeType)) {
+      const optionLabel = t(`${key}.options.${pinId}.${String(optionValue)}`, { defaultValue: '', nsSeparator: false });
+      if (optionLabel) return optionLabel;
+    }
+
+    return fallback;
+  }, [t]);
+
   /**
    * Переводит полную ноду (label, description, все pins)
    * @param {object} nodeDefinition - определение ноды
@@ -129,6 +138,12 @@ export function useNodeTranslation() {
         name: getPinName(nodeType, pin.id, pin.name),
         description: getPinDescription(nodeType, pin.id, pin.description),
         placeholder: pin.placeholder ? getPlaceholder(nodeType, pin.id, pin.placeholder) : pin.placeholder,
+        inlineFieldOptions: Array.isArray(pin.inlineFieldOptions)
+          ? pin.inlineFieldOptions.map((option) => ({
+              ...option,
+              label: getInlineOptionLabel(nodeType, pin.id, option.value, option.label),
+            }))
+          : pin.inlineFieldOptions,
       }));
     };
 
@@ -148,6 +163,7 @@ export function useNodeTranslation() {
     getPinName,
     getPinDescription,
     getPlaceholder,
+    getInlineOptionLabel,
     translateNode,
   };
 }

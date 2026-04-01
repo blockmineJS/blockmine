@@ -22,7 +22,7 @@ const ActionHttpRequestSettings = ({ nodeId, data, updateNodeData, nodeEdges }) 
             value={data.method || 'GET'}
             onValueChange={(value) => updateNodeData(nodeId, { method: value })}
           >
-            <SelectTrigger className="w-[120px] bg-slate-900 border-slate-500">
+            <SelectTrigger className="visual-editor-node-input w-[120px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -53,7 +53,8 @@ const FlowSwitchSettings = ({ nodeId, data, updateNodeData }) => {
           <div key={i} className="flex items-center gap-2">
             <Label className="text-xs w-12">Case {i}:</Label>
             <AutosizeInput
-              className="nodrag flex-1 bg-slate-900 border-slate-500 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
+              className="visual-editor-node-input nodrag flex-1 rounded-md py-1 px-2 text-sm resize-none overflow-hidden"
+              fullWidth
               value={data[`case_${i}`] ?? ''}
               onChange={(e) => updateNodeData(nodeId, { [`case_${i}`]: e.target.value })}
               placeholder={t('nodeSettings.comparePlaceholder')}

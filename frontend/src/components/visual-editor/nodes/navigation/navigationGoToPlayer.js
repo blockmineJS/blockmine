@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const navigationGoToPlayerDefinition = new NodeDefinition({
   type: 'navigation:go_to_player',
   category: 'navigation',
-  label: '🏃 Идти к игроку',
+  label: 'Идти к игроку',
   description: 'Перемещает бота к указанному игроку',
 
   computeInputs: (data) => [
