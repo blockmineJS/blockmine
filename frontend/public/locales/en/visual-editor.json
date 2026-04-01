@@ -258,10 +258,10 @@
   "valueEditor": {
     "title": "Edit value",
     "jsonObjectArray": "JSON object / array",
-    "jsonHint": "💡 Use valid JSON format",
+    "jsonHint": "Use valid JSON format",
     "value": "Value",
     "placeholder": "Enter a value",
-    "scalarHint": "💡 Supported: strings, numbers, true/false, null",
+    "scalarHint": "Supported: strings, numbers, true/false, null",
     "currentValue": "Current value:",
     "empty": "(empty)",
     "cancel": "Cancel",
@@ -299,7 +299,7 @@
       "item2": "Use the Iteration output to get the current iteration number",
       "item3": "The loop body runs on each iteration",
       "item4": "The Completed output fires after the loop finishes",
-      "warning": "⚠️ Important: the maximum iteration count is 1000. Make sure the condition can become false, otherwise the loop will be interrupted.",
+      "warning": "Important: the maximum iteration count is 1000. Make sure the condition can become false, otherwise the loop will be interrupted.",
       "note": "Note: you can stop the loop early with the Break node."
     },
     "mathRandom": {
@@ -311,13 +311,13 @@
     "node": "Node:",
     "editHint": "Edit values directly on nodes - click on the green badges with data",
     "syncHint": "All changes are synchronized in real-time between users",
-    "graphVariables": "📦 Graph variables",
+    "graphVariables": "Graph variables",
     "continue": "Continue (F5)",
     "stop": "Stop",
     "modified": "Modified",
     "empty": "(empty)",
-    "changesWarning_one": "⚠️ You modified {{count}} value. Click \"Continue\" to apply changes.",
-    "changesWarning_other": "⚠️ You modified {{count}} values. Click \"Continue\" to apply changes."
+    "changesWarning_one": "You modified {{count}} value. Click \"Continue\" to apply changes.",
+    "changesWarning_other": "You modified {{count}} values. Click \"Continue\" to apply changes."
   },
   "breakpointDialog": {
     "editTitle": "Edit breakpoint",
@@ -327,12 +327,12 @@
     "conditionPlaceholder": "user.username === 'admin'",
     "conditionHelp": "JavaScript expression. Leave empty for unconditional stop.",
     "availableVars": "Available variables:",
-    "howItWorksTitle": "💡 How conditions work:",
+    "howItWorksTitle": "How conditions work:",
     "howItWorks1": "Execution will stop only if condition returns <code class=\"text-green-400\">true</code>",
     "howItWorks2": "Use <code class=\"text-blue-400\">user</code> to check user (username, id)",
     "howItWorks3": "Use <code class=\"text-blue-400\">args</code> to check command arguments",
     "howItWorks4": "Use <code class=\"text-blue-400\">variables</code> to check graph variables",
-    "examplesTitle": "📋 Example conditions:",
+    "examplesTitle": "Example conditions:",
     "exampleAdmin": "Stop only for admin:",
     "exampleCount": "Stop if number is greater than 10:",
     "exampleDebug": "Stop in debug mode:",
