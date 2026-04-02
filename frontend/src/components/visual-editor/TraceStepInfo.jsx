@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Activity, CheckCircle2, XCircle, Info, Database, TrendingUp } from 'lucide-react';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import { cn } from '@/lib/utils';
+import { useNodeTranslation } from './hooks/useNodeTranslation';
 
 /**
  * TraceStepInfo - информационная панель для текущего шага трассировки
@@ -16,6 +18,8 @@ import { cn } from '@/lib/utils';
  * - Стек вызовов (путь выполнения)
  */
 const TraceStepInfo = () => {
+  const { t } = useTranslation('visual-editor');
+  const { getNodeTranslation } = useNodeTranslation();
   const trace = useVisualEditorStore(state => state.trace);
   const currentStepIndex = useVisualEditorStore(state => state.playbackState.currentStepIndex);
   const nodes = useVisualEditorStore(state => state.nodes);
@@ -65,11 +69,11 @@ const TraceStepInfo = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Info className="w-5 h-5" />
-            Информация о шаге
+            {t('traceStepInfo.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-slate-400 text-sm">Выберите шаг для просмотра деталей</p>
+          <p className="text-slate-400 text-sm">{t('traceStepInfo.empty')}</p>
         </CardContent>
       </Card>
     );
@@ -77,13 +81,16 @@ const TraceStepInfo = () => {
 
   const { step, node, nodeDefinition, stepNumber, totalSteps } = currentStepData;
   const executionTime = step.duration !== null && step.duration !== undefined ? step.duration : 0;
+  const nodeLabel = node
+    ? getNodeTranslation(node.type).label || nodeDefinition?.label || node.type
+    : t('traceStepInfo.unknown');
 
   return (
     <Card className="bg-slate-800 border-slate-600 text-white h-full overflow-auto">
       <CardHeader className="pb-3 border-b border-slate-700">
         <CardTitle className="text-lg flex items-center gap-2">
           <Activity className="w-5 h-5 text-green-400" />
-          Шаг {stepNumber} из {totalSteps}
+          {t('traceStepInfo.stepOf', { step: stepNumber, total: totalSteps })}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
@@ -91,19 +98,19 @@ const TraceStepInfo = () => {
         <div>
           <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
             <Info className="w-4 h-4" />
-            Нода
+            {t('traceStepInfo.node')}
           </h3>
           <div className="bg-slate-900 rounded-lg p-3 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Название:</span>
-              <span className="text-sm font-medium">{nodeDefinition?.label || node?.type || 'Неизвестно'}</span>
+              <span className="text-xs text-slate-400">{t('traceStepInfo.name')}</span>
+              <span className="text-sm font-medium">{nodeLabel}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Тип:</span>
+              <span className="text-xs text-slate-400">{t('traceStepInfo.type')}</span>
               <span className="text-xs text-slate-300 font-mono">{node?.type || 'N/A'}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">ID:</span>
+              <span className="text-xs text-slate-400">{t('traceStepInfo.id')}</span>
               <span className="text-xs text-slate-300 font-mono">{step.nodeId}</span>
             </div>
           </div>
@@ -117,22 +124,22 @@ const TraceStepInfo = () => {
             ) : (
               <XCircle className="w-4 h-4 text-red-400" />
             )}
-            Статус
+            {t('traceStepInfo.status')}
           </h3>
           <div className="bg-slate-900 rounded-lg p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Результат:</span>
+              <span className="text-xs text-slate-400">{t('traceStepInfo.result')}</span>
               <span className={cn(
                 "text-sm font-medium px-2 py-0.5 rounded",
                 step.status === 'executed' ? "bg-green-900/50 text-green-300" : "bg-red-900/50 text-red-300"
               )}>
-                {step.status === 'executed' ? 'Успешно' : 'Ошибка'}
+                {step.status === 'executed' ? t('traceStepInfo.success') : t('traceStepInfo.error')}
               </span>
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                Время:
+                {t('traceStepInfo.time')}
               </span>
               <span className="text-sm font-medium">{executionTime}ms</span>
             </div>
@@ -144,7 +151,7 @@ const TraceStepInfo = () => {
           <div>
             <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 rotate-180" />
-              Входные данные
+              {t('traceStepInfo.inputs')}
             </h3>
             <div className="bg-slate-900 rounded-lg p-3 space-y-2">
               {Object.entries(step.inputs).map(([key, value]) => (
@@ -164,7 +171,7 @@ const TraceStepInfo = () => {
           <div>
             <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
-              Выходные данные
+              {t('traceStepInfo.outputs')}
             </h3>
             <div className="bg-slate-900 rounded-lg p-3 space-y-2">
               {Object.entries(step.outputs).map(([key, value]) => (
@@ -184,7 +191,7 @@ const TraceStepInfo = () => {
           <div>
             <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
               <Database className="w-4 h-4" />
-              Путь выполнения
+              {t('traceStepInfo.path')}
             </h3>
             <div className="bg-slate-900 rounded-lg p-3">
               <div className="space-y-1">
@@ -199,7 +206,9 @@ const TraceStepInfo = () => {
                     <div className="flex items-center gap-1 flex-1">
                       <span className="text-slate-500">→</span>
                       <span className="font-medium">
-                        {pathItem.nodeDefinition?.label || pathItem.node?.type || 'Unknown'}
+                        {pathItem.node
+                          ? getNodeTranslation(pathItem.node.type).label || pathItem.nodeDefinition?.label || pathItem.node.type
+                          : t('traceStepInfo.unknown')}
                       </span>
                     </div>
                     {pathItem.isCurrent && (
@@ -217,7 +226,7 @@ const TraceStepInfo = () => {
           <div>
             <h3 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
               <XCircle className="w-4 h-4" />
-              Ошибка
+              {t('traceStepInfo.error')}
             </h3>
             <div className="bg-red-900/20 border border-red-800 rounded-lg p-3">
               <pre className="text-xs text-red-300 whitespace-pre-wrap font-mono">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useParams, NavLink, useNavigate, useLocation, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi, Gamepad2 } from 'lucide-react';
@@ -9,21 +9,101 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
+import FadeTransition from '@/components/FadeTransition';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const EMPTY_EXTENSIONS = [];
+const UI_EXTENSION_LABEL_TRANSLATIONS = {
+    'Модерация': {
+        ru: 'Модерация',
+        en: 'Moderation',
+    },
+};
+const TRANSLATABLE_BOT_STATUSES = new Set(['running', 'stopped', 'starting', 'stopping', 'restarting']);
+
+const BOT_STATUS_STYLES = {
+    running: {
+        badge: 'bg-green-500/10 border-green-500/20 text-green-600',
+        dot: 'bg-green-500 animate-pulse',
+    },
+    stopped: {
+        badge: 'bg-red-500/10 border-red-500/20 text-red-600',
+        dot: 'bg-red-500',
+    },
+    starting: {
+        badge: 'bg-amber-500/10 border-amber-500/20 text-amber-600',
+        dot: 'bg-amber-500 animate-pulse',
+    },
+    stopping: {
+        badge: 'bg-orange-500/10 border-orange-500/20 text-orange-600',
+        dot: 'bg-orange-500 animate-pulse',
+    },
+    restarting: {
+        badge: 'bg-sky-500/10 border-sky-500/20 text-sky-600',
+        dot: 'bg-sky-500 animate-pulse',
+    },
+};
+
+function resolveUiExtensionLabel(extension, language) {
+    const currentLanguage = language?.split('-')[0] || 'ru';
+    const fallbackLanguage = currentLanguage === 'ru' ? 'en' : 'ru';
+
+    const tryLocalizedValue = (value) => {
+        if (!value) return null;
+        if (typeof value === 'string') {
+            const mapped = UI_EXTENSION_LABEL_TRANSLATIONS[value.trim()];
+            return mapped?.[currentLanguage] || mapped?.[fallbackLanguage] || value;
+        }
+        if (typeof value === 'object') {
+            return (
+                value[currentLanguage] ||
+                value[language] ||
+                value[fallbackLanguage] ||
+                value.en ||
+                value.ru ||
+                Object.values(value).find((item) => typeof item === 'string') ||
+                null
+            );
+        }
+        return null;
+    };
+
+    return (
+        tryLocalizedValue(extension?.label) ||
+        tryLocalizedValue(extension?.labels) ||
+        tryLocalizedValue(extension?.title) ||
+        tryLocalizedValue(extension?.name) ||
+        extension?.id ||
+        extension?.identifier ||
+        `unknown-extension:${extension?.type || 'unknown'}` ||
+        ''
+    );
+}
+
+function resolveBotStatusLabel(status, t) {
+    const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim().toLowerCase() : 'stopped';
+
+    if (TRANSLATABLE_BOT_STATUSES.has(normalizedStatus)) {
+        return t(`status.${normalizedStatus}`, { defaultValue: normalizedStatus });
+    }
+
+    return normalizedStatus;
+}
 
 export default function BotView() {
-    const { t } = useTranslation('bots');
+    const { t, i18n } = useTranslation('bots');
     const { botId } = useParams();
     const navigate = useNavigate();
-    
+    const location = useLocation();
+    const outlet = useOutlet();
+
     if (!botId) {
         return null;
     }
 
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    
+
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const startBot = useAppStore(state => state.startBot);
@@ -71,153 +151,132 @@ export default function BotView() {
         );
     }
 
-    const isRunning = botStatuses[bot.id] === 'running';
+    const rawBotStatus = botStatuses[bot.id] || 'stopped';
+    const isRunning = rawBotStatus === 'running';
+    const botStatusLabel = resolveBotStatusLabel(rawBotStatus, t);
+    const botStatusStyle = BOT_STATUS_STYLES[rawBotStatus] || BOT_STATUS_STYLES.stopped;
+    const tabTransitionKey = location.pathname.split('/').slice(3).join('/') || 'default';
+    const botTabLinkClasses = ({ isActive }) =>
+        cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium shrink-0 transition-[background-color,color,box-shadow,opacity] duration-200 ease-out",
+            isActive
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+        );
 
     return (
         <>
             <div className="flex flex-col h-full w-full overflow-hidden">
                 <header className="shrink-0 p-4 border-b">
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center justify-between gap-3 mb-3 md:pr-12 lg:pr-16 xl:pr-20">
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h1 className="text-xl font-bold tracking-tight truncate">
+                                    <h1 className="text-xl font-bold tracking-tight leading-none truncate">
                                         {bot.username}
                                     </h1>
-                                    <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="inline-flex h-6 shrink-0 translate-y-[2px] items-center gap-1 self-center text-xs leading-none text-muted-foreground">
+                                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500 animate-pulse" />
                                         {bot.server.host}:{bot.server.port}
                                     </span>
                                     {bot.note && (
-                                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                                        <span className="inline-flex h-6 max-w-[200px] shrink-0 translate-y-[2px] items-center rounded-full bg-muted px-2 text-xs leading-none truncate">
                                             {bot.note}
                                         </span>
                                     )}
+                                    <AnimatePresence mode="wait" initial={false}>
+                                        <div className="inline-flex h-6 shrink-0 self-center translate-y-[2px]">
+                                            <motion.div
+                                                key={rawBotStatus}
+                                                initial={{ opacity: 0, scale: 0.96 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.98 }}
+                                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                                                className={cn(
+                                                    "inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-[10px] font-medium",
+                                                    botStatusStyle.badge
+                                                )}
+                                            >
+                                                <div className={cn("h-1.5 w-1.5 rounded-full", botStatusStyle.dot)} />
+                                                <span className="font-bold uppercase leading-none">
+                                                    {botStatusLabel}
+                                                </span>
+                                            </motion.div>
+                                        </div>
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         </div>
-                        <div className={cn(
-                            "flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-medium transition-all shrink-0",
-                            isRunning
-                                ? "bg-green-500/10 border-green-500/20 text-green-600"
-                                : "bg-red-500/10 border-red-500/20 text-red-600"
-                        )}>
-                            <div className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                isRunning ? "bg-green-500 animate-pulse" : "bg-red-500"
-                            )} />
-                            <span className="uppercase font-bold">
-                                {botStatuses[bot.id] || 'stopped'}
-                            </span>
-                        </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1 overflow-x-auto whitespace-nowrap -mx-2 px-2 md:mx-0 md:px-1">
                             <NavLink
                                 to="console"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Terminal className="h-4 w-4" />
                                 {t('tabs.console')}
                             </NavLink>
                             <NavLink
                                 to="minecraft-viewer"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Gamepad2 className="h-4 w-4" />
                                 {t('tabs.minecraftViewer')}
                             </NavLink>
                             <NavLink
-                                to="plugins" 
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                to="plugins"
+                                end
+                                className={botTabLinkClasses}
                             >
                                 <Puzzle className="h-4 w-4" />
                                 {t('tabs.plugins')}
                             </NavLink>
-                             {uiExtensions.map(ext => {
+                            {uiExtensions.map(ext => {
                                 const IconComponent = Icons[ext.icon] || Icons.Puzzle;
+                                const extensionLabel = resolveUiExtensionLabel(ext, i18n.language);
                                 return (
                                     <NavLink
                                         key={ext.id}
                                         to={`plugins/ui/${ext.pluginName}/${ext.path}`}
-                                        className={({isActive}) => cn(
-                                            "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                            isActive 
-                                                ? "bg-background text-foreground shadow-sm" 
-                                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                        )}
+                                        className={botTabLinkClasses}
                                     >
                                         <IconComponent className="h-4 w-4" />
-                                        {ext.label}
+                                        {extensionLabel}
                                     </NavLink>
                                 );
                             })}
-                            <NavLink 
-                                to="settings" 
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                            <NavLink
+                                to="settings"
+                                className={botTabLinkClasses}
                             >
                                 <Settings className="h-4 w-4" />
                                 {t('tabs.settings')}
                             </NavLink>
                             <NavLink
-                                to="events" 
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                to="events"
+                                className={botTabLinkClasses}
                             >
                                 <Zap className="h-4 w-4" />
                                 {t('tabs.events')}
                             </NavLink>
                             <NavLink
                                 to="management"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Users className="h-4 w-4" />
                                 {t('tabs.management')}
                             </NavLink>
                             <NavLink
                                 to="websocket"
-                                className={({isActive}) => cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all shrink-0",
-                                    isActive
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
+                                className={botTabLinkClasses}
                             >
                                 <Wifi className="h-4 w-4" />
                                 {t('tabs.websocket')}
                             </NavLink>
                         </nav>
-                        
+
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
                             {hasPermission('bot:start_stop') && (
                                 <>
@@ -242,19 +301,19 @@ export default function BotView() {
                                         <span className="hidden sm:inline">{t('actions.stop')}</span>
                                     </Button>
                                     <Button
-                                       variant="outline"
-                                       size="xs"
-                                       onClick={() => restartBot(bot.id)}
-                                       disabled={!isRunning}
-                                       className="h-7 px-2 text-xs bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() => restartBot(bot.id)}
+                                        disabled={!isRunning}
+                                        className="h-7 px-2 text-xs bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
                                     >
-                                       <Sparkles className="h-3 w-3 mr-1" />
-                                       <span className="hidden sm:inline">{t('actions.restart')}</span>
+                                        <Sparkles className="h-3 w-3 mr-1" />
+                                        <span className="hidden sm:inline">{t('actions.restart')}</span>
                                     </Button>
                                 </>
                             )}
                             {hasPermission('bot:export') && (
-                                 <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+                                <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
                                     <DialogTrigger asChild>
                                         <Button
                                             variant="outline"
@@ -269,7 +328,7 @@ export default function BotView() {
                                 </Dialog>
                             )}
                             {hasPermission('bot:delete') && (
-                                 <Button
+                                <Button
                                     variant="ghost"
                                     size="xs"
                                     onClick={() => setIsDeleteConfirmOpen(true)}
@@ -284,8 +343,10 @@ export default function BotView() {
                     </div>
                 </header>
 
-                <main className="flex-grow min-h-0 flex flex-col overflow-hidden">
-                    <Outlet />
+                <main className="relative flex-grow min-h-0 overflow-hidden">
+                    <FadeTransition transitionKey={tabTransitionKey} className="absolute inset-0">
+                        {outlet}
+                    </FadeTransition>
                 </main>
             </div>
 

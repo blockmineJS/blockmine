@@ -6,7 +6,11 @@ import {
     ReactFlow,
     ReactFlowProvider,
     Controls,
+    ControlButton,
     Background,
+    useReactFlow,
+    useStore,
+    useStoreApi,
 } from 'reactflow';
 import { shallow } from 'zustand/shallow';
 
@@ -28,18 +32,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Share2, Zap, Bug } from 'lucide-react';
+import { Upload, Share2, Zap, Bug, Plus, Minus, ScanSearch, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { initializeVisualEditor } from '@/components/visual-editor/initVisualEditor';
 import NodeRegistry from '@/components/visual-editor/nodes';
-import { apiHelper } from '@/lib/api';
+import { apiHelper, getGraphStoreApiUrl } from '@/lib/api';
 import CollaborativeUsersHeader from '@/components/visual-editor/CollaborativeUsersHeader';
 import CollaborativeCursors from '@/components/visual-editor/CollaborativeCursors';
 import CollaborativeConnections from '@/components/visual-editor/CollaborativeConnections';
+import { useNodeTranslation } from '@/components/visual-editor/hooks/useNodeTranslation';
+import { normalizeVisualEditorCategory } from '@/components/visual-editor/categoryUtils';
+import FadeTransition from '@/components/FadeTransition';
+import { cn } from '@/lib/utils';
+import { AnimatePresence } from 'framer-motion';
 
 initializeVisualEditor();
-
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
 const nodeTypes = (() => {
     const types = {};
@@ -63,10 +70,82 @@ const edgeTypes = {
     default: AnimatedEdge,
 };
 
+const flowControlsSelector = (state) => ({
+    isInteractive: state.nodesDraggable || state.nodesConnectable || state.elementsSelectable,
+    minZoomReached: state.transform[2] <= state.minZoom,
+    maxZoomReached: state.transform[2] >= state.maxZoom,
+});
+
+function VisualEditorControls() {
+    const { t } = useTranslation('visual-editor');
+    const { zoomIn, zoomOut, fitView } = useReactFlow();
+    const reactFlowStore = useStoreApi();
+    const { isInteractive, minZoomReached, maxZoomReached } = useStore(flowControlsSelector, shallow);
+
+    const handleToggleInteractivity = () => {
+        const nextInteractive = !isInteractive;
+        reactFlowStore.setState({
+            nodesDraggable: nextInteractive,
+            nodesConnectable: nextInteractive,
+            elementsSelectable: nextInteractive,
+        });
+    };
+
+    return (
+        <Controls className="visual-editor-flow-controls" showZoom={false} showFitView={false} showInteractive={false}>
+            <ControlButton
+                className="visual-editor-flow-control-button"
+                onClick={() => zoomIn({ duration: 220 })}
+                title={t('controls.zoomIn', { defaultValue: 'Приблизить' })}
+                aria-label={t('controls.zoomIn', { defaultValue: 'Приблизить' })}
+                disabled={maxZoomReached}
+            >
+                <Plus className="h-[15px] w-[15px]" strokeWidth={2.3} absoluteStrokeWidth />
+            </ControlButton>
+            <ControlButton
+                className="visual-editor-flow-control-button"
+                onClick={() => zoomOut({ duration: 220 })}
+                title={t('controls.zoomOut', { defaultValue: 'Отдалить' })}
+                aria-label={t('controls.zoomOut', { defaultValue: 'Отдалить' })}
+                disabled={minZoomReached}
+            >
+                <Minus className="h-[15px] w-[15px]" strokeWidth={2.3} absoluteStrokeWidth />
+            </ControlButton>
+            <ControlButton
+                className="visual-editor-flow-control-button"
+                onClick={() => fitView({ duration: 260, padding: 0.16 })}
+                title={t('controls.fitView', { defaultValue: 'Показать весь граф' })}
+                aria-label={t('controls.fitView', { defaultValue: 'Показать весь граф' })}
+            >
+                <ScanSearch className="h-[15px] w-[15px]" strokeWidth={2.2} absoluteStrokeWidth />
+            </ControlButton>
+            <ControlButton
+                className={cn(
+                    "visual-editor-flow-control-button visual-editor-flow-control-lock",
+                    !isInteractive && "is-locked"
+                )}
+                onClick={handleToggleInteractivity}
+                title={isInteractive
+                    ? t('controls.lockInteractions', { defaultValue: 'Заблокировать перемещение и выделение' })
+                    : t('controls.unlockInteractions', { defaultValue: 'Разблокировать перемещение и выделение' })}
+                aria-label={isInteractive
+                    ? t('controls.lockInteractions', { defaultValue: 'Заблокировать перемещение и выделение' })
+                    : t('controls.unlockInteractions', { defaultValue: 'Разблокировать перемещение и выделение' })}
+            >
+                <span className="visual-editor-flow-control-icon-stack" aria-hidden="true">
+                    <LockOpen className="visual-editor-flow-control-icon visual-editor-flow-control-icon-open h-[15px] w-[15px]" strokeWidth={2.2} absoluteStrokeWidth />
+                    <Lock className="visual-editor-flow-control-icon visual-editor-flow-control-icon-closed h-[15px] w-[15px]" strokeWidth={2.2} absoluteStrokeWidth />
+                </span>
+            </ControlButton>
+        </Controls>
+    );
+}
+
 function BotVisualEditorPage() {
     const { botId, commandId, eventId } = useParams();
     const location = useLocation();
     const { t } = useTranslation('visual-editor');
+    const { getNodeTranslation } = useNodeTranslation();
 
     const [botName, setBotName] = useState(null);
     const appSocket = useAppStore(state => state.socket);
@@ -101,6 +180,7 @@ function BotVisualEditorPage() {
     const pasteNodes = useVisualEditorStore(state => state.pasteNodes);
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
+    const [isRouteReady, setIsRouteReady] = useState(false);
     const reactFlowWrapper = useRef(null);
     const [publishDialogOpen, setPublishDialogOpen] = useState(false);
     const [showEventTypeDialog, setShowEventTypeDialog] = useState(false);
@@ -118,11 +198,21 @@ function BotVisualEditorPage() {
     const entityId = editorType === 'command' ? commandId : eventId;
 
     useEffect(() => {
+        let isMounted = true;
+
+        setIsRouteReady(false);
+
         if (botId && entityId) {
-            init(botId, entityId, editorType);
+            init(botId, entityId, editorType).finally(() => {
+                if (isMounted) {
+                    setIsRouteReady(true);
+                }
+            });
         }
 
         return () => {
+            isMounted = false;
+            setIsRouteReady(false);
             flushSaveGraph();
             // Отключаемся от collaborative socket при уходе со страницы
             const disconnectGraphSocket = useVisualEditorStore.getState().disconnectGraphSocket;
@@ -136,11 +226,11 @@ function BotVisualEditorPage() {
 
         const bot = bots.find(b => b.id === parseInt(botId));
         if (bot) {
-            setBotName(bot.username || bot.name || `Бот ${botId}`);
+            setBotName(bot.username || bot.name || t('editor.botFallback', { id: botId }));
         } else {
-            setBotName(`Бот ${botId}`);
+            setBotName(t('editor.botFallback', { id: botId }));
         }
-    }, [botId, bots]);
+    }, [botId, bots, t]);
 
     // Отправляем метаданные для presence (название графа и бота)
     useEffect(() => {
@@ -283,7 +373,7 @@ function BotVisualEditorPage() {
 
     const loadCategories = async () => {
         try {
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/categories`);
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/categories'));
             const data = await response.json();
             setCategories(data);
         } catch (error) {
@@ -319,7 +409,7 @@ function BotVisualEditorPage() {
                 if (eventNodes.length > 1) {
                     const types = eventNodes.map(n => ({
                         type: n.type.replace('event:', ''),
-                        label: NodeRegistry.get(n.type)?.label || n.type
+                        label: getNodeTranslation(n.type).label || NodeRegistry.get(n.type)?.label || n.type
                     }));
                     setAvailableEventTypes(types);
                     setShowEventTypeDialog(true);
@@ -394,7 +484,7 @@ function BotVisualEditorPage() {
             const graphType = editorType === 'command' ? 'COMMAND' : 'EVENT';
             const categoryId = graphType === 'COMMAND' ? 1 : 2;
 
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/publish`, {
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/publish'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -470,19 +560,23 @@ function BotVisualEditorPage() {
         }
 
         const staticGroups = Object.entries(availableNodes).map(([category, nodes]) => ({
-            label: category,
+            label: t(`nodePanel.categories.${normalizeVisualEditorCategory(category)}`, { defaultValue: category }),
             children: nodes.map(node => ({
-                label: node.label,
+                label: getNodeTranslation(node.type).label || node.label,
                 type: node.type,
             }))
         }));
 
         return [...dynamicGroups, ...staticGroups];
-    }, [availableNodes, variables, commandArguments]);
+    }, [availableNodes, variables, commandArguments, getNodeTranslation, t]);
 
     const handleMenuItemSelect = (item) => {
         const { menuPosition, addNode, closeMenu, socket, command } = useVisualEditorStore.getState();
         const newNode = addNode(item.type, menuPosition.flowPosition, false);
+        if (!newNode) {
+            closeMenu();
+            return;
+        }
 
         // Если есть дополнительные данные (для переменных/аргументов), применяем их
         if (item.data && Object.keys(item.data).length > 0) {
@@ -511,14 +605,15 @@ function BotVisualEditorPage() {
     };
     
     const handlePaneInteraction = (event, handler) => {
-        if (!reactFlowInstance) return;
+        if (!reactFlowInstance || !reactFlowWrapper.current) return;
 
         const position = reactFlowInstance.screenToFlowPosition({
             x: event.clientX,
             y: event.clientY,
         });
 
-        handler(event.clientY, event.clientX, position);
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        handler(event.clientY - rect.top, event.clientX - rect.left, position);
     };
 
     const handleConnectStart = (event, { nodeId, handleId, handleType }) => {
@@ -576,16 +671,23 @@ function BotVisualEditorPage() {
         addNode(type, position);
     };
 
-    if (isLoading || Object.keys(availableNodes).length === 0) {
-        return <div className="flex items-center justify-center h-full">{t('loading')}</div>;
-    }
-
     return (
-        <ReactFlowProvider>
-            <div
-                className="h-full w-full flex flex-col"
-                onContextMenu={(e) => e.preventDefault()}
-            >
+        <FadeTransition
+            transitionKey={`${editorType}-${entityId}`}
+            ready={isRouteReady && !isLoading && Object.keys(availableNodes).length > 0}
+            duration={0.22}
+            className="h-full"
+            fallback={
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                    {t('loading')}
+                </div>
+            }
+        >
+            <ReactFlowProvider>
+                <div
+                    className="h-full w-full flex flex-col"
+                    onContextMenu={(e) => e.preventDefault()}
+                >
                  <header className="p-2 border-b flex justify-between items-center">
                     <h1 className="text-lg font-bold">{t('editor.title')}: {command?.name}</h1>
                     <div className="flex gap-2 items-center">
@@ -680,7 +782,7 @@ function BotVisualEditorPage() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                        <Button onClick={handleSave} disabled={isSaving}>
+                        <Button size="sm" onClick={handleSave} disabled={isSaving}>
                             {isSaving ? t('save.saving') : t('save.button')}
                         </Button>
                     </div>
@@ -695,7 +797,7 @@ function BotVisualEditorPage() {
                         </>
                     )}
                     <ResizablePanel defaultSize={isTraceViewerOpen ? 80 : 65}>
-                        <div className="h-full" ref={reactFlowWrapper}>
+                        <div className="relative h-full overflow-hidden" ref={reactFlowWrapper}>
                             <ReactFlow
                                 nodes={nodes}
                                 edges={edges}
@@ -728,7 +830,7 @@ function BotVisualEditorPage() {
                                     handlePaneInteraction(e, openMenu);
                                 }}
                             >
-                                <Controls />
+                                <VisualEditorControls />
                                 <Background />
                             </ReactFlow>
 
@@ -739,6 +841,16 @@ function BotVisualEditorPage() {
                                     <CollaborativeConnections flowToScreenPosition={reactFlowInstance.flowToScreenPosition} />
                                 </>
                             )}
+
+                            <AnimatePresence>
+                                {isMenuOpen && <CommandMenu
+                                    position={menuPosition}
+                                    onClose={closeMenu}
+                                    items={menuItems}
+                                    onSelect={handleMenuItemSelect}
+                                    containerRef={reactFlowWrapper}
+                                />}
+                            </AnimatePresence>
                         </div>
                     </ResizablePanel>
                     <ResizableHandle withHandle />
@@ -752,16 +864,11 @@ function BotVisualEditorPage() {
                         )}
                     </ResizablePanel>
                 </ResizablePanelGroup>
-                {isMenuOpen && <CommandMenu
-                    position={menuPosition}
-                    onClose={closeMenu}
-                    items={menuItems}
-                    onSelect={handleMenuItemSelect}
-                />}
                 <TraceViewer />
                 <DebugControls />
-            </div>
-        </ReactFlowProvider>
+                </div>
+            </ReactFlowProvider>
+        </FadeTransition>
     );
 }
 

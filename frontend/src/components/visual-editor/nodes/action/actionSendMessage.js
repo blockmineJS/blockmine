@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const actionSendMessageDefinition = new NodeDefinition({
   type: 'action:send_message',
   category: 'action',
-  label: '🗣️ Отправить сообщение',
+  label: 'Отправить сообщение',
   description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
 
   computeInputs: (data) => [

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Users, ChevronDown, ChevronUp } from 'lucide-react';
 
 const CollaborativeUsers = () => {
+  const { t } = useTranslation('visual-editor');
   const collabUsers = useVisualEditorStore(state => state.collabUsers);
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -41,7 +43,7 @@ const CollaborativeUsers = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Users size={16} />
           <span style={{ fontSize: '14px', fontWeight: '500' }}>
-            В сети ({collabUsers.length})
+            {t('collaboration.online', { count: collabUsers.length })}
           </span>
         </div>
         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}

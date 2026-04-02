@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -18,30 +19,32 @@ export default function ProxyForm({ proxy, onSubmit, onCancel, isSaving }) {
     });
 
     useEffect(() => {
-        if (proxy) {
-            setFormData({
-                name: proxy.name || '',
-                type: proxy.type || 'socks5',
-                host: proxy.host || '',
-                port: proxy.port?.toString() || '1080',
-                username: proxy.username || '',
-                password: proxy.password || '',
-                note: proxy.note || ''
-            });
+        if (!proxy) {
+            return;
         }
+
+        setFormData({
+            name: proxy.name || '',
+            type: proxy.type || 'socks5',
+            host: proxy.host || '',
+            port: proxy.port?.toString() || '1080',
+            username: proxy.username || '',
+            password: proxy.password || '',
+            note: proxy.note || ''
+        });
     }, [proxy]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleTypeChange = (value) => {
-        setFormData(prev => ({ ...prev, type: value }));
+        setFormData((prev) => ({ ...prev, type: value }));
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = (event) => {
+        event.preventDefault();
         onSubmit(formData);
     };
 
@@ -89,7 +92,7 @@ export default function ProxyForm({ proxy, onSubmit, onCancel, isSaving }) {
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="password">Пароль (опционально)</Label>
-                        <Input id="password" name="password" type="password" value={formData.password} onChange={handleChange} placeholder="••••••" />
+                        <PasswordInput id="password" name="password" value={formData.password} onChange={handleChange} placeholder="******" />
                     </div>
                 </div>
                 <div className="space-y-2">

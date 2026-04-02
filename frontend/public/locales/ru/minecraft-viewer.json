@@ -1,6 +1,9 @@
 {
   "connecting": "Подключение к боту...",
   "error": "Ошибка",
+  "errors": {
+    "botNotRunning": "Бот не запущен"
+  },
   "settingsButton": "Настройки (Esc)",
   "settings": {
     "title": "Настройки",

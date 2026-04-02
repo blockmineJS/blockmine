@@ -21,11 +21,23 @@ const IconComponent = ({ name, ...props }) => {
     return <LucideIcon {...props} />;
 };
 
+const getSafeExternalUrl = (url) => {
+    if (!url || typeof url !== 'string') return null;
+    try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : null;
+    } catch {
+        return null;
+    }
+};
+
 export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo, repoUrl, latestTag, botId, pluginName, githubToken, onSuccess, isUpdate = false, currentVersion = null }) {
     const [pluginDisplayName, setPluginDisplayName] = useState('');
     const [icon, setIcon] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [prUrl, setPrUrl] = useState(null);
+    const safeRepoUrl = getSafeExternalUrl(repoUrl);
+    const safePrUrl = getSafeExternalUrl(prUrl);
 
     useEffect(() => {
         if (pluginInfo) {
@@ -66,12 +78,13 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                 })
             });
 
-            setPrUrl(result.prUrl);
+            const safeResultPrUrl = getSafeExternalUrl(result.prUrl);
+            setPrUrl(safeResultPrUrl);
             toast({
                 title: 'Pull Request создан!',
                 description: (
                     <div>
-                        <a href={result.prUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a href={safeResultPrUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                             Открыть PR #{result.prNumber}
                         </a>
                     </div>
@@ -102,9 +115,14 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
 
     // Извлекаем repo ID из URL
     const getRepoId = () => {
-        if (!repoUrl) return '';
-        const match = repoUrl.match(/github\.com[\/:](.+?)\/(.+?)(\.git)?$/);
-        return match ? match[2].replace('.git', '') : '';
+        if (!safeRepoUrl) return '';
+        try {
+            const parsed = new URL(safeRepoUrl);
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+            return pathParts[1]?.replace(/\.git$/i, '') || '';
+        } catch {
+            return '';
+        }
     };
 
     // Проверяем доступна ли иконка
@@ -145,8 +163,12 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => window.open(prUrl, '_blank')}
+                                        onClick={() => {
+                                            if (!safePrUrl) return;
+                                            window.open(safePrUrl, '_blank', 'noopener,noreferrer');
+                                        }}
                                         className="w-full"
+                                        disabled={!safePrUrl}
                                     >
                                         <ExternalLink className="h-3 w-3 mr-2" />
                                         Открыть Pull Request
@@ -224,14 +246,16 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                                                 <span>by {pluginInfo?.author || 'Unknown'}</span>
                                                             </CardDescription>
                                                         </div>
-                                                        <a
-                                                            href={repoUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
-                                                        >
-                                                            <Icons.Github className="h-5 w-5" />
-                                                        </a>
+                                                        {safeRepoUrl && (
+                                                            <a
+                                                                href={safeRepoUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-muted-foreground hover:text-foreground transition-all hover:scale-110"
+                                                            >
+                                                                <Icons.Github className="h-5 w-5" />
+                                                            </a>
+                                                        )}
                                                     </div>
                                                 </CardHeader>
 

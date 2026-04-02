@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const containerDepositDefinition = new NodeDefinition({
   type: 'container:deposit',
   category: 'container',
-  label: '📦 Контейнер: положить',
+  label: 'Контейнер: положить',
   description: 'Кладёт предмет из инвентаря в открытый контейнер',
 
   computeInputs: (data) => [

@@ -529,17 +529,71 @@
 
   "action:create_command": {
     "label": "Create Command",
-    "description": "Creates new command"
+    "description": "Creates new command",
+    "pins": {
+      "exec": "Execute",
+      "name": "Command Name",
+      "description": "Description",
+      "aliases": "Aliases",
+      "cooldown": "Cooldown (sec)",
+      "allowedChatTypes": "Chat Types",
+      "permissionName": "Permission Name",
+      "temporary": "Temporary?",
+      "commandId": "Command ID",
+      "success": "Success?"
+    },
+    "placeholders": {
+      "name": "mycommand",
+      "description": "Command description",
+      "aliases": "[\"alias1\", \"alias2\"]",
+      "cooldown": "0",
+      "allowedChatTypes": "[\"chat\", \"private\"]",
+      "permissionName": "moderator"
+    },
+    "options": {
+      "temporary": {
+        "false": "Permanent",
+        "true": "Temporary"
+      }
+    }
   },
 
   "action:update_command": {
     "label": "Update Command",
-    "description": "Updates existing command"
+    "description": "Updates existing command",
+    "pins": {
+      "exec": "Execute",
+      "commandName": "Command Name",
+      "newName": "New Name",
+      "description": "Description",
+      "aliases": "Aliases",
+      "cooldown": "Cooldown (sec)",
+      "allowedChatTypes": "Chat Types",
+      "permissionName": "Permission Name",
+      "success": "Success?"
+    },
+    "placeholders": {
+      "commandName": "mycommand",
+      "newName": "newcommand",
+      "description": "New description",
+      "aliases": "[\"alias1\", \"alias2\"]",
+      "cooldown": "0",
+      "allowedChatTypes": "[\"chat\", \"private\"]",
+      "permissionName": "moderator"
+    }
   },
 
   "action:delete_command": {
     "label": "Delete Command",
-    "description": "Deletes command"
+    "description": "Deletes command",
+    "pins": {
+      "exec": "Execute",
+      "commandName": "Command Name",
+      "success": "Success?"
+    },
+    "placeholders": {
+      "commandName": "mycommand"
+    }
   },
 
   "time:datetime_literal": {
@@ -648,11 +702,12 @@
     "label": "On Command",
     "description": "Starting point for command graph",
     "pins": {
+      "exec": "Execute",
       "command_name": "Command Name",
       "user": "User",
       "args": "Arguments",
       "chat_type": "Chat Type",
-      "success": "Success",
+      "success": "Success?",
       "success_desc": "Returns true if command executed without errors"
     }
   },

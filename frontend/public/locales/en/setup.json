@@ -3,6 +3,8 @@
   "description": "Create an administrator account for the BlockMine panel.",
   "username": "Admin username",
   "password": "Password (min. 4 characters)",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
   "confirmPassword": "Confirm password",
   "submit": "Create",
   "errors": {

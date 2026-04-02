@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import { Users } from 'lucide-react';
 import {
@@ -19,18 +20,19 @@ const getModeIcon = (debugMode) => {
   }
 };
 
-const getModeLabel = (debugMode) => {
+const getModeLabel = (debugMode, t) => {
   switch (debugMode) {
     case 'live':
-      return 'Live Debug';
+      return t('debug.live');
     case 'trace':
-      return 'Trace Viewer';
+      return t('debug.traceView');
     default:
-      return 'Редактирование';
+      return t('collaboration.editing');
   }
 };
 
 const CollaborativeUsersHeader = () => {
+  const { t } = useTranslation('visual-editor');
   const collabUsers = useVisualEditorStore(state => state.collabUsers);
 
   if (collabUsers.length === 0) {
@@ -64,7 +66,7 @@ const CollaborativeUsersHeader = () => {
         <TooltipContent side="bottom" className="p-2">
           <div style={{ minWidth: '180px' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#94a3b8' }}>
-              В сети ({collabUsers.length})
+              {t('collaboration.online', { count: collabUsers.length })}
             </div>
             {collabUsers.map((user) => (
               <div
@@ -107,7 +109,7 @@ const CollaborativeUsersHeader = () => {
                     fontSize: '14px',
                     flexShrink: 0,
                   }}
-                  title={getModeLabel(user.debugMode)}
+                  title={getModeLabel(user.debugMode, t)}
                 >
                   {getModeIcon(user.debugMode)}
                 </span>

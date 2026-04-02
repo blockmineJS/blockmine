@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventBotDiedDefinition = new NodeDefinition({
   type: 'event:botDied',
   category: 'event',
-  label: '💀 Бот умер',
+  label: 'Бот умер',
   description: 'Срабатывает, когда бот умирает',
 
   computeInputs: (data) => [],

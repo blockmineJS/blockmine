@@ -3,6 +3,8 @@
   "description": "Введите ваши учетные данные для доступа к панели.",
   "username": "Имя пользователя",
   "password": "Пароль",
+  "showPassword": "Показать пароль",
+  "hidePassword": "Скрыть пароль",
   "submit": "Войти",
   "forgotPassword": "Забыли пароль?",
   "loginError": "Не удалось войти.",

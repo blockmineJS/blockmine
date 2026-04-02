@@ -3,6 +3,8 @@
   "description": "Создайте аккаунт администратора для панели BlockMine.",
   "username": "Имя администратора",
   "password": "Пароль (мин. 4 символа)",
+  "showPassword": "Показать пароль",
+  "hidePassword": "Скрыть пароль",
   "confirmPassword": "Подтвердите пароль",
   "submit": "Создать",
   "errors": {

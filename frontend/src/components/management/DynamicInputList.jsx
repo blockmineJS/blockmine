@@ -1,9 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X, PlusCircle } from 'lucide-react';
 
-export default function DynamicInputList({ value = [], onChange, placeholder = "Добавить элемент..." }) {
+export default function DynamicInputList({ value = [], onChange, placeholder }) {
+    const { t } = useTranslation('management');
+    const resolvedPlaceholder = placeholder || t('dynamicInput.placeholder');
 
     const handleItemChange = (index, newValue) => {
         const updatedItems = [...value];
@@ -28,7 +31,7 @@ export default function DynamicInputList({ value = [], onChange, placeholder = "
                     <Input
                         value={item}
                         onChange={(e) => handleItemChange(index, e.target.value)}
-                        placeholder={placeholder}
+                        placeholder={resolvedPlaceholder}
                     />
                     <Button
                         type="button"
@@ -49,7 +52,7 @@ export default function DynamicInputList({ value = [], onChange, placeholder = "
                 onClick={handleAddItem}
             >
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Добавить
+                {t('dynamicInput.add')}
             </Button>
         </div>
     );

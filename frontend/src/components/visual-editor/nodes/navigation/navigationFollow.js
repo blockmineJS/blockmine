@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const navigationFollowDefinition = new NodeDefinition({
   type: 'navigation:follow',
   category: 'navigation',
-  label: '👥 Следовать',
+  label: 'Следовать',
   description: 'Начинает следовать за игроком или сущностью',
 
   computeInputs: (data) => [

@@ -8,7 +8,7 @@ import NavigationGoToSettings from './NavigationGoToSettings';
 export const navigationGoToDefinition = new NodeDefinition({
   type: 'navigation:go_to',
   category: 'navigation',
-  label: '🚶 Идти к',
+  label: 'Идти к',
   description: 'Перемещает бота к указанным координатам используя pathfinding',
 
   computeInputs: (data) => [

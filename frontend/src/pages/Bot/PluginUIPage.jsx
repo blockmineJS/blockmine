@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, PowerOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import FadeTransition from '@/components/FadeTransition';
 
 
 const RecursiveRenderer = ({ schema, data, onAction, onDataChange, actionLoading, t }) => {
@@ -198,6 +199,11 @@ export default function PluginUIPage() {
     const shouldShowStartMessage = !isBotRunning && !isStartingBot;
 
     const fetchContent = useCallback(async () => {
+        if (!isBotRunning) {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             const data = await apiHelper(`/api/bots/${botId}/plugins/${pluginName}/ui-content/${pluginPath}`);
@@ -215,13 +221,17 @@ export default function PluginUIPage() {
                 return merged;
             });
         } catch (error) {
-            toast({ variant: 'destructive', title: t('ui.error'), description: t('ui.loadError') });
         } finally {
             setLoading(false);
         }
-    }, [botId, pluginName, pluginPath, toast]);
+    }, [botId, pluginName, pluginPath, isBotRunning]);
     
     useEffect(() => {
+        if (!isBotRunning && !isStartingBot) {
+            setLoading(false);
+            return;
+        }
+
         if (!socket) {
             fetchContent();
             return;
@@ -249,15 +259,16 @@ export default function PluginUIPage() {
         
         socket.emit('plugin:ui:subscribe', { botId: parseInt(botId), pluginName, path: pluginPath });
         
-        setTimeout(() => {
+        const fetchTimer = setTimeout(() => {
             fetchContent();
         }, 100);
 
         return () => {
+            clearTimeout(fetchTimer);
             socket.emit('plugin:ui:unsubscribe', { botId: parseInt(botId), pluginName, path: pluginPath });
             socket.off('plugin:ui:dataUpdate', handleDataUpdate);
         };
-    }, [botId, pluginName, pluginPath, socket, fetchContent]);
+    }, [botId, pluginName, pluginPath, socket, fetchContent, isBotRunning, isStartingBot]);
 
     useEffect(() => {
         if (isBotRunning && isStartingBot) {
@@ -291,10 +302,6 @@ export default function PluginUIPage() {
         setPageData(prev => ({ ...prev, [key]: value }));
     };
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-
     if (isStartingBot) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -325,11 +332,6 @@ export default function PluginUIPage() {
                                 await startBot(parseInt(botId));
                             } catch (error) {
                                 setIsStartingBot(false);
-                                toast({
-                                    variant: 'destructive',
-                                    title: t('ui.error'),
-                                    description: t('ui.botStartError')
-                                });
                             }
                         }}
                         disabled={isStartingBot}
@@ -343,13 +345,25 @@ export default function PluginUIPage() {
         );
     }
 
-    if (!pageSchema || !pageData) {
+    if (!loading && (!pageSchema || !pageData)) {
         return <div className="p-4 text-center">{t('ui.loadError2')}</div>;
     }
 
     return (
-        <div className="p-4">
-            <RecursiveRenderer schema={pageSchema} data={pageData} onAction={handleAction} onDataChange={onDataChange} actionLoading={actionLoading} t={t}/>
-        </div>
+        <FadeTransition
+            transitionKey={`${pluginName}-${pluginPath}`}
+            ready={!loading}
+            duration={0.22}
+            className="h-full"
+            fallback={
+                <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+            }
+        >
+            <div className="p-4">
+                <RecursiveRenderer schema={pageSchema} data={pageData} onAction={handleAction} onDataChange={onDataChange} actionLoading={actionLoading} t={t}/>
+            </div>
+        </FadeTransition>
     );
 }

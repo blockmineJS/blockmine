@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useMemo, useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactFlow, { Background, Controls, useReactFlow, useKeyPress } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -16,12 +16,14 @@ import CustomNode from './CustomNode.new';
 import CollaborativeCursors from './CollaborativeCursors';
 import CollaborativeConnections from './CollaborativeConnections';
 import { useNodeTranslation } from './hooks/useNodeTranslation';
+import { normalizeVisualEditorCategory } from './categoryUtils';
 
 const VisualEditorCanvas = () => {
   const { t } = useTranslation('visual-editor');
   const { getNodeTranslation } = useNodeTranslation();
   const reactFlowWrapper = useRef(null);
   const menuRef = useRef(null);
+  const [menuCanvasPosition, setMenuCanvasPosition] = useState({ top: 0, left: 0 });
   const { screenToFlowPosition, flowToScreenPosition } = useReactFlow();
 
   const nodes = useVisualEditorStore(state => state.nodes);
@@ -73,6 +75,19 @@ const VisualEditorCanvas = () => {
     [screenToFlowPosition, addNode]
   );
 
+  const getCanvasRelativePosition = useCallback((clientX, clientY) => {
+    const wrapper = reactFlowWrapper.current;
+    if (!wrapper) {
+      return { top: clientY, left: clientX };
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    return {
+      top: clientY - rect.top,
+      left: clientX - rect.left,
+    };
+  }, []);
+
   const onPaneContextMenu = useCallback(
     (event) => {
       event.preventDefault();
@@ -80,9 +95,10 @@ const VisualEditorCanvas = () => {
         x: event.clientX,
         y: event.clientY,
       });
-      openMenu(event.clientY, event.clientX, position);
+      const canvasPosition = getCanvasRelativePosition(event.clientX, event.clientY);
+      openMenu(canvasPosition.top, canvasPosition.left, position);
     },
-    [screenToFlowPosition]
+    [getCanvasRelativePosition, openMenu, screenToFlowPosition]
   );
 
   const handleAddNodeFromMenu = (nodeType, nodeData = {}) => {
@@ -91,6 +107,10 @@ const VisualEditorCanvas = () => {
     } else {
       if (menuPosition && menuPosition.flowPosition) {
         const newNode = addNode(nodeType, menuPosition.flowPosition, false);
+        if (!newNode) {
+          closeMenu();
+          return;
+        }
         if (Object.keys(nodeData).length > 0) {
           newNode.data = { ...newNode.data, ...nodeData };
         }
@@ -115,7 +135,8 @@ const VisualEditorCanvas = () => {
                 x: event.clientX,
                 y: event.clientY,
             });
-            openMenu(event.clientY, event.clientX, position);
+            const canvasPosition = getCanvasRelativePosition(event.clientX, event.clientY);
+            openMenu(canvasPosition.top, canvasPosition.left, position);
         }, 50);
       } else {
         setConnectingPin(null);
@@ -129,13 +150,13 @@ const VisualEditorCanvas = () => {
         });
       }
     },
-    [screenToFlowPosition, openMenu, setConnectingPin, socket, command]
+    [getCanvasRelativePosition, screenToFlowPosition, openMenu, setConnectingPin, socket, command]
   );
 
   const onConnectStart = useCallback((event, { nodeId, handleId, handleType }) => {
     const sourceNode = nodes.find(n => n.id === nodeId);
     if (!sourceNode) return;
-    setConnectingPin({ nodeId, handleId, handleType, nodeType: sourceNode.type });
+    setConnectingPin({ nodeId, pinId: handleId, handleType, nodeType: sourceNode.type });
 
     // Broadcast начало создания соединения
     if (socket && command) {
@@ -197,9 +218,33 @@ const VisualEditorCanvas = () => {
     };
   }, [isMenuOpen, closeMenu]);
 
+  useLayoutEffect(() => {
+    if (!isMenuOpen) return;
+
+    const clampMenuPosition = () => {
+      if (!menuRef.current || !reactFlowWrapper.current) return;
+
+      const menuWidth = menuRef.current.offsetWidth;
+      const menuHeight = menuRef.current.offsetHeight;
+      const wrapper = reactFlowWrapper.current;
+      const canvasPadding = 12;
+      const maxLeft = Math.max(canvasPadding, wrapper.clientWidth - menuWidth - canvasPadding);
+      const maxTop = Math.max(canvasPadding, wrapper.clientHeight - menuHeight - canvasPadding);
+
+      setMenuCanvasPosition({
+        left: Math.min(Math.max(menuPosition.left, canvasPadding), maxLeft),
+        top: Math.min(Math.max(menuPosition.top, canvasPadding), maxTop),
+      });
+    };
+
+    clampMenuPosition();
+    window.addEventListener('resize', clampMenuPosition);
+    return () => window.removeEventListener('resize', clampMenuPosition);
+  }, [isMenuOpen, menuPosition.left, menuPosition.top]);
+
   return (
     <div
-      style={{ height: '100%', width: '100%', position: 'relative' }}
+      style={{ height: '100%', width: '100%', position: 'relative', overflow: 'hidden' }}
       ref={reactFlowWrapper}
     >
       <ReactFlow
@@ -229,10 +274,10 @@ const VisualEditorCanvas = () => {
       {isMenuOpen && (
           <div
             ref={menuRef}
-            style={{ top: menuPosition.top, left: menuPosition.left, position: 'absolute', zIndex: 10 }}
+            style={{ top: menuCanvasPosition.top, left: menuCanvasPosition.left, position: 'absolute', zIndex: 20 }}
           >
-            <Command>
-              <CommandInput placeholder={t('contextMenu.searchPlaceholder')} />
+            <Command className="w-[320px] border border-border bg-popover/98 shadow-2xl backdrop-blur-md">
+              <CommandInput autoFocus placeholder={t('contextMenu.searchPlaceholder')} />
               <CommandList>
                 <CommandEmpty>{t('contextMenu.noResults')}</CommandEmpty>
 
@@ -273,7 +318,10 @@ const VisualEditorCanvas = () => {
 
                   {/* Обычные ноды */}
                   {Object.entries(filteredNodes).map(([category, nodes]) => (
-                    <CommandGroup key={category} heading={t(`nodePanel.categories.${category}`, category)}>
+                    <CommandGroup
+                      key={category}
+                      heading={t(`nodePanel.categories.${normalizeVisualEditorCategory(category)}`, { defaultValue: category })}
+                    >
                       {nodes.map(node => {
                         const nodeLabel = getNodeTranslation(node.type).label || node.label;
                         return (

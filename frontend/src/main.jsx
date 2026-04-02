@@ -42,6 +42,20 @@ function Root() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
     setTheme(savedTheme);
+  }, [setTheme]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = () => {
+      if (useAppStore.getState().theme === 'system') {
+        useAppStore.getState().setTheme('system');
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleThemeChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleThemeChange);
+    };
   }, []);
 
   useEffect(() => {

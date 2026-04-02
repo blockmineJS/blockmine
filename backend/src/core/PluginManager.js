@@ -13,7 +13,192 @@ const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 
 const TELEMETRY_ENABLED = true;
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
+const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
+
+function normalizeGithubRepoUrl(repoUrl) {
+    if (!repoUrl || typeof repoUrl !== 'string') return null;
+
+    let trimmed = repoUrl.trim();
+    if (!trimmed) return null;
+
+    try {
+        trimmed = trimmed.replace(/^git\+/i, '');
+        if (/^github\.com\//i.test(trimmed)) {
+            trimmed = `https://${trimmed}`;
+        }
+
+        const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+        if (sshMatch) {
+            const owner = sshMatch[1].toLowerCase();
+            const repo = sshMatch[2].toLowerCase();
+            return `https://github.com/${owner}/${repo}`;
+        }
+
+        const parsed = new URL(trimmed);
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname !== 'github.com' && hostname !== 'www.github.com') return null;
+
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        if (pathParts.length < 2) return null;
+
+        const owner = pathParts[0].toLowerCase();
+        const repo = pathParts[1].replace(/\.git$/i, '').toLowerCase();
+        return `https://github.com/${owner}/${repo}`;
+    } catch {
+        return null;
+    }
+}
+
+function parseGithubOwnerRepo(repoUrl) {
+    const normalized = normalizeGithubRepoUrl(repoUrl);
+    if (!normalized) return null;
+    try {
+        const parsed = new URL(normalized);
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        if (parts.length < 2) return null;
+        return { owner: parts[0], repo: parts[1] };
+    } catch {
+        return null;
+    }
+}
+
+function getGithubRepoName(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    return ownerRepo?.repo || null;
+}
+
+function getGithubHeaders(extra = {}) {
+    const headers = {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'BlockMine',
+        ...extra
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    return headers;
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { headers: getGithubHeaders(), signal: controller.signal });
+        if (!response.ok) {
+            return null;
+        }
+        return response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchGithubResponseWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers: getGithubHeaders(options.headers || {}),
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            const error = new Error(`GitHub request failed with status ${response.status}.`);
+            error.status = response.status;
+            throw error;
+        }
+
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            const timeoutError = new Error('GitHub request timed out.');
+            timeoutError.name = 'AbortError';
+            throw timeoutError;
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchGithubRepoInfo(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    return fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}`);
+}
+
+async function downloadGithubArchive(repoUrl, ref) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) {
+        throw new Error('Invalid GitHub repository URL.');
+    }
+
+    const response = await fetchGithubResponseWithTimeout(
+        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/zipball/${encodeURIComponent(ref)}`,
+        { headers: { Accept: 'application/vnd.github+json' } },
+        15000
+    );
+
+    return response;
+}
+
+async function fetchGithubPackageVersion(repoUrl, ref = null) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    const resolvedRef = ref || (await fetchGithubRepoInfo(repoUrl))?.default_branch;
+    if (!resolvedRef) return null;
+
+    const packageJsonData = await fetchJsonWithTimeout(
+        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/contents/package.json?ref=${encodeURIComponent(resolvedRef)}`
+    );
+
+    if (!packageJsonData?.content) {
+        return null;
+    }
+
+    try {
+        const packageJsonRaw = Buffer.from(packageJsonData.content, packageJsonData.encoding || 'base64').toString('utf8');
+        const packageJson = JSON.parse(packageJsonRaw);
+        return typeof packageJson?.version === 'string' ? packageJson.version : null;
+    } catch {
+        return null;
+    }
+}
+
+async function fetchLatestGithubVersionTag(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    const releaseData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/releases/latest`);
+    const releaseTag = typeof releaseData?.tag_name === 'string' ? releaseData.tag_name : null;
+    if (releaseTag) return releaseTag;
+
+    const tagsData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/tags?per_page=20`);
+    if (!Array.isArray(tagsData) || tagsData.length === 0) return null;
+
+    const semverTags = tagsData
+        .map(item => item?.name)
+        .filter(Boolean)
+        .map(tag => ({ tag, normalized: semver.coerce(tag)?.version || null }))
+        .filter(item => item.normalized);
+
+    if (semverTags.length > 0) {
+        semverTags.sort((a, b) => semver.rcompare(a.normalized, b.normalized));
+        return semverTags[0].tag;
+    }
+
+    const firstTag = tagsData[0]?.name;
+    return typeof firstTag === 'string' ? firstTag : null;
+}
 
 function reportPluginDownload(pluginName) {
     if (!TELEMETRY_ENABLED) return;
@@ -188,6 +373,8 @@ class PluginManager {
     async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
         const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
         await fse.mkdir(botPluginsDir, { recursive: true });
+        let sourceRefType = tag ? 'tag' : 'branch';
+        let sourceRef = tag || 'main';
 
         if (!isUpdate) {
         const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
@@ -197,32 +384,30 @@ class PluginManager {
         try {
             const url = new URL(repoUrl);
             const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
+            const repoInfo = tag ? null : await fetchGithubRepoInfo(repoUrl);
+            if (repoInfo?.default_branch) {
+                sourceRef = repoInfo.default_branch;
+            }
             
             let response;
             
-            // Если указан тег - скачиваем конкретный релиз
             if (tag) {
-                const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
                 console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
                 try {
-                    response = await fetch(archiveUrlTag);
+                    response = await downloadGithubArchive(repoUrl, tag);
                 } catch (err) {
                     throw new Error(`Ошибка сети при скачивании релиза ${tag}: ${err.message || err}`);
                 }
-                if (!response.ok) {
-                    throw new Error(`Не удалось скачать релиз ${tag}. Статус: ${response.status}. Возможно, тег не существует.`);
-                }
             } else {
-                // Если тег не указан - скачиваем последний коммит из main/master (старое поведение)
-                const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
-                const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
-
-                response = await fetch(archiveUrlMain);
-                if (!response.ok) {
-                    console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
-                    response = await fetch(archiveUrlMaster);
-                    if (!response.ok) {
-                        throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
+                try {
+                    response = await downloadGithubArchive(repoUrl, sourceRef);
+                } catch (err) {
+                    if (!repoInfo && sourceRef !== 'master') {
+                        console.log(`[PluginManager] Ветка '${sourceRef}' не найдена для ${repoUrl}, пробую 'master'...`);
+                        sourceRef = 'master';
+                        response = await downloadGithubArchive(repoUrl, sourceRef);
+                    } else {
+                        throw new Error(`Не удалось скачать архив плагина: ${err.message || err}`);
                     }
                 }
             }
@@ -264,7 +449,10 @@ class PluginManager {
                 depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
             }
 
-            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient);
+            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient, {
+                sourceRefType,
+                sourceRef
+            });
 
             reportPluginDownload(packageJson.name);
 
@@ -285,7 +473,7 @@ class PluginManager {
         }
     }
 
-    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = prisma) {
+    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = prisma, extraData = {}) {
         const packageJsonPath = path.join(directoryPath, 'package.json');
         let packageJson;
         try {
@@ -307,6 +495,7 @@ class PluginManager {
             sourceType,
             sourceUri: sourceUri || directoryPath,
             manifest: JSON.stringify(packageJson.botpanel || {}),
+            ...extraData,
         };
         
         return prismaClient.installedPlugin.upsert({
@@ -397,24 +586,76 @@ class PluginManager {
             where: { botId, sourceType: 'GITHUB' }
         });
         const updatesAvailable = [];
-        const catalogMap = new Map(catalog.map(item => [item.repoUrl, item]));
+        const catalogMapByRepo = new Map();
+        const catalogMapByName = new Map();
+        const catalogMapByRepoName = new Map();
+        const latestTagCache = new Map();
+
+        for (const item of catalog) {
+            const normalizedRepoUrl = normalizeGithubRepoUrl(item.repoUrl);
+            if (normalizedRepoUrl) {
+                catalogMapByRepo.set(normalizedRepoUrl, item);
+                const repoName = getGithubRepoName(normalizedRepoUrl);
+                if (repoName && !catalogMapByRepoName.has(repoName)) {
+                    catalogMapByRepoName.set(repoName, item);
+                }
+            }
+            if (item?.name) {
+                catalogMapByName.set(String(item.name).toLowerCase(), item);
+            }
+        }
 
         for (const plugin of githubPlugins) {
             try {
-                const catalogInfo = catalogMap.get(plugin.sourceUri);
-                if (!catalogInfo || !catalogInfo.latestTag) continue;
-                
-                const localVersion = semver.coerce(plugin.version)?.version || plugin.version;
-                const recommendedVersion = semver.coerce(catalogInfo.latestTag)?.version || catalogInfo.latestTag;
+                const normalizedSourceUri = normalizeGithubRepoUrl(plugin.sourceUri);
+                const repoName = getGithubRepoName(normalizedSourceUri || plugin.sourceUri);
+                const catalogInfo =
+                    (normalizedSourceUri ? catalogMapByRepo.get(normalizedSourceUri) : null) ||
+                    catalogMapByName.get(String(plugin.name).toLowerCase()) ||
+                    (repoName ? catalogMapByRepoName.get(repoName) : null);
 
-                if (semver.gt(recommendedVersion, localVersion)) {
+                const targetRepoUrl = catalogInfo?.repoUrl || normalizedSourceUri || normalizeGithubRepoUrl(plugin.sourceUri) || plugin.sourceUri;
+                let latestTagRaw =
+                    catalogInfo?.latestTag ||
+                    catalogInfo?.recommendedVersion ||
+                    catalogInfo?.version ||
+                    catalogInfo?.latestVersion ||
+                    catalogInfo?.tag;
+
+                if (!latestTagRaw) {
+                    const cacheKey = targetRepoUrl || plugin.name;
+                    if (latestTagCache.has(cacheKey)) {
+                        latestTagRaw = latestTagCache.get(cacheKey);
+                    } else {
+                        const fetchedTag = targetRepoUrl ? await fetchLatestGithubVersionTag(targetRepoUrl) : null;
+                        latestTagCache.set(cacheKey, fetchedTag);
+                        latestTagRaw = fetchedTag;
+                    }
+                }
+
+                let latestVersionRaw = latestTagRaw;
+                if (!latestVersionRaw && targetRepoUrl) {
+                    latestVersionRaw = await fetchGithubPackageVersion(
+                        targetRepoUrl,
+                        plugin.sourceRefType === 'branch' ? plugin.sourceRef : null
+                    );
+                }
+
+                if (!latestVersionRaw) continue;
+                
+                const localSemver = semver.coerce(plugin.version);
+                const remoteSemver = semver.coerce(latestVersionRaw);
+                if (!localSemver || !remoteSemver) continue;
+
+                if (semver.gt(remoteSemver.version, localSemver.version)) {
                     updatesAvailable.push({
                         id: plugin.id,
                         name: plugin.name,
                         sourceUri: plugin.sourceUri,
-                        currentVersion: localVersion,
-                        recommendedVersion: recommendedVersion,
-                        latestTag: catalogInfo.latestTag, // 🏷️ Добавляем тег для использования при обновлении
+                        currentVersion: localSemver.version,
+                        recommendedVersion: remoteSemver.version,
+                        latestTag: catalogInfo?.latestTag || latestTagRaw || null,
+                        targetRepoUrl,
                     });
                 }
             } catch (error) {
@@ -424,7 +665,7 @@ class PluginManager {
         return updatesAvailable;
     }
 
-    async updatePlugin(pluginId, targetTag = null) {
+    async updatePlugin(pluginId, targetTag = null, targetRepoUrl = null) {
         const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin || plugin.sourceType !== 'GITHUB') {
             throw new Error('Плагин не найден или не является GitHub-плагином.');
@@ -432,7 +673,7 @@ class PluginManager {
 
         console.log(`[PluginManager] Начало обновления плагина ${plugin.name}${targetTag ? ` до версии ${targetTag}` : ''}...`);
 
-        const repoUrl = plugin.sourceUri;
+        const repoUrl = targetRepoUrl || plugin.sourceUri;
         const botId = plugin.botId;
         const oldVersion = plugin.version;
 

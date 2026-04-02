@@ -21,7 +21,10 @@
   },
   "status": {
     "running": "Running",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "starting": "Starting",
+    "stopping": "Stopping",
+    "restarting": "Restarting"
   },
   "deleteDialog": {
     "title": "Delete bot {{username}}?",

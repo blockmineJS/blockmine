@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const actionUpdateCommandDefinition = new NodeDefinition({
   type: 'action:update_command',
   category: 'action',
-  label: '✏️ Редактировать команду',
+  label: 'Редактировать команду',
   description: 'Изменяет параметры существующей команды',
 
   computeInputs: (data) => [

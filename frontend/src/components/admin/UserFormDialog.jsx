@@ -1,12 +1,12 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
-import { DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { apiHelper } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,7 +28,7 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
             try {
                 const list = await apiHelper('/api/bots');
                 setBots(list);
-            } catch (e) {
+            } catch {
             }
         })();
     }, []);
@@ -39,37 +39,47 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
             setRoleId(user.roleId.toString());
             setPassword('');
             setAllBots(user.allBots ?? true);
-            const accessIds = Array.isArray(user.botAccess) ? user.botAccess.map(a => a.botId) : [];
+            const accessIds = Array.isArray(user.botAccess) ? user.botAccess.map((access) => access.botId) : [];
             setSelectedBotIds(accessIds);
-        } else {
-            setUsername('');
-            setPassword('');
-            setRoleId(roles.length > 0 ? roles[0].id.toString() : '');
-            setAllBots(true);
-            setSelectedBotIds([]);
+            return;
         }
+
+        setUsername('');
+        setPassword('');
+        setRoleId(roles.length > 0 ? roles[0].id.toString() : '');
+        setAllBots(true);
+        setSelectedBotIds([]);
     }, [user, roles, isEditMode]);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = (event) => {
+        event.preventDefault();
+
         if (!username || !roleId) {
             toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.usernameRequired') });
             return;
         }
+
         if (!isEditMode && (!password || password.length < 4)) {
-             toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordRequired') });
-            return;
-        }
-        if (isEditMode && password && password.length < 4) {
-             toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordMinLength') });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordRequired') });
             return;
         }
 
-        const dataToSubmit = { username, roleId: parseInt(roleId, 10), allBots, botIds: allBots ? [] : selectedBotIds };
+        if (isEditMode && password && password.length < 4) {
+            toast({ variant: 'destructive', title: t('common.error'), description: t('userForm.validation.passwordMinLength') });
+            return;
+        }
+
+        const dataToSubmit = {
+            username,
+            roleId: parseInt(roleId, 10),
+            allBots,
+            botIds: allBots ? [] : selectedBotIds,
+        };
+
         if (password) {
             dataToSubmit.password = password;
         }
-        
+
         onSubmit(dataToSubmit, user?.id);
     };
 
@@ -88,14 +98,14 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="password">{isEditMode ? t('userForm.newPassword') : t('userForm.password')}</Label>
-                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+                    <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="********" />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="roleId">{t('userForm.role')}</Label>
                     <Select value={roleId} onValueChange={setRoleId} required>
                         <SelectTrigger><SelectValue placeholder={t('userForm.selectRole')} /></SelectTrigger>
                         <SelectContent>
-                            {roles.map(role => (
+                            {roles.map((role) => (
                                 <SelectItem key={role.id} value={role.id.toString()}>{role.name}</SelectItem>
                             ))}
                         </SelectContent>
@@ -103,23 +113,23 @@ export default function UserFormDialog({ user, roles, onSubmit, onCancel, isSavi
                 </div>
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                        <Checkbox id="allBots" checked={allBots} onCheckedChange={(v) => setAllBots(!!v)} disabled={isOwner} />
+                        <Checkbox id="allBots" checked={allBots} onCheckedChange={(value) => setAllBots(!!value)} disabled={isOwner} />
                         <Label htmlFor="allBots">{t('userForm.allBotsAccess')} {isOwner ? t('userForm.ownerNote') : ''}</Label>
                     </div>
                     {!allBots && !isOwner && (
                         <div className="max-h-48 overflow-auto border rounded p-2 space-y-1">
-                            {bots.map(b => {
-                                const checked = selectedBotIds.includes(b.id);
+                            {bots.map((bot) => {
+                                const checked = selectedBotIds.includes(bot.id);
                                 return (
-                                    <label key={b.id} className="flex items-center gap-2 text-sm">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={checked} 
+                                    <label key={bot.id} className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
                                             onChange={(e) => {
-                                                setSelectedBotIds(prev => e.target.checked ? [...prev, b.id] : prev.filter(id => id !== b.id))
+                                                setSelectedBotIds((prev) => e.target.checked ? [...prev, bot.id] : prev.filter((id) => id !== bot.id));
                                             }}
                                         />
-                                        <span>{b.username}</span>
+                                        <span>{bot.username}</span>
                                     </label>
                                 );
                             })}

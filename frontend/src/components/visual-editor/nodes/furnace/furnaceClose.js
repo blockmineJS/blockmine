@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const furnaceCloseDefinition = new NodeDefinition({
   type: 'furnace:close',
   category: 'furnace',
-  label: '🔥 Печка: закрыть',
+  label: 'Печка: закрыть',
   description: 'Закрывает открытую печку',
 
   computeInputs: (data) => [

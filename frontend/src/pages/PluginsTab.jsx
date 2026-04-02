@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap, Github } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
+import GitHubInstallDialog from '@/components/GitHubInstallDialog';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
-import { cn } from '@/lib/utils';
+import FadeTransition from '@/components/FadeTransition';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function PluginsTab() {
@@ -34,7 +35,7 @@ export default function PluginsTab() {
     const deletePlugin = useAppStore(state => state.deletePlugin);
     const updatePlugin = useAppStore(state => state.updatePlugin);
     const installPluginFromPath = useAppStore(state => state.installPluginFromPath);
-    const fetchPluginCatalog = useAppStore(state => state.fetchPluginCatalog);
+    const installPluginFromRepo = useAppStore(state => state.installPluginFromRepo);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
     const reloadLocalPlugin = useAppStore(state => state.reloadLocalPlugin);
@@ -42,6 +43,9 @@ export default function PluginsTab() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
     const [isUpdating, setIsUpdating] = useState(null);
+    const [isGithubInstallOpen, setIsGithubInstallOpen] = useState(false);
+    const [githubInstallDialogKey, setGithubInstallDialogKey] = useState(0);
+    const [isGithubInstalling, setIsGithubInstalling] = useState(false);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -55,30 +59,39 @@ export default function PluginsTab() {
     useEffect(() => {
         const loadInitialData = async () => {
             setIsLoading(true);
-            await fetchPluginCatalog();
             await fetchInstalledPlugins(intBotId);
             setIsLoading(false);
         };
         if (bot) {
             loadInitialData();
         }
-    }, [bot, intBotId, fetchInstalledPlugins, fetchPluginCatalog]);
+    }, [bot, intBotId, fetchInstalledPlugins]);
 
     useEffect(() => {
         if (activeTab === 'installed' && bot && installedPlugins.length > 0 && !isLoading) {
-            checkForUpdates(intBotId, false);
+            checkForUpdates(intBotId);
         }
     }, [installedPlugins.length, isLoading, activeTab, bot, intBotId, checkForUpdates]);
 
     const handleCheckForUpdates = async () => {
         setIsCheckingUpdates(true);
-        await checkForUpdates(intBotId, true);
-        setIsCheckingUpdates(false);
+        try {
+            await checkForUpdates(intBotId);
+        } finally {
+            setIsCheckingUpdates(false);
+        }
     };
 
     const handleTabChange = (value) => {
         setActiveTab(value);
         localStorage.setItem('plugins-active-tab', value);
+    };
+
+    const handleGithubDialogOpenChange = (open) => {
+        if (open) {
+            setGithubInstallDialogKey((current) => current + 1);
+        }
+        setIsGithubInstallOpen(open);
     };
     
     const handleCreatePlugin = async ({ name, template }) => {
@@ -119,6 +132,18 @@ export default function PluginsTab() {
             setIsLocalInstallOpen(false);
         } finally {
             setIsLocalInstalling(false);
+        }
+    };
+
+    const handleGithubInstall = async (repoUrl, tag = null) => {
+        setIsGithubInstalling(true);
+        try {
+            await installPluginFromRepo(intBotId, repoUrl, null, tag);
+            setIsGithubInstallOpen(false);
+        } catch (error) {
+            console.error('[PluginsTab] GitHub install failed:', error);
+        } finally {
+            setIsGithubInstalling(false);
         }
     };
     
@@ -183,6 +208,15 @@ export default function PluginsTab() {
                             </DialogTrigger>
                             <LocalInstallDialog onInstall={handleLocalInstall} onCancel={() => setIsLocalInstallOpen(false)} isInstalling={isLocalInstalling} />
                         </Dialog>
+                        <Dialog open={isGithubInstallOpen} onOpenChange={handleGithubDialogOpenChange}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <Github className="h-4 w-4" />
+                                    <span className="ml-2">{t('actions.installGithub')}</span>
+                                </Button>
+                            </DialogTrigger>
+                            <GitHubInstallDialog key={githubInstallDialogKey} botId={intBotId} onInstall={handleGithubInstall} onCancel={() => setIsGithubInstallOpen(false)} isInstalling={isGithubInstalling} />
+                        </Dialog>
                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm" disabled={!canDevelop}>
                             <Code2 className="h-4 w-4" />
                             <span className="ml-2">{t('actions.createPlugin')}</span>
@@ -191,31 +225,38 @@ export default function PluginsTab() {
                 </div>
             </div>
             
-            <TabsContent value="installed" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
-                <div className="flex-1 overflow-y-auto">
-                    <InstalledPluginsView
-                        bot={bot}
-                        installedPlugins={installedPlugins}
-                        isLoading={isLoading}
-                        updates={updates}
-                        isUpdating={isUpdating}
-                        onTogglePlugin={canUpdate ? ((plugin, isEnabled) => togglePlugin(intBotId, plugin.id, isEnabled)) : null}
-                        onDeletePlugin={canDelete ? ((plugin) => deletePlugin(intBotId, plugin.id, plugin.name)) : null}
-                        onUpdatePlugin={canUpdate ? ((pluginId) => handleUpdatePlugin(pluginId)) : null}
-                        onSaveSettings={handlePluginOperationSuccess}
-                        onForkPlugin={canDevelop ? ((plugin) => handleForkPlugin(plugin)) : null}
-                        onReloadPlugin={canDevelop ? ((plugin) => reloadLocalPlugin(intBotId, plugin.id)) : null}
-                    />
-                </div>
-            </TabsContent>
-            
-            <TabsContent value="browser" className="flex-grow flex flex-col min-h-0 data-[state=inactive]:hidden">
-                <PluginBrowserView 
-                    botId={intBotId}
-                    installedPlugins={installedPlugins}
-                    onInstallSuccess={handlePluginOperationSuccess}
-                />
-            </TabsContent>
+            <main className="flex-grow min-h-0">
+                <FadeTransition transitionKey={activeTab} duration={0.2}>
+                    {activeTab === 'installed' ? (
+                        <div className="flex h-full flex-col min-h-0">
+                            <div className="flex-1 overflow-y-auto">
+                                <InstalledPluginsView
+                                    bot={bot}
+                                    installedPlugins={installedPlugins}
+                                    isLoading={isLoading}
+                                    updates={updates}
+                                    isUpdating={isUpdating}
+                                    onTogglePlugin={canUpdate ? ((plugin, isEnabled) => togglePlugin(intBotId, plugin.id, isEnabled)) : null}
+                                    onDeletePlugin={canDelete ? ((plugin) => deletePlugin(intBotId, plugin.id, plugin.name)) : null}
+                                    onUpdatePlugin={canUpdate ? ((pluginId) => handleUpdatePlugin(pluginId)) : null}
+                                    onSaveSettings={handlePluginOperationSuccess}
+                                    onForkPlugin={canDevelop ? ((plugin) => handleForkPlugin(plugin)) : null}
+                                    onReloadPlugin={canDevelop ? ((plugin) => reloadLocalPlugin(intBotId, plugin.id)) : null}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex h-full flex-col min-h-0">
+                            <PluginBrowserView 
+                                botId={intBotId}
+                                isActive={activeTab === 'browser'}
+                                installedPlugins={installedPlugins}
+                                onInstallSuccess={handlePluginOperationSuccess}
+                            />
+                        </div>
+                    )}
+                </FadeTransition>
+            </main>
 
             <CreatePluginDialog 
                 open={isCreateDialogOpen}

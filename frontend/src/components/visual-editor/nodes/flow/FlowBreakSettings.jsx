@@ -1,23 +1,25 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Настройки для ноды flow:break
  */
 function FlowBreakSettings({ nodeId, data, updateNodeData }) {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">
-        <p>Нода <strong>Break</strong> прерывает выполнение цикла.</p>
+        <p>{t('nodeHelp.flowBreak.intro')}</p>
         <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Используется внутри циклов <strong>For Each</strong> и <strong>While</strong></li>
-          <li>При выполнении немедленно прерывает цикл</li>
-          <li>Управление передается на выход <strong>Completed</strong> цикла</li>
+          <li>{t('nodeHelp.flowBreak.item1')}</li>
+          <li>{t('nodeHelp.flowBreak.item2')}</li>
+          <li>{t('nodeHelp.flowBreak.item3')}</li>
         </ul>
       </div>
 
       <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-        <strong>Примечание:</strong> Нода не имеет выходных пинов, так как после
-        прерывания выполнение продолжается с выхода Completed родительского цикла.
+        {t('nodeHelp.flowBreak.note')}
       </div>
     </div>
   );

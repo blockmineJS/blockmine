@@ -66,29 +66,35 @@ const SettingsPanel = () => {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <h3 className="text-lg font-bold">{isEventGraph ? t('settings.titleEventGraph') : t('settings.titleCommand')}</h3>
+    <div className="h-full overflow-y-auto bg-card/40">
+      <div className="space-y-4 p-4">
+        <div className="space-y-1 border-b pb-4">
+          <h3 className="text-lg font-bold">{isEventGraph ? t('settings.titleEventGraph') : t('settings.titleCommand')}</h3>
+        </div>
 
-      <div>
-        <Label htmlFor="command-name">{isEventGraph ? t('settings.graphName') : t('settings.commandName')}</Label>
+      <div className="space-y-2">
+        <Label htmlFor="command-name" className="text-sm font-medium">{isEventGraph ? t('settings.graphName') : t('settings.commandName')}</Label>
         <Input
           id="command-name"
           value={command.name || ''}
           onChange={(e) => updateCommand({ name: e.target.value })}
+          className="h-10"
         />
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Checkbox
-            id="is-enabled"
-            checked={command.isEnabled}
-            onCheckedChange={(checked) => updateCommand({ isEnabled: checked })}
-        />
-        <Label htmlFor="is-enabled">{t('settings.enabled')}</Label>
+      <div className="rounded-lg border bg-background/60 p-3">
+        <div className="flex items-center gap-3">
+          <Checkbox
+              id="is-enabled"
+              checked={command.isEnabled}
+              onCheckedChange={(checked) => updateCommand({ isEnabled: checked })}
+          />
+          <Label htmlFor="is-enabled" className="text-sm font-medium">{t('settings.enabled')}</Label>
+        </div>
       </div>
 
-      <div>
-        <Label htmlFor="plugin-owner" className="flex items-center gap-2">
+      <div className="space-y-2 rounded-lg border bg-background/60 p-3">
+        <Label htmlFor="plugin-owner" className="flex items-center gap-2 text-sm font-medium">
           <Package className="h-4 w-4" />
           {t('settings.pluginOwner')}
         </Label>
@@ -99,7 +105,7 @@ const SettingsPanel = () => {
             updatePluginOwner(command.botId, pluginId);
           }}
         >
-          <SelectTrigger id="plugin-owner">
+          <SelectTrigger id="plugin-owner" className="h-10 w-full">
             <SelectValue placeholder={t('settings.selectPlugin')} />
           </SelectTrigger>
           <SelectContent>
@@ -120,7 +126,7 @@ const SettingsPanel = () => {
             )}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="break-words text-xs text-muted-foreground">
           {availablePlugins?.length > 0
             ? t('settings.pluginBindNote', { type: isEventGraph ? t('settings.pluginBindNoteGraph') : t('settings.pluginBindNoteCommand') })
             : t('settings.pluginPermissionNote')
@@ -130,32 +136,34 @@ const SettingsPanel = () => {
 
       {!isEventGraph && (
         <>
-          <div>
-            <Label htmlFor="command-description">{t('settings.description')}</Label>
+          <div className="space-y-2">
+            <Label htmlFor="command-description" className="text-sm font-medium">{t('settings.description')}</Label>
             <Textarea
               id="command-description"
               value={command.description || ''}
               onChange={(e) => updateCommand({ description: e.target.value })}
+              className="min-h-24"
             />
           </div>
 
-          <div>
-            <Label htmlFor="command-aliases">{t('settings.aliases')}</Label>
+          <div className="space-y-2">
+            <Label htmlFor="command-aliases" className="text-sm font-medium">{t('settings.aliases')}</Label>
             <Input
               id="command-aliases"
               value={aliasesStr}
               onChange={(e) => setAliasesStr(e.target.value)}
               onBlur={handleAliasesBlur}
+              className="h-10"
             />
           </div>
 
-          <div>
-            <Label htmlFor="command-permission">{t('settings.permission')}</Label>
+          <div className="space-y-2">
+            <Label htmlFor="command-permission" className="text-sm font-medium">{t('settings.permission')}</Label>
             <Select
               value={command.permissionId ? command.permissionId.toString() : "none"}
               onValueChange={(value) => updateCommand({ permissionId: value === 'none' ? null : parseInt(value) })}
             >
-              <SelectTrigger id="command-permission">
+              <SelectTrigger id="command-permission" className="h-10">
                 <SelectValue placeholder={t('settings.selectPermission')} />
               </SelectTrigger>
               <SelectContent>
@@ -167,8 +175,8 @@ const SettingsPanel = () => {
           </Select>
         </div>
 
-          <div>
-            <Label htmlFor="command-cooldown">{t('settings.cooldown')}</Label>
+          <div className="space-y-2">
+            <Label htmlFor="command-cooldown" className="text-sm font-medium">{t('settings.cooldown')}</Label>
             <Input
               id="command-cooldown"
               type="number"
@@ -176,6 +184,7 @@ const SettingsPanel = () => {
               value={command.cooldown || 0}
               onChange={(e) => updateCommand({ cooldown: parseInt(e.target.value) || 0 })}
               placeholder="0"
+              className="h-10"
             />
             <p className="text-xs text-muted-foreground mt-1">
               {t('settings.cooldownNote')}
@@ -183,28 +192,30 @@ const SettingsPanel = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>{t('settings.chatTypes')}</Label>
+            <Label className="text-sm font-medium">{t('settings.chatTypes')}</Label>
             <Input
               id="command-chat-types"
               value={chatTypesStr}
               onChange={(e) => setChatTypesStr(e.target.value)}
               onBlur={handleChatTypesBlur}
+              className="h-10"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-lg border bg-background/60 p-3">
             <h4 className="font-bold">{t('settings.arguments')}</h4>
             <div className="space-y-2">
               {args.map((arg, index) => (
-                <div key={arg.id || index} className="flex items-center gap-2 p-2 border rounded-md">
+                <div key={arg.id || index} className="space-y-3 rounded-md border bg-background/70 p-3">
                   <Input
                     placeholder={t('settings.argName')}
                     value={arg.name}
                     onChange={(e) => updateArgument(arg.id, { name: e.target.value })}
-                    className="flex-grow"
+                    className="h-10"
                   />
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
                   <Select value={arg.type} onValueChange={(value) => updateArgument(arg.id, { type: value }) }>
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger className="h-10 w-full min-w-[132px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -213,26 +224,28 @@ const SettingsPanel = () => {
                       <SelectItem value="boolean">Boolean</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
                     <Checkbox
                       id={`required-${arg.id}`}
                       checked={arg.required}
                       onCheckedChange={(checked) => updateArgument(arg.id, { required: checked })}
                     />
-                    <Label htmlFor={`required-${arg.id}`}>{t('settings.argRequired')}</Label>
+                    <Label htmlFor={`required-${arg.id}`} className="text-sm">{t('settings.argRequired')}</Label>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => removeArgument(arg.id)}>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => removeArgument(arg.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  </div>
                 </div>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={addArgument}>{t('settings.addArgument')}</Button>
+            <Button variant="outline" size="sm" className="h-9 w-full justify-center" onClick={addArgument}>{t('settings.addArgument')}</Button>
           </div>
         </>
       )}
 
       <VariablesPanel />
+      </div>
     </div>
   );
 };

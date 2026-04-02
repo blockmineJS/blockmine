@@ -2,8 +2,6 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,48 +57,41 @@ export default function ChangelogDialog() {
     const showChangelogDialog = useAppStore(state => state.showChangelogDialog);
     const changelog = useAppStore(state => state.changelog);
     const appVersion = useAppStore(state => state.appVersion);
-    const closeChangelogDialog = useAppStore(state => state.closeChangelogDialog);
+    const isChangelogLoading = useAppStore(state => state.isChangelogLoading);
+    const setShowChangelogDialog = useAppStore(state => state.setShowChangelogDialog);
 
     const releases = useMemo(() => parseChangelog(changelog), [changelog]);
 
-    const [expanded, setExpanded] = useState([]);
+    const [expanded, setExpanded] = useState('');
     const [selectedVersion, setSelectedVersion] = useState('');
 
     useEffect(() => {
         const lastShown = localStorage.getItem('lastShownVersion') || '';
         if (releases.length === 0) {
-            setExpanded([]);
+            setExpanded('');
             setSelectedVersion('');
             return;
         }
 
         if (!lastShown) {
-            const initial = releases.slice(0, 2).map(r => r.version);
+            const initial = releases[0]?.version || '';
             setExpanded(initial);
             setSelectedVersion(releases[0]?.version || '');
             return;
         }
 
-        const idx = releases.findIndex(r => r.version === lastShown);
-        const versionsToExpand = idx === -1
-            ? releases.map(r => r.version)
-            : releases.slice(0, Math.max(0, idx)).map(r => r.version);
-
-        if (versionsToExpand.length > 0) {
-            setExpanded(versionsToExpand);
-        } else {
-            setExpanded([releases[0].version]);
-        }
+        const nextExpandedVersion = releases[0]?.version || '';
+        setExpanded(nextExpandedVersion);
         setSelectedVersion(releases[0].version);
     }, [releases]);
 
     const handleAccordionChange = (value) => {
-        if (Array.isArray(value)) setExpanded(value);
+        if (typeof value === 'string') setExpanded(value);
     };
 
     const handleJumpToVersion = (v) => {
         setSelectedVersion(v);
-        if (!expanded.includes(v)) setExpanded(prev => [...prev, v]);
+        if (expanded !== v) setExpanded(v);
         setTimeout(() => {
             const el = document.getElementById(`release-${v}`);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -108,15 +99,15 @@ export default function ChangelogDialog() {
     };
 
     return (
-        <Dialog open={showChangelogDialog} onOpenChange={closeChangelogDialog}>
+        <Dialog open={showChangelogDialog} onOpenChange={setShowChangelogDialog}>
             <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>{t('changelog.title', { version: appVersion })}</DialogTitle>
                 </DialogHeader>
 
-                <div className="flex items-center justify-end border rounded-lg p-3">
+                <div className="flex items-center border rounded-lg p-3">
                     <Select value={selectedVersion} onValueChange={handleJumpToVersion}>
-                        <SelectTrigger className="w-44">
+                        <SelectTrigger className="w-full">
                             <SelectValue placeholder={t('changelog.selectVersion')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -127,11 +118,13 @@ export default function ChangelogDialog() {
                     </Select>
                 </div>
 
-                <ScrollArea className="flex-1 w-full rounded-md border p-2 md:p-3">
-                    {releases.length === 0 ? (
+                <div className="custom-scrollbar flex-1 overflow-y-auto rounded-md border p-2 md:p-3">
+                    {isChangelogLoading ? (
+                        <div className="py-16 text-center text-muted-foreground">{t('common.loading', { ns: 'common', defaultValue: 'Загрузка...' })}</div>
+                    ) : releases.length === 0 ? (
                         <div className="text-center py-16 text-muted-foreground">{t('changelog.noData')}</div>
                     ) : (
-                        <Accordion type="multiple" value={expanded} onValueChange={handleAccordionChange} className="w-full">
+                        <Accordion type="single" collapsible value={expanded} onValueChange={handleAccordionChange} className="w-full">
                             {releases.map((r) => (
                                 <AccordionItem key={r.version} value={r.version} id={`release-${r.version}`} className="border rounded-lg mb-3">
                                     <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -204,7 +197,7 @@ export default function ChangelogDialog() {
                             ))}
                         </Accordion>
                     )}
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     );

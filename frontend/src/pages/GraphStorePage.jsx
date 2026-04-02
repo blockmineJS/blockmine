@@ -10,9 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Heart, Upload, Search, Settings, ShoppingBag } from 'lucide-react';
-import { api } from '@/lib/api';
-
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
+import { api, getGraphStoreApiUrl } from '@/lib/api';
+import FadeTransition from '@/components/FadeTransition';
 
 export default function GraphStorePage() {
     const { t } = useTranslation('graph-store');
@@ -44,7 +43,7 @@ export default function GraphStorePage() {
 
     const loadCategories = async () => {
         try {
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/categories`);
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/categories'));
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -65,7 +64,7 @@ export default function GraphStorePage() {
             if (selectedType && selectedType !== 'all') params.append('type', selectedType);
             if (searchQuery) params.append('search', searchQuery);
 
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs?${params}`);
+            const response = await fetch(getGraphStoreApiUrl(`/api/graphs?${params}`));
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -106,7 +105,7 @@ export default function GraphStorePage() {
         try {
             setInstalling(true);
             
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/${selectedGraph.id}/download`, {
+            const response = await fetch(getGraphStoreApiUrl(`/api/graphs/${selectedGraph.id}/download`), {
                 method: 'POST'
             });
             
@@ -197,7 +196,7 @@ export default function GraphStorePage() {
                 localStorage.setItem('graphStoreInstanceId', instanceId);
             }
             
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/${graphId}/like`, {
+            const response = await fetch(getGraphStoreApiUrl(`/api/graphs/${graphId}/like`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ instanceId })
@@ -239,7 +238,7 @@ export default function GraphStorePage() {
                 categoryId = 2;
             }
 
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/publish`, {
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/publish'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -421,9 +420,13 @@ export default function GraphStorePage() {
                 </CardContent>
             </Card>
 
-            {loading ? (
-                <div className="text-center py-8 text-muted-foreground">{t('loading')}</div>
-            ) : graphs.length === 0 ? (
+            <FadeTransition
+                transitionKey={`graph-store-${selectedCategory}-${selectedType}-${searchQuery}`}
+                ready={!loading}
+                duration={0.22}
+                fallback={<div className="text-center py-8 text-muted-foreground">{t('loading')}</div>}
+            >
+            {graphs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">{t('empty')}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -472,6 +475,7 @@ export default function GraphStorePage() {
                     ))}
                 </div>
             )}
+            </FadeTransition>
 
             <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
                 <DialogContent className="max-w-md">

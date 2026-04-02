@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventEntityMovedDefinition = new NodeDefinition({
   type: 'event:entityMoved',
   category: 'event',
-  label: '🧍 Сущность подвинулась',
+  label: 'Сущность подвинулась',
   description: 'Вызывается, когда любая сущность перемещается',
 
   computeInputs: (data) => [],

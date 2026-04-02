@@ -8,6 +8,7 @@ import * as THREE from 'three';
 const geometryCache = new Map();
 const materialCache = new Map();
 const textureLoader = new THREE.TextureLoader();
+const SRGB_COLOR_SPACE = 'srgb';
 
 // URL текстур сундуков
 const CHEST_TEXTURES = {
@@ -166,7 +167,11 @@ export function getEntityMaterial(blockName) {
             (texture) => {
                 texture.magFilter = THREE.NearestFilter;
                 texture.minFilter = THREE.NearestFilter;
-                texture.colorSpace = THREE.SRGBColorSpace;
+                if ('colorSpace' in texture) {
+                    texture.colorSpace = SRGB_COLOR_SPACE;
+                } else if (THREE.sRGBEncoding) {
+                    texture.encoding = THREE.sRGBEncoding;
+                }
                 material.map = texture;
                 material.needsUpdate = true;
             },

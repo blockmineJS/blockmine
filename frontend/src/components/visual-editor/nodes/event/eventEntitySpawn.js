@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventEntitySpawnDefinition = new NodeDefinition({
   type: 'event:entitySpawn',
   category: 'event',
-  label: '📦 Сущность появилась',
+  label: 'Сущность появилась',
   description: 'Вызывается, когда новая сущность появляется в поле зрения бота',
 
   computeInputs: (data) => [],

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -6,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для data:boolean_literal ноды
  */
 const DataBooleanLiteralSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
-      <Label>Значение:</Label>
+      <Label>{t('nodeSettings.value')}</Label>
       <Select
         value={data.value ? 'true' : 'false'}
         onValueChange={(value) => updateNodeData(nodeId, { value: value === 'true' })}
@@ -17,8 +20,8 @@ const DataBooleanLiteralSettings = ({ nodeId, data, updateNodeData }) => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="true">True (Истина)</SelectItem>
-          <SelectItem value="false">False (Ложь)</SelectItem>
+          <SelectItem value="true">{t('nodeSettings.booleanTrue')}</SelectItem>
+          <SelectItem value="false">{t('nodeSettings.booleanFalse')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

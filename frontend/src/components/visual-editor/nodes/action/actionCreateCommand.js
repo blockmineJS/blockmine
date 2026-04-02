@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const actionCreateCommandDefinition = new NodeDefinition({
   type: 'action:create_command',
   category: 'action',
-  label: '➕ Создать команду',
+  label: 'Создать команду',
   description: 'Создает новую команду для бота (временную или постоянную)',
 
   computeInputs: (data) => [

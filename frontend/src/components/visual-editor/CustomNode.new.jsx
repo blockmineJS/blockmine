@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import BaseNode from './core/base/BaseNode';
@@ -19,7 +19,7 @@ function CustomNode({ data, type, id: nodeId }) {
   const debugSession = useVisualEditorStore(state => state.debugSession);
 
   // i18n переводы для нод
-  const { getNodeTranslation, getPinName, getPinDescription, getPlaceholder } = useNodeTranslation();
+  const { getNodeTranslation, getPinName, getPinDescription, getPlaceholder, getInlineOptionLabel } = useNodeTranslation();
 
   const nodeEdges = useMemo(
     () => edges.filter(e => e.target === nodeId || e.source === nodeId),
@@ -46,8 +46,24 @@ function CustomNode({ data, type, id: nodeId }) {
       name: getPinName(type, pin.id, pin.name),
       description: getPinDescription(type, pin.id, pin.description),
       placeholder: pin.placeholder ? getPlaceholder(type, pin.id, pin.placeholder) : pin.placeholder,
+      inlineFieldOptions: Array.isArray(pin.inlineFieldOptions)
+        ? pin.inlineFieldOptions.map((option) => ({
+            ...option,
+            label: getInlineOptionLabel(type, pin.id, option.value, option.label),
+          }))
+        : typeof pin.inlineFieldOptions === 'function'
+          ? (ctx) => {
+              const resolvedOptions = pin.inlineFieldOptions(ctx);
+              if (!Array.isArray(resolvedOptions)) return resolvedOptions;
+
+              return resolvedOptions.map((option) => ({
+                ...option,
+                label: getInlineOptionLabel(type, pin.id, option.value, option.label),
+              }));
+            }
+          : pin.inlineFieldOptions,
     }));
-  }, [type, getPinName, getPinDescription, getPlaceholder]);
+  }, [type, getPinName, getPinDescription, getPlaceholder, getInlineOptionLabel]);
 
   const inputs = useMemo(
     () => definition ? translatePins(definition.getInputs(data, context)) : [],
@@ -64,6 +80,17 @@ function CustomNode({ data, type, id: nodeId }) {
     () => getNodeTranslation(type),
     [type, getNodeTranslation]
   );
+
+  useEffect(() => {
+    if (type !== 'default') {
+      return;
+    }
+
+    console.warn('[VisualEditor] Removing invalid default node from canvas:', nodeId);
+    useVisualEditorStore.setState((state) => {
+      state.nodes = state.nodes.filter((node) => node.id !== nodeId);
+    });
+  }, [type, nodeId]);
 
   // Получаем inputs и outputs из trace для текущего шага, если воспроизводится трассировка
   const traceData = useMemo(() => {
@@ -151,6 +178,10 @@ function CustomNode({ data, type, id: nodeId }) {
         isPausedNode={debugSession?.status === 'paused' && debugSession?.nodeId === nodeId}
       />
     );
+  }
+
+  if (type === 'default') {
+    return null;
   }
 
   if (!nodeConfig) {

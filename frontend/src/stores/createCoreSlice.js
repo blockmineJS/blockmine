@@ -37,7 +37,9 @@ export const createCoreSlice = (set, get) => ({
     appVersion: '',
     botUIExtensions: {},
     changelog: '',
+    changelogFetchedAt: 0,
     showChangelogDialog: false,
+    isChangelogLoading: false,
 
     connectSocket: () => {
         const existingSocket = get().socket;
@@ -103,8 +105,7 @@ export const createCoreSlice = (set, get) => ({
             
             
                 if (currentVersion && currentVersion !== lastShownVersion) {
-                    await get().fetchChangelog();
-                    set({ showChangelogDialog: true });
+                    await get().openChangelogDialog();
                 }
 
             set(state => {
@@ -183,16 +184,35 @@ export const createCoreSlice = (set, get) => ({
     },
 
     fetchChangelog: async () => {
+        if (get().isChangelogLoading) {
+            return;
+        }
+
         try {
+            set({ isChangelogLoading: true });
             const response = await fetch('/api/changelog');
             if (!response.ok) {
                 throw new Error('Failed to fetch changelog');
             }
             const text = await response.text();
-            set({ changelog: text });
+            set({ changelog: text, changelogFetchedAt: Date.now() });
         } catch (error) {
             console.error('Не удалось загрузить changelog:', error);
-            set({ changelog: '' });
+            set({ changelog: '', changelogFetchedAt: 0 });
+        } finally {
+            set({ isChangelogLoading: false });
+        }
+    },
+
+    openChangelogDialog: async () => {
+        const now = Date.now();
+        const fetchedAt = get().changelogFetchedAt || 0;
+        const hasFreshChangelog = get().changelog && (now - fetchedAt) < 5 * 60 * 1000;
+
+        set({ showChangelogDialog: true });
+
+        if (!hasFreshChangelog) {
+            get().fetchChangelog();
         }
     },
 
@@ -205,6 +225,11 @@ export const createCoreSlice = (set, get) => ({
     },
 
     setShowChangelogDialog: (show) => {
-        set({ showChangelogDialog: show });
+        if (!show) {
+            get().closeChangelogDialog();
+            return;
+        }
+
+        set({ showChangelogDialog: true });
     },
 });

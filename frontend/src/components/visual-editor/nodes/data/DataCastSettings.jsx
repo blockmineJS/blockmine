@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -6,20 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для data:cast ноды
  */
 const DataCastSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
-      <Label>Целевой тип:</Label>
+      <Label>{t('nodeSettings.targetType')}</Label>
       <Select
         value={data.targetType || 'String'}
         onValueChange={(value) => updateNodeData(nodeId, { targetType: value })}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Выберите тип..." />
+          <SelectValue placeholder={t('nodeSettings.selectType')} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="String">String (Текст)</SelectItem>
-          <SelectItem value="Number">Number (Число)</SelectItem>
-          <SelectItem value="Boolean">Boolean (Да/Нет)</SelectItem>
+          <SelectItem value="String">{t('nodeSettings.castString')}</SelectItem>
+          <SelectItem value="Number">{t('nodeSettings.castNumber')}</SelectItem>
+          <SelectItem value="Boolean">{t('nodeSettings.castBoolean')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

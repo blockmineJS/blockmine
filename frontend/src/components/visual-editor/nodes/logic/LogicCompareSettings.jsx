@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -6,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для logic:compare ноды
  */
 const LogicCompareSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
-      <Label>Операция:</Label>
+      <Label>{t('nodeSettings.operator')}</Label>
       <Select
         value={data.operation || '=='}
         onValueChange={(value) => updateNodeData(nodeId, { operation: value })}
@@ -17,12 +20,12 @@ const LogicCompareSettings = ({ nodeId, data, updateNodeData }) => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="==">Равно (==)</SelectItem>
-          <SelectItem value="!=">Не равно (!=)</SelectItem>
-          <SelectItem value=">">Больше (&gt;)</SelectItem>
-          <SelectItem value="<">Меньше (&lt;)</SelectItem>
-          <SelectItem value=">=">Больше или равно (&gt;=)</SelectItem>
-          <SelectItem value="<=">Меньше или равно (&lt;=)</SelectItem>
+          <SelectItem value="==">{t('nodeSettings.compareEquals')}</SelectItem>
+          <SelectItem value="!=">{t('nodeSettings.compareNotEquals')}</SelectItem>
+          <SelectItem value=">">{t('nodeSettings.compareGreater')}</SelectItem>
+          <SelectItem value="<">{t('nodeSettings.compareLess')}</SelectItem>
+          <SelectItem value=">=">{t('nodeSettings.compareGreaterOrEqual')}</SelectItem>
+          <SelectItem value="<=">{t('nodeSettings.compareLessOrEqual')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

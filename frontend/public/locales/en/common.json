@@ -36,7 +36,13 @@
     "error": "An error occurred",
     "saved": "Saved",
     "deleted": "Deleted",
-    "copied": "Copied"
+    "copied": "Copied",
+    "networkTitle": "Network error",
+    "networkDescription": "Unable to connect to the server",
+    "authError": "Authorization error",
+    "downloadError": "Failed to download file.",
+    "downloadErrorWithStatus": "Failed to download file: {{status}}",
+    "serverError": "An unknown server error occurred"
   },
   "plurals": {
     "bot_one": "{{count}} bot",

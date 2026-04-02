@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const navigationGoToEntityDefinition = new NodeDefinition({
   type: 'navigation:go_to_entity',
   category: 'navigation',
-  label: '🎯 Идти к сущности',
+  label: 'Идти к сущности',
   description: 'Перемещает бота к указанной сущности (моб, животное)',
 
   computeInputs: (data) => [

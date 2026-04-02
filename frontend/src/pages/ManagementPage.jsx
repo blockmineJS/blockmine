@@ -6,8 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useDebounce } from '@/hooks/useDebounce';
+import FadeTransition from '@/components/FadeTransition';
 
 import CommandsManager from '@/components/management/CommandsManager';
 import UsersManager from '@/components/management/UsersManager';
@@ -30,8 +30,9 @@ export default function ManagementPage() {
     const [sortConfig, setSortConfig] = useState({ key: 'username', direction: 'ascending' });
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const { toast } = useToast();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('commands');
+    const [isInitialContentReady, setIsInitialContentReady] = useState(false);
 
   const handleCreateCommand = async (commandData) => {
     try {
@@ -69,14 +70,14 @@ export default function ManagementPage() {
         }
     }, [bot, debouncedSearchQuery, sortConfig]);
 
+    useEffect(() => {
+        if (!isLoading && bot) {
+            setIsInitialContentReady(true);
+        }
+    }, [isLoading, bot]);
+
     const handleSortChange = (newSortConfig) => {
         setSortConfig(newSortConfig);
-    };
-    
-    const motionVariants = {
-        initial: { opacity: 0 },
-        animate: { opacity: 1 },
-        exit: { opacity: 0 },
     };
     
     const tabContent = {
@@ -146,19 +147,18 @@ export default function ManagementPage() {
             </CardHeader>
             
             <main className="flex-grow min-h-0">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        variants={motionVariants}
-                        initial="initial"
-                        animate="animate"
-                        exit="exit"
-                        transition={{ duration: 0.2 }}
-                        className="h-full"
-                    >
-                        {tabContent[activeTab]}
-                    </motion.div>
-                </AnimatePresence>
+                <FadeTransition
+                    transitionKey={activeTab}
+                    duration={0.22}
+                    ready={isInitialContentReady}
+                    fallback={
+                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                            {t('commands.loading')}
+                        </div>
+                    }
+                >
+                    {tabContent[activeTab]}
+                </FadeTransition>
             </main>
 
             <CreateCommandDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreate={handleCreateCommand} />

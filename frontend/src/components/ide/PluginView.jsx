@@ -3,6 +3,7 @@ import { Package, GitBranch, Loader2, AlertCircle, CheckCircle, ExternalLink, Ke
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -383,7 +384,7 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
             });
 
             // Открываем PR в новой вкладке
-            window.open(result.prUrl, '_blank');
+            window.open(result.prUrl, '_blank', 'noopener,noreferrer');
         } catch (error) {
             toast({
                 variant: 'destructive',
@@ -483,18 +484,19 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                                     <Label htmlFor="github-token-repo" className="text-sm mb-2 block">
                                         Personal Access Token
                                     </Label>
-                                    <div className="flex gap-2 mb-2">
-                                        <Input
+                                    <div className="mb-2">
+                                        <PasswordInput
                                             id="github-token-repo"
-                                            type={showToken ? "text" : "password"}
                                             placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                                             value={githubToken}
                                             onChange={(e) => setGithubToken(e.target.value)}
-                                            className="font-mono text-sm"
+                                            className="w-full"
+                                            inputClassName="font-mono text-sm"
                                         />
                                         <Button
                                             variant="outline"
                                             size="icon"
+                                            className="hidden"
                                             onClick={() => setShowToken(!showToken)}
                                         >
                                             {showToken ? '🙈' : '👁️'}
@@ -788,18 +790,19 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
                                 <Label htmlFor="github-token" className="text-sm mb-2 block">
                                     Personal Access Token
                                 </Label>
-                                <div className="flex gap-2 mb-2">
-                                    <Input
+                                <div className="mb-2">
+                                    <PasswordInput
                                         id="github-token"
-                                        type={showToken ? "text" : "password"}
                                         placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                                         value={githubToken}
                                         onChange={(e) => setGithubToken(e.target.value)}
-                                        className="font-mono text-sm"
+                                        className="w-full"
+                                        inputClassName="font-mono text-sm"
                                     />
                                     <Button
                                         variant="outline"
                                         size="icon"
+                                        className="hidden"
                                         onClick={() => setShowToken(!showToken)}
                                     >
                                         {showToken ? '🙈' : '👁️'}

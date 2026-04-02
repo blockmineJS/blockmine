@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -6,24 +7,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  * Компонент настроек для data:type_check ноды
  */
 const DataTypeCheckSettings = ({ nodeId, data, updateNodeData }) => {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="p-2 border-t border-slate-700">
-      <Label>Проверить тип:</Label>
+      <Label>{t('nodeSettings.checkType')}</Label>
       <Select
         value={data.checkType || 'string'}
         onValueChange={(value) => updateNodeData(nodeId, { checkType: value })}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Выберите тип..." />
+          <SelectValue placeholder={t('nodeSettings.selectType')} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="string">String (Строка)</SelectItem>
-          <SelectItem value="number">Number (Число)</SelectItem>
-          <SelectItem value="numeric_string">Числовая строка ("100")</SelectItem>
-          <SelectItem value="boolean">Boolean (Да/Нет)</SelectItem>
-          <SelectItem value="array">Array (Массив)</SelectItem>
-          <SelectItem value="object">Object (Объект)</SelectItem>
-          <SelectItem value="null">Null/Undefined (Пусто)</SelectItem>
+          <SelectItem value="string">{t('nodeSettings.typeString')}</SelectItem>
+          <SelectItem value="number">{t('nodeSettings.typeNumber')}</SelectItem>
+          <SelectItem value="numeric_string">{t('nodeSettings.typeNumericString')}</SelectItem>
+          <SelectItem value="boolean">{t('nodeSettings.typeBoolean')}</SelectItem>
+          <SelectItem value="array">{t('nodeSettings.typeArray')}</SelectItem>
+          <SelectItem value="object">{t('nodeSettings.typeObject')}</SelectItem>
+          <SelectItem value="null">{t('nodeSettings.typeNull')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const flowWhileDefinition = new NodeDefinition({
   type: 'flow:while',
   category: 'flow',
-  label: '🔁 Цикл While',
+  label: 'Цикл While',
   description: 'Выполняет "Тело цикла" пока условие истинно',
 
   computeInputs: (data) => [

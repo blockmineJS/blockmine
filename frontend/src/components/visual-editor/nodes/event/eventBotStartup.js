@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventBotStartupDefinition = new NodeDefinition({
   type: 'event:botStartup',
   category: 'event',
-  label: '🚀 При запуске бота',
+  label: 'При запуске бота',
   description: 'Срабатывает один раз при запуске бота',
 
   computeInputs: (data) => [],

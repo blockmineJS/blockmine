@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
@@ -6,10 +7,12 @@ import { Input } from '@/components/ui/input';
  * Настройки для ноды flow:delay
  */
 function FlowDelaySettings({ nodeId, data, updateNodeData }) {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="delay">Задержка в миллисекундах (по умолчанию)</Label>
+        <Label htmlFor="delay">{t('nodeHelp.flowDelay.label')}</Label>
         <Input
           id="delay"
           type="number"
@@ -19,22 +22,21 @@ function FlowDelaySettings({ nodeId, data, updateNodeData }) {
           placeholder="1000"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Используется если пин Delay не подключен
+          {t('nodeSettings.usedWhenPinDisconnected', { pin: 'Delay' })}
         </p>
       </div>
 
       <div className="text-sm text-muted-foreground">
-        <p>Нода <strong>Delay</strong> приостанавливает выполнение графа.</p>
+        <p>{t('nodeHelp.flowDelay.intro')}</p>
         <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>1000 мс = 1 секунда</li>
-          <li>Можно указать задержку через пин или в настройках</li>
-          <li>Если значение отрицательное или не число, задержка будет 0 мс</li>
+          <li>{t('nodeHelp.flowDelay.item1')}</li>
+          <li>{t('nodeHelp.flowDelay.item2')}</li>
+          <li>{t('nodeHelp.flowDelay.item3')}</li>
         </ul>
       </div>
 
       <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-        <strong>Примечание:</strong> Задержка работает асинхронно и не блокирует
-        другие процессы приложения.
+        {t('nodeHelp.flowDelay.note')}
       </div>
     </div>
   );

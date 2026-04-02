@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const mathRandomNumberDefinition = new NodeDefinition({
   type: 'math:random_number',
   category: 'math',
-  label: '🎲 Случайное число',
+  label: 'Случайное число',
   description: 'Генерирует случайное число в заданном диапазоне',
 
   computeInputs: (data) => [

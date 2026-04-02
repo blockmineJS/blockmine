@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const eventChatDefinition = new NodeDefinition({
   type: 'event:chat',
   category: 'event',
-  label: '💬 Сообщение в чате',
+  label: 'Сообщение в чате',
   description: 'Срабатывает, когда в чат приходит сообщение',
 
   computeInputs: (data) => [],

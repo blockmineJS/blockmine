@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
@@ -6,10 +7,12 @@ import { Input } from '@/components/ui/input';
  * Настройки для ноды math:random_number
  */
 function MathRandomNumberSettings({ nodeId, data, updateNodeData }) {
+  const { t } = useTranslation('visual-editor');
+
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="min">Минимум (по умолчанию)</Label>
+        <Label htmlFor="min">{t('nodeSettings.minimumDefault')}</Label>
         <Input
           id="min"
           type="text"
@@ -18,12 +21,12 @@ function MathRandomNumberSettings({ nodeId, data, updateNodeData }) {
           placeholder="0"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Используется если пин Min не подключен
+          {t('nodeSettings.usedWhenPinDisconnected', { pin: 'Min' })}
         </p>
       </div>
 
       <div>
-        <Label htmlFor="max">Максимум (по умолчанию)</Label>
+        <Label htmlFor="max">{t('nodeSettings.maximumDefault')}</Label>
         <Input
           id="max"
           type="text"
@@ -32,13 +35,12 @@ function MathRandomNumberSettings({ nodeId, data, updateNodeData }) {
           placeholder="1"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Используется если пин Max не подключен
+          {t('nodeSettings.usedWhenPinDisconnected', { pin: 'Max' })}
         </p>
       </div>
 
       <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-        <strong>Примечание:</strong> Если min или max содержат точку или запятую,
-        будет сгенерировано float число, иначе - целое число.
+        {t('nodeHelp.mathRandom.note')}
       </div>
     </div>
   );

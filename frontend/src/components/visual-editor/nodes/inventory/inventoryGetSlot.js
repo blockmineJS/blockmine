@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const inventoryGetSlotDefinition = new NodeDefinition({
   type: 'inventory:get_slot',
   category: 'inventory',
-  label: '🎰 Инвентарь: получить слот',
+  label: 'Получить слот',
   description: 'Получает предмет в указанном слоте инвентаря',
 
   computeInputs: (data) => [

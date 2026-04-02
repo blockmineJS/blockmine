@@ -6,21 +6,219 @@ const { pluginManager } = require('../../core/services');
 
 const prisma = new PrismaClient();
 const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
+const CATALOG_TTL_MS = 5 * 60 * 1000;
+const PLUGIN_DETAIL_TTL_MS = 10 * 60 * 1000;
+const PLUGIN_CHANGELOG_TTL_MS = 10 * 60 * 1000;
 
-const getCacheBustedUrl = (url) => `${url}?t=${new Date().getTime()}`;
+let catalogCache = {
+    data: null,
+    expiresAt: 0,
+    pending: null,
+};
 
+const pluginDetailCache = new Map();
+const pluginChangelogCache = new Map();
+const GITHUB_REQUEST_TIMEOUT_MS = 10000;
 
-router.get('/catalog', async (req, res) => {
+function getGithubHeaders(extra = {}) {
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'BlockMine',
+        ...extra
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    return headers;
+}
+
+async function fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
     try {
-        const response = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchOfficialCatalog(force = false) {
+    const now = Date.now();
+
+    if (!force && catalogCache.data && catalogCache.expiresAt > now) {
+        return catalogCache.data;
+    }
+
+    if (catalogCache.pending) {
+        return catalogCache.pending;
+    }
+
+    catalogCache.pending = (async () => {
+        const response = await fetchWithTimeout(OFFICIAL_CATALOG_URL);
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`[API Error] Failed to fetch catalog from GitHub. Status: ${response.status}, Response: ${errorText}`);
             throw new Error(`GitHub returned status ${response.status}`);
         }
-        
-        res.json(await response.json());
+
+        const data = await response.json();
+        catalogCache.data = data;
+        catalogCache.expiresAt = Date.now() + CATALOG_TTL_MS;
+        return data;
+    })();
+
+    try {
+        return await catalogCache.pending;
+    } catch (error) {
+        catalogCache.data = null;
+        catalogCache.expiresAt = 0;
+        throw error;
+    } finally {
+        catalogCache.pending = null;
+    }
+}
+
+function getCachedTimedValue(cache, key) {
+    const cached = cache.get(key);
+    if (!cached) return null;
+    if (cached.expiresAt <= Date.now()) {
+        cache.delete(key);
+        return null;
+    }
+    return cached.data;
+}
+
+function setCachedTimedValue(cache, key, data, ttlMs) {
+    cache.set(key, {
+        data,
+        expiresAt: Date.now() + ttlMs,
+    });
+}
+
+function getCachedPluginDetail(pluginName) {
+    return getCachedTimedValue(pluginDetailCache, pluginName);
+}
+
+function setCachedPluginDetail(pluginName, data) {
+    setCachedTimedValue(pluginDetailCache, pluginName, data, PLUGIN_DETAIL_TTL_MS);
+}
+
+function getCachedPluginChangelog(pluginName) {
+    return getCachedTimedValue(pluginChangelogCache, pluginName);
+}
+
+function setCachedPluginChangelog(pluginName, data) {
+    setCachedTimedValue(pluginChangelogCache, pluginName, data, PLUGIN_CHANGELOG_TTL_MS);
+}
+
+function parseGithubRepoInfo(repoUrl) {
+    if (typeof repoUrl !== 'string') {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(repoUrl);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (!['github.com', 'www.github.com'].includes(hostname)) {
+            return null;
+        }
+
+        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+        if (pathParts.length < 2) {
+            return null;
+        }
+
+        return {
+            owner: pathParts[0],
+            repo: pathParts[1].replace(/\.git$/i, '')
+        };
+    } catch {
+        return null;
+    }
+}
+
+async function fetchGithubReadme(owner, repo) {
+    const response = await fetchWithTimeout(
+        `https://api.github.com/repos/${owner}/${repo}/readme`,
+        { headers: getGithubHeaders({ 'Accept': 'application/vnd.github.raw+json' }) }
+    );
+
+    if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub README] Rate limit reached while loading README for ${owner}/${repo}.`);
+            }
+        }
+        return null;
+    }
+
+    return response.text();
+}
+
+async function renderGithubMarkdown(markdown, owner, repo) {
+    if (!markdown) {
+        return null;
+    }
+
+    const response = await fetchWithTimeout('https://api.github.com/markdown', {
+        method: 'POST',
+        headers: getGithubHeaders({
+            'Accept': 'text/html',
+            'Content-Type': 'application/json'
+        }),
+        body: JSON.stringify({
+            text: markdown,
+            mode: 'gfm',
+            context: `${owner}/${repo}`
+        })
+    });
+
+    if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub Markdown] Rate limit reached while rendering ${owner}/${repo}.`);
+            }
+        }
+        return null;
+    }
+
+    return response.text();
+}
+
+async function fetchLatestGithubReleaseBody(repoUrl) {
+    const repoInfo = parseGithubRepoInfo(repoUrl);
+    if (!repoInfo) {
+        return null;
+    }
+
+    const response = await fetchWithTimeout(
+        `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/releases/latest`,
+        { headers: getGithubHeaders() }
+    );
+
+    if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub Releases] Rate limit reached while loading changelog for ${repoInfo.owner}/${repoInfo.repo}.`);
+            }
+        }
+        return null;
+    }
+
+    const release = await response.json();
+    return typeof release?.body === 'string' ? release.body : null;
+}
+
+
+router.get('/catalog', async (req, res) => {
+    try {
+        res.json(await fetchOfficialCatalog());
     } catch (error) {
         console.error(`[API Error] Could not fetch catalog URL. Reason: ${error.message}`);
         res.status(500).json({ error: 'Не удалось загрузить каталог плагинов.' });
@@ -31,9 +229,7 @@ router.post('/check-updates/:botId', authenticateUniversal, authorize('plugin:up
     try {
         const botId = parseInt(req.params.botId);
         
-        const catalogResponse = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        if (!catalogResponse.ok) throw new Error('Не удалось загрузить каталог для проверки обновлений.');
-        const catalog = await catalogResponse.json();
+        const catalog = await fetchOfficialCatalog();
 
         const updates = await pluginManager.checkForUpdates(botId, catalog);
         res.json(updates);
@@ -47,7 +243,7 @@ router.post('/update/:pluginId', authenticateUniversal, authorize('plugin:update
     try {
         const pluginId = parseInt(req.params.pluginId);
         const { targetTag } = req.body; // Получаем тег из тела запроса (если указан)
-        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag);
+        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag, req.body?.targetRepoUrl);
         res.json(updatedPlugin);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -92,6 +288,8 @@ router.get('/:id/info', authenticateUniversal, authorize('plugin:list'), async (
                 description: true,
                 sourceType: true,
                 sourceUri: true,
+                sourceRefType: true,
+                sourceRef: true,
                 isEnabled: true,
                 manifest: true,
                 settings: true,
@@ -142,6 +340,8 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
                 description: true,
                 sourceType: true,
                 sourceUri: true,
+                sourceRefType: true,
+                sourceRef: true,
                 isEnabled: true,
                 manifest: true,
                 settings: true,
@@ -176,14 +376,42 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
     }
 });
 
+router.get('/catalog/:name/changelog', async (req, res) => {
+    try {
+        const pluginName = req.params.name;
+        const cachedChangelog = getCachedPluginChangelog(pluginName);
+
+        if (cachedChangelog !== null) {
+            return res.json({ body: cachedChangelog });
+        }
+
+        const catalog = await fetchOfficialCatalog();
+        const pluginInfo = catalog.find((plugin) => plugin.name === pluginName);
+
+        if (!pluginInfo) {
+            return res.status(404).json({ error: 'Plugin not found in catalog.' });
+        }
+
+        const changelogBody = (await fetchLatestGithubReleaseBody(pluginInfo.repoUrl)) || '';
+        setCachedPluginChangelog(pluginName, changelogBody);
+
+        return res.json({ body: changelogBody });
+    } catch (error) {
+        console.error(`[API Error] /catalog/:name/changelog:`, error);
+        return res.status(500).json({ error: 'Failed to load plugin changelog.' });
+    }
+});
+
 router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;
+        const cachedDetail = getCachedPluginDetail(pluginName);
 
-        const catalogResponse = await fetch(getCacheBustedUrl(OFFICIAL_CATALOG_URL));
-        if (!catalogResponse.ok) throw new Error(`Failed to fetch catalog, status: ${catalogResponse.status}`);
+        if (cachedDetail) {
+            return res.json(cachedDetail);
+        }
 
-        const catalog = await catalogResponse.json();
+        const catalog = await fetchOfficialCatalog();
         const pluginInfo = catalog.find(p => p.name === pluginName);
 
         if (!pluginInfo) {
@@ -191,6 +419,7 @@ router.get('/catalog/:name', async (req, res) => {
         }
 
         let readmeContent = pluginInfo.description || 'Описание для этого плагина не предоставлено.';
+        let readmeHtml = null;
 
         try {
             const urlParts = new URL(pluginInfo.repoUrl);
@@ -200,19 +429,10 @@ router.get('/catalog/:name', async (req, res) => {
                 const owner = pathParts[0];
                 const repo = pathParts[1].replace('.git', '');
 
-                const readmeUrls = [
-                    `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/main/readme.md`,
-                    `https://raw.githubusercontent.com/${owner}/${repo}/master/readme.md`,
-                ];
-
-                for (const url of readmeUrls) {
-                    const readmeResponse = await fetch(getCacheBustedUrl(url));
-                    if (readmeResponse.ok) {
-                        readmeContent = await readmeResponse.text();
-                        break;
-                    }
+                const fetchedReadme = await fetchGithubReadme(owner, repo);
+                if (fetchedReadme) {
+                    readmeContent = fetchedReadme;
+                    readmeHtml = await renderGithubMarkdown(fetchedReadme, owner, repo);
                 }
             }
         } catch (readmeError) {
@@ -221,9 +441,11 @@ router.get('/catalog/:name', async (req, res) => {
 
         const finalPluginData = {
             ...pluginInfo,
-            fullDescription: readmeContent
+            fullDescription: readmeContent,
+            readmeHtml
         };
 
+        setCachedPluginDetail(pluginName, finalPluginData);
         res.json(finalPluginData);
     } catch (error) {
         console.error(`[API Error] /catalog/:name :`, error);

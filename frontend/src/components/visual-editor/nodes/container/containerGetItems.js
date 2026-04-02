@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const containerGetItemsDefinition = new NodeDefinition({
   type: 'container:get_items',
   category: 'container',
-  label: '📦 Контейнер: содержимое',
+  label: 'Контейнер: содержимое',
   description: 'Получает список предметов из открытого контейнера',
 
   computeInputs: (data) => [

@@ -7,6 +7,7 @@
   "actions": {
     "checkUpdates": "Проверить обновления",
     "installLocal": "Установить локально",
+    "installGithub": "Установить с GitHub",
     "createPlugin": "Создать плагин",
     "install": "Установить",
     "uninstall": "Удалить",
@@ -71,10 +72,104 @@
     "deleting": "Удаление..."
   },
   "localInstall": {
-    "title": "Установка локального плагина",
-    "description": "Введите путь к папке плагина на сервере",
-    "pathLabel": "Путь к плагину",
-    "pathPlaceholder": "/путь/к/папке/плагина",
+    "title": "Установить плагин локально",
+    "description": "Укажите полный путь к папке с плагином на сервере, где запущена панель. Папка должна содержать валидный package.json.",
+    "pathLabel": "Путь к папке плагина",
+    "pathPlaceholder": "Например, /home/user/my-bot-plugins/super-plugin",
+    "install": "Установить"
+  },
+  "settingsDialog": {
+    "title": "Плагин: {{name}}",
+    "description": "Управление настройками и информацией о плагине",
+    "emptySettings": "У этого плагина нет настроек.",
+    "clearData": "Очистить данные",
+    "selectPlaceholder": "Выберите значение",
+    "unknownSettingType": "Неизвестный тип настройки: {{type}}",
+    "confirmClearData": "Вы уверены, что хотите удалить все данные плагина \"{{name}}\"? Это действие необратимо.",
+    "confirmDeleteKey": "Удалить ключ \"{{key}}\"?",
+    "tabs": {
+      "settings": "Настройки",
+      "data": "Данные",
+      "info": "Информация"
+    },
+    "jsonEditor": {
+      "title": "Редактор конфигурации JSON",
+      "description": "Внесите изменения и сохраните.",
+      "descriptionWithSyntax": "Внесите изменения и сохраните. Редактор подсветит синтаксические ошибки.",
+      "invalidJson": "Ошибка: Невалидный JSON. Проверьте синтаксис.",
+      "apply": "Применить",
+      "applyAndSave": "Применить и сохранить"
+    },
+    "proxy": {
+      "selectPlaceholder": "Выберите прокси",
+      "none": "Без прокси",
+      "custom": "Настроить вручную",
+      "host": "Хост",
+      "port": "Порт",
+      "type": "Тип",
+      "username": "Имя пользователя",
+      "password": "Пароль",
+      "optional": "Опционально"
+    },
+    "permissions": {
+      "addEntries": "Недостаточно прав для добавления записей",
+      "generic": "Недостаточно прав",
+      "editData": "Недостаточно прав для изменения данных",
+      "save": "Недостаточно прав для сохранения настроек"
+    },
+    "validation": {
+      "emptyKey": "Ключ не может быть пустым",
+      "invalidJsonValue": "Значение должно быть валидным JSON"
+    },
+    "data": {
+      "searchPlaceholder": "Поиск по ключу",
+      "refresh": "Обновить",
+      "addEntry": "Добавить запись",
+      "empty": "Нет данных",
+      "editEntry": "Редактировать запись",
+      "newEntry": "Новая запись",
+      "editEntryDescription": "Измените JSON значение и сохраните.",
+      "newEntryDescription": "Укажите ключ и JSON значение.",
+      "keyLabel": "Ключ",
+      "keyPlaceholder": "Например, state",
+      "jsonValue": "JSON значение",
+      "columns": {
+        "key": "Ключ",
+        "updated": "Обновлено",
+        "actions": "Действия"
+      }
+    },
+    "toasts": {
+      "savedSettings": "Настройки плагина сохранены.",
+      "clearedData": "Данные плагина успешно очищены.",
+      "entryDeleted": "Запись удалена",
+      "entrySaved": "Запись сохранена"
+    },
+    "loadError": "Не удалось загрузить настройки плагина."
+  },
+  "githubInstall": {
+    "title": "Установка с GitHub",
+    "description": "Вставьте ссылку на публичный GitHub-репозиторий. В нем должен быть валидный package.json плагина.",
+    "previewStepDescription": "Проверьте репозиторий, при необходимости выберите версию и установите плагин.",
+    "urlLabel": "URL репозитория",
+    "urlPlaceholder": "https://github.com/owner/repository",
+    "urlHint": "Вставьте прямую ссылку на GitHub-репозиторий. Предпросмотр откроется на следующем шаге.",
+    "loadPreview": "Загрузить предпросмотр",
+    "loadingPreview": "Загрузка предпросмотра...",
+    "continue": "Далее",
+    "back": "Назад",
+    "previewTitle": "Предпросмотр репозитория",
+    "defaultBranch": "Основная ветка",
+    "latestRelease": "Последний релиз",
+    "selectVersion": "Версия для установки",
+    "versionLatest": "Актуальное состояние ветки",
+    "versionRelease": "Последний релиз",
+    "versionTagPrefix": "Тег",
+    "versionHint": "Оставьте актуальное состояние ветки для обычной установки или выберите релизный тег.",
+    "noTags": "Теги не найдены",
+    "readmeTitle": "README",
+    "noReadme": "GitHub API не вернул README для этого репозитория.",
+    "previewHint": "Загрузите предпросмотр репозитория, чтобы выбрать релиз или тег перед установкой.",
     "install": "Установить"
   },
   "createDialog": {
@@ -98,6 +193,10 @@
     "categories": "Категории",
     "all": "Все",
     "noResults": "Плагины не найдены"
+  },
+  "toasts": {
+    "statusUpdating": "Обновляем статус плагина...",
+    "statusUpdated": "Статус плагина обновлен."
   },
   "details": {
     "version": "Версия",

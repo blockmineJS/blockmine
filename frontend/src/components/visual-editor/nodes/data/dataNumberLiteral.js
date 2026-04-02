@@ -7,7 +7,7 @@ import { NodeDefinition } from '../../core/registry';
 export const dataNumberLiteralDefinition = new NodeDefinition({
   type: 'data:number_literal',
   category: 'data',
-  label: '🔢 Число',
+  label: 'Число',
   description: 'Простое числовое значение.',
 
   computeInputs: (data) => [
