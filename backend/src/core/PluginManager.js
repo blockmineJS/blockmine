@@ -13,7 +13,7 @@ const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 
 const TELEMETRY_ENABLED = true;
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
+const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
 
 function normalizeGithubRepoUrl(repoUrl) {
     if (!repoUrl || typeof repoUrl !== 'string') return null;
@@ -94,6 +94,83 @@ async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
         return null;
     } finally {
         clearTimeout(timeoutId);
+    }
+}
+
+async function fetchGithubResponseWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers: getGithubHeaders(options.headers || {}),
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            const error = new Error(`GitHub request failed with status ${response.status}.`);
+            error.status = response.status;
+            throw error;
+        }
+
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            const timeoutError = new Error('GitHub request timed out.');
+            timeoutError.name = 'AbortError';
+            throw timeoutError;
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function fetchGithubRepoInfo(repoUrl) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    return fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}`);
+}
+
+async function downloadGithubArchive(repoUrl, ref) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) {
+        throw new Error('Invalid GitHub repository URL.');
+    }
+
+    const response = await fetchGithubResponseWithTimeout(
+        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/zipball/${encodeURIComponent(ref)}`,
+        { headers: { Accept: 'application/vnd.github+json' } },
+        15000
+    );
+
+    return response;
+}
+
+async function fetchGithubPackageVersion(repoUrl, ref = null) {
+    const ownerRepo = parseGithubOwnerRepo(repoUrl);
+    if (!ownerRepo) return null;
+
+    const resolvedRef = ref || (await fetchGithubRepoInfo(repoUrl))?.default_branch;
+    if (!resolvedRef) return null;
+
+    const packageJsonData = await fetchJsonWithTimeout(
+        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/contents/package.json?ref=${encodeURIComponent(resolvedRef)}`
+    );
+
+    if (!packageJsonData?.content) {
+        return null;
+    }
+
+    try {
+        const packageJsonRaw = Buffer.from(packageJsonData.content, packageJsonData.encoding || 'base64').toString('utf8');
+        const packageJson = JSON.parse(packageJsonRaw);
+        return typeof packageJson?.version === 'string' ? packageJson.version : null;
+    } catch {
+        return null;
     }
 }
 
@@ -307,33 +384,30 @@ class PluginManager {
         try {
             const url = new URL(repoUrl);
             const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
+            const repoInfo = tag ? null : await fetchGithubRepoInfo(repoUrl);
+            if (repoInfo?.default_branch) {
+                sourceRef = repoInfo.default_branch;
+            }
             
             let response;
             
-            // Если указан тег - скачиваем конкретный релиз
             if (tag) {
-                const archiveUrlTag = `https://github.com/${repoPath}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
                 console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
                 try {
-                    response = await fetch(archiveUrlTag);
+                    response = await downloadGithubArchive(repoUrl, tag);
                 } catch (err) {
                     throw new Error(`Ошибка сети при скачивании релиза ${tag}: ${err.message || err}`);
                 }
-                if (!response.ok) {
-                    throw new Error(`Не удалось скачать релиз ${tag}. Статус: ${response.status}. Возможно, тег не существует.`);
-                }
             } else {
-                // Если тег не указан - скачиваем последний коммит из main/master (старое поведение)
-                const archiveUrlMain = `https://github.com/${repoPath}/archive/refs/heads/main.zip`;
-                const archiveUrlMaster = `https://github.com/${repoPath}/archive/refs/heads/master.zip`;
-
-                response = await fetch(archiveUrlMain);
-                if (!response.ok) {
-                    console.log(`[PluginManager] Ветка 'main' не найдена для ${repoUrl}, пробую 'master'...`);
-                    sourceRef = 'master';
-                    response = await fetch(archiveUrlMaster);
-                    if (!response.ok) {
-                        throw new Error(`Не удалось скачать архив плагина. Статус: ${response.status}`);
+                try {
+                    response = await downloadGithubArchive(repoUrl, sourceRef);
+                } catch (err) {
+                    if (!repoInfo && sourceRef !== 'master') {
+                        console.log(`[PluginManager] Ветка '${sourceRef}' не найдена для ${repoUrl}, пробую 'master'...`);
+                        sourceRef = 'master';
+                        response = await downloadGithubArchive(repoUrl, sourceRef);
+                    } else {
+                        throw new Error(`Не удалось скачать архив плагина: ${err.message || err}`);
                     }
                 }
             }
@@ -540,6 +614,7 @@ class PluginManager {
                     catalogMapByName.get(String(plugin.name).toLowerCase()) ||
                     (repoName ? catalogMapByRepoName.get(repoName) : null);
 
+                const targetRepoUrl = catalogInfo?.repoUrl || normalizedSourceUri || normalizeGithubRepoUrl(plugin.sourceUri) || plugin.sourceUri;
                 let latestTagRaw =
                     catalogInfo?.latestTag ||
                     catalogInfo?.recommendedVersion ||
@@ -547,23 +622,29 @@ class PluginManager {
                     catalogInfo?.latestVersion ||
                     catalogInfo?.tag;
 
-                if (!catalogInfo) continue;
-
                 if (!latestTagRaw) {
-                    const cacheKey = normalizedSourceUri || plugin.sourceUri || plugin.name;
+                    const cacheKey = targetRepoUrl || plugin.name;
                     if (latestTagCache.has(cacheKey)) {
                         latestTagRaw = latestTagCache.get(cacheKey);
                     } else {
-                        const fetchedTag = catalogInfo.repoUrl ? await fetchLatestGithubVersionTag(catalogInfo.repoUrl) : null;
+                        const fetchedTag = targetRepoUrl ? await fetchLatestGithubVersionTag(targetRepoUrl) : null;
                         latestTagCache.set(cacheKey, fetchedTag);
                         latestTagRaw = fetchedTag;
                     }
                 }
 
-                if (!latestTagRaw) continue;
+                let latestVersionRaw = latestTagRaw;
+                if (!latestVersionRaw && targetRepoUrl) {
+                    latestVersionRaw = await fetchGithubPackageVersion(
+                        targetRepoUrl,
+                        plugin.sourceRefType === 'branch' ? plugin.sourceRef : null
+                    );
+                }
+
+                if (!latestVersionRaw) continue;
                 
                 const localSemver = semver.coerce(plugin.version);
-                const remoteSemver = semver.coerce(latestTagRaw);
+                const remoteSemver = semver.coerce(latestVersionRaw);
                 if (!localSemver || !remoteSemver) continue;
 
                 if (semver.gt(remoteSemver.version, localSemver.version)) {
@@ -573,8 +654,8 @@ class PluginManager {
                         sourceUri: plugin.sourceUri,
                         currentVersion: localSemver.version,
                         recommendedVersion: remoteSemver.version,
-                        latestTag: catalogInfo?.latestTag || latestTagRaw, // 🏷️ Добавляем тег для использования при обновлении
-                        targetRepoUrl: catalogInfo?.repoUrl || plugin.sourceUri,
+                        latestTag: catalogInfo?.latestTag || latestTagRaw || null,
+                        targetRepoUrl,
                     });
                 }
             } catch (error) {

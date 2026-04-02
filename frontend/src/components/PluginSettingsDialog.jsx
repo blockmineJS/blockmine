@@ -182,7 +182,12 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
             return (
                 <div className="space-y-2">
                     <Label htmlFor={id}>{config.label}</Label>
-                    <Textarea id={id} value={Array.isArray(value) ? value.join('\n') : ''} onChange={(e) => onChange(settingKey, e.target.value.split('\n'))} disabled={readOnly} />
+                    <Textarea
+                        id={id}
+                        value={Array.isArray(value) ? value.join('\n') : ''}
+                        onChange={(e) => onChange(settingKey, e.target.value === '' ? [] : e.target.value.split(/\r?\n/))}
+                        disabled={readOnly}
+                    />
                     {config.description && <p className="text-sm text-muted-foreground">{config.description}</p>}
                 </div>
             );

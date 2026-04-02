@@ -56,7 +56,7 @@ async function fetchOfficialCatalog(force = false) {
     }
 
     catalogCache.pending = (async () => {
-        const response = await fetch(OFFICIAL_CATALOG_URL);
+        const response = await fetchWithTimeout(OFFICIAL_CATALOG_URL);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -65,19 +65,19 @@ async function fetchOfficialCatalog(force = false) {
         }
 
         const data = await response.json();
-        catalogCache = {
-            data,
-            expiresAt: Date.now() + CATALOG_TTL_MS,
-            pending: null,
-        };
+        catalogCache.data = data;
+        catalogCache.expiresAt = Date.now() + CATALOG_TTL_MS;
         return data;
     })();
 
     try {
         return await catalogCache.pending;
     } catch (error) {
-        catalogCache.pending = null;
+        catalogCache.data = null;
+        catalogCache.expiresAt = 0;
         throw error;
+    } finally {
+        catalogCache.pending = null;
     }
 }
 
@@ -141,21 +141,22 @@ function parseGithubRepoInfo(repoUrl) {
 }
 
 async function fetchGithubReadme(owner, repo) {
-    const readmeUrls = [
-        `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
-        `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`,
-        `https://raw.githubusercontent.com/${owner}/${repo}/main/readme.md`,
-        `https://raw.githubusercontent.com/${owner}/${repo}/master/readme.md`,
-    ];
+    const response = await fetchWithTimeout(
+        `https://api.github.com/repos/${owner}/${repo}/readme`,
+        { headers: getGithubHeaders({ 'Accept': 'application/vnd.github.raw+json' }) }
+    );
 
-    for (const url of readmeUrls) {
-        const readmeResponse = await fetchWithTimeout(url, { headers: getGithubHeaders() });
-        if (readmeResponse.ok) {
-            return readmeResponse.text();
+    if (!response.ok) {
+        if (response.status === 403) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining === '0') {
+                console.warn(`[GitHub README] Rate limit reached while loading README for ${owner}/${repo}.`);
+            }
         }
+        return null;
     }
 
-    return null;
+    return response.text();
 }
 
 async function renderGithubMarkdown(markdown, owner, repo) {

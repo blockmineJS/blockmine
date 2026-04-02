@@ -13,6 +13,7 @@ import PluginListItem from '@/components/PluginListItem';
 import * as Icons from 'lucide-react';
 import { FixedSizeGrid, FixedSizeList } from 'react-window';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { toast } from '@/hooks/use-toast';
 import {
   PLUGIN_BROWSER_CATEGORIES,
   pluginMatchesCategory,
@@ -91,6 +92,9 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
     try {
       await installPluginFromRepo(botId, pluginToInstall.repoUrl, pluginToInstall.name);
       onInstallSuccess();
+      return true;
+    } catch {
+      return false;
     } finally {
       setInstallingPlugins((previous) => {
         const next = new Set(previous);
@@ -101,34 +105,63 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   };
 
   const handleInstall = async (pluginToInstall) => {
-    const requiredDependencyNames = pluginToInstall.dependencies || [];
-    if (requiredDependencyNames.length === 0) {
-      await installSinglePlugin(pluginToInstall);
-      return;
-    }
+    try {
+      const requiredDependencyNames = pluginToInstall.dependencies || [];
+      if (requiredDependencyNames.length === 0) {
+        await installSinglePlugin(pluginToInstall);
+        return;
+      }
 
-    const installedPluginNames = new Set(installedPlugins.map((plugin) => plugin.name));
-    const catalogMapByName = new Map(catalog.map((plugin) => [plugin.name, plugin]));
+      const installedPluginNames = new Set(installedPlugins.map((plugin) => plugin.name));
+      const catalogMapByName = new Map(catalog.map((plugin) => [plugin.name, plugin]));
 
-    const allDependenciesWithStatus = requiredDependencyNames
-      .map((dependencyName) => {
+      const unresolvedDependencies = [];
+      const allDependenciesWithStatus = requiredDependencyNames.map((dependencyName) => {
         const pluginInfo = catalogMapByName.get(dependencyName);
-        return pluginInfo ? { ...pluginInfo, isInstalled: installedPluginNames.has(dependencyName) } : null;
-      })
-      .filter(Boolean);
+        if (!pluginInfo) {
+          unresolvedDependencies.push(dependencyName);
+          return {
+            id: `missing:${dependencyName}`,
+            name: dependencyName,
+            description: t('dependencyDialog.unresolvedDependency', {
+              name: dependencyName,
+              defaultValue: 'Dependency "{{name}}" was not found in the official catalog.',
+            }),
+            isInstalled: false,
+            isMissingFromCatalog: true,
+          };
+        }
 
-    const missingDependencies = allDependenciesWithStatus.filter((dependency) => !dependency.isInstalled);
-
-    if (missingDependencies.length > 0) {
-      setDependencyDialogState({
-        isOpen: true,
-        mainPlugin: pluginToInstall,
-        dependencies: allDependenciesWithStatus,
+        return { ...pluginInfo, isInstalled: installedPluginNames.has(dependencyName), isMissingFromCatalog: false };
       });
-      return;
-    }
 
-    await installSinglePlugin(pluginToInstall);
+      if (unresolvedDependencies.length > 0) {
+        toast({
+          variant: 'destructive',
+          title: t('dependencyDialog.unresolvedTitle', { defaultValue: 'Missing dependencies' }),
+          description: t('dependencyDialog.unresolvedDescription', {
+            dependencies: unresolvedDependencies.join(', '),
+            defaultValue: 'These dependencies are not in the official catalog: {{dependencies}}',
+          }),
+        });
+        return;
+      }
+
+      const missingDependencies = allDependenciesWithStatus.filter((dependency) => !dependency.isInstalled);
+
+      if (missingDependencies.length > 0) {
+        setDependencyDialogState({
+          isOpen: true,
+          mainPlugin: pluginToInstall,
+          dependencies: allDependenciesWithStatus,
+        });
+        return;
+      }
+
+      await installSinglePlugin(pluginToInstall);
+    } catch {
+      // apiHelper already reports user-facing errors; keep the handler from bubbling an unhandled promise
+    }
   };
 
   const confirmAndInstallAll = async () => {

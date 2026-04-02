@@ -38,6 +38,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
   const hasDependencies = plugin.dependencies && plugin.dependencies.length > 0;
   const [isHovered, setIsHovered] = useState(false);
   const safeRepoUrl = getSafeExternalUrl(plugin.repoUrl);
+  const pluginDetailPath = `/bots/${botId}/plugins/view/${encodeURIComponent(plugin.name)}`;
   const authorLabel = plugin.author || t('labels.unknownAuthor', { defaultValue: 'Неизвестный автор' });
   const description = plugin.description || t('labels.noDescription', { defaultValue: 'Нет описания.' });
 
@@ -72,7 +73,7 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
         <CardHeader className="relative z-10 px-5 pb-2 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group/title">
+              <Link to={pluginDetailPath} className="group/title">
                 <CardTitle className="flex items-start gap-2 text-[1.15rem] leading-tight transition-colors group-hover/title:text-primary">
                   <span
                     className={cn(

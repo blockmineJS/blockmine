@@ -1,6 +1,6 @@
 import i18n from '@/i18n';
 import { toast } from '@/hooks/use-toast';
-import { apiHelper } from '@/lib/api';
+import { apiHelper, PLUGIN_STATS_API_URL } from '@/lib/api';
 import { produce } from 'immer';
 
 const translatePlugins = (key, defaultValue, options = {}) =>
@@ -77,17 +77,15 @@ const enrichCatalog = (catalogData = [], statsMap = new Map()) =>
   catalogData
     .map((plugin) => ({
       ...plugin,
-      downloads: statsMap.get(plugin.name) || plugin.downloads || 0,
+      downloads: statsMap.has(plugin.name) ? statsMap.get(plugin.name) : (plugin.downloads ?? 0),
       author: resolveAuthor(plugin.author, getGithubAuthorFromUrl(plugin.repoUrl)),
     }))
-    .sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
+    .sort((a, b) => (b.downloads ?? 0) - (a.downloads ?? 0))
     .map((plugin, index) => ({
       ...plugin,
       isTop3: index < 3,
       topPosition: index + 1,
     }));
-
-const PLUGIN_STATS_URL = (import.meta.env.VITE_PLUGIN_STATS_URL || '/api/stats').trim();
 
 export const createPluginSlice = (set, get) => {
   const INSTALLED_PLUGINS_CACHE_TTL = 30 * 1000;
@@ -99,6 +97,7 @@ export const createPluginSlice = (set, get) => {
     pluginUpdates: {},
     pluginUpdateCounts: loadStoredPluginUpdateCounts(),
     pluginCatalog: [],
+    pluginCatalogRequestId: 0,
     isCatalogLoading: true,
 
     optimisticallyIncrementDownloadCount: (pluginName) => {
@@ -116,16 +115,21 @@ export const createPluginSlice = (set, get) => {
         return;
       }
 
-      set({ isCatalogLoading: true });
+      const requestId = Date.now();
+      set({ isCatalogLoading: true, pluginCatalogRequestId: requestId });
 
       try {
         const catalogData = await apiHelper('/api/plugins/catalog');
+        if (get().pluginCatalogRequestId !== requestId) {
+          return;
+        }
+
         set({ pluginCatalog: enrichCatalog(catalogData), isCatalogLoading: false });
 
-        fetch(PLUGIN_STATS_URL)
+        fetch(PLUGIN_STATS_API_URL)
           .then((response) => (response.ok ? response.json() : null))
           .then((statsData) => {
-            if (!statsData) return;
+            if (!statsData || get().pluginCatalogRequestId !== requestId) return;
 
             const statsMap = new Map(
               (statsData?.plugins || []).map((plugin) => [plugin.pluginName, plugin.downloadCount])
@@ -136,8 +140,14 @@ export const createPluginSlice = (set, get) => {
             console.warn('Не удалось загрузить статистику скачиваний плагинов:', statsError.message);
           });
       } catch (error) {
+        if (get().pluginCatalogRequestId !== requestId) {
+          return;
+        }
         console.error('Не удалось загрузить каталог плагинов:', error.message);
-        set({ pluginCatalog: [], isCatalogLoading: false });
+        set((state) => ({
+          pluginCatalog: state.pluginCatalog.length > 0 ? state.pluginCatalog : [],
+          isCatalogLoading: false,
+        }));
       }
     },
 

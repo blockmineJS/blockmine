@@ -116,8 +116,13 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
     // Извлекаем repo ID из URL
     const getRepoId = () => {
         if (!safeRepoUrl) return '';
-        const match = safeRepoUrl.match(/github\.com[\/:](.+?)\/(.+?)(\.git)?$/);
-        return match ? match[2].replace('.git', '') : '';
+        try {
+            const parsed = new URL(safeRepoUrl);
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+            return pathParts[1]?.replace(/\.git$/i, '') || '';
+        } catch {
+            return '';
+        }
     };
 
     // Проверяем доступна ли иконка
@@ -160,7 +165,7 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                                         size="sm"
                                         onClick={() => {
                                             if (!safePrUrl) return;
-                                            window.open(safePrUrl, '_blank');
+                                            window.open(safePrUrl, '_blank', 'noopener,noreferrer');
                                         }}
                                         className="w-full"
                                         disabled={!safePrUrl}

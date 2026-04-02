@@ -6,7 +6,58 @@ const translateCommon = (key, defaultValue, options = {}) =>
   i18n.t(key, { ns: 'common', defaultValue, ...options });
 
 const API_BASE = '/api';
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
+
+const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '');
+
+const resolveGraphStoreApiBase = () => {
+  const configuredBase = (import.meta.env.VITE_GRAPH_STORE_API_BASE || import.meta.env.VITE_STATS_SERVER_URL || '').trim();
+  if (configuredBase) {
+    return trimTrailingSlash(configuredBase);
+  }
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:3000`;
+  }
+
+  return 'http://localhost:3000';
+};
+
+const GRAPH_STORE_API_BASE = resolveGraphStoreApiBase();
+const PLUGIN_STATS_API_URL = (import.meta.env.VITE_PLUGIN_STATS_URL || '/api/stats').trim();
+
+export const getGraphStoreApiUrl = (path = '') => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${GRAPH_STORE_API_BASE}${normalizedPath}`;
+};
+
+const getBinaryErrorMessage = async (response) => {
+  const fallbackMessage = translateCommon(
+    'messages.downloadErrorWithStatus',
+    'Ошибка при скачивании файла: {{status}}',
+    { status: response.statusText || response.status }
+  );
+
+  try {
+    const errorText = await response.text();
+    if (!errorText) {
+      return fallbackMessage;
+    }
+
+    try {
+      const errData = JSON.parse(errorText);
+      return (
+        errData.error ||
+        errData.message ||
+        translateCommon('messages.downloadError', 'Ошибка при скачивании файла.')
+      );
+    } catch {
+      return fallbackMessage;
+    }
+  } catch {
+    return fallbackMessage;
+  }
+};
 
 export const apiHelper = async (url, options = {}, successMessage) => {
   const token = useAppStore.getState().token;
@@ -32,23 +83,7 @@ export const apiHelper = async (url, options = {}, successMessage) => {
     const contentType = response.headers.get('Content-Type');
     if (contentType?.includes('application/zip') || contentType?.includes('application/octet-stream')) {
       if (!response.ok) {
-        try {
-          const errData = await response.json();
-          throw new Error(
-            errData.error ||
-              translateCommon('messages.downloadError', 'Ошибка при скачивании файла.')
-          );
-        } catch (error) {
-          if (error instanceof Error && error.message) {
-            throw error;
-          }
-
-          throw new Error(
-            translateCommon('messages.downloadErrorWithStatus', 'Ошибка при скачивании файла: {{status}}', {
-              status: response.statusText,
-            })
-          );
-        }
+        throw new Error(await getBinaryErrorMessage(response));
       }
 
       return await response.blob();
@@ -73,11 +108,7 @@ export const apiHelper = async (url, options = {}, successMessage) => {
           logout();
         }
 
-        throw new Error(
-          data.error ||
-            data.message ||
-            translateCommon('messages.authError', 'Ошибка авторизации')
-        );
+        throw new Error(data.error || data.message || translateCommon('messages.authError', 'Ошибка авторизации'));
       }
 
       throw new Error(
@@ -132,4 +163,4 @@ export const search = async (query) => {
   }
 };
 
-export { API_BASE, STATS_SERVER_URL };
+export { API_BASE, GRAPH_STORE_API_BASE, PLUGIN_STATS_API_URL };

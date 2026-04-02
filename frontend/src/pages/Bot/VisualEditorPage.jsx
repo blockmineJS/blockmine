@@ -36,7 +36,7 @@ import { Upload, Share2, Zap, Bug, Plus, Minus, ScanSearch, Lock, LockOpen } fro
 import { toast } from 'sonner';
 import { initializeVisualEditor } from '@/components/visual-editor/initVisualEditor';
 import NodeRegistry from '@/components/visual-editor/nodes';
-import { apiHelper } from '@/lib/api';
+import { apiHelper, getGraphStoreApiUrl } from '@/lib/api';
 import CollaborativeUsersHeader from '@/components/visual-editor/CollaborativeUsersHeader';
 import CollaborativeCursors from '@/components/visual-editor/CollaborativeCursors';
 import CollaborativeConnections from '@/components/visual-editor/CollaborativeConnections';
@@ -47,8 +47,6 @@ import { cn } from '@/lib/utils';
 import { AnimatePresence } from 'framer-motion';
 
 initializeVisualEditor();
-
-const STATS_SERVER_URL = 'http://185.65.200.184:3000';
 
 const nodeTypes = (() => {
     const types = {};
@@ -375,7 +373,7 @@ function BotVisualEditorPage() {
 
     const loadCategories = async () => {
         try {
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/categories`);
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/categories'));
             const data = await response.json();
             setCategories(data);
         } catch (error) {
@@ -486,7 +484,7 @@ function BotVisualEditorPage() {
             const graphType = editorType === 'command' ? 'COMMAND' : 'EVENT';
             const categoryId = graphType === 'COMMAND' ? 1 : 2;
 
-            const response = await fetch(`${STATS_SERVER_URL}/api/graphs/publish`, {
+            const response = await fetch(getGraphStoreApiUrl('/api/graphs/publish'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -52,7 +52,13 @@ const VariablesPanel = () => {
                         />
                         </div>
                         <div className="flex justify-end border-t pt-2">
-                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeVariable(variable.id)}>
+                         <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={() => removeVariable(variable.id)}
+                            aria-label={t('variables.removeVariable', { defaultValue: 'Удалить переменную' })}
+                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
                         </div>

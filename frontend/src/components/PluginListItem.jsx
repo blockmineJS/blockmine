@@ -59,6 +59,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
   const prevDownloads = useRef(plugin.downloads);
   const isPopular = plugin.isTop3;
   const safeRepoUrl = getSafeExternalUrl(plugin.repoUrl);
+  const pluginDetailPath = `/bots/${botId}/plugins/view/${encodeURIComponent(plugin.name)}`;
   const authorLabel = plugin.author || t('labels.unknownAuthor', { defaultValue: 'Неизвестный автор' });
   const description = plugin.description || t('labels.noDescription', { defaultValue: 'Нет описания.' });
 
@@ -101,7 +102,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
         <div className="min-w-0 flex-grow">
           <div className="mb-2 flex items-start justify-between">
             <div className="min-w-0 flex-grow">
-              <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="group">
+              <Link to={pluginDetailPath} className="group">
                 <h3 className="inline-flex items-center gap-2 text-lg font-semibold transition-colors group-hover:text-primary">
                   {plugin.displayName || plugin.name}
                   {plugin.verified && <SparklesIcon className="h-4 w-4 text-blue-500" />}

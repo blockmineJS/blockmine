@@ -221,7 +221,7 @@ function SettingField({ settingKey, config, value, onChange, readOnly }) {
                     <Textarea
                         id={id}
                         value={Array.isArray(value) ? value.join('\n') : ''}
-                        onChange={(e) => onChange(settingKey, e.target.value.split('\n'))}
+                        onChange={(e) => onChange(settingKey, e.target.value === '' ? [] : e.target.value.split(/\r?\n/))}
                         rows={3}
                         disabled={readOnly}
                     />

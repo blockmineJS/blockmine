@@ -384,7 +384,7 @@ export default function PluginView({ botId, pluginName, onRefresh }) {
             });
 
             // Открываем PR в новой вкладке
-            window.open(result.prUrl, '_blank');
+            window.open(result.prUrl, '_blank', 'noopener,noreferrer');
         } catch (error) {
             toast({
                 variant: 'destructive',

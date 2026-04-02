@@ -304,7 +304,7 @@ function InstalledPluginCard({
           <div className="mb-1 flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="cursor-pointer truncate text-lg font-semibold transition-colors hover:text-primary">
+                <Link to={`/bots/${botId}/plugins/view/${encodeURIComponent(plugin.name)}`} className="cursor-pointer truncate text-lg font-semibold transition-colors hover:text-primary">
                   {plugin.displayName || plugin.name}
                 </Link>
               </TooltipTrigger>
@@ -441,7 +441,7 @@ function InstalledPluginCard({
             <div className="min-w-0 flex-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link to={`/bots/${botId}/plugins/view/${plugin.name}`} className="block">
+                  <Link to={`/bots/${botId}/plugins/view/${encodeURIComponent(plugin.name)}`} className="block">
                     <CardTitle className="line-clamp-2 cursor-pointer text-lg leading-tight transition-colors hover:text-primary">
                       {plugin.displayName || plugin.name}
                     </CardTitle>
