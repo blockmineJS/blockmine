@@ -8,6 +8,26 @@ import MinecraftHotbar from '@/components/minecraft/MinecraftHotbar';
 import { loadBlockTextures, getBlockMaterial, isEntityBlock } from './blockTextureLoader';
 import { getEntityGeometry, getEntityMaterial, isEntityBlock as isEntityModel } from './entityModels';
 import { useCoordinatePickerStore } from '@/stores/coordinatePickerStore';
+import FadeTransition from '@/components/FadeTransition';
+
+const getThemeThreeColor = (variableName, fallback) => {
+    if (typeof window === 'undefined') return new THREE.Color(fallback);
+
+    const rawValue = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+    if (!rawValue) return new THREE.Color(fallback);
+
+    const normalized = rawValue.replace(/\s+/g, ' ').split(' ');
+    if (normalized.length < 3) return new THREE.Color(fallback);
+
+    const [h, s, l] = normalized;
+    const color = new THREE.Color();
+    color.setStyle(`hsl(${h}, ${s}, ${l})`);
+    return color;
+};
+
+const VIEWER_ERROR_TRANSLATION_KEYS = {
+    'Bot not running': 'errors.botNotRunning',
+};
 
 const MinecraftViewerTab = () => {
     const { t } = useTranslation('minecraft-viewer');
@@ -140,8 +160,11 @@ const MinecraftViewerTab = () => {
         renderer.setPixelRatio(window.devicePixelRatio || 1);
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 30, 60);
+        const sceneBackground = getThemeThreeColor('--background', 0x0a0a0f);
+        const fogColor = sceneBackground.clone();
+        renderer.setClearColor(sceneBackground, 1);
+        scene.background = sceneBackground;
+        scene.fog = new THREE.Fog(fogColor, 30, 60);
 
         const camera = new THREE.PerspectiveCamera(
             75,
@@ -1062,231 +1085,272 @@ const MinecraftViewerTab = () => {
         });
     };
 
-    if (error) {
-        return (
-            <div className="flex items-center justify-center h-full bg-gray-900">
-                <div className="bg-red-900 text-red-200 p-6 rounded">
-                    <h2 className="text-xl font-bold mb-2">{t('error')}</h2>
-                    <p>{error}</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!connected) {
-        return (
-            <div className="flex items-center justify-center h-full bg-gray-900">
-                <div className="text-white">{t('connecting')}</div>
-            </div>
-        );
-    }
-
     const updateSetting = (key, value) => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
 
+    const applySceneTheme = () => {
+        const scene = sceneRef.current;
+        if (!scene) return;
+
+        const sceneBackground = getThemeThreeColor('--background', 0x0a0a0f);
+        const fogColor = sceneBackground.clone();
+        const renderer = rendererRef.current;
+
+        scene.background = sceneBackground;
+        renderer?.setClearColor(sceneBackground, 1);
+
+        if (scene.fog) {
+            scene.fog.color.copy(fogColor);
+        } else {
+            scene.fog = new THREE.Fog(fogColor, 30, 60);
+        }
+    };
+
+    useEffect(() => {
+        if (!connected) return;
+
+        applySceneTheme();
+
+        const observer = new MutationObserver(() => {
+            applySceneTheme();
+        });
+
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'style'],
+        });
+
+        return () => observer.disconnect();
+    }, [connected]);
+
+    const localizedError = error
+        ? t(VIEWER_ERROR_TRANSLATION_KEYS[error] || error, {
+            defaultValue: error,
+        })
+        : null;
+
     return (
-        <div className="relative w-full h-full overflow-hidden bg-black">
-            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-
-            {/* Кнопка настроек */}
-            <button
-                onClick={() => setSettingsOpen(!settingsOpen)}
-                className="absolute top-4 left-4 bg-black bg-opacity-70 hover:bg-opacity-90 text-white p-2 rounded z-10"
-                title={t('settingsButton')}
-            >
-                ⚙️
-            </button>
-
-            {/* Панель настроек */}
-            {settingsOpen && (
-                <div className="absolute top-14 left-4 bg-black bg-opacity-90 text-white p-4 rounded w-72 z-20">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold">{t('settings.title')}</h3>
-                        <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-white">✕</button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {/* Радиус отображения */}
-                        <div>
-                            <label className="block text-sm mb-1">
-                                {t('settings.renderDistance', { value: settings.renderDistance })}
-                            </label>
-                            <input
-                                type="range"
-                                min="8"
-                                max="64"
-                                step="4"
-                                value={settings.renderDistance}
-                                onChange={(e) => updateSetting('renderDistance', parseInt(e.target.value))}
-                                className="w-full accent-blue-500"
-                            />
-                        </div>
-
-                        {/* Сила синхронизации */}
-                        <div>
-                            <label className="block text-sm mb-1">
-                                {t('settings.correctionSpeed', { value: settings.correctionSpeed.toFixed(1) })}
-                            </label>
-                            <input
-                                type="range"
-                                min="0.2"
-                                max="3"
-                                step="0.1"
-                                value={settings.correctionSpeed}
-                                onChange={(e) => updateSetting('correctionSpeed', parseFloat(e.target.value))}
-                                className="w-full accent-blue-500"
-                            />
-                            <div className="text-xs text-gray-400 mt-1">
-                                {t('settings.correctionSpeedHint')}
-                            </div>
-                        </div>
-
-                        {/* Чувствительность мыши */}
-                        <div>
-                            <label className="block text-sm mb-1">
-                                {t('settings.sensitivity', { value: settings.sensitivity.toFixed(1) })}
-                            </label>
-                            <input
-                                type="range"
-                                min="0.2"
-                                max="3"
-                                step="0.1"
-                                value={settings.sensitivity}
-                                onChange={(e) => updateSetting('sensitivity', parseFloat(e.target.value))}
-                                className="w-full accent-blue-500"
-                            />
-                        </div>
-
-                        {/* Чекбоксы */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.localMovement}
-                                    onChange={(e) => updateSetting('localMovement', e.target.checked)}
-                                    className="accent-blue-500"
-                                />
-                                <span className="text-sm">{t('settings.localMovement')}</span>
-                            </label>
-
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.showDebug}
-                                    onChange={(e) => updateSetting('showDebug', e.target.checked)}
-                                    className="accent-blue-500"
-                                />
-                                <span className="text-sm">{t('settings.showDebug')}</span>
-                            </label>
-                        </div>
-
-                        {/* Кнопка сброса */}
-                        <button
-                            onClick={() => setSettings({
-                                renderDistance: 24,
-                                correctionSpeed: 1.0,
-                                sensitivity: 1.0,
-                                localMovement: true,
-                                showDebug: false,
-                            })}
-                            className="w-full mt-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-                        >
-                            {t('settings.reset')}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {botState && (
-                <div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-4 rounded">
-                    <div>Health: {botState.health?.toFixed(1) || 20}</div>
-                    <div>Food: {botState.food?.toFixed(1) || 20}</div>
-                    {botState.position && (
-                        <div className="text-sm mt-2">
-                            X: {botState.position.x.toFixed(1)}{' '}
-                            Y: {botState.position.y.toFixed(1)}{' '}
-                            Z: {botState.position.z.toFixed(1)}
-                        </div>
-                    )}
-                    {settings.showDebug && cameraRef.current && (
-                        <div className="text-xs mt-2 text-gray-400 border-t border-gray-600 pt-2">
-                            <div>Camera: {cameraRef.current.position.x.toFixed(1)}, {cameraRef.current.position.y.toFixed(1)}, {cameraRef.current.position.z.toFixed(1)}</div>
-                            <div>Yaw: {(localCameraRef.current.yaw * 180 / Math.PI).toFixed(0)}°</div>
-                            <div>Chunks: {chunkCacheRef.current.size}</div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Панель выбора координат */}
-            {isPickMode && (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                    <div className="text-cyan-400 text-xl font-bold animate-pulse">
-                        {t('picker.clickOnBlock')}
-                    </div>
-                </div>
-            )}
-            {isPickMode && (
-                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900/95 border border-cyan-500 rounded-lg p-4 z-20">
-                    <div className="text-center mb-3">
-                        <div className="text-cyan-400 font-bold text-lg">{t('picker.title')}</div>
-                        <div className="text-gray-400 text-sm">{t('picker.description')}</div>
-                    </div>
-
-                    {selectedCoords ? (
-                        <div className="text-center mb-3">
-                            <div className="text-green-400 font-mono text-lg">
-                                X: {selectedCoords.x}  Y: {selectedCoords.y}  Z: {selectedCoords.z}
-                            </div>
+        <FadeTransition
+            transitionKey={error ? 'viewer-error' : connected ? 'viewer-ready' : 'viewer-connecting'}
+            ready={connected && !error}
+            duration={0.24}
+            className="relative w-full h-full overflow-hidden bg-black"
+            fallback={
+                <div className="flex h-full items-center justify-center bg-background text-foreground">
+                    {error ? (
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/85 p-6 text-destructive-foreground shadow-lg">
+                            <h2 className="mb-2 text-xl font-bold">{t('error')}</h2>
+                            <p>{localizedError}</p>
                         </div>
                     ) : (
-                        <div className="text-center mb-3 text-gray-500">
-                            {t('picker.notSelected')}
-                        </div>
+                        <div className="text-foreground">{t('connecting')}</div>
                     )}
-
-                    <div className="flex gap-2 justify-center">
-                        <button
-                            onClick={cancelPicking}
-                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-                        >
-                            {t('picker.cancel')}
-                        </button>
-                        <button
-                            onClick={() => selectedCoords && confirmSelection(selectedCoords)}
-                            disabled={!selectedCoords}
-                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
-                        >
-                            {t('picker.confirm')}
-                        </button>
-                    </div>
                 </div>
-            )}
+            }
+        >
+            <div className="relative w-full h-full overflow-hidden bg-black">
+                <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-            <MinecraftChat
-                messages={chatMessages}
-                isOpen={chatOpen}
-                onClose={() => setChatOpen(false)}
-                onSend={(message) => {
-                    sendChatMessage(message);
-                    setChatOpen(false);
-                }}
-                alwaysShowMessages={true}
-            />
+                {/* Кнопка настроек */}
+                <button
+                    onClick={() => setSettingsOpen(!settingsOpen)}
+                    className="absolute top-4 left-4 z-10 rounded bg-black bg-opacity-70 p-2 text-white hover:bg-opacity-90"
+                    title={t('settingsButton')}
+                >
+                    ⚙️
+                </button>
 
-            {/* Хот бар */}
-            <MinecraftHotbar
-                inventory={botState?.inventory || []}
-                selectedSlot={selectedHotbarSlot}
-                onSlotSelect={(slotIndex) => {
-                    setSelectedHotbarSlot(slotIndex);
-                    socketRef.current?.emit('viewer:control', {
-                        command: { type: 'hotbar_slot', slot: slotIndex }
-                    });
-                }}
-            />
-        </div>
+                {/* Панель настроек */}
+                {settingsOpen && (
+                    <div className="absolute top-14 left-4 z-20 w-72 rounded bg-black bg-opacity-90 p-4 text-white">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="font-bold">{t('settings.title')}</h3>
+                            <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-white">✕</button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Радиус отображения */}
+                            <div>
+                                <label className="mb-1 block text-sm">
+                                    {t('settings.renderDistance', { value: settings.renderDistance })}
+                                </label>
+                                <input
+                                    type="range"
+                                    min="8"
+                                    max="64"
+                                    step="4"
+                                    value={settings.renderDistance}
+                                    onChange={(e) => updateSetting('renderDistance', parseInt(e.target.value))}
+                                    className="w-full accent-blue-500"
+                                />
+                            </div>
+
+                            {/* Сила синхронизации */}
+                            <div>
+                                <label className="mb-1 block text-sm">
+                                    {t('settings.correctionSpeed', { value: settings.correctionSpeed.toFixed(1) })}
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0.2"
+                                    max="3"
+                                    step="0.1"
+                                    value={settings.correctionSpeed}
+                                    onChange={(e) => updateSetting('correctionSpeed', parseFloat(e.target.value))}
+                                    className="w-full accent-blue-500"
+                                />
+                                <div className="mt-1 text-xs text-gray-400">
+                                    {t('settings.correctionSpeedHint')}
+                                </div>
+                            </div>
+
+                            {/* Чувствительность мыши */}
+                            <div>
+                                <label className="mb-1 block text-sm">
+                                    {t('settings.sensitivity', { value: settings.sensitivity.toFixed(1) })}
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0.2"
+                                    max="3"
+                                    step="0.1"
+                                    value={settings.sensitivity}
+                                    onChange={(e) => updateSetting('sensitivity', parseFloat(e.target.value))}
+                                    className="w-full accent-blue-500"
+                                />
+                            </div>
+
+                            {/* Чекбоксы */}
+                            <div className="space-y-2">
+                                <label className="flex cursor-pointer items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.localMovement}
+                                        onChange={(e) => updateSetting('localMovement', e.target.checked)}
+                                        className="accent-blue-500"
+                                    />
+                                    <span className="text-sm">{t('settings.localMovement')}</span>
+                                </label>
+
+                                <label className="flex cursor-pointer items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.showDebug}
+                                        onChange={(e) => updateSetting('showDebug', e.target.checked)}
+                                        className="accent-blue-500"
+                                    />
+                                    <span className="text-sm">{t('settings.showDebug')}</span>
+                                </label>
+                            </div>
+
+                            {/* Кнопка сброса */}
+                            <button
+                                onClick={() => setSettings({
+                                    renderDistance: 24,
+                                    correctionSpeed: 1.0,
+                                    sensitivity: 1.0,
+                                    localMovement: true,
+                                    showDebug: false,
+                                })}
+                                className="mt-2 w-full rounded bg-gray-700 py-1 text-sm hover:bg-gray-600"
+                            >
+                                {t('settings.reset')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {botState && (
+                    <div className="absolute top-4 right-4 rounded bg-black bg-opacity-70 p-4 text-white">
+                        <div>Health: {botState.health?.toFixed(1) || 20}</div>
+                        <div>Food: {botState.food?.toFixed(1) || 20}</div>
+                        {botState.position && (
+                            <div className="mt-2 text-sm">
+                                X: {botState.position.x.toFixed(1)}{' '}
+                                Y: {botState.position.y.toFixed(1)}{' '}
+                                Z: {botState.position.z.toFixed(1)}
+                            </div>
+                        )}
+                        {settings.showDebug && cameraRef.current && (
+                            <div className="mt-2 border-t border-gray-600 pt-2 text-xs text-gray-400">
+                                <div>Camera: {cameraRef.current.position.x.toFixed(1)}, {cameraRef.current.position.y.toFixed(1)}, {cameraRef.current.position.z.toFixed(1)}</div>
+                                <div>Yaw: {(localCameraRef.current.yaw * 180 / Math.PI).toFixed(0)}°</div>
+                                <div>Chunks: {chunkCacheRef.current.size}</div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Панель выбора координат */}
+                {isPickMode && (
+                    <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform">
+                        <div className="animate-pulse text-xl font-bold text-cyan-400">
+                            {t('picker.clickOnBlock')}
+                        </div>
+                    </div>
+                )}
+                {isPickMode && (
+                    <div className="absolute bottom-20 left-1/2 z-20 -translate-x-1/2 transform rounded-lg border border-cyan-500 bg-slate-900/95 p-4">
+                        <div className="mb-3 text-center">
+                            <div className="text-lg font-bold text-cyan-400">{t('picker.title')}</div>
+                            <div className="text-sm text-gray-400">{t('picker.description')}</div>
+                        </div>
+
+                        {selectedCoords ? (
+                            <div className="mb-3 text-center">
+                                <div className="font-mono text-lg text-green-400">
+                                    X: {selectedCoords.x}  Y: {selectedCoords.y}  Z: {selectedCoords.z}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mb-3 text-center text-gray-500">
+                                {t('picker.notSelected')}
+                            </div>
+                        )}
+
+                        <div className="flex justify-center gap-2">
+                            <button
+                                onClick={cancelPicking}
+                                className="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-600"
+                            >
+                                {t('picker.cancel')}
+                            </button>
+                            <button
+                                onClick={() => selectedCoords && confirmSelection(selectedCoords)}
+                                disabled={!selectedCoords}
+                                className="rounded bg-cyan-600 px-4 py-2 text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+                            >
+                                {t('picker.confirm')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                <MinecraftChat
+                    messages={chatMessages}
+                    isOpen={chatOpen}
+                    onClose={() => setChatOpen(false)}
+                    onSend={(message) => {
+                        sendChatMessage(message);
+                        setChatOpen(false);
+                    }}
+                    alwaysShowMessages={true}
+                />
+
+                {/* Хот бар */}
+                <MinecraftHotbar
+                    inventory={botState?.inventory || []}
+                    selectedSlot={selectedHotbarSlot}
+                    onSlotSelect={(slotIndex) => {
+                        setSelectedHotbarSlot(slotIndex);
+                        socketRef.current?.emit('viewer:control', {
+                            command: { type: 'hotbar_slot', slot: slotIndex }
+                        });
+                    }}
+                />
+            </div>
+        </FadeTransition>
     );
 };
 

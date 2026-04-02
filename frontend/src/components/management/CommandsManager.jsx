@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,10 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
             active: localCommands.filter(c => c.isEnabled).length
         };
     }, [localCommands]);
+    const activeCountLabel = useMemo(
+        () => t('commands.activeCount', { active: stats.active, total: stats.total }),
+        [stats.active, stats.total, t]
+    );
 
     const handleOpenModal = (command) => {
         if (command.isVisual || (command.graphJson && command.graphJson !== 'null')) {
@@ -160,8 +165,19 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                     <div className="flex-1">
                         <div className="flex items-baseline gap-3 mb-1">
                             <CardTitle className="text-2xl font-bold tracking-tight">{t('commands.title')}</CardTitle>
-                            <span className="text-sm text-muted-foreground">
-                                {t('commands.activeCount', { active: stats.active, total: stats.total })}
+                            <span className="relative inline-flex min-h-[20px] items-center overflow-hidden text-sm text-muted-foreground">
+                                <AnimatePresence mode="wait" initial={false}>
+                                    <motion.span
+                                        key={activeCountLabel}
+                                        initial={{ opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                                        className="inline-block"
+                                    >
+                                        {activeCountLabel}
+                                    </motion.span>
+                                </AnimatePresence>
                             </span>
                         </div>
                         <CardDescription>{t('commands.description')}</CardDescription>

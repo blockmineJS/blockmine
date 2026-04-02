@@ -10,6 +10,7 @@ import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
 import FadeTransition from '@/components/FadeTransition';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const EMPTY_EXTENSIONS = [];
 const UI_EXTENSION_LABEL_TRANSLATIONS = {
@@ -19,6 +20,29 @@ const UI_EXTENSION_LABEL_TRANSLATIONS = {
     },
 };
 const TRANSLATABLE_BOT_STATUSES = new Set(['running', 'stopped', 'starting', 'stopping', 'restarting']);
+
+const BOT_STATUS_STYLES = {
+    running: {
+        badge: 'bg-green-500/10 border-green-500/20 text-green-600',
+        dot: 'bg-green-500 animate-pulse',
+    },
+    stopped: {
+        badge: 'bg-red-500/10 border-red-500/20 text-red-600',
+        dot: 'bg-red-500',
+    },
+    starting: {
+        badge: 'bg-amber-500/10 border-amber-500/20 text-amber-600',
+        dot: 'bg-amber-500 animate-pulse',
+    },
+    stopping: {
+        badge: 'bg-orange-500/10 border-orange-500/20 text-orange-600',
+        dot: 'bg-orange-500 animate-pulse',
+    },
+    restarting: {
+        badge: 'bg-sky-500/10 border-sky-500/20 text-sky-600',
+        dot: 'bg-sky-500 animate-pulse',
+    },
+};
 
 function resolveUiExtensionLabel(extension, language) {
     const currentLanguage = language?.split('-')[0] || 'ru';
@@ -72,14 +96,14 @@ export default function BotView() {
     const navigate = useNavigate();
     const location = useLocation();
     const outlet = useOutlet();
-    
+
     if (!botId) {
         return null;
     }
 
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    
+
     const bots = useAppStore(state => state.bots);
     const botStatuses = useAppStore(state => state.botStatuses);
     const startBot = useAppStore(state => state.startBot);
@@ -130,6 +154,7 @@ export default function BotView() {
     const rawBotStatus = botStatuses[bot.id] || 'stopped';
     const isRunning = rawBotStatus === 'running';
     const botStatusLabel = resolveBotStatusLabel(rawBotStatus, t);
+    const botStatusStyle = BOT_STATUS_STYLES[rawBotStatus] || BOT_STATUS_STYLES.stopped;
     const tabTransitionKey = location.pathname.split('/').slice(3).join('/') || 'default';
     const botTabLinkClasses = ({ isActive }) =>
         cn(
@@ -159,25 +184,31 @@ export default function BotView() {
                                             {bot.note}
                                         </span>
                                     )}
+                                    <AnimatePresence mode="wait" initial={false}>
+                                        <div className="inline-flex h-6 shrink-0 self-center translate-y-[2px]">
+                                            <motion.div
+                                                key={rawBotStatus}
+                                                initial={{ opacity: 0, scale: 0.96 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.98 }}
+                                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                                                className={cn(
+                                                    "inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-[10px] font-medium",
+                                                    botStatusStyle.badge
+                                                )}
+                                            >
+                                                <div className={cn("h-1.5 w-1.5 rounded-full", botStatusStyle.dot)} />
+                                                <span className="font-bold uppercase leading-none">
+                                                    {botStatusLabel}
+                                                </span>
+                                            </motion.div>
+                                        </div>
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         </div>
-                        <div className={cn(
-                            "flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-medium transition-all shrink-0",
-                            isRunning
-                                ? "bg-green-500/10 border-green-500/20 text-green-600"
-                                : "bg-red-500/10 border-red-500/20 text-red-600"
-                        )}>
-                            <div className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                isRunning ? "bg-green-500 animate-pulse" : "bg-red-500"
-                            )} />
-                            <span className="uppercase font-bold">
-                                {botStatusLabel}
-                            </span>
-                        </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <nav className="flex items-center gap-1 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-lg p-1 overflow-x-auto whitespace-nowrap -mx-2 px-2 md:mx-0 md:px-1">
                             <NavLink
@@ -195,14 +226,14 @@ export default function BotView() {
                                 {t('tabs.minecraftViewer')}
                             </NavLink>
                             <NavLink
-                                to="plugins" 
+                                to="plugins"
                                 end
                                 className={botTabLinkClasses}
                             >
                                 <Puzzle className="h-4 w-4" />
                                 {t('tabs.plugins')}
                             </NavLink>
-                             {uiExtensions.map(ext => {
+                            {uiExtensions.map(ext => {
                                 const IconComponent = Icons[ext.icon] || Icons.Puzzle;
                                 const extensionLabel = resolveUiExtensionLabel(ext, i18n.language);
                                 return (
@@ -216,15 +247,15 @@ export default function BotView() {
                                     </NavLink>
                                 );
                             })}
-                            <NavLink 
-                                to="settings" 
+                            <NavLink
+                                to="settings"
                                 className={botTabLinkClasses}
                             >
                                 <Settings className="h-4 w-4" />
                                 {t('tabs.settings')}
                             </NavLink>
                             <NavLink
-                                to="events" 
+                                to="events"
                                 className={botTabLinkClasses}
                             >
                                 <Zap className="h-4 w-4" />
@@ -245,7 +276,7 @@ export default function BotView() {
                                 {t('tabs.websocket')}
                             </NavLink>
                         </nav>
-                        
+
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
                             {hasPermission('bot:start_stop') && (
                                 <>
@@ -270,19 +301,19 @@ export default function BotView() {
                                         <span className="hidden sm:inline">{t('actions.stop')}</span>
                                     </Button>
                                     <Button
-                                       variant="outline"
-                                       size="xs"
-                                       onClick={() => restartBot(bot.id)}
-                                       disabled={!isRunning}
-                                       className="h-7 px-2 text-xs bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() => restartBot(bot.id)}
+                                        disabled={!isRunning}
+                                        className="h-7 px-2 text-xs bg-yellow-500/10 border-yellow-500/20 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
                                     >
-                                       <Sparkles className="h-3 w-3 mr-1" />
-                                       <span className="hidden sm:inline">{t('actions.restart')}</span>
+                                        <Sparkles className="h-3 w-3 mr-1" />
+                                        <span className="hidden sm:inline">{t('actions.restart')}</span>
                                     </Button>
                                 </>
                             )}
                             {hasPermission('bot:export') && (
-                                 <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+                                <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
                                     <DialogTrigger asChild>
                                         <Button
                                             variant="outline"
@@ -297,7 +328,7 @@ export default function BotView() {
                                 </Dialog>
                             )}
                             {hasPermission('bot:delete') && (
-                                 <Button
+                                <Button
                                     variant="ghost"
                                     size="xs"
                                     onClick={() => setIsDeleteConfirmOpen(true)}

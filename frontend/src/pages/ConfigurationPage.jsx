@@ -181,7 +181,7 @@ export default function ConfigurationPage() {
 
                         <TabsContent value="plugins" className="flex-grow overflow-y-auto px-6 pb-6">
                             {allSettings.plugins.length > 0 ? (
-                                <Accordion type="multiple" className="w-full space-y-4 max-w-2xl mx-auto">
+                                <Accordion type="multiple" className="mx-auto w-full max-w-5xl space-y-4">
                                     {allSettings.plugins.map(plugin => (
                                         <AccordionItem key={plugin.id} value={`plugin-${plugin.id}`} className="border rounded-2xl shadow-md bg-muted/40">
                                             <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline flex items-center gap-3">
@@ -204,7 +204,7 @@ export default function ConfigurationPage() {
                                     ))}
                                 </Accordion>
                             ) : (
-                                <div className="text-center p-10 text-muted-foreground rounded-lg border-2 border-dashed max-w-2xl mx-auto bg-muted/30">
+                                <div className="mx-auto max-w-5xl rounded-lg border-2 border-dashed bg-muted/30 p-10 text-center text-muted-foreground">
                                     {t('plugins.empty')}
                                 </div>
                             )}

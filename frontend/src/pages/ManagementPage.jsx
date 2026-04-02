@@ -30,8 +30,9 @@ export default function ManagementPage() {
     const [sortConfig, setSortConfig] = useState({ key: 'username', direction: 'ascending' });
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const { toast } = useToast();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('commands');
+    const [isInitialContentReady, setIsInitialContentReady] = useState(false);
 
   const handleCreateCommand = async (commandData) => {
     try {
@@ -68,6 +69,12 @@ export default function ManagementPage() {
             fetchData(1, userPageSize, debouncedSearchQuery, sortConfig);
         }
     }, [bot, debouncedSearchQuery, sortConfig]);
+
+    useEffect(() => {
+        if (!isLoading && bot) {
+            setIsInitialContentReady(true);
+        }
+    }, [isLoading, bot]);
 
     const handleSortChange = (newSortConfig) => {
         setSortConfig(newSortConfig);
@@ -140,7 +147,16 @@ export default function ManagementPage() {
             </CardHeader>
             
             <main className="flex-grow min-h-0">
-                <FadeTransition transitionKey={activeTab} duration={0.2}>
+                <FadeTransition
+                    transitionKey={activeTab}
+                    duration={0.22}
+                    ready={isInitialContentReady}
+                    fallback={
+                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                            {t('commands.loading')}
+                        </div>
+                    }
+                >
                     {tabContent[activeTab]}
                 </FadeTransition>
             </main>

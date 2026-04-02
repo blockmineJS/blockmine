@@ -89,13 +89,16 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
       >
         <div
           className={cn(
-            'relative mt-1 shrink-0 transition-transform duration-200',
+            'relative mt-1 shrink-0 transition-[filter,transform,opacity] duration-300 ease-out',
             isHovered && 'scale-105'
           )}
         >
           <IconComponent
             name={plugin.icon}
-            className={cn('h-12 w-12 text-primary', isHovered && 'drop-shadow-glow')}
+            className={cn(
+              'h-12 w-12 text-primary transition-[filter,color,opacity] duration-300 ease-out',
+              isHovered && 'drop-shadow-glow'
+            )}
           />
         </div>
 

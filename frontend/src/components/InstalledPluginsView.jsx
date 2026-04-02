@@ -292,7 +292,7 @@ function InstalledPluginCard({
           <IconComponent
             name={plugin.manifest?.icon}
             className={cn(
-              'h-10 w-10 transform-gpu transition-transform duration-300 ease-out group-hover:scale-105',
+              'h-10 w-10 transform-gpu transition-[filter,transform,color,opacity] duration-300 ease-out group-hover:scale-105',
               displayEnabled ? 'text-primary' : 'text-muted-foreground',
               isHovered && 'drop-shadow-glow'
             )}
@@ -432,7 +432,7 @@ function InstalledPluginCard({
               <IconComponent
                 name={plugin.manifest?.icon}
                 className={cn(
-                  'h-10 w-10 transform-gpu transition-transform duration-300 ease-out group-hover:scale-105',
+                  'h-10 w-10 transform-gpu transition-[filter,transform,color,opacity] duration-300 ease-out group-hover:scale-105',
                   displayEnabled ? 'text-primary' : 'text-muted-foreground',
                   isHovered && 'drop-shadow-glow'
                 )}

@@ -384,17 +384,45 @@
 @keyframes toast-enter-smooth {
   0% {
     opacity: 0;
-    transform: translateY(28px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 .toast-shell[data-state="open"] {
   transform-origin: bottom right;
-  animation: toast-enter-smooth 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: toast-enter-smooth 680ms cubic-bezier(0.18, 1, 0.32, 1) both;
+  will-change: opacity;
+}
+
+.toast-text-rendering,
+.toast-text-rendering * {
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.toast-text-transition {
+  will-change: opacity;
+}
+
+.toast-text-leave {
+  opacity: 0;
+  transition: opacity 130ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes toast-text-enter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.toast-text-enter {
+  animation: toast-text-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* React Flow text clarity */

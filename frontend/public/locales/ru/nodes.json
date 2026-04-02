@@ -529,17 +529,71 @@
 
   "action:create_command": {
     "label": "Создать команду",
-    "description": "Создаёт новую команду"
+    "description": "Создаёт новую команду",
+    "pins": {
+      "exec": "Выполнить",
+      "name": "Имя команды",
+      "description": "Описание",
+      "aliases": "Алиасы",
+      "cooldown": "Кулдаун (сек)",
+      "allowedChatTypes": "Типы чата",
+      "permissionName": "Название права",
+      "temporary": "Временная?",
+      "commandId": "ID команды",
+      "success": "Успешно?"
+    },
+    "placeholders": {
+      "name": "моя-команда",
+      "description": "Описание команды",
+      "aliases": "[\"алиас1\", \"алиас2\"]",
+      "cooldown": "0",
+      "allowedChatTypes": "[\"chat\", \"private\"]",
+      "permissionName": "модератор"
+    },
+    "options": {
+      "temporary": {
+        "false": "Постоянная",
+        "true": "Временная"
+      }
+    }
   },
 
   "action:update_command": {
     "label": "Обновить команду",
-    "description": "Обновляет существующую команду"
+    "description": "Обновляет существующую команду",
+    "pins": {
+      "exec": "Выполнить",
+      "commandName": "Имя команды",
+      "newName": "Новое имя",
+      "description": "Описание",
+      "aliases": "Алиасы",
+      "cooldown": "Кулдаун (сек)",
+      "allowedChatTypes": "Типы чата",
+      "permissionName": "Название права",
+      "success": "Успешно?"
+    },
+    "placeholders": {
+      "commandName": "моя-команда",
+      "newName": "новая-команда",
+      "description": "Новое описание команды",
+      "aliases": "[\"алиас1\", \"алиас2\"]",
+      "cooldown": "0",
+      "allowedChatTypes": "[\"chat\", \"private\"]",
+      "permissionName": "модератор"
+    }
   },
 
   "action:delete_command": {
     "label": "Удалить команду",
-    "description": "Удаляет команду"
+    "description": "Удаляет команду",
+    "pins": {
+      "exec": "Выполнить",
+      "commandName": "Имя команды",
+      "success": "Успешно?"
+    },
+    "placeholders": {
+      "commandName": "моя-команда"
+    }
   },
 
   "time:datetime_literal": {

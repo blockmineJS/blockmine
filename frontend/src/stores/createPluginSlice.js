@@ -7,6 +7,7 @@ const translatePlugins = (key, defaultValue, options = {}) =>
   i18n.t(key, { ns: 'plugins', defaultValue, ...options });
 
 const PLUGIN_UPDATE_COUNT_STORAGE_KEY = 'blockmine-plugin-update-counts';
+const PLUGIN_STATUS_TOAST_ID = 'plugin-status-toast';
 
 const loadStoredPluginUpdateCounts = () => {
   try {
@@ -212,6 +213,8 @@ export const createPluginSlice = (set, get) => {
       }
 
       const statusToast = toast({
+        id: PLUGIN_STATUS_TOAST_ID,
+        duration: 0,
         title: translatePlugins('messages.updating', 'Updating...'),
         description: translatePlugins('toasts.statusUpdating', 'Updating plugin status...'),
       });
@@ -248,6 +251,7 @@ export const createPluginSlice = (set, get) => {
         );
 
         statusToast.update({
+          duration: 4200,
           title: translatePlugins('ui.success', 'Success'),
           description: translatePlugins('toasts.statusUpdated', 'Plugin status updated.'),
         });

@@ -8,6 +8,66 @@ import { cn } from "@/lib/utils"
 
 const ToastProvider = ToastPrimitives.Provider
 
+const TOAST_TEXT_FADE_OUT_MS = 130
+const TOAST_TEXT_FADE_IN_MS = 220
+
+function AnimatedToastText({ children, className }) {
+  const [renderedChildren, setRenderedChildren] = React.useState(children)
+  const [phase, setPhase] = React.useState("")
+  const isFirstRenderRef = React.useRef(true)
+  const previousChildrenRef = React.useRef(children)
+  const fadeOutTimeoutRef = React.useRef(null)
+  const fadeInTimeoutRef = React.useRef(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (fadeOutTimeoutRef.current) {
+        window.clearTimeout(fadeOutTimeoutRef.current)
+      }
+      if (fadeInTimeoutRef.current) {
+        window.clearTimeout(fadeInTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      previousChildrenRef.current = children
+      setRenderedChildren(children)
+      return
+    }
+
+    if (Object.is(previousChildrenRef.current, children)) {
+      return
+    }
+
+    previousChildrenRef.current = children
+
+    if (fadeOutTimeoutRef.current) {
+      window.clearTimeout(fadeOutTimeoutRef.current)
+    }
+    if (fadeInTimeoutRef.current) {
+      window.clearTimeout(fadeInTimeoutRef.current)
+    }
+
+    setPhase("toast-text-leave")
+    fadeOutTimeoutRef.current = window.setTimeout(() => {
+      setRenderedChildren(children)
+      setPhase("toast-text-enter")
+      fadeInTimeoutRef.current = window.setTimeout(() => {
+        setPhase("")
+      }, TOAST_TEXT_FADE_IN_MS)
+    }, TOAST_TEXT_FADE_OUT_MS)
+  }, [children])
+
+  return (
+    <span className={cn("block toast-text-transition", phase, className)}>
+      {renderedChildren}
+    </span>
+  )
+}
+
 const ToastViewport = React.forwardRef(({ className, ...props }, ref) => (
   <ToastPrimitives.Viewport
     ref={ref}
@@ -39,7 +99,7 @@ const Toast = React.forwardRef(({ className, variant, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
       ref={ref}
-      className={cn(toastVariants({ variant }), className)}
+      className={cn(toastVariants({ variant }), "toast-text-rendering", className)}
       {...props} />
   );
 })
@@ -74,12 +134,17 @@ const ToastTitle = React.forwardRef(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
     className={cn("text-sm font-semibold [&+div]:text-xs", className)}
-    {...props} />
+    {...props}
+  >
+    <AnimatedToastText>{props.children}</AnimatedToastText>
+  </ToastPrimitives.Title>
 ))
 ToastTitle.displayName = ToastPrimitives.Title.displayName
 
 const ToastDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <ToastPrimitives.Description ref={ref} className={cn("text-sm opacity-90", className)} {...props} />
+  <ToastPrimitives.Description ref={ref} className={cn("text-sm opacity-90", className)} {...props}>
+    <AnimatedToastText>{props.children}</AnimatedToastText>
+  </ToastPrimitives.Description>
 ))
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 

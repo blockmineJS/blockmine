@@ -2,6 +2,7 @@ import * as React from "react"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+const DEFAULT_TOAST_DURATION = 4200
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -18,6 +19,34 @@ function genId() {
 }
 
 const toastTimeouts = new Map()
+const autoDismissTimeouts = new Map()
+
+const clearAutoDismissTimeout = (toastId) => {
+  if (!autoDismissTimeouts.has(toastId)) {
+    return
+  }
+
+  window.clearTimeout(autoDismissTimeouts.get(toastId))
+  autoDismissTimeouts.delete(toastId)
+}
+
+const scheduleAutoDismiss = (toastId, duration = DEFAULT_TOAST_DURATION) => {
+  clearAutoDismissTimeout(toastId)
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return
+  }
+
+  const timeout = window.setTimeout(() => {
+    autoDismissTimeouts.delete(toastId)
+    dispatch({
+      type: "DISMISS_TOAST",
+      toastId,
+    })
+  }, duration)
+
+  autoDismissTimeouts.set(toastId, timeout)
+}
 
 const addToRemoveQueue = (toastId) => {
   if (toastTimeouts.has(toastId)) {
@@ -38,6 +67,15 @@ const addToRemoveQueue = (toastId) => {
 export const reducer = (state, action) => {
   switch (action.type) {
     case "ADD_TOAST":
+      const existingToastIndex = state.toasts.findIndex((t) => t.id === action.toast.id)
+      if (existingToastIndex !== -1) {
+        const nextToasts = [...state.toasts]
+        nextToasts.splice(existingToastIndex, 1)
+        return {
+          ...state,
+          toasts: [action.toast, ...nextToasts].slice(0, TOAST_LIMIT),
+        };
+      }
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
@@ -73,6 +111,11 @@ export const reducer = (state, action) => {
       };
     }
     case "REMOVE_TOAST":
+      if (action.toastId !== undefined) {
+        clearAutoDismissTimeout(action.toastId)
+      } else {
+        state.toasts.forEach((toast) => clearAutoDismissTimeout(toast.id))
+      }
       if (action.toastId === undefined) {
         return {
           ...state,
@@ -100,26 +143,45 @@ function dispatch(action) {
 function toast({
   ...props
 }) {
-  const id = genId()
-
-  const update = (props) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
+  const id = props.id ?? genId()
+  const duration = typeof props.duration === "number" ? props.duration : DEFAULT_TOAST_DURATION
+  const buildToastPayload = (nextProps = {}) => ({
+    ...props,
+    ...nextProps,
+    id,
+    duration: typeof nextProps.duration === "number" ? nextProps.duration : duration,
+    open: true,
+    onOpenChange: (open) => {
+      if (!open) dismiss()
     },
   })
+
+  const update = (nextProps) => {
+    const nextDuration =
+      typeof nextProps?.duration === "number"
+        ? nextProps.duration
+        : memoryState.toasts.find((toast) => toast.id === id)?.duration ?? duration
+
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: buildToastPayload({ ...nextProps, duration: nextDuration }),
+    })
+    scheduleAutoDismiss(id, nextDuration)
+  }
+
+  const dismiss = () => {
+    clearAutoDismissTimeout(id)
+    dispatch({ type: "DISMISS_TOAST", toastId: id })
+  }
+
+  const payload = buildToastPayload()
+  const hasExistingToast = memoryState.toasts.some((toast) => toast.id === id)
+
+  dispatch({
+    type: hasExistingToast ? "UPDATE_TOAST" : "ADD_TOAST",
+    toast: payload,
+  })
+  scheduleAutoDismiss(id, payload.duration)
 
   return {
     id: id,
