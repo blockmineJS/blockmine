@@ -1050,11 +1050,24 @@ process.on('message', async (message) => {
 
             bot.on('chat', (username, message) => {
                 if (messageHandledByCustomParser) return;
+                // Эмитируем событие для event graphs
+                bot.events.emit('chat:message', {
+                    username,
+                    message,
+                    type: 'chat',
+                    raw: message
+                });
                 handleIncomingCommand('chat', username, message);
             });
 
             bot.on('whisper', (username, message) => {
                 if (messageHandledByCustomParser) return;
+                bot.events.emit('chat:message', {
+                    username,
+                    message,
+                    type: 'whisper',
+                    raw: message
+                });
                 handleIncomingCommand('whisper', username, message);
             });
 
