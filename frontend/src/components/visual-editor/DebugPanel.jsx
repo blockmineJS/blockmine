@@ -1,27 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
-import { Bug, Users, Circle, Trash2, Eye, EyeOff } from 'lucide-react';
-import WhatIfEditor from './WhatIfEditor';
+import {
+  Bug, Users, Circle, Trash2, Eye, EyeOff, FlaskConical, Play, Square,
+  Activity, Wifi, ListChecks, Info
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import TestModeStartDialog from './TestModeStartDialog';
 
 const DebugPanel = () => {
   const { t } = useTranslation('visual-editor');
   const debugMode = useVisualEditorStore(state => state.debugMode);
   const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
   const breakpoints = useVisualEditorStore(state => state.breakpoints);
-  const debugSession = useVisualEditorStore(state => state.debugSession);
   const connectedDebugUsers = useVisualEditorStore(state => state.connectedDebugUsers);
   const nodes = useVisualEditorStore(state => state.nodes);
   const removeBreakpoint = useVisualEditorStore(state => state.removeBreakpoint);
   const toggleBreakpoint = useVisualEditorStore(state => state.toggleBreakpoint);
   const socket = useVisualEditorStore(state => state.socket);
+  const testMode = useVisualEditorStore(state => state.testMode);
+  const testModeRunning = useVisualEditorStore(state => state.testModeRunning);
+  const disableTestMode = useVisualEditorStore(state => state.disableTestMode);
+  const openRunNodeDialog = useVisualEditorStore(state => state.openRunNodeDialog);
+  const [startDialogOpen, setStartDialogOpen] = useState(false);
 
-  // Получить имя ноды по ID
+  const selectedNodes = nodes.filter(n => n.selected);
+  const singleSelected = selectedNodes.length === 1 ? selectedNodes[0] : null;
+
   const getNodeName = (nodeId) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return nodeId;
@@ -39,45 +47,32 @@ const DebugPanel = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
-        {/* Переключатель режима */}
-        <div className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
-          <div className="flex items-center gap-3">
-            <Label htmlFor="debug-mode" className="text-sm font-medium">
-              {t('debugPanel.debugMode')}
-            </Label>
-            <Switch
-              id="debug-mode"
-              checked={debugMode === 'live'}
-              onCheckedChange={(checked) => setDebugMode(checked ? 'live' : 'normal')}
-            />
-          </div>
-          <Badge variant={debugMode === 'live' ? 'default' : 'secondary'}>
-            {debugMode === 'live' ? t('debugPanel.live') : debugMode === 'trace' ? t('debugPanel.trace') : t('debugPanel.normal')}
-          </Badge>
-        </div>
-
-        {/* Статус подключения */}
-        {debugMode === 'live' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Circle
-                  className={`w-3 h-3 ${socket ? 'fill-green-400 text-green-400' : 'fill-gray-400 text-gray-400'}`}
-                />
-                <span className="text-sm">
-                  {socket ? t('debugPanel.connected') : t('debugPanel.disconnected')}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-400" />
-                <span className="text-sm">{t('debugPanel.users', { count: connectedDebugUsers.length })}</span>
-              </div>
+        {/* Подключение */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+            <Wifi className="w-4 h-4" />
+            {t('debugPanel.connection')}
+          </h3>
+          <div className="bg-slate-900 rounded-lg p-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">{t('debugPanel.status')}</span>
+              <span className={cn(
+                "text-sm font-medium px-2 py-0.5 rounded flex items-center gap-1",
+                socket ? "bg-green-900/50 text-green-300" : "bg-slate-700 text-slate-400"
+              )}>
+                <Circle className={cn("w-2.5 h-2.5", socket ? "fill-green-400 text-green-400" : "fill-slate-500 text-slate-500")} />
+                {socket ? t('debugPanel.connected') : t('debugPanel.disconnected')}
+              </span>
             </div>
-
-            {/* Список подключенных пользователей */}
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {t('debugPanel.usersLabel')}
+              </span>
+              <span className="text-sm font-medium">{connectedDebugUsers.length}</span>
+            </div>
             {connectedDebugUsers.length > 0 && (
-              <div className="p-3 bg-slate-700/50 rounded-lg">
-                <div className="text-xs text-slate-400 mb-2">{t('debugPanel.connectedUsers')}</div>
+              <div className="pt-2 border-t border-slate-800">
                 <div className="flex flex-wrap gap-1">
                   {connectedDebugUsers.map(user => (
                     <Badge key={user.socketId} variant="outline" className="text-xs">
@@ -88,72 +83,95 @@ const DebugPanel = () => {
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Статус выполнения */}
-        {debugSession && (
-          <div className="p-3 bg-amber-900/30 border border-amber-600 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-amber-400">
-                {t('debugPanel.onPause')}
-              </span>
-              <Badge variant="outline" className="text-amber-400 border-amber-400">
-                {getNodeName(debugSession.nodeId)}
+        {/* Режим теста */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+            <FlaskConical className="w-4 h-4 text-yellow-400" />
+            {t('testMode.title')}
+            {testMode && (
+              <Badge variant="outline" className="ml-auto text-yellow-400 border-yellow-500 text-xs">
+                {testModeRunning ? t('testMode.running') : t('testMode.idle')}
               </Badge>
-            </div>
-            <p className="text-xs text-slate-300">
-              {t('debugPanel.pausedDescription')}
-            </p>
+            )}
+          </h3>
+          <div className="bg-slate-900 rounded-lg p-3 space-y-2">
+            <p className="text-xs text-slate-400">{t('testMode.description')}</p>
+            {!testMode ? (
+              <Button
+                size="sm"
+                className="w-full bg-yellow-600 hover:bg-yellow-700"
+                onClick={() => setStartDialogOpen(true)}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                {t('testMode.startButton')}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="w-full"
+                onClick={() => disableTestMode()}
+              >
+                <Square className="w-4 h-4 mr-2" />
+                {t('testMode.exitButton')}
+              </Button>
+            )}
+            {singleSelected && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full border-yellow-700 bg-slate-950 text-yellow-300 hover:bg-yellow-900/30 hover:text-yellow-200"
+                onClick={() => openRunNodeDialog(singleSelected.id)}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                {t('testMode.runSelectedNode', { type: singleSelected.type })}
+              </Button>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* WhatIf Editor - показываем когда выполнение на паузе */}
-        {debugSession && debugSession.status === 'paused' && (
-          <WhatIfEditor />
-        )}
-
-        {/* Список брейкпоинтов */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-300">
-              {t('debugPanel.breakpoints')} ({breakpointsArray.length})
-            </h3>
-          </div>
-
+        {/* Брейкпоинты */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+            <ListChecks className="w-4 h-4" />
+            {t('debugPanel.breakpoints')}
+            <Badge variant="outline" className="ml-auto text-xs">{breakpointsArray.length}</Badge>
+          </h3>
           {breakpointsArray.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 text-sm border border-dashed border-slate-600 rounded-lg">
-              {t('debugPanel.noBreakpoints')}
-              <br />
-              <span className="text-xs">
-                {debugMode === 'live'
-                  ? t('debugPanel.noBreakpointsLive')
-                  : t('debugPanel.noBreakpointsNormal')
-                }
-              </span>
+            <div className="bg-slate-900 rounded-lg p-3 text-center text-slate-400 text-sm">
+              <div>{t('debugPanel.noBreakpoints')}</div>
+              <div className="text-xs mt-1 text-slate-500">
+                {t('debugPanel.noBreakpointsLive')}
+              </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="bg-slate-900 rounded-lg p-3 space-y-2">
               {breakpointsArray.map((bp) => (
                 <div
                   key={bp.id}
-                  className={`p-3 rounded-lg border ${
-                    bp.enabled
-                      ? 'bg-slate-700 border-slate-600'
-                      : 'bg-slate-800 border-slate-700 opacity-60'
-                  }`}
+                  className={cn(
+                    "border-b border-slate-800 last:border-b-0 pb-2 last:pb-0",
+                    !bp.enabled && "opacity-60"
+                  )}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-slate-400">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Circle className={cn(
+                        "w-2.5 h-2.5 shrink-0",
+                        bp.enabled ? "fill-red-400 text-red-400" : "fill-slate-600 text-slate-600"
+                      )} />
+                      <span className="text-xs font-mono text-slate-300 truncate">
                         {getNodeName(bp.nodeId)}
                       </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
                       {bp.hitCount > 0 && (
                         <Badge variant="outline" className="text-xs">
                           {t('debugPanel.hitCount', { count: bp.hitCount })}
                         </Badge>
                       )}
-                    </div>
-                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -161,11 +179,7 @@ const DebugPanel = () => {
                         onClick={() => toggleBreakpoint(bp.nodeId)}
                         title={bp.enabled ? t('debugPanel.disable') : t('debugPanel.enable')}
                       >
-                        {bp.enabled ? (
-                          <Eye className="w-3 h-3" />
-                        ) : (
-                          <EyeOff className="w-3 h-3" />
-                        )}
+                        {bp.enabled ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -178,9 +192,8 @@ const DebugPanel = () => {
                       </Button>
                     </div>
                   </div>
-
                   {bp.condition && (
-                    <div className="mt-2 p-2 bg-slate-900 rounded text-xs font-mono text-blue-300">
+                    <div className="mt-1 p-2 bg-slate-950 rounded text-xs font-mono text-blue-300 break-all">
                       {bp.condition}
                     </div>
                   )}
@@ -190,25 +203,22 @@ const DebugPanel = () => {
           )}
         </div>
 
-        {/* Инструкции для разных режимов */}
-        {debugMode === 'normal' && (
-          <div className="p-3 bg-slate-700/50 border border-slate-600/30 rounded-lg">
-            <p className="text-xs text-slate-300">
-              <Trans i18nKey="debugPanel.normalModeDesc" ns="visual-editor">
-                <strong>Normal mode:</strong> Graph editing. Enable <strong>Live mode</strong> for real-time debugging with breakpoints.
-              </Trans>
-            </p>
+        {/* Подсказки для режимов */}
+        {debugMode === 'live' && (
+          <div>
+            <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+              <Info className="w-4 h-4 text-blue-400" />
+              {t('debugPanel.tipTitle')}
+            </h3>
+            <div className="bg-slate-900 rounded-lg p-3">
+              <p className="text-xs text-slate-400">
+                {t('debugPanel.liveModeTip')}
+              </p>
+            </div>
           </div>
         )}
-        {debugMode === 'trace' && (
-          <div className="p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg">
-            <p className="text-xs text-slate-300">
-              <Trans i18nKey="debugPanel.traceModeDesc" ns="visual-editor">
-                <strong>Trace mode:</strong> View execution traces after commands complete. Switch to <strong>Live mode</strong> for real-time debugging with breakpoints.
-              </Trans>
-            </p>
-          </div>
-        )}
+
+        <TestModeStartDialog open={startDialogOpen} onOpenChange={setStartDialogOpen} />
       </CardContent>
     </Card>
   );

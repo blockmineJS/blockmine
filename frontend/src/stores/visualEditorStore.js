@@ -55,9 +55,16 @@ export const useVisualEditorStore = create(
     breakpoints: new Map(), // Map<nodeId, Breakpoint>
     debugSession: null, // Текущая сессия отладки
     whatIfOverrides: new Map(), // Map<nodeId:pinId, value>
-    debugMode: 'trace', // 'trace' | 'live'
+    debugMode: 'trace', // 'trace' | 'live' | 'normal'
     connectedDebugUsers: [], // Array<{socketId, userId, username}>
     socket: null,
+
+    testMode: false,
+    testModeHistoryLength: 0,
+    testModeCanStepBack: false,
+    testModeRunning: false,
+    runNodeDialog: null,
+    runNodeResult: null,
 
     // Collaborative editing state
     collabUsers: [], // Array<{socketId, username, userId, color}>
@@ -1284,6 +1291,68 @@ export const useVisualEditorStore = create(
       });
     },
 
+    stepBack: () => {
+      const { socket, debugSession } = get();
+      if (!socket || !debugSession) return;
+      socket.emit('debug:step-back', { sessionId: debugSession.sessionId });
+    },
+
+    enableTestMode: () => {
+      const { socket, command } = get();
+      if (!socket || !command) return;
+      if (get().debugMode !== 'live') {
+        get().setDebugMode('live');
+      }
+      socket.emit('debug:enable-test-mode', {
+        botId: command.botId,
+        graphId: command.id
+      });
+      set({ testMode: true });
+    },
+
+    disableTestMode: () => {
+      const { socket, command } = get();
+      if (!socket || !command) return;
+      socket.emit('debug:disable-test-mode', { graphId: command.id });
+      set({ testMode: false, testModeRunning: false, testModeHistoryLength: 0, testModeCanStepBack: false });
+    },
+
+    startTestRun: async ({ eventType, eventArgs }) => {
+      const { command } = get();
+      if (!command) return null;
+      try {
+        const response = await apiHelper(`/api/bots/${command.botId}/event-graphs/test-run/${command.id}`, {
+          method: 'POST',
+          body: { eventType, eventArgs }
+        });
+        set({ testModeRunning: true });
+        return response;
+      } catch (e) {
+        console.error('[TestMode] startTestRun failed:', e);
+        return { success: false, error: e.message };
+      }
+    },
+
+    runSingleNode: async ({ nodeId, inputs, variables }) => {
+      const { command } = get();
+      if (!command) return null;
+      try {
+        const response = await apiHelper(`/api/bots/${command.botId}/event-graphs/run-node/${command.id}/${nodeId}`, {
+          method: 'POST',
+          body: { inputs: inputs || {}, variables: variables || {} }
+        });
+        set({ runNodeResult: response });
+        return response;
+      } catch (e) {
+        const errResult = { success: false, error: e.message };
+        set({ runNodeResult: errResult });
+        return errResult;
+      }
+    },
+
+    openRunNodeDialog: (nodeId) => set({ runNodeDialog: { nodeId }, runNodeResult: null }),
+    closeRunNodeDialog: () => set({ runNodeDialog: null, runNodeResult: null }),
+
     setDebugMode: (mode) => {
       const { socket, command } = get();
 
@@ -1318,6 +1387,12 @@ export const useVisualEditorStore = create(
           breakpoints: new Map(),
           debugSession: null,
           connectedDebugUsers: [],
+          highlightedNodeIds: new Set(),
+          currentActiveNodeId: null,
+          testMode: false,
+          testModeRunning: false,
+          testModeHistoryLength: 0,
+          testModeCanStepBack: false,
         });
       }
 
@@ -1603,6 +1678,9 @@ export const useVisualEditorStore = create(
           );
           state.debugSession = data.activeExecution;
           state.connectedDebugUsers = data.connectedUsers || [];
+          if (typeof data.testMode === 'boolean') state.testMode = data.testMode;
+          if (typeof data.historyLength === 'number') state.testModeHistoryLength = data.historyLength;
+          if (typeof data.canStepBack === 'boolean') state.testModeCanStepBack = data.canStepBack;
         });
       });
 
@@ -1633,25 +1711,79 @@ export const useVisualEditorStore = create(
         console.log('[Debug] Current debugMode:', currentState.debugMode);
         console.log('[Debug] Current isTraceViewerOpen:', currentState.isTraceViewerOpen);
 
-        // Always set debugSession when paused, regardless of mode
         set(state => {
-          console.log('[Debug] Setting debugSession in state');
           state.debugSession = {
             sessionId: data.sessionId,
             nodeId: data.nodeId,
             nodeType: data.nodeType,
             inputs: data.inputs,
             executedSteps: data.executedSteps,
-            status: 'paused'  // IMPORTANT: Add status field
+            status: 'paused'
           };
-          console.log('[Debug] debugSession set:', state.debugSession);
+          if (typeof data.testMode === 'boolean') state.testMode = data.testMode;
+          if (typeof data.historyLength === 'number') state.testModeHistoryLength = data.historyLength;
+          if (typeof data.canStepBack === 'boolean') state.testModeCanStepBack = data.canStepBack;
+
+          const executed = data.executedSteps?.steps || [];
+          const visited = new Set();
+          for (const step of executed) {
+            if (step.type === 'traversal') continue;
+            if (step.nodeId && step.status === 'executed') {
+              visited.add(step.nodeId);
+            }
+          }
+          if (data.nodeId) visited.add(data.nodeId);
+          state.highlightedNodeIds = visited;
+          state.currentActiveNodeId = data.nodeId || null;
         });
       });
 
-      newSocket.on('debug:resumed', () => {
+      newSocket.on('debug:rewound', ({ target }) => {
+        console.log('[Debug] Rewound to', target);
+        set(state => {
+          state.testModeCanStepBack = true;
+        });
+      });
+
+      newSocket.on('debug:rewind-failed', ({ reason }) => {
+        console.warn('[Debug] Rewind failed:', reason);
+      });
+
+      newSocket.on('debug:test-mode-started', (data) => {
+        set({ testMode: true, testModeRunning: true, testModeHistoryLength: 0, testModeCanStepBack: false });
+      });
+
+      newSocket.on('debug:test-mode-stopped', () => {
+        set(state => {
+          state.testMode = false;
+          state.testModeRunning = false;
+          state.testModeHistoryLength = 0;
+          state.testModeCanStepBack = false;
+          state.highlightedNodeIds = new Set();
+          state.currentActiveNodeId = null;
+        });
+      });
+
+      newSocket.on('debug:stopped', () => {
+        console.log('[Debug] Received debug:stopped event');
+        set(state => {
+          state.debugSession = null;
+          state.testMode = false;
+          state.testModeRunning = false;
+          state.testModeHistoryLength = 0;
+          state.testModeCanStepBack = false;
+          state.highlightedNodeIds = new Set();
+          state.currentActiveNodeId = null;
+        });
+      });
+
+      newSocket.on('debug:resumed', (data) => {
         console.log('[Debug] Received debug:resumed event');
         set(state => {
           state.debugSession = null;
+          if (!data?.testMode) {
+            state.currentActiveNodeId = null;
+          }
         });
       });
 
@@ -1660,6 +1792,8 @@ export const useVisualEditorStore = create(
         set(state => {
           state.debugSession = null;
           state.trace = trace;
+          state.highlightedNodeIds = new Set();
+          state.currentActiveNodeId = null;
         });
       });
 
@@ -1674,19 +1808,55 @@ export const useVisualEditorStore = create(
       newSocket.on('debug:value-updated', ({ key, value, updatedBy }) => {
         console.log('[Debug] Value updated by', updatedBy, ':', key, '=', value);
         set(state => {
-          if (!state.debugSession?.executedSteps) return;
+          if (!state.debugSession) return;
 
-          const parts = key.split('.');
-          if (parts.length !== 3) return;
+          if (key.startsWith('var.')) {
+            const varName = key.substring(4);
+            if (!state.variables) state.variables = {};
+            state.variables[varName] = value;
+            return;
+          }
 
-          const [nodeId, direction, pinId] = parts;
-          const step = state.debugSession.executedSteps.steps?.find(s => s.nodeId === nodeId);
+          const outIdx = key.indexOf('.out.');
+          const inIdx = key.indexOf('.in.');
 
-          if (step) {
-            if (direction === 'out' && step.outputs) {
-              step.outputs[pinId] = value;
-            } else if (direction === 'in' && step.inputs) {
-              step.inputs[pinId] = value;
+          let nodeId = null, direction = null, pinId = null;
+          if (outIdx > 0) {
+            nodeId = key.substring(0, outIdx);
+            direction = 'out';
+            pinId = key.substring(outIdx + 5);
+          } else if (inIdx > 0) {
+            nodeId = key.substring(0, inIdx);
+            direction = 'in';
+            pinId = key.substring(inIdx + 4);
+          } else {
+            // bare pinName — текущая нода на паузе
+            nodeId = state.debugSession.nodeId;
+            direction = 'in';
+            pinId = key;
+          }
+
+          if (!nodeId || !pinId) return;
+
+          if (direction === 'in' && state.debugSession.nodeId === nodeId) {
+            if (!state.debugSession.inputs) state.debugSession.inputs = {};
+            state.debugSession.inputs[pinId] = value;
+          }
+
+          if (state.debugSession.executedSteps?.steps) {
+            const steps = state.debugSession.executedSteps.steps;
+            for (let i = steps.length - 1; i >= 0; i--) {
+              const s = steps[i];
+              if (s.type === 'traversal') continue;
+              if (s.nodeId !== nodeId) continue;
+              if (direction === 'out') {
+                if (!s.outputs) s.outputs = {};
+                s.outputs[pinId] = value;
+              } else {
+                if (!s.inputs) s.inputs = {};
+                s.inputs[pinId] = value;
+              }
+              break;
             }
           }
         });
@@ -1732,6 +1902,11 @@ export const useVisualEditorStore = create(
       socket.off('debug:user-joined');
       socket.off('debug:user-left');
       socket.off('debug:value-updated');
+      socket.off('debug:rewound');
+      socket.off('debug:rewind-failed');
+      socket.off('debug:test-mode-started');
+      socket.off('debug:test-mode-stopped');
+      socket.off('debug:stopped');
 
       socket.disconnect();
 

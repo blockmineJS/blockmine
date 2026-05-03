@@ -207,6 +207,32 @@ function initializeSocket(httpServer) {
             debugState.stop();
         });
 
+        socket.on('debug:step-back', ({ sessionId }) => {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.getBySessionId(sessionId);
+            if (!debugState) {
+                socket.emit('debug:error', { message: 'No active debug session for step-back' });
+                return;
+            }
+            const target = debugState.stepBack();
+            if (!target) {
+                socket.emit('debug:error', { message: 'Cannot step back: no history' });
+            }
+        });
+
+        socket.on('debug:enable-test-mode', ({ botId, graphId }) => {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.getOrCreate(botId, graphId);
+            debugState.enableTestMode({ botId, graphId });
+        });
+
+        socket.on('debug:disable-test-mode', ({ graphId }) => {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.get(graphId);
+            if (!debugState) return;
+            debugState.disableTestMode();
+        });
+
         socket.on('debug:update-value', ({ botId, graphId, key, value }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.get(graphId);

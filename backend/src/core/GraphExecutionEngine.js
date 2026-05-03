@@ -6,6 +6,7 @@ const debugConfig = require('../config/debug.config');
 const prisma = prismaService.getClient();
 
 const BreakLoopSignal = require('./BreakLoopSignal');
+const RewindSignal = require('./RewindSignal');
 const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 
@@ -77,12 +78,39 @@ class GraphExecutionEngine {
           }
 
           if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
-          this.memo.clear();
 
-          const eventName = eventType || 'command';
-          const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
+          let rewindAttempts = 0;
+          const MAX_REWINDS = 100;
+          this._inputOverrides = new Map();
 
-          if (startNode) {
+          while (true) {
+              this.memo.clear();
+
+              if (graphId) {
+                  try {
+                      const debugManager = getGlobalDebugManager();
+                      const debugState = debugManager.get(graphId);
+                      if (debugState && debugState.replayState) {
+                          if (debugState.replayState.variables) {
+                              this.context.variables = JSON.parse(JSON.stringify(debugState.replayState.variables));
+                          }
+                          if (debugState.replayState.commandArguments) {
+                              this.context.commandArguments = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
+                          }
+                      }
+                  } catch (e) {}
+              }
+
+              const eventName = eventType || 'command';
+              const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
+
+              if (!startNode) {
+                  if (!eventType) {
+                      throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
+                  }
+                  break;
+              }
+
               if (this.currentTraceId) {
                   this.traceCollector.recordStep(this.currentTraceId, {
                       nodeId: startNode.id,
@@ -94,9 +122,33 @@ class GraphExecutionEngine {
                   });
               }
 
-              await this.traverse(startNode, 'exec');
-          } else if (!eventType) {
-              throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
+              try {
+                  await this.traverse(startNode, 'exec');
+                  break;
+              } catch (err) {
+                  if (err instanceof RewindSignal) {
+                      rewindAttempts++;
+                      if (rewindAttempts > MAX_REWINDS) {
+                          console.error('[Debug] Too many rewinds, aborting');
+                          break;
+                      }
+                      console.log(`[Debug] Rewind requested, restarting graph (attempt ${rewindAttempts})`);
+
+                      if (this.currentTraceId && graphId && botId) {
+                          try {
+                              await this.traceCollector.completeTrace(this.currentTraceId);
+                          } catch (e) {}
+                          this.currentTraceId = await this.traceCollector.startTrace(
+                              botId,
+                              graphId,
+                              eventType || 'command',
+                              context.eventArgs || {}
+                          );
+                      }
+                      continue;
+                  }
+                  throw err;
+              }
           }
 
           if (this.currentTraceId) {
@@ -163,8 +215,11 @@ class GraphExecutionEngine {
               this.currentTraceId = null;
           }
 
-          if (!(error instanceof BreakLoopSignal)) {
+          const isStoppedByDebugger = error?.message === 'Execution stopped by debugger';
+          if (!(error instanceof BreakLoopSignal) && !isStoppedByDebugger) {
             console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
+          } else if (isStoppedByDebugger) {
+            console.log('[GraphExecutionEngine] Execution stopped by user from debugger');
           }
       }
 
@@ -297,16 +352,13 @@ class GraphExecutionEngine {
               if (debugState && debugState.shouldStepPause(node.id)) {
                   console.log(`[Debug] Step mode: pausing after executing node ${node.id}`);
 
-                  // Получаем inputs для отправки в debug session
                   const inputs = await this._captureNodeInputs(node);
 
-                  // Получаем текущую трассировку для отображения выполненных шагов
                   const executedSteps = this.currentTraceId
                       ? await this.traceCollector.getTrace(this.currentTraceId)
                       : null;
 
-                  // Паузим выполнение
-                  await debugState.pause({
+                  const overrides = await debugState.pause({
                       nodeId: node.id,
                       nodeType: node.type,
                       inputs,
@@ -317,9 +369,22 @@ class GraphExecutionEngine {
                           commandArguments: this.context.commandArguments,
                       }
                   });
+
+                  if (overrides && overrides.__rewind) {
+                      throw new RewindSignal(overrides.target);
+                  }
+
+                  if (overrides && overrides.__stopped) {
+                      throw new Error('Execution stopped by debugger');
+                  }
+
+                  if (overrides) {
+                      this.applyWhatIfOverrides(node, overrides);
+                  }
               }
           }
       } catch (error) {
+          if (error instanceof RewindSignal) throw error;
           if (error.message !== 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
               throw error;
           }
@@ -464,6 +529,11 @@ class GraphExecutionEngine {
   }
 
   async resolvePinValue(node, pinId, defaultValue = null) {
+      const overrideValue = this._getInputOverride && this._getInputOverride(node.id, pinId);
+      if (overrideValue !== undefined) {
+          return overrideValue;
+      }
+
       const connection = this.activeGraph.connections.find(c => c.targetNodeId === node.id && c.targetPinId === pinId);
       if (connection) {
           const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
@@ -514,12 +584,31 @@ class GraphExecutionEngine {
               memo: this.memo,
           };
 
-          // Записываем data ноду в трассировку перед вычислением (только один раз)
           const traceKey = `trace_recorded:${node.id}`;
-          const isDataNode = !nodeConfig.pins.inputs.some(p => p.type === 'Exec');
+          let inputPinsLocal = [];
+          let outputPinsLocal = [];
+          try {
+              if (typeof nodeConfig.getInputs === 'function') {
+                  inputPinsLocal = nodeConfig.getInputs(node.data || {}) || [];
+              } else if (typeof nodeConfig.computeInputs === 'function') {
+                  inputPinsLocal = nodeConfig.computeInputs(node.data || {}) || [];
+              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
+                  inputPinsLocal = nodeConfig.pins.inputs;
+              }
+              if (typeof nodeConfig.getOutputs === 'function') {
+                  outputPinsLocal = nodeConfig.getOutputs(node.data || {}) || [];
+              } else if (typeof nodeConfig.computeOutputs === 'function') {
+                  outputPinsLocal = nodeConfig.computeOutputs(node.data || {}) || [];
+              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.outputs)) {
+                  outputPinsLocal = nodeConfig.pins.outputs;
+              }
+          } catch (e) {
+              inputPinsLocal = nodeConfig.pins?.inputs || [];
+              outputPinsLocal = nodeConfig.pins?.outputs || [];
+          }
+          const isDataNode = !inputPinsLocal.some(p => p && p.type === 'Exec');
 
           if (this.currentTraceId && isDataNode && !this.memo.has(traceKey)) {
-              // Это data нода (нет exec пинов) и она ещё не записана - записываем её inputs
               const inputs = await this._captureNodeInputs(node);
 
               this.traceCollector.recordStep(this.currentTraceId, {
@@ -531,7 +620,6 @@ class GraphExecutionEngine {
                   outputs: {},
               });
 
-              // Помечаем, что нода уже записана в трассировку
               this.memo.set(traceKey, true);
           }
 
@@ -542,13 +630,11 @@ class GraphExecutionEngine {
               this.memo.set(cacheKey, result);
           }
 
-          // Обновляем outputs для data ноды после вычисления И после записи в memo
-          // Обновляем только один раз для всей ноды (не для каждого пина отдельно)
           const traceOutputsKey = `trace_outputs_recorded:${node.id}`;
           if (this.currentTraceId && isDataNode && this.memo.has(traceKey) && !this.memo.has(traceOutputsKey)) {
               const outputs = {};
-              for (const outputPin of nodeConfig.pins.outputs) {
-                  if (outputPin.type !== 'Exec') {
+              for (const outputPin of outputPinsLocal) {
+                  if (outputPin && outputPin.type !== 'Exec') {
                       const outKey = `${node.id}:${outputPin.id}`;
                       if (this.memo.has(outKey)) {
                           outputs[outputPin.id] = this.memo.get(outKey);
@@ -694,11 +780,21 @@ class GraphExecutionEngine {
           const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
           if (!nodeConfig) continue;
 
-          // Проверяем, является ли это data-нодой (нет exec входов)
-          const isDataNode = !nodeConfig.pins.inputs.some(p => p.type === 'Exec');
+          let inputPinsForCheck = [];
+          try {
+              if (typeof nodeConfig.getInputs === 'function') {
+                  inputPinsForCheck = nodeConfig.getInputs(node.data || {}) || [];
+              } else if (typeof nodeConfig.computeInputs === 'function') {
+                  inputPinsForCheck = nodeConfig.computeInputs(node.data || {}) || [];
+              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
+                  inputPinsForCheck = nodeConfig.pins.inputs;
+              }
+          } catch (e) {
+              inputPinsForCheck = nodeConfig.pins?.inputs || [];
+          }
+          const isDataNode = !inputPinsForCheck.some(p => p && p.type === 'Exec');
           if (!isDataNode) continue;
 
-          // Захватываем outputs
           try {
               const outputs = await this._captureNodeOutputs(node);
               if (outputs && Object.keys(outputs).length > 0) {
@@ -716,20 +812,29 @@ class GraphExecutionEngine {
   async _captureNodeInputs(node) {
       const inputs = {};
 
-      // Получаем конфигурацию ноды
       const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (!nodeConfig || !nodeConfig.pins || !nodeConfig.pins.inputs) {
+      if (!nodeConfig) {
           return inputs;
       }
 
-      // Захватываем значения всех входов
-      for (const inputPin of nodeConfig.pins.inputs) {
-          if (inputPin.type === 'Exec') continue; // Пропускаем exec пины
+      let inputPins = [];
+      try {
+          if (typeof nodeConfig.getInputs === 'function') {
+              inputPins = nodeConfig.getInputs(node.data || {}) || [];
+          } else if (typeof nodeConfig.computeInputs === 'function') {
+              inputPins = nodeConfig.computeInputs(node.data || {}) || [];
+          } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
+              inputPins = nodeConfig.pins.inputs;
+          }
+      } catch (e) {
+          inputPins = nodeConfig.pins?.inputs || [];
+      }
+
+      for (const inputPin of inputPins) {
+          if (!inputPin || inputPin.type === 'Exec') continue;
 
           try {
-              // Используем resolvePinValue для получения актуального значения
               const value = await this.resolvePinValue(node, inputPin.id);
-              // Записываем все значения, включая undefined и null
               inputs[inputPin.id] = value;
           } catch (error) {
               inputs[inputPin.id] = '<error capturing>';
@@ -744,21 +849,29 @@ class GraphExecutionEngine {
   async _captureNodeOutputs(node) {
       const outputs = {};
 
-      // Получаем конфигурацию ноды
       const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (!nodeConfig || !nodeConfig.pins || !nodeConfig.pins.outputs) {
+      if (!nodeConfig) {
           return outputs;
       }
 
-      // Захватываем значения всех выходов
-      for (const outputPin of nodeConfig.pins.outputs) {
-          if (outputPin.type === 'Exec') continue; // Пропускаем exec пины
+      let outputPins = [];
+      try {
+          if (typeof nodeConfig.getOutputs === 'function') {
+              outputPins = nodeConfig.getOutputs(node.data || {}) || [];
+          } else if (typeof nodeConfig.computeOutputs === 'function') {
+              outputPins = nodeConfig.computeOutputs(node.data || {}) || [];
+          } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.outputs)) {
+              outputPins = nodeConfig.pins.outputs;
+          }
+      } catch (e) {
+          outputPins = nodeConfig.pins?.outputs || [];
+      }
+
+      for (const outputPin of outputPins) {
+          if (!outputPin || outputPin.type === 'Exec') continue;
 
           try {
-              // Активно вызываем evaluateOutputPin вместо чтения из memo
-              // Это необходимо для event нод, которые используют switch-case и не пишут в memo
               const value = await this.evaluateOutputPin(node, outputPin.id);
-              // Записываем все значения, включая undefined и null
               outputs[outputPin.id] = value;
           } catch (error) {
               outputs[outputPin.id] = '<error capturing>';
@@ -818,6 +931,10 @@ class GraphExecutionEngine {
                   }
               });
 
+              if (overrides && overrides.__rewind) {
+                  throw new RewindSignal(overrides.target);
+              }
+
               if (overrides && overrides.__stopped) {
                   throw new Error('Execution stopped by debugger');
               }
@@ -827,11 +944,12 @@ class GraphExecutionEngine {
               }
           }
       } catch (error) {
+          if (error instanceof RewindSignal) throw error;
+          if (error.message === 'Execution stopped by debugger') throw error;
           console.error(`[checkBreakpoint] ERROR:`, error.message, error.stack);
           if (error.message === 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
               return;
           }
-          // НЕ пробрасываем ошибку дальше, чтобы не сломать выполнение
           console.error(`[checkBreakpoint] Ignoring error to continue execution`);
       }
   }
@@ -966,46 +1084,49 @@ class GraphExecutionEngine {
 
       console.log(`[Debug] Applying what-if overrides to node ${node.id}:`, overrides);
 
-      for (const [key, value] of Object.entries(overrides)) {
-          if (key === '__stopped') continue;
+      if (!this._inputOverrides) this._inputOverrides = new Map();
 
-          // Парсим ключ для определения типа изменения
-          // Форматы:
-          // - "var.varName" - переменная графа
-          // - "nodeId.out.pinName" - выходной пин ноды
-          // - "nodeId.in.pinName" - входной пин ноды
-          // - "pinName" - входной пин текущей ноды
+      for (const [key, value] of Object.entries(overrides)) {
+          if (key === '__stopped' || key === '__rewind' || key === 'target') continue;
 
           if (key.startsWith('var.')) {
-              // Изменение переменной графа
               const varName = key.substring(4);
-              if (!this.context.variables) {
-                  this.context.variables = {};
-              }
+              if (!this.context.variables) this.context.variables = {};
               this.context.variables[varName] = value;
-              console.log(`[Debug] Variable override: ${varName} = ${JSON.stringify(value)}`);
+              console.log(`[Debug] Variable override: ${varName} =`, value);
+              continue;
           }
-          else if (key.includes('.out.')) {
-              // Изменение выходного пина ноды
-              const [nodeId, , pinName] = key.split('.');
-              const memoKey = `${nodeId}:${pinName}`;
+
+          const outIdx = key.indexOf('.out.');
+          if (outIdx > 0) {
+              const targetNodeId = key.substring(0, outIdx);
+              const pinName = key.substring(outIdx + 5);
+              const memoKey = `${targetNodeId}:${pinName}`;
               this.memo.set(memoKey, value);
-              console.log(`[Debug] Output override: ${memoKey} = ${JSON.stringify(value)}`);
+              console.log(`[Debug] Output override: ${memoKey} =`, value);
+              continue;
           }
-          else if (key.includes('.in.')) {
-              // Изменение входного пина ноды (пока не применяется, но можно расширить)
-              const [nodeId, , pinName] = key.split('.');
-              console.log(`[Debug] Input override (informational): ${nodeId}.${pinName} = ${JSON.stringify(value)}`);
-              // Входы можно изменить через изменение outputs предыдущих нод или переменных
+
+          const inIdx = key.indexOf('.in.');
+          if (inIdx > 0) {
+              const targetNodeId = key.substring(0, inIdx);
+              const pinName = key.substring(inIdx + 4);
+              this._inputOverrides.set(`${targetNodeId}:${pinName}`, value);
+              console.log(`[Debug] Input override stored: ${targetNodeId}.${pinName} =`, value);
+              continue;
           }
-          else {
-              // Изменение входного пина текущей ноды
-              if (!node.data) {
-                  node.data = {};
-              }
-              node.data[key] = value;
-          }
+
+          this._inputOverrides.set(`${node.id}:${key}`, value);
+          if (!node.data) node.data = {};
+          node.data[key] = value;
+          console.log(`[Debug] Current-node input override: ${node.id}.${key} =`, value);
       }
+  }
+
+  _getInputOverride(nodeId, pinId) {
+      if (!this._inputOverrides) return undefined;
+      const k = `${nodeId}:${pinId}`;
+      return this._inputOverrides.has(k) ? this._inputOverrides.get(k) : undefined;
   }
 }
 

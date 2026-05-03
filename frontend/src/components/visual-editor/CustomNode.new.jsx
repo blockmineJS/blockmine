@@ -173,7 +173,7 @@ function CustomNode({ data, type, id: nodeId }) {
         traceOutputs={displayData.outputs}
         isHighlighted={highlightedNodeIds.has(nodeId)}
         isActiveNode={currentActiveNodeId === nodeId}
-        isTraceActive={isTraceViewerOpen}
+        isTraceActive={isTraceViewerOpen || !!debugSession}
         breakpoint={breakpoint}
         isPausedNode={debugSession?.status === 'paused' && debugSession?.nodeId === nodeId}
       />

@@ -23,6 +23,8 @@ import AnimatedEdge from '@/components/visual-editor/AnimatedEdge';
 import TraceViewer from '@/components/visual-editor/TraceViewer';
 import TraceStepInfo from '@/components/visual-editor/TraceStepInfo';
 import DebugPanel from '@/components/visual-editor/DebugPanel';
+import DebugStepInfo from '@/components/visual-editor/DebugStepInfo';
+import RunNodeDialog from '@/components/visual-editor/RunNodeDialog';
 import DebugControls from '@/components/visual-editor/DebugControls';
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
@@ -174,6 +176,7 @@ function BotVisualEditorPage() {
     const closeTraceViewer = useVisualEditorStore(state => state.closeTraceViewer);
     const debugMode = useVisualEditorStore(state => state.debugMode);
     const setDebugMode = useVisualEditorStore(state => state.setDebugMode);
+    const debugSession = useVisualEditorStore(state => state.debugSession);
     const socket = useVisualEditorStore(state => state.socket);
     const setViewport = useVisualEditorStore(state => state.setViewport);
     const copyNodes = useVisualEditorStore(state => state.copyNodes);
@@ -858,7 +861,11 @@ function BotVisualEditorPage() {
                         {isTraceViewerOpen ? (
                             <TraceStepInfo />
                         ) : debugMode === 'live' ? (
-                            <DebugPanel />
+                            debugSession && debugSession.status === 'paused' ? (
+                                <DebugStepInfo />
+                            ) : (
+                                <DebugPanel />
+                            )
                         ) : (
                             <SettingsPanel />
                         )}
@@ -866,6 +873,7 @@ function BotVisualEditorPage() {
                 </ResizablePanelGroup>
                 <TraceViewer />
                 <DebugControls />
+                <RunNodeDialog />
                 </div>
             </ReactFlowProvider>
         </FadeTransition>

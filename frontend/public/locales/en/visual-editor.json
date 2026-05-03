@@ -225,7 +225,12 @@
     "normalModeDesc": "Graph editing. Enable <strong>Live mode</strong> for real-time debugging with breakpoints.",
     "traceModeTitle": "Trace mode:",
     "traceModeDesc": "View execution traces after commands complete. Switch to <strong>Live mode</strong> for real-time debugging with breakpoints.",
-    "editValue": "Edit value"
+    "editValue": "Edit value",
+    "connection": "Connection",
+    "status": "Status:",
+    "usersLabel": "Users:",
+    "tipTitle": "Tip",
+    "liveModeTip": "Start a test run or wait for a breakpoint to hit. On pause, a panel with input values and step controls will appear."
   },
   "traceViewer": {
     "completed": "Completed",
@@ -341,5 +346,59 @@
     "update": "Update",
     "add": "Add",
     "breakpoint": "breakpoint"
+  },
+  "debugStepInfo": {
+    "title": "Debug",
+    "empty": "Start the graph or enable test mode — current step data will appear here.",
+    "stepNumber": "Step {{n}}",
+    "testStepNumber": "Test step {{n}}",
+    "paused": "Paused",
+    "controls": "Controls",
+    "whatIf": "What-if (override values)",
+    "historyDepth": "History depth:",
+    "unknown": "Unknown"
+  },
+  "testMode": {
+    "title": "Test Mode",
+    "description": "Run the graph step by step with an emulated event. You can edit values and rewind.",
+    "startButton": "Start test",
+    "exitButton": "Exit test",
+    "running": "running",
+    "idle": "idle",
+    "startTitle": "Start test run",
+    "startRun": "Start",
+    "cancel": "Cancel",
+    "close": "Close",
+    "eventTypeLabel": "Event type",
+    "noFields": "No additional data required",
+    "stepBack": "Back",
+    "stepBackTitle": "Rewind by one step",
+    "step": "step {{n}}",
+    "runNodeTitle": "Run node in isolation",
+    "runSelectedNode": "Run this node ({{type}})",
+    "runIsolated": "Run",
+    "noInputPins": "This node has no data input pins",
+    "valueOrJson": "value or JSON",
+    "executed": "Executed",
+    "error": "Error",
+    "outputs": "Outputs:",
+    "fields": {
+      "username": "Username",
+      "message": "Message",
+      "health": "Health (0-20)",
+      "food": "Food (0-20)",
+      "commandArgsJson": "Command arguments (JSON)"
+    },
+    "events": {
+      "chat": "Chat message",
+      "playerJoined": "Player joined",
+      "playerLeft": "Player left",
+      "health": "Health changed",
+      "botDied": "Bot died",
+      "entitySpawn": "Entity spawn",
+      "entityGone": "Entity gone",
+      "botStartup": "Bot startup",
+      "command": "Command"
+    }
   }
 }

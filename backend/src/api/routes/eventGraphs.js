@@ -458,5 +458,151 @@ router.post('/:graphId/duplicate',
   }
 );
 
+router.post('/test-run/:graphId',
+  authorize('management:edit'),
+  async (req, res) => {
+    const { botId, graphId } = req.params;
+    const { eventType = 'chat', eventArgs = {} } = req.body || {};
+
+    try {
+      const eventGraph = await prisma.eventGraph.findFirst({
+        where: { id: parseInt(graphId), botId: parseInt(botId) }
+      });
+      if (!eventGraph) {
+        return res.status(404).json({ error: 'Event graph not found' });
+      }
+      if (!eventGraph.graphJson) {
+        return res.status(400).json({ error: 'Graph has no data' });
+      }
+
+      const parsed = JSON.parse(eventGraph.graphJson);
+      const graph = {
+        id: eventGraph.id,
+        name: eventGraph.name,
+        nodes: parsed.nodes || [],
+        connections: parsed.connections || [],
+        variables: parsed.variables || []
+      };
+
+      const nodeRegistry = require('../../core/NodeRegistry');
+      const GraphExecutionEngine = require('../../core/GraphExecutionEngine');
+      const { getGlobalDebugManager } = require('../../core/services/DebugSessionManager');
+      const { buildTestContext } = require('../../core/services/TestModeContext');
+
+      const debugManager = getGlobalDebugManager();
+      const debugState = debugManager.getOrCreate(parseInt(botId), parseInt(graphId));
+      debugState.enableTestMode({ botId: parseInt(botId), graphId: parseInt(graphId), eventType, eventArgs });
+
+      const engine = new GraphExecutionEngine(nodeRegistry, null);
+
+      const context = buildTestContext({
+        botId: parseInt(botId),
+        graphId: parseInt(graphId),
+        eventArgs
+      });
+
+      engine.execute(graph, context, eventType).catch(err => {
+        if (!err) return;
+        if (err.name === 'BreakLoopSignal') return;
+        if (err.message === 'Execution stopped by debugger') return;
+        logger.error('[Test Run] Execution error:', err.message);
+      });
+
+      res.json({ success: true, message: 'Test run started in step mode' });
+    } catch (error) {
+      logger.error('[Test Run] Failed:', error);
+      res.status(500).json({ error: error.message || 'Test run failed' });
+    }
+  }
+);
+
+router.post('/run-node/:graphId/:nodeId',
+  authorize('management:edit'),
+  async (req, res) => {
+    const { botId, graphId, nodeId } = req.params;
+    const { inputs = {}, variables = {} } = req.body || {};
+
+    try {
+      const eventGraph = await prisma.eventGraph.findFirst({
+        where: { id: parseInt(graphId), botId: parseInt(botId) }
+      });
+      if (!eventGraph) {
+        return res.status(404).json({ error: 'Event graph not found' });
+      }
+      const parsed = JSON.parse(eventGraph.graphJson || '{}');
+      const node = (parsed.nodes || []).find(n => n.id === nodeId);
+      if (!node) {
+        return res.status(404).json({ error: 'Node not found in graph' });
+      }
+
+      const nodeRegistry = require('../../core/NodeRegistry');
+      const nodeConfig = nodeRegistry.getNodeConfig(node.type);
+      if (!nodeConfig) {
+        return res.status(400).json({ error: `Unknown node type: ${node.type}` });
+      }
+
+      const GraphExecutionEngine = require('../../core/GraphExecutionEngine');
+      const { buildTestContext } = require('../../core/services/TestModeContext');
+      const engine = new GraphExecutionEngine(nodeRegistry, null);
+
+      engine.activeGraph = {
+        id: parseInt(graphId),
+        nodes: parsed.nodes || [],
+        connections: parsed.connections || [],
+        variables: parsed.variables || []
+      };
+      engine.context = {
+        ...buildTestContext({
+          botId: parseInt(botId),
+          graphId: parseInt(graphId),
+          eventArgs: inputs
+        }),
+        variables
+      };
+
+      for (const [pin, value] of Object.entries(inputs)) {
+        engine.memo.set(`__forced:${node.id}:${pin}`, value);
+      }
+      const originalResolve = engine.resolvePinValue.bind(engine);
+      engine.resolvePinValue = async function(targetNode, pinName) {
+        if (targetNode.id === node.id && engine.memo.has(`__forced:${node.id}:${pinName}`)) {
+          return engine.memo.get(`__forced:${node.id}:${pinName}`);
+        }
+        return originalResolve(targetNode, pinName);
+      };
+
+      const startedAt = Date.now();
+      const helpers = {
+        resolvePinValue: engine.resolvePinValue.bind(engine),
+        traverse: async () => {},
+        memo: engine.memo,
+        clearLoopBodyMemo: () => {}
+      };
+
+      let outputs = {};
+      let errorMsg = null;
+      try {
+        await nodeConfig.executor.call(engine, node, engine.context, helpers);
+        outputs = await engine._captureNodeOutputs(node);
+      } catch (e) {
+        errorMsg = e.message;
+      }
+
+      res.json({
+        success: !errorMsg,
+        nodeId: node.id,
+        nodeType: node.type,
+        executionTime: Date.now() - startedAt,
+        outputs,
+        error: errorMsg,
+        variables: engine.context.variables
+      });
+    } catch (error) {
+      logger.error('[Run Node] Failed:', error);
+      res.status(500).json({ error: error.message || 'Run node failed' });
+    }
+  }
+);
+
 module.exports = router;
 

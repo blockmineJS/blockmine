@@ -25,6 +25,12 @@ class GraphDebugState {
     // Режим пошагового выполнения (step over)
     this.stepMode = false; // Если true, остановится на следующей ноде
     this.stepFromNodeId = null; // ID ноды, с которой начали step over (чтобы её пропустить)
+
+    this.testMode = false;
+    this.history = [];
+    this.historyLimit = 200;
+    this.rewindTargetIndex = null;
+    this.replayState = null;
   }
 
   /**
@@ -53,7 +59,6 @@ class GraphDebugState {
    * Возвращает Promise, который разрешится когда пользователь нажмет Continue
    */
   async pause(state) {
-    // Генерируем sessionId для этой паузы
     const sessionId = randomUUID();
 
     this.activeExecution = {
@@ -62,10 +67,14 @@ class GraphDebugState {
       pausedAt: Date.now()
     };
 
+    this.pushSnapshot(state);
 
     this.broadcast('debug:paused', {
       sessionId,
-      ...state
+      ...state,
+      historyLength: this.history.length,
+      canStepBack: this.history.length > 1,
+      testMode: this.testMode
     });
 
 
@@ -86,18 +95,18 @@ class GraphDebugState {
    * @param {boolean} stepMode - Если true, остановится на следующей ноде
    */
   resume(overrides = null, stepMode = false) {
+    const effectiveStepMode = this.testMode ? true : stepMode;
+
     if (this.resumeCallback) {
-      // Объединяем pendingOverrides с переданными overrides
       const finalOverrides = {
         ...this.pendingOverrides,
         ...(overrides || {})
       };
 
-      console.log('[GraphDebugState] Resuming with overrides:', finalOverrides, 'stepMode:', stepMode);
+      console.log('[GraphDebugState] Resuming with overrides:', finalOverrides, 'stepMode:', effectiveStepMode, 'testMode:', this.testMode);
 
-      // Устанавливаем флаг stepMode и запоминаем текущую ноду
-      this.stepMode = stepMode;
-      if (stepMode && this.activeExecution) {
+      this.stepMode = effectiveStepMode;
+      if (effectiveStepMode && this.activeExecution) {
         this.stepFromNodeId = this.activeExecution.nodeId;
         console.log('[GraphDebugState] Step mode: will skip current node', this.stepFromNodeId);
       }
@@ -107,15 +116,14 @@ class GraphDebugState {
       this.pausePromise = null;
     }
 
-    // Если не step mode, очищаем состояние полностью
-    if (!stepMode) {
+    if (!effectiveStepMode) {
       this.activeExecution = null;
       this.stepFromNodeId = null;
     }
 
-    this.pendingOverrides = {}; // Очищаем после применения
+    this.pendingOverrides = {};
 
-    this.broadcast('debug:resumed', { stepMode });
+    this.broadcast('debug:resumed', { stepMode: effectiveStepMode, testMode: this.testMode });
   }
 
   /**
@@ -132,6 +140,14 @@ class GraphDebugState {
     this.pendingOverrides = {}; // Очищаем при остановке
     this.stepMode = false; // Сбрасываем step mode
     this.stepFromNodeId = null; // Очищаем запомненную ноду
+
+    if (this.testMode) {
+      this.testMode = false;
+      this.history = [];
+      this.rewindTargetIndex = null;
+      this.replayState = null;
+      this.broadcast('debug:test-mode-stopped', {});
+    }
 
     this.broadcast('debug:stopped', {});
   }
@@ -217,6 +233,89 @@ class GraphDebugState {
     console.log(`[GraphDebugState] Set override: ${key} =`, value);
   }
 
+  pushSnapshot(state) {
+    if (!state) return;
+    const snapshot = {
+      index: this.history.length,
+      nodeId: state.nodeId,
+      nodeType: state.nodeType,
+      inputs: this._cloneSafely(state.inputs),
+      variables: this._cloneSafely(state.context?.variables),
+      commandArguments: this._cloneSafely(state.context?.commandArguments),
+      executedSteps: this._cloneSafely(state.executedSteps),
+      capturedAt: Date.now()
+    };
+    this.history.push(snapshot);
+    if (this.history.length > this.historyLimit) {
+      this.history.shift();
+      this.history.forEach((s, i) => { s.index = i; });
+    }
+  }
+
+  _cloneSafely(value) {
+    if (value === undefined || value === null) return value;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  enableTestMode(initialPayload = {}) {
+    this.testMode = true;
+    this.stepMode = true;
+    this.stepFromNodeId = null;
+    this.history = [];
+    this.rewindTargetIndex = null;
+    this.replayState = null;
+    this.broadcast('debug:test-mode-started', {
+      ...initialPayload,
+      testMode: true
+    });
+  }
+
+  disableTestMode() {
+    this.testMode = false;
+    this.history = [];
+    this.rewindTargetIndex = null;
+    this.replayState = null;
+    this.broadcast('debug:test-mode-stopped', {});
+  }
+
+  consumeRewindTarget(nodeId) {
+    if (this.rewindTargetIndex === null) return false;
+    const target = this.history[this.rewindTargetIndex];
+    if (target && target.nodeId === nodeId) {
+      this.rewindTargetIndex = null;
+      return true;
+    }
+    return false;
+  }
+
+  stepBack() {
+    if (this.history.length < 2) {
+      this.broadcast('debug:rewind-failed', { reason: 'no-history' });
+      return null;
+    }
+    const target = this.history[this.history.length - 2];
+    this.history = this.history.slice(0, this.history.length - 1);
+    this.rewindTargetIndex = this.history.length - 1;
+    this.replayState = {
+      variables: target.variables,
+      commandArguments: target.commandArguments,
+      targetNodeId: target.nodeId
+    };
+    if (this.resumeCallback) {
+      this.resumeCallback({ __rewind: true, target });
+      this.resumeCallback = null;
+      this.pausePromise = null;
+    }
+    this.activeExecution = null;
+    this.pendingOverrides = {};
+    this.broadcast('debug:rewound', { target });
+    return target;
+  }
+
   /**
    * Получить текущее состояние (для отправки новым пользователям)
    */
@@ -224,7 +323,10 @@ class GraphDebugState {
     return {
       breakpoints: Array.from(this.breakpoints.values()),
       activeExecution: this.activeExecution,
-      connectedUsers: Array.from(this.connectedUsers.values())
+      connectedUsers: Array.from(this.connectedUsers.values()),
+      testMode: this.testMode,
+      historyLength: this.history.length,
+      canStepBack: this.history.length > 1
     };
   }
 
