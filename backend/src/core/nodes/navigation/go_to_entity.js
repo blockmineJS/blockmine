@@ -1,35 +1,28 @@
 const { goals } = require('mineflayer-pathfinder');
 
-/**
- * navigation:go_to_entity - Идти к сущности
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
 
-  if (pinId === 'exec' || pinId === 'exec_failed') {
-    return true;
-  }
-
   if (!bot?.pathfinder) {
-    if (pinId === 'success') return false;
-    return null;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+    return;
   }
 
-  const entityData = await helpers.resolvePinValue(node, 'entity');
-  const range = (await helpers.resolvePinValue(node, 'range')) || 2;
+  const entityData = await resolvePinValue(node, 'entity', null);
+  const range = await resolvePinValue(node, 'range', node.data?.range) ?? 2;
 
   if (!entityData) {
-    if (pinId === 'success') return false;
-    context._nextExecPin = 'exec_failed';
-    return null;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+    return;
   }
 
   try {
-    // entityData может быть объектом с id или position
     let targetPos;
 
     if (entityData.id !== undefined) {
-      // Ищем актуальную сущность по id
       const entity = bot.entities[entityData.id];
       if (entity?.position) {
         targetPos = entity.position;
@@ -42,28 +35,31 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (!targetPos) {
       console.error('[navigation:go_to_entity] Entity position not found');
-      if (pinId === 'success') return false;
-      context._nextExecPin = 'exec_failed';
-      return null;
+      memo.set(`${node.id}:success`, false);
+      await traverse(node, 'exec_failed');
+      return;
     }
 
-    const goal = new goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, range);
+    const goal = new goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, Number(range));
     await bot.pathfinder.goto(goal);
 
-    if (pinId === 'success') {
-      return true;
-    }
-
-    context._nextExecPin = 'exec';
+    memo.set(`${node.id}:success`, true);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[navigation:go_to_entity] Error:', error.message);
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+  }
+}
 
-    if (pinId === 'success') return false;
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
 
-    context._nextExecPin = 'exec_failed';
+  if (pinId === 'success') {
+    return memo.get(`${node.id}:success`) ?? false;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

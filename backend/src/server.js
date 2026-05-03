@@ -31,6 +31,7 @@ const botCommandsRoutes = require('./api/routes/botCommands');
 const botGroupsRoutes = require('./api/routes/botGroups');
 const botPermissionsRoutes = require('./api/routes/botPermissions');
 const botStatusRoutes = require('./api/routes/botStatus');
+const nodeRegistryRoutes = require('./api/routes/nodeRegistry');
 
 const app = express();
 const server = http.createServer(app);
@@ -84,6 +85,7 @@ app.use('/api/changelog', changelogRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/traces', tracesRoutes);
+app.use('/api/nodes', nodeRegistryRoutes);
 
 app.use(express.static(frontendPath));
 
@@ -160,19 +162,20 @@ async function startServer() {
 
             if (HOST === '0.0.0.0') {
                 const networkInterfaces = os.networkInterfaces();
-                console.log('Панель управления доступна по следующим адресам:');
-                console.log(`  - Локально: http://localhost:${PORT}`);
+                console.log('Доступные адреса:');
+                console.log(`  Frontend: http://localhost:5173`);
+                console.log(`  API:      http://localhost:${PORT}`);
                 Object.keys(networkInterfaces).forEach(ifaceName => {
                     networkInterfaces[ifaceName].forEach(iface => {
                         if (iface.family === 'IPv4' && !iface.internal) {
-                            console.log(`  - В сети: http://${iface.address}:${PORT}`);
+                            console.log(`  Сеть:    http://${iface.address}:5173`);
                         }
                     });
                 });
-                console.log('  - А также по вашему внешнему IP адресу.');
 
             } else {
-                console.log(`Панель управления доступна по адресу: http://localhost:${PORT}`);
+                console.log(`Frontend: http://localhost:5173`);
+                console.log(`API:     http://localhost:${PORT}`);
             }
             
             await TaskScheduler.initialize();

@@ -1,78 +1,72 @@
 const validationService = require('./services/ValidationService');
 const { GRAPH_TYPES } = require('./constants/graphTypes');
+const { NodeDefinition } = require('./NodeDefinition');
 
-/**
- * @typedef {object} NodePin
- * @property {string} id - Уникальный идентификатор пина (например, "exec", "data_result").
- * @property {string} name - Читаемое имя пина.
- * @property {string} type - Тип данных пина ("Exec", "String", "Boolean" и т.д.).
- * @property {boolean} [required] - Является ли этот пин обязательным.
- */
-
-/**
- * @typedef {object} NodeConfig
- * @property {string} type - Уникальный идентификатор типа узла (например, "action:send_message").
- * @property {string} label - Читаемое имя узла.
- * @property {string} category - Категория для группировки в интерфейсе.
- * @property {string} description - Описание узла.
- * @property {NodePin[]} inputs - Массив описаний входных пинов.
- * @property {NodePin[]} outputs - Массив описаний выходных пинов.
- * @property {Function} [executor] - Функция для выполнения этого узла (на бэкенде).
- */
-
-/**
- * Реестр для управления всеми доступными типами узлов.
- */
 class NodeRegistry {
   constructor() {
     this.nodes = new Map();
     this._registerBaseNodes();
   }
 
-  /**
-   * Регистрирует новый тип узла.
-   * @param {NodeConfig} nodeConfig - Конфигурация узла.
-   */
-  registerNodeType(nodeConfig) {
-    if (!nodeConfig.type) {
+  registerNodeType(config) {
+    if (!config.type) {
       throw new Error('Node type is required');
     }
 
-    const validation = validationService.validateNode(nodeConfig, 'NodeRegistry');
+    const validation = validationService.validateNode(config, 'NodeRegistry');
     if (validation.shouldSkip) {
       return;
     }
 
-    if (this.nodes.has(nodeConfig.type)) {
-      console.warn(`Node type '${nodeConfig.type}' is already registered. Overriding.`);
+    if (this.nodes.has(config.type)) {
+      console.warn(`Node type '${config.type}' is already registered. Overriding.`);
     }
 
-    this.nodes.set(nodeConfig.type, nodeConfig);
-    //console.log(`Registered node type: ${nodeConfig.type}`);
+    let nodeDef;
+
+    if (config instanceof NodeDefinition) {
+      nodeDef = config;
+    } else {
+      nodeDef = this._normalizeToNodeDefinition(config);
+    }
+
+    this.nodes.set(config.type, nodeDef);
   }
 
-  /**
-   * Получает конфигурацию узла по его типу.
-   * @param {string} nodeType - Идентификатор типа узла.
-   * @returns {NodeConfig|undefined}
-   */
+  _normalizeToNodeDefinition(config) {
+    const inputs = config.computeInputs
+      ? config.computeInputs
+      : (() => config.pins?.inputs || []);
+
+    const outputs = config.computeOutputs
+      ? config.computeOutputs
+      : (() => config.pins?.outputs || []);
+
+    return new NodeDefinition({
+      type: config.type,
+      category: config.category || 'Other',
+      label: config.label || config.type,
+      description: config.description || '',
+      computeInputs: inputs,
+      computeOutputs: outputs,
+      pins: config.pins || { inputs: [], outputs: [] },
+      executor: config.executor || null,
+      evaluator: config.evaluator || null,
+      defaultData: config.defaultData || {},
+      theme: config.theme || {},
+      icon: config.icon || null,
+      graphType: config.graphType || GRAPH_TYPES.ALL
+    });
+  }
+
   getNodeConfig(nodeType) {
     return this.nodes.get(nodeType);
   }
 
-  /**
-   * Получает все зарегистрированные типы узлов.
-   * @returns {NodeConfig[]}
-   */
   getAllNodes() {
     return Array.from(this.nodes.values());
   }
 
-  /**
-   * Возвращает узлы, сгруппированные по категориям.
-   * @param {string} [graphType] - Тип графа ('command' или 'event') для фильтрации узлов.
-   * @returns {Object.<string, NodeConfig[]>} - Объект с узлами, сгруппированными по категориям.
-   */
   getNodesByCategory(graphType) {
     const result = {};
     for (const node of this.nodes.values()) {
@@ -86,20 +80,14 @@ class NodeRegistry {
     return result;
   }
 
-  /**
-   * Проверяет, существует ли тип узла.
-   * @param {string} nodeType - Идентификатор типа узла.
-   * @returns {boolean}
-   */
   hasNodeType(nodeType) {
     return this.nodes.has(nodeType);
   }
 
-  /**
-   * Регистрирует базовую библиотеку узлов.
-   * Автоматически обнаруживает и загружает все файлы из директории node-registries.
-   * @private
-   */
+  getNodesByTypes(types) {
+    return types.map(type => this.nodes.get(type)).filter(Boolean);
+  }
+
   _registerBaseNodes() {
     const fs = require('fs');
     const path = require('path');
@@ -107,19 +95,31 @@ class NodeRegistry {
     const registriesDir = path.join(__dirname, 'node-registries');
 
     try {
-      // Получаем все файлы .js из директории node-registries
       const files = fs.readdirSync(registriesDir)
         .filter(file => file.endsWith('.js'));
 
-      // Загружаем и регистрируем ноды из каждого файла
       for (const file of files) {
         try {
           const registry = require(path.join(registriesDir, file));
 
           if (typeof registry.registerNodes === 'function') {
             registry.registerNodes(this);
+          } else if (Array.isArray(registry)) {
+            for (const def of registry) {
+              this.registerNodeType(def);
+            }
+          } else if (typeof registry.registerNodeDefinitions === 'function') {
+            const definitions = registry.registerNodeDefinitions();
+            for (const def of definitions) {
+              this.registerNodeType(def);
+            }
+          } else if (typeof registry.createNodeDefinitions === 'function' ||
+                     typeof registry.getNodesByCategory === 'function' ||
+                     typeof registry.getAllNodeTypes === 'function') {
+            // Это служебный модуль (index.js), не содержит нод напрямую
+            // Пропускаем без варнинга
           } else {
-            console.warn(`NodeRegistry: Файл ${file} не экспортирует функцию registerNodes`);
+            console.warn(`NodeRegistry: Файл ${file} не экспортирует registerNodes, массив нод или registerNodeDefinitions`);
           }
         } catch (error) {
           console.error(`NodeRegistry: Ошибка загрузки реестра из ${file}:`, error.message);
@@ -132,8 +132,20 @@ class NodeRegistry {
     }
   }
 
-  getNodesByTypes(types) {
-    return types.map(type => this.nodes.get(type)).filter(Boolean);
+  toJSON() {
+    const result = {};
+    for (const [type, nodeDef] of this.nodes) {
+      result[type] = nodeDef.toJSON();
+    }
+    return result;
+  }
+
+  getNodesByCategoryFlat() {
+    const flat = [];
+    for (const node of this.nodes.values()) {
+      flat.push(node.toJSON());
+    }
+    return flat;
   }
 }
 

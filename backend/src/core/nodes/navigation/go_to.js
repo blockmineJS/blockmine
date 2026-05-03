@@ -1,53 +1,41 @@
 const { goals } = require('mineflayer-pathfinder');
 
-/**
- * navigation:go_to - Идти к указанным координатам
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
 
-  if (pinId === 'exec' || pinId === 'exec_failed') {
-    // Exec выходы обрабатываются движком
-    return true;
-  }
-
   if (!bot?.pathfinder) {
-    if (pinId === 'success') return false;
-    return null;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+    return;
   }
 
-  const x = await helpers.resolvePinValue(node, 'x');
-  const y = await helpers.resolvePinValue(node, 'y');
-  const z = await helpers.resolvePinValue(node, 'z');
-  const range = (await helpers.resolvePinValue(node, 'range')) || 1;
-
-  // Используем данные ноды если входы не подключены
-  const targetX = x ?? node.data?.x ?? 0;
-  const targetY = y ?? node.data?.y ?? 64;
-  const targetZ = z ?? node.data?.z ?? 0;
+  const x = await resolvePinValue(node, 'x', node.data?.x) ?? 0;
+  const y = await resolvePinValue(node, 'y', node.data?.y) ?? 64;
+  const z = await resolvePinValue(node, 'z', node.data?.z) ?? 0;
+  const range = await resolvePinValue(node, 'range', node.data?.range) ?? 1;
 
   try {
-    const goal = new goals.GoalNear(targetX, targetY, targetZ, range);
+    const goal = new goals.GoalNear(Number(x), Number(y), Number(z), Number(range));
     await bot.pathfinder.goto(goal);
 
-    if (pinId === 'success') {
-      return true;
-    }
-
-    // Указываем движку какой exec выход активировать
-    context._nextExecPin = 'exec';
+    memo.set(`${node.id}:success`, true);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[navigation:go_to] Error:', error.message);
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+  }
+}
 
-    if (pinId === 'success') {
-      return false;
-    }
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
 
-    // При ошибке активируем exec_failed
-    context._nextExecPin = 'exec_failed';
+  if (pinId === 'success') {
+    return memo.get(`${node.id}:success`) ?? false;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

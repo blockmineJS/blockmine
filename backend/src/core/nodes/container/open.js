@@ -1,19 +1,12 @@
 const Vec3 = require('vec3');
 
-/**
- * container:open - Открыть контейнер по координатам
- *
- * Executor для action ноды с exec пинами.
- * Использует helpers.traverse для перехода к следующему exec выходу.
- */
 async function execute(node, context, helpers) {
   const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
 
   if (!bot) {
     memo.set(`${node.id}:success`, false);
-    memo.set(`${node.id}:container`, null);
-    await traverse(node, 'exec_failed');
+    await traverse(node, 'exec');
     return;
   }
 
@@ -92,9 +85,6 @@ async function execute(node, context, helpers) {
   }
 }
 
-/**
- * Evaluator для data пинов (success, container)
- */
 async function evaluate(node, pinId, context, helpers) {
   const { memo } = helpers;
 

@@ -1,26 +1,22 @@
 const { goals } = require('mineflayer-pathfinder');
 
-/**
- * navigation:follow - Следовать за игроком
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
 
-  if (pinId === 'exec') {
-    return true;
-  }
-
   if (!bot?.pathfinder) {
-    if (pinId === 'following') return false;
-    return null;
+    memo.set(`${node.id}:following`, false);
+    await traverse(node, 'exec');
+    return;
   }
 
-  const target = await helpers.resolvePinValue(node, 'target');
-  const range = (await helpers.resolvePinValue(node, 'range')) || 3;
+  const target = await resolvePinValue(node, 'target', node.data?.target);
+  const range = await resolvePinValue(node, 'range', node.data?.range) ?? 3;
 
   if (!target) {
-    if (pinId === 'following') return false;
-    return null;
+    memo.set(`${node.id}:following`, false);
+    await traverse(node, 'exec');
+    return;
   }
 
   try {
@@ -28,24 +24,31 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (!player?.entity) {
       console.error(`[navigation:follow] Player "${target}" not found or not visible`);
-      if (pinId === 'following') return false;
-      return null;
+      memo.set(`${node.id}:following`, false);
+      await traverse(node, 'exec');
+      return;
     }
 
-    // Используем GoalFollow для непрерывного следования
-    const goal = new goals.GoalFollow(player.entity, range);
-    bot.pathfinder.setGoal(goal, true); // true = dynamic, обновляется при движении цели
+    const goal = new goals.GoalFollow(player.entity, Number(range));
+    bot.pathfinder.setGoal(goal, true);
 
-    if (pinId === 'following') {
-      return true;
-    }
+    memo.set(`${node.id}:following`, true);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[navigation:follow] Error:', error.message);
+    memo.set(`${node.id}:following`, false);
+    await traverse(node, 'exec');
+  }
+}
 
-    if (pinId === 'following') return false;
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
+
+  if (pinId === 'following') {
+    return memo.get(`${node.id}:following`) ?? false;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

@@ -1,46 +1,48 @@
-/**
- * inventory:select_slot - Выбрать слот хотбара
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
-  const slot = await helpers.resolvePinValue(node, 'slot');
 
-  if (pinId === 'exec') {
-    return true; // Exec output
+  if (!bot) {
+    await traverse(node, 'exec');
+    return;
   }
 
-  if (!bot?.inventory || slot === undefined || slot === null) {
-    if (pinId === 'item') return null;
-    return null;
+  const slot = await resolvePinValue(node, 'slot', node.data?.slot);
+
+  if (slot === undefined || slot === null) {
+    await traverse(node, 'exec');
+    return;
   }
 
   try {
-    // Валидация номера слота (0-8)
     const slotNumber = Math.max(0, Math.min(8, parseInt(slot)));
-
-    // Устанавливаем выбранный слот
     bot.setQuickBarSlot(slotNumber);
 
-    if (pinId === 'item') {
-      // Возвращаем предмет в выбранном слоте
-      const item = bot.inventory.slots[slotNumber + 36]; // Хотбар начинается с 36
-      if (!item) return null;
+    const item = bot.inventory.slots[slotNumber + 36];
+    memo.set(`${node.id}:item`, item ? {
+      name: item.name,
+      displayName: item.displayName,
+      count: item.count,
+      slot: item.slot,
+      type: item.type,
+      metadata: item.metadata
+    } : null);
 
-      return {
-        name: item.name,
-        displayName: item.displayName,
-        count: item.count,
-        slot: item.slot,
-        type: item.type,
-        metadata: item.metadata
-      };
-    }
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[inventory:select_slot] Error:', error.message);
-    if (pinId === 'item') return null;
+    await traverse(node, 'exec');
+  }
+}
+
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
+
+  if (pinId === 'item') {
+    return memo.get(`${node.id}:item`) ?? null;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

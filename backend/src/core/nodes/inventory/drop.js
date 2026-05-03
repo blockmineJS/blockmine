@@ -1,23 +1,24 @@
-/**
- * inventory:drop - Выбросить предмет из инвентаря
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
-  const itemName = await helpers.resolvePinValue(node, 'itemName');
-  const count = await helpers.resolvePinValue(node, 'count');
-  const dropAll = await helpers.resolvePinValue(node, 'dropAll');
 
-  if (pinId === 'exec') {
-    return true; // Exec output
+  if (!bot?.inventory) {
+    memo.set(`${node.id}:dropped`, 0);
+    await traverse(node, 'exec');
+    return;
   }
 
-  if (!bot?.inventory || !itemName) {
-    if (pinId === 'dropped') return 0;
-    return null;
+  const itemName = await resolvePinValue(node, 'itemName', node.data?.itemName);
+  const count = await resolvePinValue(node, 'count', node.data?.count);
+  const dropAll = await resolvePinValue(node, 'dropAll', node.data?.dropAll);
+
+  if (!itemName) {
+    memo.set(`${node.id}:dropped`, 0);
+    await traverse(node, 'exec');
+    return;
   }
 
   try {
-    // Ищем предмет(ы) в инвентаре
     const searchName = itemName.toLowerCase().replace('minecraft:', '');
     const items = bot.inventory.items().filter(i =>
       i.name.toLowerCase().includes(searchName) ||
@@ -25,20 +26,19 @@ async function evaluate(node, pinId, context, helpers) {
     );
 
     if (items.length === 0) {
-      if (pinId === 'dropped') return 0;
-      return null;
+      memo.set(`${node.id}:dropped`, 0);
+      await traverse(node, 'exec');
+      return;
     }
 
     let totalDropped = 0;
 
     if (dropAll) {
-      // Выбрасываем все такие предметы
       for (const item of items) {
         await bot.tossStack(item);
         totalDropped += item.count;
       }
     } else {
-      // Выбрасываем указанное количество или один стак
       const item = items[0];
       const toDrop = count || item.count;
 
@@ -51,15 +51,23 @@ async function evaluate(node, pinId, context, helpers) {
       }
     }
 
-    if (pinId === 'dropped') {
-      return totalDropped;
-    }
+    memo.set(`${node.id}:dropped`, totalDropped);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[inventory:drop] Error:', error.message);
-    if (pinId === 'dropped') return 0;
+    memo.set(`${node.id}:dropped`, 0);
+    await traverse(node, 'exec');
+  }
+}
+
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
+
+  if (pinId === 'dropped') {
+    return memo.get(`${node.id}:dropped`) ?? 0;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

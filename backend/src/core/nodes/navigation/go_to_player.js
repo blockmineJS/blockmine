@@ -1,29 +1,22 @@
 const { goals } = require('mineflayer-pathfinder');
 
-/**
- * navigation:go_to_player - Идти к игроку
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
 
-  if (pinId === 'exec' || pinId === 'exec_failed') {
-    return true;
-  }
-
   if (!bot?.pathfinder) {
-    if (pinId === 'success') return false;
-    if (pinId === 'playerPosition') return null;
-    return null;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+    return;
   }
 
-  const playerName = await helpers.resolvePinValue(node, 'playerName');
-  const range = (await helpers.resolvePinValue(node, 'range')) || 2;
+  const playerName = await resolvePinValue(node, 'playerName', node.data?.playerName);
+  const range = await resolvePinValue(node, 'range', node.data?.range) ?? 3;
 
   if (!playerName) {
-    if (pinId === 'success') return false;
-    if (pinId === 'playerPosition') return null;
-    context._nextExecPin = 'exec_failed';
-    return null;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+    return;
   }
 
   try {
@@ -31,40 +24,42 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (!player?.entity) {
       console.error(`[navigation:go_to_player] Player "${playerName}" not found or not visible`);
-      if (pinId === 'success') return false;
-      if (pinId === 'playerPosition') return null;
-      context._nextExecPin = 'exec_failed';
-      return null;
+      memo.set(`${node.id}:success`, false);
+      await traverse(node, 'exec_failed');
+      return;
     }
 
     const playerPos = player.entity.position;
 
-    if (pinId === 'playerPosition') {
-      return {
-        x: playerPos.x,
-        y: playerPos.y,
-        z: playerPos.z
-      };
-    }
+    memo.set(`${node.id}:playerPosition`, {
+      x: playerPos.x,
+      y: playerPos.y,
+      z: playerPos.z
+    });
 
-    const goal = new goals.GoalNear(playerPos.x, playerPos.y, playerPos.z, range);
+    const goal = new goals.GoalNear(playerPos.x, playerPos.y, playerPos.z, Number(range));
     await bot.pathfinder.goto(goal);
 
-    if (pinId === 'success') {
-      return true;
-    }
-
-    context._nextExecPin = 'exec';
+    memo.set(`${node.id}:success`, true);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[navigation:go_to_player] Error:', error.message);
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec_failed');
+  }
+}
 
-    if (pinId === 'success') return false;
-    if (pinId === 'playerPosition') return null;
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
 
-    context._nextExecPin = 'exec_failed';
+  if (pinId === 'success') {
+    return memo.get(`${node.id}:success`) ?? false;
+  }
+  if (pinId === 'playerPosition') {
+    return memo.get(`${node.id}:playerPosition`) ?? null;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };

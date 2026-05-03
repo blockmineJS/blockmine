@@ -1,22 +1,23 @@
-/**
- * inventory:equip - Экипировать предмет
- */
-async function evaluate(node, pinId, context, helpers) {
+async function execute(node, context, helpers) {
+  const { resolvePinValue, traverse, memo } = helpers;
   const bot = context.bot;
-  const itemName = await helpers.resolvePinValue(node, 'itemName');
-  const destination = (await helpers.resolvePinValue(node, 'destination')) || 'hand';
 
-  if (pinId === 'exec') {
-    return true; // Exec output
+  if (!bot) {
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec');
+    return;
   }
 
-  if (!bot?.inventory || !itemName) {
-    if (pinId === 'success') return false;
-    return null;
+  const itemName = await resolvePinValue(node, 'itemName', node.data?.itemName);
+  const destination = await resolvePinValue(node, 'destination', node.data?.destination) || 'hand';
+
+  if (!itemName) {
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec');
+    return;
   }
 
   try {
-    // Ищем предмет в инвентаре
     const searchName = itemName.toLowerCase().replace('minecraft:', '');
     const item = bot.inventory.items().find(i =>
       i.name.toLowerCase().includes(searchName) ||
@@ -24,22 +25,30 @@ async function evaluate(node, pinId, context, helpers) {
     );
 
     if (!item) {
-      if (pinId === 'success') return false;
-      return null;
+      memo.set(`${node.id}:success`, false);
+      await traverse(node, 'exec');
+      return;
     }
 
-    // Экипируем предмет
     await bot.equip(item, destination);
 
-    if (pinId === 'success') {
-      return true;
-    }
+    memo.set(`${node.id}:success`, true);
+    await traverse(node, 'exec');
   } catch (error) {
     console.error('[inventory:equip] Error:', error.message);
-    if (pinId === 'success') return false;
+    memo.set(`${node.id}:success`, false);
+    await traverse(node, 'exec');
+  }
+}
+
+async function evaluate(node, pinId, context, helpers) {
+  const { memo } = helpers;
+
+  if (pinId === 'success') {
+    return memo.get(`${node.id}:success`) ?? false;
   }
 
   return null;
 }
 
-module.exports = { evaluate };
+module.exports = { execute, evaluate };
