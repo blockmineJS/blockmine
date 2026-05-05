@@ -2,6 +2,8 @@ const DependencyService = require('../DependencyService');
 const { decrypt } = require('../utils/crypto');
 const UserService = require('../UserService');
 const PermissionManager = require('../PermissionManager');
+const CrashRestartManager = require('./CrashRestartManager');
+const BotIPCMessageRouter = require('./BotIPCMessageRouter');
 
 class BotLifecycleService {
     constructor({
@@ -30,7 +32,19 @@ class BotLifecycleService {
         this.logger = logger;
 
         this.logCache = new Map();
-        this.crashCounters = new Map();
+        this.crashRestartManager = new CrashRestartManager(5, 60000);
+
+        this.ipcRouter = new BotIPCMessageRouter({
+            eventGraphManager: this.eventGraphManager,
+            commandExecutionService: this.commandExecutionService,
+            processManager: this.processManager,
+            logger: this.logger,
+            crashRestartManager: this.crashRestartManager,
+            appendLog: this.appendLog.bind(this),
+            emitStatusUpdate: this.emitStatusUpdate.bind(this),
+            restartBot: this.restartBot.bind(this),
+            getBotConfig: (botId) => this.processManager.getProcess(botId)?.botConfig,
+        });
     }
 
     async startBot(botConfig) {
@@ -100,8 +114,7 @@ class BotLifecycleService {
             }
         };
 
-        // Регистрируем обработчики сообщений от child process
-        this._setupChildProcessHandlers(child, botConfig);
+        this.ipcRouter.attachToChild(child, botConfig);
 
         child.send({ type: 'start', config: fullBotConfig });
 
@@ -118,14 +131,12 @@ class BotLifecycleService {
         if (child) {
             this.eventGraphManager.unloadGraphsForBot(botId);
 
-            // Очищаем traces для этого бота
             const { getTraceCollector } = require('./TraceCollectorService');
             const traceCollector = getTraceCollector();
             traceCollector.clearForBot(botId);
 
             child.send({ type: 'stop' });
 
-            // Принудительное завершение через 5 секунд
             setTimeout(() => {
                 if (!child.killed) {
                     this.logger.warn({ botId }, 'Принудительное завершение процесса');
@@ -154,307 +165,9 @@ class BotLifecycleService {
         }
 
         await this.stopBot(botId);
-
-        // Ждём завершения процесса
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         return this.startBot(botConfig);
-    }
-
-    _setupChildProcessHandlers(child, botConfig) {
-        const botId = botConfig.id;
-
-        child.on('message', async (message) => {
-            try {
-                switch (message.type) {
-                    case 'event':
-                        await this._handleEventMessage(botId, message);
-                        break;
-                    case 'plugin:data':
-                        this._handlePluginDataMessage(botId, message);
-                        break;
-                    case 'send_websocket_message':
-                        this._handleWebSocketMessage(message);
-                        break;
-                    case 'log':
-                        this.appendLog(botId, message.content);
-                        break;
-                    case 'plugin-log':
-                        this._handlePluginLog(message.log);
-                        break;
-                    case 'status':
-                        this.emitStatusUpdate(botId, message.status);
-                        break;
-                    case 'bot_ready':
-                        this._handleBotReady(botId);
-                        break;
-                    case 'validate_and_run_command':
-                        if (this.commandExecutionService) {
-                            const botConfig = child.botConfig;
-                            if (botConfig) {
-                                await this.commandExecutionService.handleCommandValidation(botConfig, message);
-                            }
-                        }
-                        break;
-                    case 'request_user_action':
-                        await this._handleUserAction(botId, child, message);
-                        break;
-                    case 'get_player_list_response':
-                        this.processManager.resolvePlayerListRequest(message.requestId, message.payload.players);
-                        break;
-                    case 'get_nearby_entities_response':
-                        this.processManager.resolveNearbyEntitiesRequest(message.requestId, message.payload.entities);
-                        break;
-                    case 'execute_command_response':
-                        this.processManager.resolveCommandRequest(message.requestId, message.result, message.error);
-                        break;
-                    case 'register_command':
-                        await this._handleCommandRegistration(botId, message.commandConfig);
-                        break;
-                    case 'register_permissions':
-                        await this._handlePermissionsRegistration(botId, message);
-                        break;
-                    case 'register_group':
-                        await this._handleGroupRegistration(botId, message);
-                        break;
-                    case 'add_permissions_to_group':
-                        await this._handleAddPermissionsToGroup(botId, message);
-                        break;
-                    case 'trace:completed':
-                        await this._handleTraceCompleted(botId, message.trace);
-                        break;
-                    case 'debug:check_breakpoint':
-                        await this._handleDebugBreakpointCheck(botId, child, message);
-                        break;
-                    case 'debug:check_step_mode':
-                        await this._handleDebugStepModeCheck(botId, child, message);
-                        break;
-                    case 'update_credentials':
-                        await this._handleUpdateCredentials(botId, child, message);
-                        break;
-                    case 'restart_bot':
-                        await this._handleRestartBot(botId, child, message);
-                        break;
-                    case 'change_credentials':
-                        await this._handleChangeCredentials(botId, child, message);
-                        break;
-                }
-            } catch (error) {
-                this.appendLog(botId, `[SYSTEM-ERROR] Критическая ошибка в обработчике: ${error.stack}`);
-                this.logger.error({ botId, error }, 'Критическая ошибка в обработчике сообщений');
-            }
-        });
-
-        child.on('error', (err) => this.appendLog(botId, `[PROCESS FATAL] ${err.stack}`));
-        child.stdout.on('data', (data) => console.log(data.toString()));
-        child.stderr.on('data', (data) => this.appendLog(botId, `[STDERR] ${data.toString()}`));
-
-        child.on('exit', (code, signal) => {
-            this._handleProcessExit(botId, botConfig, code, signal);
-        });
-    }
-
-    async _handleEventMessage(botId, message) {
-        if (message.eventType === 'raw_message') {
-            try {
-                const { getIOSafe } = require('../../real-time/socketHandler');
-                const { broadcastToApiClients } = require('../../real-time/botApi');
-                broadcastToApiClients(getIOSafe(), botId, 'chat:raw_message', {
-                    raw_message: message.args.rawText || message.args.raw_message,
-                    json: message.args.json
-                });
-            } catch (e) { /* Socket.IO может быть не инициализирован */ }
-        }
-
-        try {
-            const { broadcastToPanelNamespace } = require('../../real-time/panelNamespace');
-            broadcastToPanelNamespace(botId, 'bot:event', {
-                botId,
-                eventType: message.eventType,
-                data: message.args || {},
-                timestamp: new Date().toISOString()
-            });
-        } catch (e) { /* Socket.IO может быть не инициализирован */ }
-
-        if (this.eventGraphManager) {
-            this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
-        }
-    }
-
-    _handlePluginDataMessage(botId, message) {
-        const { plugin: pluginName, payload } = message;
-        const pluginSubscribers = this.processManager.getPluginSubscribers(botId, pluginName);
-
-        if (pluginSubscribers && pluginSubscribers.size > 0) {
-            pluginSubscribers.forEach(socket => {
-                socket.emit('plugin:ui:dataUpdate', payload);
-            });
-        }
-    }
-
-    _handlePluginLog(logData) {
-        const { getIOSafe, addPluginLogToBuffer } = require('../../real-time/socketHandler');
-        const { botId, pluginName } = logData;
-
-        // Добавляем лог в буфер
-        addPluginLogToBuffer(botId, pluginName, logData);
-
-        // Отправляем через Socket.IO в комнату плагина
-        const io = getIOSafe();
-        if (io) {
-            const room = `plugin-logs:${botId}:${pluginName}`;
-            io.to(room).emit('plugin-log', logData);
-        }
-    }
-
-    _handleWebSocketMessage(message) {
-        const { getIOSafe } = require('../../real-time/socketHandler');
-        const { botId, message: msg } = message.payload;
-        getIOSafe().to(`bot_${botId}`).emit('bot:message', { message: msg });
-    }
-
-    _handleBotReady(botId) {
-        this.emitStatusUpdate(botId, 'running', 'Бот успешно подключился к серверу.');
-        this.crashCounters.delete(botId);
-
-        try {
-            const { getIOSafe } = require('../../real-time/socketHandler');
-            const { broadcastBotStatus } = require('../../real-time/botApi');
-            broadcastBotStatus(getIOSafe(), botId, true);
-        } catch (e) { /* Socket.IO может быть не инициализирован */ }
-
-        // Триггерим событие запуска бота
-        if (this.eventGraphManager) {
-            this.eventGraphManager.handleEvent(botId, 'botStartup', {});
-        }
-    }
-
-    async _handleCommandRegistration(botId, commandConfig) {
-        if (this.commandExecutionService) {
-            await this.commandExecutionService.handleCommandRegistration(botId, commandConfig);
-            // this.logger.debug({ botId, commandName: commandConfig.name }, 'Команда зарегистрирована');
-        } else {
-            this.logger.warn({ botId }, 'CommandExecutionService не доступен для регистрации команды');
-        }
-    }
-
-    async _handlePermissionsRegistration(botId, message) {
-        try {
-            await PermissionManager.registerPermissions(botId, message.permissions);
-            this.logger.debug({ botId, count: message.permissions.length }, 'Права зарегистрированы');
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка регистрации прав');
-        }
-    }
-
-    async _handleGroupRegistration(botId, message) {
-        try {
-            await PermissionManager.registerGroup(botId, message.groupConfig);
-            this.logger.debug({ botId, groupName: message.groupConfig.name }, 'Группа зарегистрирована');
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка регистрации группы');
-        }
-    }
-
-    async _handleAddPermissionsToGroup(botId, message) {
-        try {
-            await PermissionManager.addPermissionsToGroup(botId, message.groupName, message.permissionNames);
-            this.logger.debug({ botId, groupName: message.groupName, count: message.permissionNames.length }, 'Права добавлены в группу');
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка добавления прав в группу');
-        }
-    }
-
-    async _handleUserAction(botId, child, message) {
-        const { requestId, payload } = message;
-        const { targetUsername, action, data } = payload;
-
-        try {
-            const botConfig = child.botConfig;
-            const user = await UserService.getUser(targetUsername, botId, botConfig);
-            if (!user) throw new Error(`Пользователь ${targetUsername} не найден.`);
-
-            let result;
-
-            switch (action) {
-                case 'addGroup':
-                    result = await user.addGroup(data.group);
-                    break;
-                case 'removeGroup':
-                    result = await user.removeGroup(data.group);
-                    break;
-                case 'getGroups':
-                    result = user.groups ? user.groups.map(g => g.group.name) : [];
-                    break;
-                case 'getPermissions':
-                    result = Array.from(user.permissionsSet);
-                    break;
-                case 'isBlacklisted':
-                    result = user.isBlacklisted;
-                    break;
-                case 'setBlacklisted':
-                    result = await user.setBlacklist(data.value);
-                    break;
-                default:
-                    throw new Error(`Неизвестное действие: ${action}`);
-            }
-
-            child.send({ type: 'user_action_response', requestId, payload: result });
-        } catch (error) {
-            this.logger.error({ botId, action, username: targetUsername, error }, 'Ошибка действия пользователя');
-            child.send({ type: 'user_action_response', requestId, error: error.message });
-        }
-    }
-
-    _handleProcessExit(botId, botConfig, code, signal) {
-        this.processManager.remove(botId);
-        this.resourceMonitor.clearResourceUsage(botId);
-        this.cache.clearBotCache(botId);
-
-        this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
-
-        try {
-            const { getIOSafe } = require('../../real-time/socketHandler');
-            const { broadcastBotStatus } = require('../../real-time/botApi');
-            broadcastBotStatus(getIOSafe(), botId, false);
-        } catch (e) { /* Socket.IO может быть не инициализирован */ }
-
-        // Автоперезапуск при критических ошибках
-        if (code === 1) {
-            this._handleCrashRestart(botId, botConfig);
-        }
-    }
-
-    _handleCrashRestart(botId, botConfig) {
-        const MAX_RESTART_ATTEMPTS = 5;
-        const RESTART_COOLDOWN = 60000;
-
-        const counter = this.crashCounters.get(botId) || { count: 0, firstCrash: Date.now() };
-        const timeSinceFirstCrash = Date.now() - counter.firstCrash;
-
-        if (timeSinceFirstCrash > RESTART_COOLDOWN) {
-            counter.count = 0;
-            counter.firstCrash = Date.now();
-        }
-
-        counter.count++;
-        this.crashCounters.set(botId, counter);
-
-        if (counter.count >= MAX_RESTART_ATTEMPTS) {
-            this.logger.warn({ botId, attempts: counter.count }, 'Автоперезапуск остановлен');
-            this.appendLog(botId, `[SYSTEM] Обнаружено ${counter.count} критических ошибок подряд.`);
-            this.appendLog(botId, `[SYSTEM] Исправьте проблему и запустите бота вручную.`);
-            this.crashCounters.delete(botId);
-            return;
-        }
-
-        this.logger.info({ botId, attempt: counter.count, max: MAX_RESTART_ATTEMPTS }, 'Перезапуск через 5 секунд');
-        this.appendLog(botId, `[SYSTEM] Обнаружена критическая ошибка, перезапуск через 5 секунд... (попытка ${counter.count}/${MAX_RESTART_ATTEMPTS})`);
-
-        setTimeout(() => {
-            this.logger.info({ botId }, 'Выполняется перезапуск');
-            this.startBot(botConfig);
-        }, 5000);
     }
 
     async loadConfigForBot(botId) {
@@ -520,14 +233,12 @@ class BotLifecycleService {
             for (const perm of systemPermissions) {
                 const existing = await this.permissionRepository.findByName(botId, perm.name);
                 if (existing) {
-                    // Обновляем описание если изменилось
                     if (existing.description !== perm.description) {
                         await this.permissionRepository.update(existing.id, {
                             description: perm.description
                         });
                     }
                 } else {
-                    // Создаем новое системное право
                     await this.permissionRepository.create({
                         botId,
                         name: perm.name,
@@ -553,7 +264,9 @@ class BotLifecycleService {
         const newLogs = [...currentLogs.slice(-199), logEntry];
         this.logCache.set(botId, newLogs);
 
-        getIOSafe().emit('bot:log', { botId, log: logEntry });
+        try {
+            getIOSafe().emit('bot:log', { botId, log: logEntry });
+        } catch (e) {}
     }
 
     getBotLogs(botId) {
@@ -564,14 +277,15 @@ class BotLifecycleService {
         const { getIOSafe, broadcastToPanelNamespace } = require('../../real-time/socketHandler');
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
 
-        getIOSafe().emit('bot:status', { botId, status, message });
-
-        broadcastToPanelNamespace(getIOSafe(), 'bots:status', {
-            botId,
-            status,
-            message,
-            timestamp: new Date().toISOString()
-        });
+        try {
+            getIOSafe().emit('bot:status', { botId, status, message });
+            broadcastToPanelNamespace(getIOSafe(), 'bots:status', {
+                botId,
+                status,
+                message,
+                timestamp: new Date().toISOString()
+            });
+        } catch (e) {}
     }
 
     getFullState() {
@@ -625,8 +339,6 @@ class BotLifecycleService {
     }
 
     async getPlayerList(botId) {
-        const PLAYER_LIST_CACHE_TTL = 2000;
-
         if (!this.processManager.isRunning(botId)) {
             return [];
         }
@@ -678,8 +390,8 @@ class BotLifecycleService {
                 timeout
             });
 
-            this.processManager.sendMessage(botId, { 
-                type: 'system:get_nearby_entities', 
+            this.processManager.sendMessage(botId, {
+                type: 'system:get_nearby_entities',
                 requestId,
                 payload: { position, radius }
             });
@@ -703,316 +415,6 @@ class BotLifecycleService {
         this.processManager.sendMessage(botId, { type: 'invalidate_all_user_cache' });
 
         return { success: true };
-    }
-
-    async _handleTraceCompleted(botId, trace) {
-        try {
-            const { getTraceCollector } = require('../services/TraceCollectorService');
-            const traceCollector = getTraceCollector();
-
-            // Сохраняем трассировку в главном TraceCollectorService
-            await traceCollector._storeCompletedTrace(trace);
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка обработки завершённой трассировки');
-        }
-    }
-
-    async _handleDebugBreakpointCheck(botId, child, message) {
-        const { requestId, payload } = message;
-        const { graphId, nodeId, nodeType, inputs, executedSteps, context } = payload;
-
-        try {
-            const { getGlobalDebugManager } = require('../services/DebugSessionManager');
-            const debugManager = getGlobalDebugManager();
-
-            const debugState = debugManager.get(graphId);
-            if (!debugState) {
-                // Нет debug сессии для этого графа - просто продолжаем выполнение
-                child.send({
-                    type: 'debug:breakpoint_response',
-                    requestId,
-                    overrides: null
-                });
-                return;
-            }
-
-            const breakpoint = debugState.breakpoints.get(nodeId);
-            if (!breakpoint || !breakpoint.enabled) {
-                // Нет брейкпоинта для этой ноды или он отключен
-                child.send({
-                    type: 'debug:breakpoint_response',
-                    requestId,
-                    overrides: null
-                });
-                return;
-            }
-
-            // Проверяем условие брейкпоинта (пока всегда срабатывает)
-            // TODO: добавить evaluateBreakpointCondition
-
-            breakpoint.hitCount++;
-
-            // Приостанавливаем выполнение и ждём действий от пользователя
-            const overrides = await debugState.pause({
-                nodeId,
-                nodeType,
-                inputs,
-                executedSteps,
-                context,
-                breakpoint: {
-                    condition: breakpoint.condition,
-                    hitCount: breakpoint.hitCount
-                }
-            });
-
-            // Отправляем результат обратно в дочерний процесс
-            child.send({
-                type: 'debug:breakpoint_response',
-                requestId,
-                overrides: overrides || null
-            });
-
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка обработки debug breakpoint check');
-            // В случае ошибки отправляем null чтобы продолжить выполнение
-            child.send({
-                type: 'debug:breakpoint_response',
-                requestId,
-                overrides: null
-            });
-        }
-    }
-
-    async _handleDebugStepModeCheck(botId, child, message) {
-        const { requestId, payload } = message;
-        const { graphId, nodeId, nodeType, inputs, executedSteps, context } = payload;
-
-        try {
-            const { getGlobalDebugManager } = require('../services/DebugSessionManager');
-            const debugManager = getGlobalDebugManager();
-
-            const debugState = debugManager.get(graphId);
-            if (!debugState) {
-                // Нет debug сессии - продолжаем выполнение
-                child.send({
-                    type: 'debug:breakpoint_response', // Используем тот же тип ответа
-                    requestId,
-                    overrides: null
-                });
-                return;
-            }
-
-            // Проверяем, нужно ли остановиться в step mode
-            if (!debugState.shouldStepPause(nodeId)) {
-                // Step mode не активен или не нужно останавливаться на этой ноде
-                child.send({
-                    type: 'debug:breakpoint_response',
-                    requestId,
-                    overrides: null
-                });
-                return;
-            }
-
-            // Приостанавливаем выполнение и ждём действий от пользователя
-            const overrides = await debugState.pause({
-                nodeId,
-                nodeType,
-                inputs,
-                executedSteps,
-                context
-            });
-
-            // Отправляем результат обратно в дочерний процесс
-            child.send({
-                type: 'debug:breakpoint_response',
-                requestId,
-                overrides: overrides || null
-            });
-
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка обработки debug step mode check');
-            // В случае ошибки отправляем null чтобы продолжить выполнение
-            child.send({
-                type: 'debug:breakpoint_response',
-                requestId,
-                overrides: null
-            });
-        }
-    }
-
-    /**
-     * Обработчик обновления credentials в БД (без рестарта)
-     */
-    async _handleUpdateCredentials(botId, child, message) {
-        const { requestId, payload } = message;
-        const { username, password } = payload;
-
-        try {
-            // Валидация входных данных
-            if (!username || username.trim().length === 0) {
-                throw new Error('Username не может быть пустым');
-            }
-
-            const existingBot = await this.botRepository.findByUsername(username);
-            if (existingBot && existingBot.id !== botId) {
-                throw new Error(`Username "${username}" уже используется другим ботом (ID: ${existingBot.id})`);
-            }
-
-            const { encrypt } = require('../utils/crypto');
-            const updateData = { username };
-
-            if (password !== undefined && password !== null) {
-                if (password.trim().length === 0) {
-                    throw new Error('Password не может быть пустым');
-                }
-                updateData.password = encrypt(password);
-            }
-
-            await this.botRepository.update(botId, updateData);
-
-            if (child.botConfig) {
-                child.botConfig.username = username;
-                if (password !== undefined && password !== null) {
-                    child.botConfig.password = updateData.password;
-                }
-            }
-
-            this.logger.info({ botId, username }, 'Credentials обновлены в БД');
-            this.appendLog(botId, `[API] Credentials обновлены: username="${username}"`);
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                payload: {
-                    success: true,
-                    message: 'Credentials успешно обновлены в БД'
-                }
-            });
-
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка обновления credentials');
-            this.appendLog(botId, `[API ERROR] Не удалось обновить credentials: ${error.message}`);
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                error: error.message
-            });
-        }
-    }
-
-    /**
-     * Обработчик рестарта бота
-     */
-    async _handleRestartBot(botId, child, message) {
-        const { requestId } = message;
-
-        try {
-            this.logger.info({ botId }, 'Запрос на рестарт бота от плагина');
-            this.appendLog(botId, '[API] Получен запрос на рестарт бота от плагина');
-
-            const savedBotConfig = { ...child.botConfig };
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                payload: {
-                    success: true,
-                    message: 'Рестарт инициирован'
-                }
-            });
-
-            setTimeout(async () => {
-                try {
-                    await this.restartBot(botId, savedBotConfig);
-                    this.logger.info({ botId }, 'Бот успешно перезапущен');
-                } catch (error) {
-                    this.logger.error({ botId, error }, 'Ошибка при рестарте бота');
-                    this.appendLog(botId, `[API ERROR] Ошибка при рестарте: ${error.message}`);
-                }
-            }, 3000);
-
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка инициализации рестарта');
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                error: error.message
-            });
-        }
-    }
-
-    /**
-     * Обработчик изменения credentials с автоматическим рестартом
-     */
-    async _handleChangeCredentials(botId, child, message) {
-        const { requestId, payload } = message;
-        const { username, password } = payload;
-
-        try {
-            if (!username || username.trim().length === 0) {
-                throw new Error('Username не может быть пустым');
-            }
-
-            const existingBot = await this.botRepository.findByUsername(username);
-            if (existingBot && existingBot.id !== botId) {
-                throw new Error(`Username "${username}" уже используется другим ботом (ID: ${existingBot.id})`);
-            }
-
-            const { encrypt } = require('../utils/crypto');
-            const updateData = { username };
-
-            if (password !== undefined && password !== null) {
-                if (password.trim().length === 0) {
-                    throw new Error('Password не может быть пустым');
-                }
-                updateData.password = encrypt(password);
-            }
-
-            await this.botRepository.update(botId, updateData);
-
-            if (child.botConfig) {
-                child.botConfig.username = username;
-                if (password !== undefined && password !== null) {
-                    child.botConfig.password = updateData.password;
-                }
-            }
-
-            const savedBotConfig = { ...child.botConfig };
-
-            this.logger.info({ botId, username }, 'Credentials обновлены, инициирован рестарт');
-            this.appendLog(botId, `[API] Credentials изменены: username="${username}". Выполняется рестарт...`);
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                payload: {
-                    success: true,
-                    message: 'Credentials обновлены, рестарт инициирован'
-                }
-            });
-
-            setTimeout(async () => {
-                try {
-                    await this.restartBot(botId, savedBotConfig);
-                    this.logger.info({ botId }, 'Бот успешно перезапущен с новыми credentials');
-                } catch (error) {
-                    this.logger.error({ botId, error }, 'Ошибка при рестарте бота после изменения credentials');
-                    this.appendLog(botId, `[API ERROR] Ошибка при рестарте: ${error.message}`);
-                }
-            }, 3000);
-
-        } catch (error) {
-            this.logger.error({ botId, error }, 'Ошибка изменения credentials');
-            this.appendLog(botId, `[API ERROR] Не удалось изменить credentials: ${error.message}`);
-
-            child.send({
-                type: 'credentials_operation_response',
-                requestId,
-                error: error.message
-            });
-        }
     }
 }
 

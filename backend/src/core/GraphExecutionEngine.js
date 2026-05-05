@@ -1,1136 +1,579 @@
-const prismaService = require('./PrismaService');
 const { parseVariables } = require('./utils/variableParser');
-const validationService = require('./services/ValidationService');
-const { MAX_RECURSION_DEPTH } = require('./config/validation');
-const debugConfig = require('../config/debug.config');
-const prisma = prismaService.getClient();
-
-const BreakLoopSignal = require('./BreakLoopSignal');
-const RewindSignal = require('./RewindSignal');
+const GraphValidation = require('./GraphValidation');
+const GraphDebugHandler = require('./GraphDebugHandler');
+const { attachDebugIpcHandler } = require('./GraphDebugIPC');
 const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
-
 const { MessageTypes } = require('./ipc/ipcMessageTypes');
+const RewindSignal = require('./RewindSignal');
+const BreakLoopSignal = require('./BreakLoopSignal');
 
 class GraphExecutionEngine {
-  static _ipcHandlerAttached = false;
-  static _allPendingRequests = new Map();
+    constructor(nodeRegistry, botManagerOrApi = null) {
+        if (!nodeRegistry || typeof nodeRegistry.getNodeConfig !== 'function') {
+            throw new Error('GraphExecutionEngine requires a valid NodeRegistry instance.');
+        }
+        this.nodeRegistry = nodeRegistry;
+        this.botManager = botManagerOrApi;
+        this.activeGraph = null;
+        this.context = null;
+        this.memo = new Map();
+        this.traceCollector = getTraceCollector();
+        this.currentTraceId = null;
+        this.debugHandler = null;
+        this._inputOverrides = new Map();
 
-  constructor(nodeRegistry, botManagerOrApi = null) {
-      if (!nodeRegistry || typeof nodeRegistry.getNodeConfig !== 'function') {
-          throw new Error('GraphExecutionEngine requires a valid NodeRegistry instance.');
-      }
-      this.nodeRegistry = nodeRegistry;
-      this.botManager = botManagerOrApi;
-      this.activeGraph = null;
-      this.context = null;
-      this.memo = new Map();
-      this.traceCollector = getTraceCollector();
-      this.currentTraceId = null;
+        attachDebugIpcHandler();
+    }
 
-      this.pendingDebugRequests = GraphExecutionEngine._allPendingRequests;
+    async execute(graph, context, eventType) {
+        const validation = GraphValidation.validateGraphForExecution(graph, 'GraphExecutionEngine.execute');
+        if (validation.shouldSkip) {
+            return context;
+        }
 
-      this._inputOverrides = new Map();
+        const parsedGraph = validation.graph;
+        const graphId = context.graphId || null;
+        const botId = context.botId || null;
 
-      if (process.on && !GraphExecutionEngine._ipcHandlerAttached) {
-          process.on('message', (message) => {
-              if (message.type === MessageTypes.DEBUG.BREAKPOINT_RESPONSE ||
-                  message.type === MessageTypes.DEBUG.STEP_RESPONSE) {
-                  GraphExecutionEngine._handleGlobalDebugResponse(message);
-              }
-          });
-          GraphExecutionEngine._ipcHandlerAttached = true;
-      }
-  }
-
-
-  async execute(graph, context, eventType) {
-      if (!graph || graph === 'null') return context;
-
-      const parsedGraph = validationService.parseGraph(graph, 'GraphExecutionEngine.execute');
-      if (!parsedGraph) {
-          return context;
-      }
-
-      const validation = validationService.validateGraphStructure(parsedGraph, 'GraphExecutionEngine');
-      if (validation.shouldSkip) {
-          return context;
-      }
-
-      const graphId = context.graphId || null;
-      const botId = context.botId || null;
-
-      if (graphId && botId) {
-          this.currentTraceId = await this.traceCollector.startTrace(
-              botId,
-              graphId,
-              eventType || 'command',
-              context.eventArgs || {}
-          );
-      }
-
-      try {
-          this.activeGraph = parsedGraph;
-          this.context = context;
-
-
-          if (!this.context.variables) {
-            this.context.variables = parseVariables(
-              this.activeGraph.variables,
-              'GraphExecutionEngine'
+        if (graphId && botId) {
+            this.currentTraceId = await this.traceCollector.startTrace(
+                botId, graphId, eventType || 'command', context.eventArgs || {}
             );
-          }
+        }
 
-          if (!this.context.persistenceIntent) this.context.persistenceIntent = new Map();
+        try {
+            this.activeGraph = parsedGraph;
+            this.context = context;
 
-          let rewindAttempts = 0;
-          const MAX_REWINDS = 100;
-          this._inputOverrides = new Map();
+            if (!this.context.variables) {
+                this.context.variables = parseVariables(this.activeGraph.variables, 'GraphExecutionEngine');
+            }
 
-          while (true) {
-              this.memo.clear();
+            if (!this.context.persistenceIntent) {
+                this.context.persistenceIntent = new Map();
+            }
 
-              if (graphId) {
-                  try {
-                      const debugManager = getGlobalDebugManager();
-                      const debugState = debugManager.get(graphId);
-                      if (debugState && debugState.replayState) {
-                          if (debugState.replayState.variables) {
-                              this.context.variables = JSON.parse(JSON.stringify(debugState.replayState.variables));
-                          }
-                          if (debugState.replayState.commandArguments) {
-                              this.context.commandArguments = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
-                          }
-                      }
-                  } catch (e) {}
-              }
+            this.debugHandler = new GraphDebugHandler(this.context);
+            this._inputOverrides = new Map();
 
-              const eventName = eventType || 'command';
-              const startNode = this.activeGraph.nodes.find(n => n.type === `event:${eventName}`);
+            let rewindAttempts = 0;
+            const MAX_REWINDS = 100;
 
-              if (!startNode) {
-                  if (!eventType) {
-                      throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
-                  }
-                  break;
-              }
+            while (true) {
+                this.memo.clear();
 
-              if (this.currentTraceId) {
-                  this.traceCollector.recordStep(this.currentTraceId, {
-                      nodeId: startNode.id,
-                      nodeType: startNode.type,
-                      status: 'executed',
-                      duration: 0,
-                      inputs: {},
-                      outputs: await this._captureNodeOutputs(startNode),
-                  });
-              }
+                await this._applyReplayState(graphId);
 
-              try {
-                  await this.traverse(startNode, 'exec');
-                  break;
-              } catch (err) {
-                  if (err instanceof RewindSignal) {
-                      rewindAttempts++;
-                      if (rewindAttempts > MAX_REWINDS) {
-                          console.error('[Debug] Too many rewinds, aborting');
-                          break;
-                      }
-                      console.log(`[Debug] Rewind requested, restarting graph (attempt ${rewindAttempts})`);
+                const startNode = GraphValidation.findStartNode(this.activeGraph, eventType);
+                if (!startNode) {
+                    if (!eventType) {
+                        throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
+                    }
+                    break;
+                }
 
-                      if (this.currentTraceId && graphId && botId) {
-                          try {
-                              await this.traceCollector.completeTrace(this.currentTraceId);
-                          } catch (e) {}
-                          this.currentTraceId = await this.traceCollector.startTrace(
-                              botId,
-                              graphId,
-                              eventType || 'command',
-                              context.eventArgs || {}
-                          );
-                      }
-                      continue;
-                  }
-                  throw err;
-              }
-          }
+                if (this.currentTraceId) {
+                    this.traceCollector.recordStep(this.currentTraceId, {
+                        nodeId: startNode.id,
+                        nodeType: startNode.type,
+                        status: 'executed',
+                        duration: 0,
+                        inputs: {},
+                        outputs: await this._captureNodeOutputs(startNode),
+                    });
+                }
 
-          if (this.currentTraceId) {
-              // Перед завершением trace, захватываем outputs для всех data-нод
-              await this._captureAllDataNodeOutputs();
+                try {
+                    await this.traverse(startNode, 'exec');
+                    break;
+                } catch (err) {
+                    if (err instanceof RewindSignal) {
+                        rewindAttempts++;
+                        if (rewindAttempts > MAX_REWINDS) {
+                            console.error('[Debug] Too many rewinds, aborting');
+                            break;
+                        }
+                        console.log(`[Debug] Rewind requested, restarting graph (attempt ${rewindAttempts})`);
 
-              const trace = await this.traceCollector.completeTrace(this.currentTraceId);
+                        if (this.currentTraceId && graphId && botId) {
+                            try {
+                                await this.traceCollector.completeTrace(this.currentTraceId);
+                            } catch (e) {}
+                            this.currentTraceId = await this.traceCollector.startTrace(
+                                botId, graphId, eventType || 'command', context.eventArgs || {}
+                            );
+                        }
+                        continue;
+                    }
+                    throw err;
+                }
+            }
 
-              // Если работаем в дочернем процессе (BotProcess), отправляем трассировку в главный процесс
-              if (trace && process.send) {
-                  process.send({
-                      type: MessageTypes.GRAPH.TRACE_COMPLETED,
-                      trace: {
-                          ...trace,
-                          steps: trace.steps,
-                          eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
-                      }
-                  });
-              }
+            await this._finalizeTrace(graphId);
 
-              // Отправляем debug событие только если DebugSessionManager инициализирован
-              // (он может быть не инициализирован в дочерних процессах BotProcess)
-              if (graphId) {
-                  try {
-                      const debugManager = getGlobalDebugManager();
-                      const debugState = debugManager.get(graphId);
-                      if (debugState && debugState.activeExecution) {
-                          debugState.broadcast('debug:completed', {
-                              trace: await this.traceCollector.getTrace(this.currentTraceId)
-                          });
-                      }
-                  } catch (error) {
-                      // DebugSessionManager не инициализирован - это нормально для дочерних процессов
-                      // Просто игнорируем
-                  }
-              }
+        } catch (error) {
+            await this._handleExecutionError(error, graphId);
+        }
 
-              this.currentTraceId = null;
-          }
+        return this.context;
+    }
 
-      } catch (error) {
-          if (this.currentTraceId) {
-              // Даже при ошибке захватываем outputs для data-нод
-              try {
-                  await this._captureAllDataNodeOutputs();
-              } catch (captureError) {
-                  console.error(`[GraphExecutor] Error capturing outputs on failure:`, captureError);
-              }
+    async _applyReplayState(graphId) {
+        if (!graphId) return;
 
-              const trace = await this.traceCollector.failTrace(this.currentTraceId, error);
+        try {
+            const debugManager = getGlobalDebugManager();
+            const debugState = debugManager.get(graphId);
+            if (debugState && debugState.replayState) {
+                if (debugState.replayState.variables) {
+                    this.context.variables = JSON.parse(JSON.stringify(debugState.replayState.variables));
+                }
+                if (debugState.replayState.commandArguments) {
+                    this.context.commandArguments = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
+                }
+            }
+        } catch (e) {}
+    }
 
-              // Если работаем в дочернем процессе (BotProcess), отправляем трассировку с ошибкой в главный процесс
-              if (trace && process.send) {
-                  process.send({
-                      type: MessageTypes.GRAPH.TRACE_COMPLETED,
-                      trace: {
-                          ...trace,
-                          steps: trace.steps,
-                          eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
-                      }
-                  });
-              }
+    async _finalizeTrace(graphId) {
+        if (!this.currentTraceId) return;
 
-              this.currentTraceId = null;
-          }
+        await this._captureAllDataNodeOutputs();
 
-          const isStoppedByDebugger = error?.message === 'Execution stopped by debugger';
-          if (!(error instanceof BreakLoopSignal) && !isStoppedByDebugger) {
+        const trace = await this.traceCollector.completeTrace(this.currentTraceId);
+
+        if (trace && process.send) {
+            process.send({
+                type: MessageTypes.GRAPH.TRACE_COMPLETED,
+                trace: {
+                    ...trace,
+                    steps: trace.steps,
+                    eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
+                }
+            });
+        }
+
+        if (graphId) {
+            try {
+                const debugManager = getGlobalDebugManager();
+                const debugState = debugManager.get(graphId);
+                if (debugState && debugState.activeExecution) {
+                    debugState.broadcast('debug:completed', {
+                        trace: await this.traceCollector.getTrace(this.currentTraceId)
+                    });
+                }
+            } catch (error) {}
+        }
+
+        this.currentTraceId = null;
+    }
+
+    async _handleExecutionError(error, graphId) {
+        if (this.currentTraceId) {
+            try {
+                await this._captureAllDataNodeOutputs();
+            } catch (captureError) {
+                console.error(`[GraphExecutor] Error capturing outputs on failure:`, captureError);
+            }
+
+            const trace = await this.traceCollector.failTrace(this.currentTraceId, error);
+
+            if (trace && process.send) {
+                process.send({
+                    type: MessageTypes.GRAPH.TRACE_COMPLETED,
+                    trace: {
+                        ...trace,
+                        steps: trace.steps,
+                        eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
+                    }
+                });
+            }
+
+            this.currentTraceId = null;
+        }
+
+        const isStoppedByDebugger = error?.message === 'Execution stopped by debugger';
+        if (!(error instanceof BreakLoopSignal) && !isStoppedByDebugger) {
             console.error(`[GraphExecutionEngine] Критическая ошибка выполнения графа: ${error.stack}`);
-          } else if (isStoppedByDebugger) {
+        } else if (isStoppedByDebugger) {
             console.log('[GraphExecutionEngine] Execution stopped by user from debugger');
-          }
-      }
-
-      return this.context;
-  }
-
-  async traverse(node, fromPinId) {
-      // Находим соединение к СУЩЕСТВУЮЩЕЙ ноде (пропускаем мусорные соединения к удалённым нодам)
-      const connection = this.activeGraph.connections.find(c => {
-          if (c.sourceNodeId !== node.id || c.sourcePinId !== fromPinId) return false;
-          const targetExists = this.activeGraph.nodes.some(n => n.id === c.targetNodeId);
-          return targetExists;
-      });
-      if (!connection) {
-          return;
-      }
-
-      const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
-      if (!nextNode) return;
-
-      if (this.currentTraceId) {
-          this.traceCollector.recordTraversal(
-              this.currentTraceId,
-              node.id,
-              fromPinId,
-              nextNode.id
-          );
-      }
-
-      await this.executeNode(nextNode);
-  }
-
-  async executeNode(node) {
-      const startTime = Date.now();
-
-      // Записываем шаг ДО проверки брейкпоинта, чтобы в trace были данные о предыдущих нодах
-      if (this.currentTraceId) {
-          this.traceCollector.recordStep(this.currentTraceId, {
-              nodeId: node.id,
-              nodeType: node.type,
-              status: 'executed',
-              duration: null,
-              inputs: await this._captureNodeInputs(node),
-              outputs: {},
-          });
-      }
-
-      // Проверка брейкпоинта ПЕРЕД выполнением (но ПОСЛЕ записи в trace)
-      await this.checkBreakpoint(node);
-
-      // Проверка step mode ПЕРЕД выполнением (важно делать ДО executor, чтобы поймать ноду до traverse)
-      await this._checkStepMode(node);
-
-      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (nodeConfig && typeof nodeConfig.executor === 'function') {
-          const helpers = {
-              resolvePinValue: this.resolvePinValue.bind(this),
-              traverse: this.traverse.bind(this),
-              memo: this.memo,
-              clearLoopBodyMemo: this.clearLoopBodyMemo.bind(this),
-          };
-
-          try {
-              await nodeConfig.executor.call(this, node, this.context, helpers);
-
-              const executionTime = Date.now() - startTime;
-
-              if (this.currentTraceId) {
-                  this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
-                  this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
-              }
-          } catch (error) {
-              if (this.currentTraceId) {
-                  this.traceCollector.updateStepError(
-                      this.currentTraceId,
-                      node.id,
-                      error.message,
-                      Date.now() - startTime
-                  );
-              }
-              throw error;
-          }
-
-          return;
-      }
-
-      const execCacheKey = `${node.id}_executed`;
-      if (this.memo.has(execCacheKey)) {
-          return;
-      }
-      this.memo.set(execCacheKey, true);
-
-      try {
-          await this._executeLegacyNode(node);
-
-
-          const executionTime = Date.now() - startTime;
-
-          if (this.currentTraceId) {
-              this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
-              this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
-          }
-      } catch (error) {
-          if (this.currentTraceId) {
-              this.traceCollector.updateStepError(
-                  this.currentTraceId,
-                  node.id,
-                  error.message,
-                  Date.now() - startTime
-              );
-          }
-          throw error;
-      }
-  }
-
-  async _checkStepMode(node) {
-      try {
-          // Если работаем в дочернем процессе, используем IPC
-          if (process.send) {
-              return await this._checkStepModeViaIpc(node);
-          }
-
-          // Иначе используем прямой доступ к DebugManager
-          const { getGlobalDebugManager } = require('./services/DebugSessionManager');
-          const debugManager = getGlobalDebugManager();
-          const graphId = this.activeGraph?.id;
-
-          if (graphId) {
-              const debugState = debugManager.get(graphId);
-              if (debugState && debugState.shouldStepPause(node.id)) {
-                  console.log(`[Debug] Step mode: pausing after executing node ${node.id}`);
-
-                  const inputs = await this._captureNodeInputs(node);
-
-                  const executedSteps = this.currentTraceId
-                      ? await this.traceCollector.getTrace(this.currentTraceId)
-                      : null;
-
-                  const overrides = await debugState.pause({
-                      nodeId: node.id,
-                      nodeType: node.type,
-                      inputs,
-                      executedSteps,
-                      context: {
-                          user: this.context.user,
-                          variables: this.context.variables,
-                          commandArguments: this.context.commandArguments,
-                      }
-                  });
-
-                  if (overrides && overrides.__rewind) {
-                      throw new RewindSignal(overrides.target);
-                  }
-
-                  if (overrides && overrides.__stopped) {
-                      throw new Error('Execution stopped by debugger');
-                  }
-
-                  if (overrides) {
-                      this.applyWhatIfOverrides(node, overrides);
-                  }
-              }
-          }
-      } catch (error) {
-          if (error instanceof RewindSignal) throw error;
-          if (error.message !== 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
-              throw error;
-          }
-      }
-  }
-
-  async _checkStepModeViaIpc(node) {
-      // Step mode работает аналогично breakpoint, просто отправляем тип 'step'
-      const { randomUUID } = require('crypto');
-      const requestId = randomUUID();
-
-      const inputs = await this._captureNodeInputs(node);
-      const executedSteps = this.currentTraceId
-          ? await this.traceCollector.getTrace(this.currentTraceId)
-          : null;
-
-      process.send({
-          type: 'debug:check_step_mode',
-          requestId,
-          payload: {
-              graphId: this.context.graphId,
-              nodeId: node.id,
-              nodeType: node.type,
-              inputs,
-              executedSteps,
-              context: {
-                  user: this.context.user,
-                  variables: this.context.variables,
-                  commandArguments: this.context.commandArguments,
-              }
-          }
-      });
-
-      // Ждём ответа (если step mode не активен, ответ придёт сразу)
-      await new Promise((resolve) => {
-          this.pendingDebugRequests.set(requestId, resolve);
-
-          // Таймаут на случай, если ответ не придёт
-          const timeoutId = setTimeout(() => {
-              if (this.pendingDebugRequests.has(requestId)) {
-                  this.pendingDebugRequests.delete(requestId);
-                  resolve(null);
-              }
-          }, debugConfig.STEP_MODE_TIMEOUT);
-
-          // Сохраняем timeoutId для возможной отмены
-          this.pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
-      });
-  }
-
-  async _executeLegacyNode(node) {
-      switch (node.type) {
-
-
-
-
-
-
-
-          case 'string:contains':
-          case 'string:matches':
-          case 'string:equals': {
-              await this.traverse(node, 'exec');
-              break;
-          }
-          case 'array:get_random_element': {
-              await this.traverse(node, 'element');
-              break;
-          }
-          case 'array:add_element':
-          case 'array:remove_by_index':
-          case 'array:get_by_index':
-          case 'array:find_index':
-          case 'array:contains': {
-              await this.traverse(node, 'result');
-              break;
-          }
-          case 'data:array_literal':
-          case 'data:make_object':
-          case 'data:get_variable':
-          case 'data:get_argument':
-          case 'data:length':
-          case 'data:get_entity_field':
-          case 'data:cast':
-          case 'data:string_literal':
-          case 'data:get_user_field':
-          case 'data:get_server_players':
-          case 'data:get_bot_look':
-          case 'math:operation':
-          case 'math:random_number':
-          case 'logic:operation':
-          case 'string:concat':
-          case 'object:create':
-          case 'object:get':
-          case 'object:set':
-          case 'object:delete':
-          case 'object:has_key': {
-              await this.traverse(node, 'value');
-              break;
-          }
-      }
-  }
-
-  clearLoopBodyMemo(loopNode) {
-    const nodesToClear = new Set();
-    const queue = [];
-
-    const initialConnection = this.activeGraph.connections.find(
-      c => c.sourceNodeId === loopNode.id && c.sourcePinId === 'loop_body'
-    );
-    if (initialConnection) {
-        const firstNode = this.activeGraph.nodes.find(n => n.id === initialConnection.targetNodeId);
-        if (firstNode) {
-            queue.push(firstNode);
         }
     }
-    
-    const visited = new Set();
-    while (queue.length > 0) {
-      const currentNode = queue.shift();
-      if (visited.has(currentNode.id)) continue;
-      visited.add(currentNode.id);
-      
-      nodesToClear.add(currentNode.id);
-      
-      const connections = this.activeGraph.connections.filter(c => c.sourceNodeId === currentNode.id);
-      for (const conn of connections) {
-        const nextNode = this.activeGraph.nodes.find(n => n.id === conn.targetNodeId);
-        if (nextNode) {
-          queue.push(nextNode);
+
+    async traverse(node, fromPinId) {
+        const connection = this.activeGraph.connections.find(c => {
+            if (c.sourceNodeId !== node.id || c.sourcePinId !== fromPinId) return false;
+            const targetExists = this.activeGraph.nodes.some(n => n.id === c.targetNodeId);
+            return targetExists;
+        });
+        if (!connection) return;
+
+        const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
+        if (!nextNode) return;
+
+        if (this.currentTraceId) {
+            this.traceCollector.recordTraversal(this.currentTraceId, node.id, fromPinId, nextNode.id);
         }
-      }
+
+        await this.executeNode(nextNode);
     }
 
-    for (const nodeId of nodesToClear) {
-        for (const key of this.memo.keys()) {
-            if (key.startsWith(nodeId)) {
-                this.memo.delete(key);
+    async executeNode(node) {
+        const startTime = Date.now();
+
+        if (this.currentTraceId) {
+            this.traceCollector.recordStep(this.currentTraceId, {
+                nodeId: node.id,
+                nodeType: node.type,
+                status: 'executed',
+                duration: null,
+                inputs: await this._captureNodeInputs(node),
+                outputs: {},
+            });
+        }
+
+        if (this.debugHandler) {
+            const bpResult = await this.debugHandler.checkBreakpoint(
+                node,
+                this._captureNodeInputs.bind(this),
+                this._captureNodeOutputs.bind(this),
+                this.currentTraceId, this.traceCollector
+            );
+
+            await this.debugHandler.checkStepMode(
+                node,
+                this._captureNodeInputs.bind(this),
+                this.currentTraceId, this.traceCollector
+            );
+        }
+
+        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+        if (nodeConfig && typeof nodeConfig.executor === 'function') {
+            const helpers = {
+                resolvePinValue: this.resolvePinValue.bind(this),
+                traverse: this.traverse.bind(this),
+                memo: this.memo,
+                clearLoopBodyMemo: this.clearLoopBodyMemo.bind(this),
+            };
+
+            try {
+                await nodeConfig.executor.call(this, node, this.context, helpers);
+
+                const executionTime = Date.now() - startTime;
+                if (this.currentTraceId) {
+                    this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
+                    this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
+                }
+            } catch (error) {
+                if (this.currentTraceId) {
+                    this.traceCollector.updateStepError(this.currentTraceId, node.id, error.message, Date.now() - startTime);
+                }
+                throw error;
+            }
+
+            return;
+        }
+
+        const execCacheKey = `${node.id}_executed`;
+        if (this.memo.has(execCacheKey)) return;
+        this.memo.set(execCacheKey, true);
+
+        try {
+            await this._executeLegacyNode(node);
+
+            const executionTime = Date.now() - startTime;
+            if (this.currentTraceId) {
+                this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
+                this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
+            }
+        } catch (error) {
+            if (this.currentTraceId) {
+                this.traceCollector.updateStepError(this.currentTraceId, node.id, error.message, Date.now() - startTime);
+            }
+            throw error;
+        }
+    }
+
+    async _executeLegacyNode(node) {
+        const legacyMap = {
+            'string:contains': 'exec', 'string:matches': 'exec', 'string:equals': 'exec',
+            'array:get_random_element': 'element',
+            'array:add_element': 'result', 'array:remove_by_index': 'result',
+            'array:get_by_index': 'result', 'array:find_index': 'result', 'array:contains': 'result',
+            'data:array_literal': 'value', 'data:make_object': 'value', 'data:get_variable': 'value',
+            'data:get_argument': 'value', 'data:length': 'value', 'data:get_entity_field': 'value',
+            'data:cast': 'value', 'data:string_literal': 'value', 'data:get_user_field': 'value',
+            'data:get_server_players': 'value', 'data:get_bot_look': 'value',
+            'math:operation': 'value', 'math:random_number': 'value',
+            'logic:operation': 'value', 'string:concat': 'value',
+            'object:create': 'value', 'object:get': 'value', 'object:set': 'value',
+            'object:delete': 'value', 'object:has_key': 'value',
+        };
+
+        const pin = legacyMap[node.type];
+        if (pin) {
+            await this.traverse(node, pin);
+        }
+    }
+
+    clearLoopBodyMemo(loopNode) {
+        const nodesToClear = new Set();
+        const queue = [];
+
+        const initialConnection = this.activeGraph.connections.find(
+            c => c.sourceNodeId === loopNode.id && c.sourcePinId === 'loop_body'
+        );
+        if (initialConnection) {
+            const firstNode = this.activeGraph.nodes.find(n => n.id === initialConnection.targetNodeId);
+            if (firstNode) queue.push(firstNode);
+        }
+
+        const visited = new Set();
+        while (queue.length > 0) {
+            const currentNode = queue.shift();
+            if (visited.has(currentNode.id)) continue;
+            visited.add(currentNode.id);
+            nodesToClear.add(currentNode.id);
+
+            const connections = this.activeGraph.connections.filter(c => c.sourceNodeId === currentNode.id);
+            for (const conn of connections) {
+                const nextNode = this.activeGraph.nodes.find(n => n.id === conn.targetNodeId);
+                if (nextNode) queue.push(nextNode);
+            }
+        }
+
+        for (const nodeId of nodesToClear) {
+            for (const key of this.memo.keys()) {
+                if (key.startsWith(nodeId)) this.memo.delete(key);
             }
         }
     }
-  }
 
-  async resolvePinValue(node, pinId, defaultValue = null) {
-      const overrideValue = this._getInputOverride && this._getInputOverride(node.id, pinId);
-      if (overrideValue !== undefined) {
-          return overrideValue;
-      }
+    async resolvePinValue(node, pinId, defaultValue = null) {
+        const overrideValue = this.debugHandler?.getInputOverride(node.id, pinId);
+        if (overrideValue !== undefined) return overrideValue;
 
-      const connection = this.activeGraph.connections.find(c => c.targetNodeId === node.id && c.targetPinId === pinId);
-      if (connection) {
-          const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
-          return await this.evaluateOutputPin(sourceNode, connection.sourcePinId, defaultValue);
-      }
+        const connection = this.activeGraph.connections.find(
+            c => c.targetNodeId === node.id && c.targetPinId === pinId
+        );
+        if (connection) {
+            const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
+            return await this.evaluateOutputPin(sourceNode, connection.sourcePinId, defaultValue);
+        }
 
-      let value = node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
+        let value = node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
 
-      if (typeof value === 'string' && value.includes('{')) {
-          value = await this._replaceVariablesInString(value, node);
-      }
+        if (typeof value === 'string' && value.includes('{')) {
+            value = await this._replaceVariablesInString(value, node);
+        }
 
-      return value;
-  }
+        return value;
+    }
 
-  /**
-   * Заменяет переменные {varName} на значения из пинов
-   * @private
-   */
-  async _replaceVariablesInString(text, node) {
-      const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
-      const matches = [...text.matchAll(variablePattern)];
+    async _replaceVariablesInString(text, node) {
+        const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+        const matches = [...text.matchAll(variablePattern)];
+        let result = text;
 
-      let result = text;
+        for (const match of matches) {
+            const varName = match[1];
+            const varValue = await this.resolvePinValue(node, `var_${varName}`, '');
+            result = result.replace(match[0], String(varValue));
+        }
 
-      for (const match of matches) {
-          const varName = match[1];
-          const varValue = await this.resolvePinValue(node, `var_${varName}`, '');
-          result = result.replace(match[0], String(varValue));
-      }
+        return result;
+    }
 
-      return result;
-  }
+    async evaluateOutputPin(node, pinId, defaultValue = null) {
+        if (!node) return defaultValue;
 
-  async evaluateOutputPin(node, pinId, defaultValue = null) {
-      if (!node) return defaultValue;
+        const cacheKey = `${node.id}:${pinId}`;
+        if (this.memo.has(cacheKey)) return this.memo.get(cacheKey);
 
-      const cacheKey = `${node.id}:${pinId}`;
-      if (this.memo.has(cacheKey)) {
-          return this.memo.get(cacheKey);
-      }
+        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+        if (nodeConfig && typeof nodeConfig.evaluator === 'function') {
+            return await this._evaluateWithConfig(node, pinId, nodeConfig, cacheKey, defaultValue);
+        }
 
-      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (nodeConfig && typeof nodeConfig.evaluator === 'function') {
-          const helpers = {
-              resolvePinValue: this.resolvePinValue.bind(this),
-              memo: this.memo,
-          };
+        const result = this._evaluateLegacyNode(node, pinId, defaultValue);
 
-          const traceKey = `trace_recorded:${node.id}`;
-          let inputPinsLocal = [];
-          let outputPinsLocal = [];
-          try {
-              if (typeof nodeConfig.getInputs === 'function') {
-                  inputPinsLocal = nodeConfig.getInputs(node.data || {}) || [];
-              } else if (typeof nodeConfig.computeInputs === 'function') {
-                  inputPinsLocal = nodeConfig.computeInputs(node.data || {}) || [];
-              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
-                  inputPinsLocal = nodeConfig.pins.inputs;
-              }
-              if (typeof nodeConfig.getOutputs === 'function') {
-                  outputPinsLocal = nodeConfig.getOutputs(node.data || {}) || [];
-              } else if (typeof nodeConfig.computeOutputs === 'function') {
-                  outputPinsLocal = nodeConfig.computeOutputs(node.data || {}) || [];
-              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.outputs)) {
-                  outputPinsLocal = nodeConfig.pins.outputs;
-              }
-          } catch (e) {
-              inputPinsLocal = nodeConfig.pins?.inputs || [];
-              outputPinsLocal = nodeConfig.pins?.outputs || [];
-          }
-          const isDataNode = !inputPinsLocal.some(p => p && p.type === 'Exec');
+        if (!GraphDebugHandler.checkVolatility(node, this.activeGraph)) {
+            this.memo.set(cacheKey, result);
+        }
 
-          if (this.currentTraceId && isDataNode && !this.memo.has(traceKey)) {
-              const inputs = await this._captureNodeInputs(node);
+        return result;
+    }
 
-              this.traceCollector.recordStep(this.currentTraceId, {
-                  nodeId: node.id,
-                  nodeType: node.type,
-                  status: 'executed',
-                  duration: 0,
-                  inputs,
-                  outputs: {},
-              });
+    async _evaluateWithConfig(node, pinId, nodeConfig, cacheKey, defaultValue) {
+        const helpers = { resolvePinValue: this.resolvePinValue.bind(this), memo: this.memo };
 
-              this.memo.set(traceKey, true);
-          }
+        const traceKey = `trace_recorded:${node.id}`;
+        const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
+        const outputPins = GraphValidation.getNodeOutputPins(nodeConfig, node.data);
+        const isDataNode = !inputPins.some(p => p && p.type === 'Exec');
 
-          const result = await nodeConfig.evaluator.call(this, node, pinId, this.context, helpers);
+        if (this.currentTraceId && isDataNode && !this.memo.has(traceKey)) {
+            this.traceCollector.recordStep(this.currentTraceId, {
+                nodeId: node.id, nodeType: node.type, status: 'executed', duration: 0,
+                inputs: await this._captureNodeInputs(node), outputs: {},
+            });
+            this.memo.set(traceKey, true);
+        }
 
-          const isVolatile = this.isNodeVolatile(node);
-          if (!isVolatile) {
-              this.memo.set(cacheKey, result);
-          }
+        const result = await nodeConfig.evaluator.call(this, node, pinId, this.context, helpers);
 
-          const traceOutputsKey = `trace_outputs_recorded:${node.id}`;
-          if (this.currentTraceId && isDataNode && this.memo.has(traceKey) && !this.memo.has(traceOutputsKey)) {
-              const outputs = {};
-              for (const outputPin of outputPinsLocal) {
-                  if (outputPin && outputPin.type !== 'Exec') {
-                      const outKey = `${node.id}:${outputPin.id}`;
-                      if (this.memo.has(outKey)) {
-                          outputs[outputPin.id] = this.memo.get(outKey);
-                      }
-                  }
-              }
-              this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
-              this.memo.set(traceOutputsKey, true); // Помечаем, что outputs уже записаны
-          }
+        if (!GraphDebugHandler.checkVolatility(node, this.activeGraph)) {
+            this.memo.set(cacheKey, result);
+        }
 
-          return result;
-      }
-
-      let result;
-
-      switch (node.type) {
-          case 'user:set_blacklist':
-              result = this.memo.get(`${node.id}:updated_user`);
-              break;
-          case 'event:command':
-              if (pinId === 'args') result = this.context.eventArgs?.args || {};
-              else if (pinId === 'user') result = this.context.eventArgs?.user || {};
-              else if (pinId === 'chat_type') result = this.context.eventArgs?.typeChat || 'chat';
-              else if (pinId === 'command_name') result = this.context.eventArgs?.commandName;
-              else if (pinId === 'success') result = this.context.success !== undefined ? this.context.success : true;
-              else result = this.context.eventArgs?.[pinId];
-              break;
-          case 'event:chat':
-              if (pinId === 'username') result = this.context.eventArgs?.username || this.context.username;
-              else if (pinId === 'message') result = this.context.eventArgs?.message || this.context.message;
-              else if (pinId === 'chatType') result = this.context.eventArgs?.chatType || this.context.chat_type;
-              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-          case 'event:raw_message':
-              if (pinId === 'rawText') result = this.context.eventArgs?.rawText || this.context.rawText;
-              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-          case 'event:playerJoined':
-          case 'event:playerLeft':
-              if (pinId === 'user') result = this.context.eventArgs?.user || this.context.user;
-              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-          case 'event:entitySpawn':
-          case 'event:entityMoved':
-          case 'event:entityGone':
-              if (pinId === 'entity') result = this.context.eventArgs?.entity || this.context.entity;
-              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-          case 'event:health':
-          case 'event:botDied':
-          case 'event:botStartup':
-              result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-          case 'event:websocket_call':
-              if (pinId === 'graphName') result = this.context.eventArgs?.graphName || this.context.graphName;
-              else if (pinId === 'data') result = this.context.eventArgs?.data || this.context.data;
-              else if (pinId === 'socketId') result = this.context.eventArgs?.socketId || this.context.socketId;
-              else if (pinId === 'keyPrefix') result = this.context.eventArgs?.keyPrefix || this.context.keyPrefix;
-              else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-              break;
-
-          case 'flow:for_each': {
-            if (pinId === 'element') {
-                result = this.memo.get(`${node.id}:element`);
-            } else if (pinId === 'index') {
-                result = this.memo.get(`${node.id}:index`);
+        const traceOutputsKey = `trace_outputs_recorded:${node.id}`;
+        if (this.currentTraceId && isDataNode && this.memo.has(traceKey) && !this.memo.has(traceOutputsKey)) {
+            const outputs = {};
+            for (const outputPin of outputPins) {
+                if (outputPin && outputPin.type !== 'Exec') {
+                    const outKey = `${node.id}:${outputPin.id}`;
+                    if (this.memo.has(outKey)) outputs[outputPin.id] = this.memo.get(outKey);
+                }
             }
-            break;
-          }
+            this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
+            this.memo.set(traceOutputsKey, true);
+        }
 
-          default:
-              result = defaultValue;
-              break;
-      }
-
-      const isVolatile = this.isNodeVolatile(node);
-
-      if (!isVolatile) {
-          this.memo.set(cacheKey, result);
-      }
-
-      return result;
-  }
-
-  isNodeVolatile(node, visited = new Set(), depth = 0) {
-    if (!node) return false;
-
-    if (depth > MAX_RECURSION_DEPTH) {
-        console.warn(`[GraphExecutionEngine] isNodeVolatile достиг максимальной глубины рекурсии (${MAX_RECURSION_DEPTH})`);
-        return false;
+        return result;
     }
 
-    if (visited.has(node.id)) {
-        return false;
-    }
-    visited.add(node.id);
+    _evaluateLegacyNode(node, pinId, defaultValue) {
+        let result;
 
-    if (node.type === 'data:get_variable') {
-        return true;
+        switch (node.type) {
+            case 'user:set_blacklist':
+                result = this.memo.get(`${node.id}:updated_user`);
+                break;
+            case 'event:command':
+                if (pinId === 'args') result = this.context.eventArgs?.args || {};
+                else if (pinId === 'user') result = this.context.eventArgs?.user || {};
+                else if (pinId === 'chat_type') result = this.context.eventArgs?.typeChat || 'chat';
+                else if (pinId === 'command_name') result = this.context.eventArgs?.commandName;
+                else if (pinId === 'success') result = this.context.success !== undefined ? this.context.success : true;
+                else result = this.context.eventArgs?.[pinId];
+                break;
+            case 'event:chat':
+                if (pinId === 'username') result = this.context.eventArgs?.username || this.context.username;
+                else if (pinId === 'message') result = this.context.eventArgs?.message || this.context.message;
+                else if (pinId === 'chatType') result = this.context.eventArgs?.chatType || this.context.chat_type;
+                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'event:raw_message':
+                if (pinId === 'rawText') result = this.context.eventArgs?.rawText || this.context.rawText;
+                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'event:playerJoined':
+            case 'event:playerLeft':
+                if (pinId === 'user') result = this.context.eventArgs?.user || this.context.user;
+                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'event:entitySpawn':
+            case 'event:entityMoved':
+            case 'event:entityGone':
+                if (pinId === 'entity') result = this.context.eventArgs?.entity || this.context.entity;
+                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'event:health':
+            case 'event:botDied':
+            case 'event:botStartup':
+                result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'event:websocket_call':
+                if (pinId === 'graphName') result = this.context.eventArgs?.graphName || this.context.graphName;
+                else if (pinId === 'data') result = this.context.eventArgs?.data || this.context.data;
+                else if (pinId === 'socketId') result = this.context.eventArgs?.socketId || this.context.socketId;
+                else if (pinId === 'keyPrefix') result = this.context.eventArgs?.keyPrefix || this.context.keyPrefix;
+                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
+                break;
+            case 'flow:for_each':
+                if (pinId === 'element') result = this.memo.get(`${node.id}:element`);
+                else if (pinId === 'index') result = this.memo.get(`${node.id}:index`);
+                break;
+            default:
+                result = defaultValue;
+        }
+
+        return result;
     }
 
-    const connections = this.activeGraph.connections.filter(c => c.targetNodeId === node.id);
-    for (const conn of connections) {
-        const sourceNode = this.activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
-        if (this.isNodeVolatile(sourceNode, visited, depth + 1)) {
-            return true;
+    hasConnection(node, pinId) {
+        if (!this.activeGraph || !this.activeGraph.connections) return false;
+        return this.activeGraph.connections.some(conn =>
+            conn.targetNodeId === node.id && conn.targetPinId === pinId
+        );
+    }
+
+    async _captureAllDataNodeOutputs() {
+        if (!this.currentTraceId) return;
+
+        const trace = await this.traceCollector.getTrace(this.currentTraceId);
+        if (!trace || !trace.steps) return;
+
+        for (const step of trace.steps) {
+            if (step.type === 'traversal') continue;
+            if (step.outputs && Object.keys(step.outputs).length > 0) continue;
+
+            const node = this.activeGraph.nodes.find(n => n.id === step.nodeId);
+            if (!node) continue;
+
+            const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+            if (!nodeConfig) continue;
+
+            const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
+            if (inputPins.some(p => p && p.type === 'Exec')) continue;
+
+            try {
+                const outputs = await this._captureNodeOutputs(node);
+                if (outputs && Object.keys(outputs).length > 0) {
+                    this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
+                }
+            } catch (error) {
+                console.error(`[GraphExecutor] Error capturing outputs for data node ${node.id}:`, error);
+            }
         }
     }
 
-    return false;
-  }
+    async _captureNodeInputs(node) {
+        const inputs = {};
+        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+        if (!nodeConfig) return inputs;
 
-  hasConnection(node, pinId) {
-      if (!this.activeGraph || !this.activeGraph.connections) return false;
-      return this.activeGraph.connections.some(conn =>
-          conn.targetNodeId === node.id && conn.targetPinId === pinId
-      );
-  }
+        const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
 
-  /**
-   * Захватить outputs для всех data-нод в trace
-   * Вызывается перед завершением trace, чтобы гарантировать,
-   * что для всех data-нод записаны outputs (даже если их выходы не подключены)
-   */
-  async _captureAllDataNodeOutputs() {
-      if (!this.currentTraceId) return;
+        for (const inputPin of inputPins) {
+            if (!inputPin || inputPin.type === 'Exec') continue;
+            try {
+                inputs[inputPin.id] = await this.resolvePinValue(node, inputPin.id);
+            } catch (error) {
+                inputs[inputPin.id] = '<error capturing>';
+            }
+        }
+        return inputs;
+    }
 
-      const trace = await this.traceCollector.getTrace(this.currentTraceId);
-      if (!trace || !trace.steps) return;
+    async _captureNodeOutputs(node) {
+        const outputs = {};
+        const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
+        if (!nodeConfig) return outputs;
 
-      // Проходим по всем шагам и находим data-ноды
-      for (const step of trace.steps) {
-          if (step.type === 'traversal') continue;
+        const outputPins = GraphValidation.getNodeOutputPins(nodeConfig, node.data);
 
-          // Проверяем, есть ли уже outputs
-          if (step.outputs && Object.keys(step.outputs).length > 0) continue;
-
-          // Находим ноду в графе
-          const node = this.activeGraph.nodes.find(n => n.id === step.nodeId);
-          if (!node) continue;
-
-          // Получаем конфигурацию ноды
-          const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-          if (!nodeConfig) continue;
-
-          let inputPinsForCheck = [];
-          try {
-              if (typeof nodeConfig.getInputs === 'function') {
-                  inputPinsForCheck = nodeConfig.getInputs(node.data || {}) || [];
-              } else if (typeof nodeConfig.computeInputs === 'function') {
-                  inputPinsForCheck = nodeConfig.computeInputs(node.data || {}) || [];
-              } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
-                  inputPinsForCheck = nodeConfig.pins.inputs;
-              }
-          } catch (e) {
-              inputPinsForCheck = nodeConfig.pins?.inputs || [];
-          }
-          const isDataNode = !inputPinsForCheck.some(p => p && p.type === 'Exec');
-          if (!isDataNode) continue;
-
-          try {
-              const outputs = await this._captureNodeOutputs(node);
-              if (outputs && Object.keys(outputs).length > 0) {
-                  this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, outputs);
-              }
-          } catch (error) {
-              console.error(`[GraphExecutor] Error capturing outputs for data node ${node.id}:`, error);
-          }
-      }
-  }
-
-  /**
-   * Захватить значения входов ноды для трассировки
-   */
-  async _captureNodeInputs(node) {
-      const inputs = {};
-
-      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (!nodeConfig) {
-          return inputs;
-      }
-
-      let inputPins = [];
-      try {
-          if (typeof nodeConfig.getInputs === 'function') {
-              inputPins = nodeConfig.getInputs(node.data || {}) || [];
-          } else if (typeof nodeConfig.computeInputs === 'function') {
-              inputPins = nodeConfig.computeInputs(node.data || {}) || [];
-          } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.inputs)) {
-              inputPins = nodeConfig.pins.inputs;
-          }
-      } catch (e) {
-          inputPins = nodeConfig.pins?.inputs || [];
-      }
-
-      for (const inputPin of inputPins) {
-          if (!inputPin || inputPin.type === 'Exec') continue;
-
-          try {
-              const value = await this.resolvePinValue(node, inputPin.id);
-              inputs[inputPin.id] = value;
-          } catch (error) {
-              inputs[inputPin.id] = '<error capturing>';
-          }
-      }
-      return inputs;
-  }
-
-  /**
-   * Захватить значения выходов ноды для трассировки
-   */
-  async _captureNodeOutputs(node) {
-      const outputs = {};
-
-      const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-      if (!nodeConfig) {
-          return outputs;
-      }
-
-      let outputPins = [];
-      try {
-          if (typeof nodeConfig.getOutputs === 'function') {
-              outputPins = nodeConfig.getOutputs(node.data || {}) || [];
-          } else if (typeof nodeConfig.computeOutputs === 'function') {
-              outputPins = nodeConfig.computeOutputs(node.data || {}) || [];
-          } else if (nodeConfig.pins && Array.isArray(nodeConfig.pins.outputs)) {
-              outputPins = nodeConfig.pins.outputs;
-          }
-      } catch (e) {
-          outputPins = nodeConfig.pins?.outputs || [];
-      }
-
-      for (const outputPin of outputPins) {
-          if (!outputPin || outputPin.type === 'Exec') continue;
-
-          try {
-              const value = await this.evaluateOutputPin(node, outputPin.id);
-              outputs[outputPin.id] = value;
-          } catch (error) {
-              outputs[outputPin.id] = '<error capturing>';
-          }
-      }
-      return outputs;
-  }
-
-  /**
-   * Проверить брейкпоинт перед выполнением ноды
-   */
-  async checkBreakpoint(node) {
-      try {
-          // Если работаем в дочернем процессе, используем IPC
-          if (process.send) {
-              return await this._checkBreakpointViaIpc(node);
-          }
-
-          // Иначе используем прямой доступ к DebugManager
-          const debugManager = getGlobalDebugManager();
-          const graphId = this.context.graphId;
-
-          if (!graphId) return;
-
-          const debugState = debugManager.get(graphId);
-          if (!debugState) return;
-
-          const breakpoint = debugState.breakpoints.get(node.id);
-          if (!breakpoint || !breakpoint.enabled) return;
-
-          const shouldPause = await this.evaluateBreakpointCondition(breakpoint);
-
-          if (shouldPause) {
-              console.log(`[Debug] Hit breakpoint at node ${node.id}, pausing execution`);
-
-              breakpoint.hitCount++;
-
-              const inputs = await this._captureNodeInputs(node);
-
-              const executedSteps = this.currentTraceId
-                  ? await this.traceCollector.getTrace(this.currentTraceId)
-                  : null;
-
-              const overrides = await debugState.pause({
-                  nodeId: node.id,
-                  nodeType: node.type,
-                  inputs,
-                  executedSteps, // Добавляем выполненные шаги
-                  context: {
-                      user: this.context.user,
-                      variables: this.context.variables,
-                      commandArguments: this.context.commandArguments,
-                  },
-                  breakpoint: {
-                      condition: breakpoint.condition,
-                      hitCount: breakpoint.hitCount
-                  }
-              });
-
-              if (overrides && overrides.__rewind) {
-                  throw new RewindSignal(overrides.target);
-              }
-
-              if (overrides && overrides.__stopped) {
-                  throw new Error('Execution stopped by debugger');
-              }
-
-              if (overrides) {
-                  this.applyWhatIfOverrides(node, overrides);
-              }
-          }
-      } catch (error) {
-          if (error instanceof RewindSignal) throw error;
-          if (error.message === 'Execution stopped by debugger') throw error;
-          console.error(`[checkBreakpoint] ERROR:`, error.message, error.stack);
-          if (error.message === 'DebugSessionManager not initialized! Call initializeDebugManager(io) first.') {
-              return;
-          }
-          console.error(`[checkBreakpoint] Ignoring error to continue execution`);
-      }
-  }
-
-  /**
-   * Оценить условие брейкпоинта
-   */
-  async evaluateBreakpointCondition(breakpoint) {
-      // Если нет условия, всегда срабатывает
-      if (!breakpoint.condition || breakpoint.condition.trim() === '') {
-          return true;
-      }
-
-      try {
-          // Создаем sandbox для безопасного выполнения условия
-          const sandbox = {
-              user: this.context.user || {},
-              args: this.context.commandArguments || {},
-              variables: this.context.variables || {},
-              context: this.context
-          };
-
-          // Используем Function constructor для безопасного выполнения
-          const fn = new Function(
-              ...Object.keys(sandbox),
-              `return (${breakpoint.condition})`
-          );
-
-          const result = fn(...Object.values(sandbox));
-
-          return Boolean(result);
-      } catch (error) {
-          console.error(`[Debug] Error evaluating breakpoint condition: ${error.message}`);
-          console.error(`[Debug] Condition was: ${breakpoint.condition}`);
-          return false;
-      }
-  }
-
-  /**
-   * Применить what-if overrides к ноде
-   */
-  /**
-   * Проверить брейкпоинт через IPC (для дочерних процессов)
-   */
-  async _checkBreakpointViaIpc(node) {
-      try {
-          const { randomUUID } = require('crypto');
-          const requestId = randomUUID();
-
-          const inputs = await this._captureNodeInputs(node);
-          const executedSteps = this.currentTraceId
-              ? await this.traceCollector.getTrace(this.currentTraceId)
-              : null;
-
-          // Отправляем запрос в главный процесс
-          process.send({
-              type: 'debug:check_breakpoint',
-              requestId,
-              payload: {
-                  graphId: this.context.graphId,
-                  nodeId: node.id,
-                  nodeType: node.type,
-                  inputs,
-                  executedSteps,
-                  context: {
-                      user: this.context.user,
-                      variables: this.context.variables,
-                      commandArguments: this.context.commandArguments,
-                  }
-              }
-          });
-
-          // Ждём ответа
-          const overrides = await new Promise((resolve) => {
-              this.pendingDebugRequests.set(requestId, resolve);
-
-              // Таймаут на случай, если ответ не придёт
-              const timeoutId = setTimeout(() => {
-                  if (this.pendingDebugRequests.has(requestId)) {
-                      this.pendingDebugRequests.delete(requestId);
-                      resolve(null);
-                  }
-              }, debugConfig.BREAKPOINT_TIMEOUT);
-
-              // Сохраняем timeoutId для возможной отмены
-              this.pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
-          });
-
-          if (overrides && overrides.__stopped) {
-              throw new Error('Execution stopped by debugger');
-          }
-
-          if (overrides) {
-              this.applyWhatIfOverrides(node, overrides);
-          }
-      } catch (error) {
-          if (error.message === 'Execution stopped by debugger') {
-              throw error;
-          }
-      }
-  }
-
-  /**
-   * Статический обработчик IPC ответов (глобальный для всех instances)
-   */
-  static _handleGlobalDebugResponse(message) {
-      const { requestId, overrides } = message;
-      const resolve = GraphExecutionEngine._allPendingRequests.get(requestId);
-
-      if (resolve) {
-          // Отменяем таймаут
-          const timeoutId = GraphExecutionEngine._allPendingRequests.get(`${requestId}_timeout`);
-          if (timeoutId) {
-              clearTimeout(timeoutId);
-              GraphExecutionEngine._allPendingRequests.delete(`${requestId}_timeout`);
-          }
-
-          GraphExecutionEngine._allPendingRequests.delete(requestId);
-          resolve(overrides);
-      }
-  }
-
-  /**
-   * Обработать IPC ответ от главного процесса (legacy wrapper)
-   */
-  _handleDebugResponse(message) {
-      GraphExecutionEngine._handleGlobalDebugResponse(message);
-  }
-
-  applyWhatIfOverrides(node, overrides) {
-      if (!overrides || typeof overrides !== 'object') return;
-
-      console.log(`[Debug] Applying what-if overrides to node ${node.id}:`, overrides);
-
-      if (!this._inputOverrides) this._inputOverrides = new Map();
-
-      for (const [key, value] of Object.entries(overrides)) {
-          if (key === '__stopped' || key === '__rewind' || key === 'target') continue;
-
-          if (key.startsWith('var.')) {
-              const varName = key.substring(4);
-              if (!this.context.variables) this.context.variables = {};
-              this.context.variables[varName] = value;
-              console.log(`[Debug] Variable override: ${varName} =`, value);
-              continue;
-          }
-
-          const outIdx = key.indexOf('.out.');
-          if (outIdx > 0) {
-              const targetNodeId = key.substring(0, outIdx);
-              const pinName = key.substring(outIdx + 5);
-              const memoKey = `${targetNodeId}:${pinName}`;
-              this.memo.set(memoKey, value);
-              console.log(`[Debug] Output override: ${memoKey} =`, value);
-              continue;
-          }
-
-          const inIdx = key.indexOf('.in.');
-          if (inIdx > 0) {
-              const targetNodeId = key.substring(0, inIdx);
-              const pinName = key.substring(inIdx + 4);
-              this._inputOverrides.set(`${targetNodeId}:${pinName}`, value);
-              console.log(`[Debug] Input override stored: ${targetNodeId}.${pinName} =`, value);
-              continue;
-          }
-
-          this._inputOverrides.set(`${node.id}:${key}`, value);
-          if (!node.data) node.data = {};
-          node.data[key] = value;
-          console.log(`[Debug] Current-node input override: ${node.id}.${key} =`, value);
-      }
-  }
-
-  _getInputOverride(nodeId, pinId) {
-      if (!this._inputOverrides) return undefined;
-      const k = `${nodeId}:${pinId}`;
-      return this._inputOverrides.has(k) ? this._inputOverrides.get(k) : undefined;
-  }
+        for (const outputPin of outputPins) {
+            if (!outputPin || outputPin.type === 'Exec') continue;
+            try {
+                outputs[outputPin.id] = await this.evaluateOutputPin(node, outputPin.id);
+            } catch (error) {
+                outputs[outputPin.id] = '<error capturing>';
+            }
+        }
+        return outputs;
+    }
 }
 
 module.exports = GraphExecutionEngine;
