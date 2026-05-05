@@ -10,10 +10,14 @@ const RewindSignal = require('./RewindSignal');
 const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 
+const GraphTraverser = require('./graph/GraphTraverser');
+const NodeExecutor = require('./graph/NodeExecutor');
+const DebugController = require('./graph/DebugController');
+
+const { MessageTypes } = require('./ipc/ipcMessageTypes');
+
 class GraphExecutionEngine {
-  // Static флаг для предотвращения дублирования IPC handler
   static _ipcHandlerAttached = false;
-  // Static Map для хранения всех pending requests из всех instances
   static _allPendingRequests = new Map();
 
   constructor(nodeRegistry, botManagerOrApi = null) {
@@ -28,17 +32,36 @@ class GraphExecutionEngine {
       this.traceCollector = getTraceCollector();
       this.currentTraceId = null;
 
-      // Используем статическую Map для всех instance
       this.pendingDebugRequests = GraphExecutionEngine._allPendingRequests;
+
+      this._inputOverrides = new Map();
 
       if (process.on && !GraphExecutionEngine._ipcHandlerAttached) {
           process.on('message', (message) => {
-              if (message.type === 'debug:breakpoint_response' || message.type === 'debug:step_response') {
+              if (message.type === MessageTypes.DEBUG.BREAKPOINT_RESPONSE ||
+                  message.type === MessageTypes.DEBUG.STEP_RESPONSE) {
                   GraphExecutionEngine._handleGlobalDebugResponse(message);
               }
           });
           GraphExecutionEngine._ipcHandlerAttached = true;
       }
+  }
+
+  _initComponents() {
+      this.graphTraverser = new GraphTraverser(this.activeGraph, this.traceCollector);
+      this.nodeExecutor = new NodeExecutor(this.nodeRegistry, this.context, this.memo, this.traceCollector);
+      this.debugController = new DebugController(this.context, this.traceCollector);
+
+      this.nodeExecutor.setActiveGraph(this.activeGraph);
+
+      this.debugController.setMemo(this.memo);
+  }
+
+  setMemo(memo) {
+    this.memo = memo;
+    if (this.debugController) {
+      this.debugController.setMemo(memo);
+    }
   }
 
   async execute(graph, context, eventType) {
@@ -69,6 +92,8 @@ class GraphExecutionEngine {
       try {
           this.activeGraph = parsedGraph;
           this.context = context;
+
+          this._initComponents();
 
           if (!this.context.variables) {
             this.context.variables = parseVariables(
@@ -160,7 +185,7 @@ class GraphExecutionEngine {
               // Если работаем в дочернем процессе (BotProcess), отправляем трассировку в главный процесс
               if (trace && process.send) {
                   process.send({
-                      type: 'trace:completed',
+                      type: MessageTypes.GRAPH.TRACE_COMPLETED,
                       trace: {
                           ...trace,
                           steps: trace.steps,
@@ -203,7 +228,7 @@ class GraphExecutionEngine {
               // Если работаем в дочернем процессе (BotProcess), отправляем трассировку с ошибкой в главный процесс
               if (trace && process.send) {
                   process.send({
-                      type: 'trace:completed',
+                      type: MessageTypes.GRAPH.TRACE_COMPLETED,
                       trace: {
                           ...trace,
                           steps: trace.steps,
@@ -542,7 +567,6 @@ class GraphExecutionEngine {
 
       let value = node.data && node.data[pinId] !== undefined ? node.data[pinId] : defaultValue;
 
-      // Автоматически заменяем переменные {varName} в строковых значениях
       if (typeof value === 'string' && value.includes('{')) {
           value = await this._replaceVariablesInString(value, node);
       }

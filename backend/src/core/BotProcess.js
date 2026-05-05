@@ -12,6 +12,8 @@ const Command = require('./system/Command');
 const { parseArguments } = require('./system/parseArguments');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 const NodeRegistry = require('./NodeRegistry');
+const { createBotApi } = require('./ipc/botApiFactory');
+const { MessageTypes } = require('./ipc/ipcMessageTypes');
 
 const UserService = require('./UserService');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
@@ -40,7 +42,7 @@ JSON.parse = function (text, reviver) {
 
 function sendLog(content) {
     if (process.send) {
-        process.send({ type: 'log', content });
+        process.send({ type: MessageTypes.BOT.LOG, content });
     } else {
         console.log(`[ChildProcess Log] ${content}`);
     }
@@ -49,7 +51,6 @@ function sendLog(content) {
 
 function sendEvent(eventName, eventArgs) {
     if (process.send) {
-        // Добавляем информацию о боте (позицию) во все события
         const enrichedArgs = {
             ...eventArgs,
             botEntity: bot && bot.entity ? {
@@ -58,7 +59,7 @@ function sendEvent(eventName, eventArgs) {
                 pitch: bot.entity.pitch
             } : null
         };
-        process.send({ type: 'event', eventType: eventName, args: enrichedArgs });
+        process.send({ type: MessageTypes.BOT.EVENT, eventType: eventName, args: enrichedArgs });
     }
 }
 
@@ -367,58 +368,12 @@ process.on('message', async (message) => {
         } catch (error) {
             sendLog(`[Viewer] Control error: ${error.message}`);
         }
-    } else if (message.type === 'execute_event_graph') {
-        // Выполнение event графа в child process
+    } else if (message.type === MessageTypes.GRAPH.EXECUTE_EVENT_GRAPH) {
         const { botId, graph, eventType, eventArgs } = message;
 
         try {
-
             const playerList = bot ? Object.keys(bot.players) : [];
-            const botApi = {
-                sendMessage: (chatType, message, recipient) => {
-                    if (!bot || !bot.messageQueue) {
-                        sendLog('[EventGraph] Bot not ready');
-                        return;
-                    }
-
-                    bot.messageQueue.enqueue(chatType, message, recipient);
-                },
-                executeCommand: (command) => {
-                    if (!bot || !bot.messageQueue) {
-                        sendLog('[EventGraph] Bot not ready');
-                        return;
-                    }
-                    bot.messageQueue.enqueue('command', command);
-                },
-                lookAt: async (x, y, z) => {
-                    if (!bot) return;
-                    const target = new Vec3(x, y, z);
-                    await bot.lookAt(target);
-                },
-                navigate: async (x, y, z) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
-                    await bot.pathfinder.goto(goal);
-                },
-                attack: (entityId) => {
-                    if (!bot) return;
-                    const entity = bot.entities[entityId];
-                    if (entity) bot.attack(entity);
-                },
-                follow: (username) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const player = bot.players[username];
-                    if (player && player.entity) {
-                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
-                        bot.pathfinder.setGoal(goal, true);
-                    }
-                },
-                stopFollow: () => {
-                    if (bot && bot.pathfinder) {
-                        bot.pathfinder.setGoal(null);
-                    }
-                }
-            };
+            const botApi = createBotApi(bot, { enableLogging: true });
 
             const context = {
                 bot: bot,  // Полный mineflayer bot
@@ -1513,7 +1468,6 @@ process.on('message', async (message) => {
             bot.messageQueue.enqueue('command', message.payload.command);
         }
     } else if (message.type === 'execute_event_graph') {
-        // Выполнение event графа в child process
         const { graph, eventType, eventArgs } = message;
 
         try {
@@ -1528,44 +1482,7 @@ process.on('message', async (message) => {
                 return;
             }
 
-            const botApi = {
-                sendMessage: (chatType, messageText, recipient) => {
-                    if (!bot || !bot.messageQueue) return;
-                    bot.messageQueue.enqueue(chatType, messageText, recipient);
-                },
-                executeCommand: (command) => {
-                    if (!bot || !bot.messageQueue) return;
-                    bot.messageQueue.enqueue('command', command);
-                },
-                lookAt: async (x, y, z) => {
-                    if (!bot) return;
-                    const target = new Vec3(x, y, z);
-                    await bot.lookAt(target);
-                },
-                navigate: async (x, y, z) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
-                    await bot.pathfinder.goto(goal);
-                },
-                attack: (entityId) => {
-                    if (!bot) return;
-                    const entity = bot.entities[entityId];
-                    if (entity) bot.attack(entity);
-                },
-                follow: (username) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const player = bot.players[username];
-                    if (player && player.entity) {
-                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
-                        bot.pathfinder.setGoal(goal, true);
-                    }
-                },
-                stopFollow: () => {
-                    if (bot && bot.pathfinder) {
-                        bot.pathfinder.setGoal(null);
-                    }
-                }
-            };
+            const botApi = createBotApi(bot);
 
             const players = bot ? Object.keys(bot.players) : [];
 
