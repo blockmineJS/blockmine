@@ -32,6 +32,7 @@ const botGroupsRoutes = require('./api/routes/botGroups');
 const botPermissionsRoutes = require('./api/routes/botPermissions');
 const botStatusRoutes = require('./api/routes/botStatus');
 const nodeRegistryRoutes = require('./api/routes/nodeRegistry');
+const healthRoutes = require('./api/routes/health');
 
 const app = express();
 const server = http.createServer(app);
@@ -86,6 +87,7 @@ app.use('/api/logs', logsRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/traces', tracesRoutes);
 app.use('/api/nodes', nodeRegistryRoutes);
+app.use('/api/health', healthRoutes);
 
 app.use(express.static(frontendPath));
 

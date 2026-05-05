@@ -23,6 +23,7 @@ const CommandExecutionService = require('./core/services/CommandExecutionService
 // Core
 const EventGraphManager = require('./core/EventGraphManager');
 const PluginManager = require('./core/PluginManager');
+const BotManager = require('./core/BotManager');
 
 function createLogger() {
     return {
@@ -36,14 +37,12 @@ function createLogger() {
 function configureContainer() {
     const container = createContainer();
 
-    // Infrastructure
     container.register({
         prisma: asValue(prisma),
         config: asValue(config),
         logger: asFunction(createLogger).singleton(),
     });
 
-    // Repositories
     container.register({
         botRepository: asClass(BotRepository).singleton(),
         commandRepository: asClass(CommandRepository).singleton(),
@@ -55,7 +54,6 @@ function configureContainer() {
         groupRepository: asClass(GroupRepository).singleton(),
     });
 
-    // Core Services
     container.register({
         cacheManager: asClass(CacheManager).singleton(),
         botProcessManager: asClass(BotProcessManager).singleton(),
@@ -63,17 +61,18 @@ function configureContainer() {
         telemetryService: asClass(TelemetryService).singleton(),
     });
 
-    // Managers
-    container.register({
-        pluginManager: asClass(PluginManager).singleton(),
-        // EventGraphManager создаётся без зависимости - botManager передаётся через setter
-        eventGraphManager: asClass(EventGraphManager).singleton(),
-    });
-
-    // High-level Services (зависят от managers)
     container.register({
         botLifecycleService: asClass(BotLifecycleService).singleton(),
         commandExecutionService: asClass(CommandExecutionService).singleton(),
+    });
+
+    container.register({
+        pluginManager: asClass(PluginManager).singleton(),
+        eventGraphManager: asClass(EventGraphManager).singleton(),
+    });
+
+    container.register({
+        botManager: asClass(BotManager).singleton(),
     });
 
     return container;
