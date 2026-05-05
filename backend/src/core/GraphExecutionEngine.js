@@ -10,10 +10,6 @@ const RewindSignal = require('./RewindSignal');
 const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 
-const GraphTraverser = require('./graph/GraphTraverser');
-const NodeExecutor = require('./graph/NodeExecutor');
-const DebugController = require('./graph/DebugController');
-
 const { MessageTypes } = require('./ipc/ipcMessageTypes');
 
 class GraphExecutionEngine {
@@ -47,22 +43,6 @@ class GraphExecutionEngine {
       }
   }
 
-  _initComponents() {
-      this.graphTraverser = new GraphTraverser(this.activeGraph, this.traceCollector);
-      this.nodeExecutor = new NodeExecutor(this.nodeRegistry, this.context, this.memo, this.traceCollector);
-      this.debugController = new DebugController(this.context, this.traceCollector);
-
-      this.nodeExecutor.setActiveGraph(this.activeGraph);
-
-      this.debugController.setMemo(this.memo);
-  }
-
-  setMemo(memo) {
-    this.memo = memo;
-    if (this.debugController) {
-      this.debugController.setMemo(memo);
-    }
-  }
 
   async execute(graph, context, eventType) {
       if (!graph || graph === 'null') return context;
@@ -93,7 +73,6 @@ class GraphExecutionEngine {
           this.activeGraph = parsedGraph;
           this.context = context;
 
-          this._initComponents();
 
           if (!this.context.variables) {
             this.context.variables = parseVariables(

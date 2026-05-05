@@ -27,6 +27,7 @@ const MessageTypes = {
     STATUS: 'status',
     LOG: 'log',
     STOP: 'stop',
+    START: 'start',
     RESTART: 'restart_bot',
     CHANGE_CREDENTIALS: 'change_credentials',
     UPDATE_CREDENTIALS: 'update_credentials',
