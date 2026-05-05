@@ -1,9 +1,13 @@
-const DependencyService = require('../DependencyService');
+const DependencyResolver = require('../domain/services/DependencyResolver');
 const { decrypt } = require('../utils/crypto');
 const UserService = require('../UserService');
 const PermissionManager = require('../PermissionManager');
 const CrashRestartManager = require('./CrashRestartManager');
 const BotIPCMessageRouter = require('./BotIPCMessageRouter');
+const ErrorHandler = require('../errors/ErrorHandler');
+
+const dependencyResolver = new DependencyResolver();
+const errorHandler = new ErrorHandler({ logger: console });
 
 class BotLifecycleService {
     constructor({
@@ -61,7 +65,7 @@ class BotLifecycleService {
         this.emitStatusUpdate(botId, 'starting', '');
 
         const allPluginsForBot = await this.pluginRepository.findEnabledByBotId(botId);
-        const { sortedPlugins, hasCriticalIssues, pluginInfo } = DependencyService.resolveDependencies(allPluginsForBot, allPluginsForBot);
+        const { sortedPlugins, hasCriticalIssues, pluginInfo } = dependencyResolver.resolve(allPluginsForBot, allPluginsForBot);
 
         if (hasCriticalIssues) {
             this.appendLog(botId, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен.');
@@ -77,7 +81,8 @@ class BotLifecycleService {
                 if (criticalIssues.length > 0) {
                     this.appendLog(botId, `* Плагин "${info.name}":`);
                     for (const issue of criticalIssues) {
-                        this.appendLog(botId, `  - ${issue.message}`);
+                        const msg = issue.message || `${issue.messageKey} ${JSON.stringify(issue.context || {})}`;
+                        this.appendLog(botId, `  - ${msg}`);
                     }
                 }
             }
@@ -197,6 +202,7 @@ class BotLifecycleService {
             return config;
         } catch (error) {
             this.logger.error({ botId, error }, 'Ошибка загрузки конфигурации');
+            const handled = errorHandler.handle(error, { botId });
             throw new Error(`Failed to load/cache bot configuration for botId ${botId}: ${error.message}`);
         }
     }

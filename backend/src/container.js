@@ -19,6 +19,8 @@ const ResourceMonitorService = require('./core/services/ResourceMonitorService')
 const TelemetryService = require('./core/services/TelemetryService');
 const BotLifecycleService = require('./core/services/BotLifecycleService');
 const CommandExecutionService = require('./core/services/CommandExecutionService');
+const PluginManagementService = require('./core/services/PluginManagementService');
+const EventGraphService = require('./core/services/EventGraphService');
 
 // Core
 const EventGraphManager = require('./core/EventGraphManager');
@@ -64,6 +66,8 @@ function configureContainer() {
     container.register({
         botLifecycleService: asClass(BotLifecycleService).singleton(),
         commandExecutionService: asClass(CommandExecutionService).singleton(),
+        pluginManagementService: asClass(PluginManagementService).singleton(),
+        eventGraphService: asClass(EventGraphService).singleton(),
     });
 
     container.register({

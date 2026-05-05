@@ -221,6 +221,9 @@ router.get('/catalog', async (req, res) => {
         res.json(await fetchOfficialCatalog());
     } catch (error) {
         console.error(`[API Error] Could not fetch catalog URL. Reason: ${error.message}`);
+        if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timed out')) {
+            return res.json([]);
+        }
         res.status(500).json({ error: 'Не удалось загрузить каталог плагинов.' });
     }
 });
