@@ -507,6 +507,17 @@ router.get('/:id/logs', conditionalListAuth, authenticateUniversal, checkBotAcce
     }
 });
 
+router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+    const { botId } = req.params;
+    const { path } = req.body;
+    try {
+        const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
+        res.status(201).json(newPlugin);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 router.use(authenticate);
 router.use('/:botId/event-graphs', eventGraphsRouter);
 router.use('/:botId/plugins/ide', pluginIdeRouter);
@@ -879,17 +890,6 @@ router.post('/:botId/plugins/install/github', githubInstallLimiter, authenticate
         }
 
         res.status(status).json({ message });
-    }
-});
-
-router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
-    const { botId } = req.params;
-    const { path } = req.body;
-    try {
-        const newPlugin = await pluginManager.installFromLocalPath(parseInt(botId), path);
-        res.status(201).json(newPlugin);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
     }
 });
 
