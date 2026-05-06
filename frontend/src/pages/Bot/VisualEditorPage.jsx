@@ -401,7 +401,11 @@ function BotVisualEditorPage() {
 
             // Если eventType не указан, проверяем сколько event нод в графе
             if (!selectedEventType) {
-                const eventNodes = nodes.filter(n => n.type?.startsWith('event:'));
+                const eventNodes = nodes.filter(n => 
+                    n.type?.startsWith('event:') && 
+                    n.type !== 'event:custom_event' && 
+                    n.type !== 'event:call_event'
+                );
 
                 if (eventNodes.length === 0) {
                     toast.error(t('trace.noEventNodes'));

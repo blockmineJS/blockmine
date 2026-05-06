@@ -123,6 +123,7 @@ import {
 // Bot nodes
 import {
   botGetPositionDefinition,
+  botGetNameDefinition,
 } from './bot';
 
 // Debug nodes
@@ -290,6 +291,7 @@ export function registerAllNodes() {
 
   // Bot category
   NodeRegistry.register(botGetPositionDefinition);
+  NodeRegistry.register(botGetNameDefinition);
 
   // Debug category
   NodeRegistry.register(debugLogDefinition);
