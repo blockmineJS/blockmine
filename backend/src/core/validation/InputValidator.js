@@ -1,7 +1,7 @@
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/;
 
 const DANGEROUS_PATTERNS = [
-    /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+    /<script\b[^>]*>[\s\S]*?<\/script(?:\s+[^>]*)?\s*>/gi,
     /<[^>]+on\w+\s*=\s*["'][^"']*["'][^>]*>/gi,
     /javascript\s*:/gi,
     /vbscript\s*:/gi,
