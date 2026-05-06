@@ -177,6 +177,46 @@ const eventsNodes = [
     ],
     defaultData: {},
     theme: { headerColor: '#8b5cf6', accentColor: '#a78bfa' }
+  },
+  {
+    type: 'event:custom_event',
+    label: '▶️ Событие',
+    category: 'События',
+    description: 'Стартовая нода пользовательского события с динамическими параметрами',
+    graphType: GRAPH_TYPES.EVENT,
+    computeInputs: () => [],
+    computeOutputs: (data) => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec' },
+      ...(data.pins || []).map((pin) => ({ id: pin.id, name: pin.name, type: pin.type }))
+    ],
+    evaluator: require('../../core/nodes/event/custom_event').evaluate,
+    defaultData: { pins: [] },
+    theme: { headerColor: '#8b5cf6', accentColor: '#a78bfa' }
+  },
+  {
+    type: 'event:call_event',
+    label: 'Вызвать событие',
+    category: 'Управление',
+    description: 'Вызывает пользовательское событие и передаёт параметры',
+    graphType: GRAPH_TYPES.ALL,
+    computeInputs: (data, context) => {
+      const pins = [{ id: 'exec', name: 'Выполнить', type: 'Exec' }];
+      if (data.selectedEventId != null) {
+        const selectedNode = (context.nodes || []).find(n => n.id === data.selectedEventId);
+        if (selectedNode && selectedNode.type === 'event:custom_event') {
+          (selectedNode.data.pins || [])
+            .filter(pin => pin.type !== 'Exec')
+            .forEach(pin => pins.push({ id: pin.id, name: pin.name, type: pin.type }));
+        }
+      }
+      return pins;
+    },
+    computeOutputs: () => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec' }
+    ],
+    executor: require('../../core/nodes/event/call_event').executor,
+    defaultData: { selectedEventId: null },
+    theme: { headerColor: '#8b5cf6', accentColor: '#a78bfa' }
   }
 ];
 

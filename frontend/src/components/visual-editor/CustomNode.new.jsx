@@ -8,6 +8,7 @@ function CustomNode({ data, type, id: nodeId }) {
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
   const variables = useVisualEditorStore(state => state.variables);
   const commandArguments = useVisualEditorStore(state => state.commandArguments);
+  const nodes = useVisualEditorStore(state => state.nodes);
   const edges = useVisualEditorStore(state => state.edges);
   const availableNodes = useVisualEditorStore(state => state.availableNodes);
   const trace = useVisualEditorStore(state => state.trace);
@@ -34,8 +35,8 @@ function CustomNode({ data, type, id: nodeId }) {
   );
 
   const context = useMemo(
-    () => ({ variables, commandArguments }),
-    [variables, commandArguments]
+    () => ({ variables, commandArguments, nodes }),
+    [variables, commandArguments, nodes]
   );
 
   // Функция для перевода пинов
@@ -80,6 +81,11 @@ function CustomNode({ data, type, id: nodeId }) {
     () => getNodeTranslation(type),
     [type, getNodeTranslation]
   );
+
+  const resolvedLabel = useMemo(() => {
+    if (data?.label) return data.label;
+    return nodeTranslation.label || definition?.label || type;
+  }, [data?.label, nodeTranslation.label, definition?.label, type]);
 
   useEffect(() => {
     if (type !== 'default') {
@@ -159,7 +165,7 @@ function CustomNode({ data, type, id: nodeId }) {
       <BaseNode
         nodeId={nodeId}
         type={type}
-        label={nodeTranslation.label || definition.label}
+        label={resolvedLabel}
         description={nodeTranslation.description || definition.description}
         inputs={inputs}
         outputs={outputs}

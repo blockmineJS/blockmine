@@ -187,6 +187,8 @@ import {
   eventBotStartupDefinition,
   eventHealthDefinition,
   eventWebsocketCallDefinition,
+  eventCustomEventDefinition,
+  eventCallEventDefinition,
 } from './event';
 
 /**
@@ -340,6 +342,8 @@ export function registerAllNodes() {
   NodeRegistry.register(eventBotStartupDefinition);
   NodeRegistry.register(eventHealthDefinition);
   NodeRegistry.register(eventWebsocketCallDefinition);
+  NodeRegistry.register(eventCustomEventDefinition);
+  NodeRegistry.register(eventCallEventDefinition);
 
   console.log(`[NodeRegistry] Зарегистрировано ${NodeRegistry.size()} типов нод`);
 }

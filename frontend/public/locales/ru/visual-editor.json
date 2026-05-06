@@ -360,6 +360,20 @@
     "historyDepth": "Глубина истории:",
     "unknown": "Неизвестно"
   },
+  "eventNodes": {
+    "addPin": "Добавить пин",
+    "pinName": "Имя:",
+    "pinNamePlaceholder": "Имя пина",
+    "pinType": "Тип:",
+    "confirmPin": "Добавить",
+    "cancelPin": "Отмена",
+    "deletePin": "Удалить",
+    "eventName": "Имя события:",
+    "eventNamePlaceholder": "Моё событие",
+    "selectEvent": "Выбрать событие:",
+    "noEvents": "Нет доступных событий",
+    "selectEventPlaceholder": "Выберите событие..."
+  },
   "testMode": {
     "title": "Режим теста",
     "description": "Запустить граф пошагово с эмулированным событием. Можно менять значения и откатываться назад.",

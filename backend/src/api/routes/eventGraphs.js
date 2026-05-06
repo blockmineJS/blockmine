@@ -178,7 +178,11 @@ router.put('/:graphId',
           dataToUpdate.graphJson = graphJson;
 
           const parsedGraph = JSON.parse(graphJson);
-          const eventNodes = parsedGraph.nodes.filter(node => node.type.startsWith('event:'));
+          const NON_TRIGGER_TYPES = ['custom_event', 'call_event'];
+          const eventNodes = parsedGraph.nodes.filter(node => 
+              node.type.startsWith('event:') && 
+              !NON_TRIGGER_TYPES.includes(node.type.split(':')[1])
+          );
           const eventTypes = [...new Set(eventNodes.map(node => node.type.split(':')[1]))];
           
           const existingGraph = await prisma.eventGraph.findUnique({
