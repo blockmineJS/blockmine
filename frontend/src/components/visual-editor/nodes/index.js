@@ -21,6 +21,8 @@ import {
   dataEntityInfoDefinition,
   dataGetUserFieldDefinition,
   dataLengthDefinition,
+  dataStoreReadDefinition,
+  dataStoreWriteDefinition,
 } from './data';
 
 // Flow nodes
@@ -32,6 +34,7 @@ import {
   flowWhileDefinition,
   flowBreakDefinition,
   flowDelayDefinition,
+  flowTimerDefinition,
 } from './flow';
 
 // Math nodes
@@ -73,6 +76,7 @@ import {
   arrayRemoveByIndexDefinition,
   arrayFindIndexDefinition,
   arrayJoinDefinition,
+  arrayShuffleDefinition,
 } from './array';
 
 // Object nodes
@@ -113,6 +117,9 @@ import {
   userSetBlacklistDefinition,
   userGetGroupsDefinition,
   userGetPermissionsDefinition,
+  userCheckPermissionDefinition,
+  userAddToGroupDefinition,
+  userRemoveFromGroupDefinition,
 } from './user';
 
 // Type conversion nodes
@@ -212,6 +219,8 @@ export function registerAllNodes() {
   NodeRegistry.register(dataEntityInfoDefinition);
   NodeRegistry.register(dataGetUserFieldDefinition);
   NodeRegistry.register(dataLengthDefinition);
+  NodeRegistry.register(dataStoreReadDefinition);
+  NodeRegistry.register(dataStoreWriteDefinition);
 
   // Flow category
   NodeRegistry.register(flowBranchDefinition);
@@ -221,6 +230,7 @@ export function registerAllNodes() {
   NodeRegistry.register(flowWhileDefinition);
   NodeRegistry.register(flowBreakDefinition);
   NodeRegistry.register(flowDelayDefinition);
+  NodeRegistry.register(flowTimerDefinition);
 
   // Math category
   NodeRegistry.register(mathOperationDefinition);
@@ -254,6 +264,7 @@ export function registerAllNodes() {
   NodeRegistry.register(arrayRemoveByIndexDefinition);
   NodeRegistry.register(arrayFindIndexDefinition);
   NodeRegistry.register(arrayJoinDefinition);
+  NodeRegistry.register(arrayShuffleDefinition);
 
   // Object category
   NodeRegistry.register(objectCreateDefinition);
@@ -286,6 +297,9 @@ export function registerAllNodes() {
   NodeRegistry.register(userSetBlacklistDefinition);
   NodeRegistry.register(userGetGroupsDefinition);
   NodeRegistry.register(userGetPermissionsDefinition);
+  NodeRegistry.register(userCheckPermissionDefinition);
+  NodeRegistry.register(userAddToGroupDefinition);
+  NodeRegistry.register(userRemoveFromGroupDefinition);
 
   // Type conversion category
   NodeRegistry.register(typeToStringDefinition);
