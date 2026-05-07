@@ -8,6 +8,7 @@ class BotIPCMessageRouter {
         this.appendLog = deps.appendLog;
         this.emitStatusUpdate = deps.emitStatusUpdate;
         this.restartBot = deps.restartBot;
+        this.stopBot = deps.stopBot;
         this.getBotConfig = deps.getBotConfig;
     }
 
@@ -55,6 +56,7 @@ class BotIPCMessageRouter {
             'debug:check_step_mode': () => this._handleStepMode(botId, child, message),
             'update_credentials': () => this._handleUpdateCredentials(botId, child, message),
             'restart_bot': () => this._handleRestartBot(botId, child, message),
+            'stop': () => this._handleStopBot(botId),
             'change_credentials': () => this._handleChangeCredentials(botId, child, message),
         };
 
@@ -270,6 +272,12 @@ class BotIPCMessageRouter {
 
         this.appendLog(botId, `[API] Credentials обновлены: ${username}`);
         child.send({ type: 'credentials_operation_response', requestId, payload: { success: true } });
+    }
+
+    async _handleStopBot(botId) {
+        if (this.stopBot) {
+            await this.stopBot(botId);
+        }
     }
 
     async _handleRestartBot(botId, child, message) {

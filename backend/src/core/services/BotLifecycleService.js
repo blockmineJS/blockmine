@@ -47,6 +47,7 @@ class BotLifecycleService {
             appendLog: this.appendLog.bind(this),
             emitStatusUpdate: this.emitStatusUpdate.bind(this),
             restartBot: this.restartBot.bind(this),
+            stopBot: this.stopBot.bind(this),
             getBotConfig: (botId) => this.processManager.getProcess(botId)?.botConfig,
         });
     }

@@ -2,6 +2,20 @@ const { GRAPH_TYPES } = require('../../core/constants/graphTypes');
 
 const botNodes = [
   {
+    type: 'bot:stop',
+    label: '🔴 Выключить бота',
+    category: 'Бот',
+    description: 'Останавливает бота.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../../core/nodes/bot/stop_bot').execute,
+    computeInputs: () => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec' }
+    ],
+    computeOutputs: () => [],
+    defaultData: {},
+    theme: { headerColor: '#dc2626', accentColor: '#ef4444' }
+  },
+  {
     type: 'bot:get_position',
     label: '🤖 Позиция бота',
     category: 'Бот',

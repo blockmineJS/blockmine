@@ -124,6 +124,7 @@ import {
 import {
   botGetPositionDefinition,
   botGetNameDefinition,
+  botStopDefinition,
 } from './bot';
 
 // Debug nodes
@@ -292,6 +293,7 @@ export function registerAllNodes() {
   // Bot category
   NodeRegistry.register(botGetPositionDefinition);
   NodeRegistry.register(botGetNameDefinition);
+  NodeRegistry.register(botStopDefinition);
 
   // Debug category
   NodeRegistry.register(debugLogDefinition);
