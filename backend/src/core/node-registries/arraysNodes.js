@@ -131,6 +131,21 @@ const arraysNodes = [
       { id: 'result', name: 'Result', type: 'String' }
     ],
     defaultData: { separator: ',' }
+  },
+  {
+    type: 'array:shuffle',
+    label: 'Перемешать массив',
+    category: 'Массив',
+    graphType: GRAPH_TYPES.ALL,
+    description: 'Возвращает новый массив с элементами в случайном порядке.',
+    evaluator: require('../../core/nodes/arrays/shuffle').evaluate,
+    computeInputs: () => [
+      { id: 'array', name: 'Массив', type: 'Array', required: true }
+    ],
+    computeOutputs: () => [
+      { id: 'shuffled', name: 'Перемешанный', type: 'Array' }
+    ],
+    defaultData: {}
   }
 ];
 
