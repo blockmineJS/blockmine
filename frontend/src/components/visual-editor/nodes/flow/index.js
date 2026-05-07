@@ -5,3 +5,4 @@ export { flowForEachDefinition } from './flowForEach';
 export { flowWhileDefinition } from './flowWhile';
 export { flowBreakDefinition } from './flowBreak';
 export { flowDelayDefinition } from './flowDelay';
+export { flowTimerDefinition } from './flowTimer';
