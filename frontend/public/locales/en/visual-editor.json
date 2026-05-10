@@ -358,6 +358,20 @@
     "historyDepth": "History depth:",
     "unknown": "Unknown"
   },
+  "eventNodes": {
+    "addPin": "Add pin",
+    "pinName": "Name:",
+    "pinNamePlaceholder": "Pin name",
+    "pinType": "Type:",
+    "confirmPin": "Add",
+    "cancelPin": "Cancel",
+    "deletePin": "Delete",
+    "eventName": "Event name:",
+    "eventNamePlaceholder": "My event",
+    "selectEvent": "Select event:",
+    "noEvents": "No events available",
+    "selectEventPlaceholder": "Select event..."
+  },
   "testMode": {
     "title": "Test Mode",
     "description": "Run the graph step by step with an emulated event. You can edit values and rewind.",

@@ -7,14 +7,18 @@ const botHistoryStore = require('./BotHistoryStore');
 const prisma = prismaService.getClient();
 
 class EventGraphManager {
-    constructor(botManager = null) {
-        this.botManager = botManager;
+    constructor() {
+        this._botManager = null;
         this.activeGraphs = new Map();
         this.graphStates = new Map();
     }
 
+    get botManager() {
+        return this._botManager;
+    }
+
     setBotManager(botManager) {
-        this.botManager = botManager;
+        this._botManager = botManager;
     }
 
     async loadGraphsForBot(botId) {

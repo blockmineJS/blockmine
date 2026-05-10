@@ -1,29 +1,42 @@
 const { LRUCache } = require('lru-cache');
 
+const DEFAULT_MEMORY_THRESHOLD = 500 * 1024 * 1024;
+
 class CacheManager {
     constructor({ commandRepository, permissionRepository, logger } = {}) {
-        // Кеш с TTL и максимальным размером
         this.tokenCache = new LRUCache({
             max: 500,
-            ttl: 1000 * 60 * 5, // 5 минут
+            ttl: 1000 * 60 * 5,
         });
 
         this.playerListCache = new LRUCache({
             max: 100,
-            ttl: 1000 * 2, // 2 секунды
+            ttl: 1000 * 2,
         });
 
         this.botConfigsCache = new Map();
-        
-        // Зависимости для автозагрузки конфигурации
+
         this.commandRepository = commandRepository;
         this.permissionRepository = permissionRepository;
         this.logger = logger;
+
+        this.memoryThreshold = DEFAULT_MEMORY_THRESHOLD;
+
+        this._metrics = {
+            tokenCache: { hits: 0, misses: 0 },
+            playerListCache: { hits: 0, misses: 0 },
+            botConfigsCache: { hits: 0, misses: 0 },
+        };
     }
 
-    // Token cache
     getToken(token) {
-        return this.tokenCache.get(token);
+        const value = this.tokenCache.get(token);
+        if (value !== undefined) {
+            this._metrics.tokenCache.hits++;
+        } else {
+            this._metrics.tokenCache.misses++;
+        }
+        return value;
     }
 
     setToken(token, data) {
@@ -34,18 +47,28 @@ class CacheManager {
         this.tokenCache.delete(token);
     }
 
-    // Player list cache
     getPlayerList(botId) {
-        return this.playerListCache.get(botId);
+        const value = this.playerListCache.get(botId);
+        if (value !== undefined) {
+            this._metrics.playerListCache.hits++;
+        } else {
+            this._metrics.playerListCache.misses++;
+        }
+        return value;
     }
 
     setPlayerList(botId, players) {
         this.playerListCache.set(botId, players);
     }
 
-    // Bot config cache
     getBotConfig(botId) {
-        return this.botConfigsCache.get(botId);
+        const value = this.botConfigsCache.get(botId);
+        if (value !== undefined) {
+            this._metrics.botConfigsCache.hits++;
+        } else {
+            this._metrics.botConfigsCache.misses++;
+        }
+        return value;
     }
 
     setBotConfig(botId, config) {
@@ -56,27 +79,64 @@ class CacheManager {
         this.botConfigsCache.delete(botId);
     }
 
-    // Очистка всего кеша для бота
     clearBotCache(botId) {
         this.deleteBotConfig(botId);
         this.playerListCache.delete(botId);
     }
 
-    /**
-     * Получает конфигурацию бота из кеша или загружает из БД
-     * @param {number} botId - ID бота
-     * @returns {Promise<object>} - Конфигурация бота
-     */
+    getMetrics() {
+        const calc = ({ hits, misses }) => {
+            const total = hits + misses;
+            return {
+                hits,
+                misses,
+                hitRate: total === 0 ? 0 : hits / total,
+            };
+        };
+
+        return {
+            tokenCache: calc(this._metrics.tokenCache),
+            playerListCache: calc(this._metrics.playerListCache),
+            botConfigsCache: calc(this._metrics.botConfigsCache),
+        };
+    }
+
+    resetMetrics() {
+        this._metrics = {
+            tokenCache: { hits: 0, misses: 0 },
+            playerListCache: { hits: 0, misses: 0 },
+            botConfigsCache: { hits: 0, misses: 0 },
+        };
+    }
+
+    checkMemoryUsage() {
+        const { heapUsed } = process.memoryUsage();
+        const threshold = this.memoryThreshold;
+        const exceeded = heapUsed > threshold;
+
+        if (exceeded) {
+            if (this.logger) {
+                this.logger.warn(
+                    { heapUsed, threshold },
+                    'Memory threshold exceeded, clearing playerListCache'
+                );
+            }
+            this.playerListCache.clear();
+        }
+
+        return { heapUsed, threshold, exceeded };
+    }
+
     async getOrLoadBotConfig(botId) {
         let config = this.botConfigsCache.get(botId);
-        
+
         if (!config) {
             if (this.logger) {
-                this.logger.debug({ botId }, 'Кеш конфигурации отсутствует, загрузка из БД');
+                this.logger.debug({ botId }, 'Cache miss, loading from DB');
             }
-            
+
             if (!this.commandRepository || !this.permissionRepository) {
-                throw new Error('CacheManager не имеет доступа к репозиториям для загрузки конфигурации');
+                throw new Error('CacheManager does not have access to repositories for loading configuration');
             }
 
             const [commands, permissions] = await Promise.all([
@@ -98,9 +158,9 @@ class CacheManager {
             }
 
             this.botConfigsCache.set(botId, config);
-            
+
             if (this.logger) {
-                this.logger.debug({ botId }, 'Конфигурация загружена и закеширована');
+                this.logger.debug({ botId }, 'Configuration loaded and cached');
             }
         }
 

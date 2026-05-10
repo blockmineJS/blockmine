@@ -12,6 +12,8 @@ const Command = require('./system/Command');
 const { parseArguments } = require('./system/parseArguments');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 const NodeRegistry = require('./NodeRegistry');
+const { createBotApi } = require('./ipc/botApiFactory');
+const { MessageTypes, EventTypes } = require('./ipc/ipcMessageTypes');
 
 const UserService = require('./UserService');
 const PermissionManager = require('./ipc/PermissionManager.stub.js');
@@ -40,7 +42,7 @@ JSON.parse = function (text, reviver) {
 
 function sendLog(content) {
     if (process.send) {
-        process.send({ type: 'log', content });
+        process.send({ type: MessageTypes.BOT.LOG, content });
     } else {
         console.log(`[ChildProcess Log] ${content}`);
     }
@@ -49,7 +51,6 @@ function sendLog(content) {
 
 function sendEvent(eventName, eventArgs) {
     if (process.send) {
-        // Добавляем информацию о боте (позицию) во все события
         const enrichedArgs = {
             ...eventArgs,
             botEntity: bot && bot.entity ? {
@@ -58,7 +59,7 @@ function sendEvent(eventName, eventArgs) {
                 pitch: bot.entity.pitch
             } : null
         };
-        process.send({ type: 'event', eventType: eventName, args: enrichedArgs });
+        process.send({ type: MessageTypes.BOT.EVENT, eventType: eventName, args: enrichedArgs });
     }
 }
 
@@ -145,7 +146,7 @@ function handleIncomingCommand(type, username, message) {
 
         if (process.send) {
             process.send({
-                type: 'validate_and_run_command',
+                type: MessageTypes.COMMAND.VALIDATE_AND_RUN,
                 commandName: commandInstance.name,
                 username,
                 args: processedArgs,
@@ -159,17 +160,17 @@ function handleIncomingCommand(type, username, message) {
 }
 
 process.on('message', async (message) => {
-    if (message.type === 'plugin:ui:start-updates') {
+    if (message.type === MessageTypes.PLUGIN.UI_START_UPDATES) {
         const { pluginName } = message;
         const state = pluginUiState.get(pluginName);
         if (state && process.send) {
             process.send({
-                type: 'plugin:data',
+                type: MessageTypes.PLUGIN.UI_DATA,
                 plugin: pluginName,
                 payload: state
             });
         }
-    } else if (message.type === 'user_action_response') {
+    } else if (message.type === MessageTypes.USER.ACTION_RESPONSE) {
         if (pendingRequests.has(message.requestId)) {
             const { resolve, reject } = pendingRequests.get(message.requestId);
             if (message.error) {
@@ -179,7 +180,7 @@ process.on('message', async (message) => {
             }
             pendingRequests.delete(message.requestId);
         }
-    } else if (message.type === 'credentials_operation_response') {
+    } else if (message.type === MessageTypes.USER.CREDENTIALS_OPERATION_RESPONSE) {
         if (pendingRequests.has(message.requestId)) {
             const { resolve, reject } = pendingRequests.get(message.requestId);
             if (message.error) {
@@ -189,16 +190,16 @@ process.on('message', async (message) => {
             }
             pendingRequests.delete(message.requestId);
         }
-    } else if (message.type === 'system:get_player_list') {
+    } else if (message.type === MessageTypes.SYSTEM.GET_PLAYER_LIST) {
         const playerList = bot ? Object.keys(bot.players) : [];
         if (process.send) {
             process.send({
-                type: 'get_player_list_response',
+                type: MessageTypes.SYSTEM.GET_PLAYER_LIST_RESPONSE,
                 requestId: message.requestId,
                 payload: { players: playerList }
             });
         }
-    } else if (message.type === 'system:get_nearby_entities') {
+    } else if (message.type === MessageTypes.SYSTEM.GET_NEARBY_ENTITIES) {
         const entities = [];
         if (bot && bot.entities) {
             const centerPos = message.payload?.position || bot.entity?.position;
@@ -225,12 +226,12 @@ process.on('message', async (message) => {
 
         if (process.send) {
             process.send({
-                type: 'get_nearby_entities_response',
+                type: MessageTypes.SYSTEM.GET_NEARBY_ENTITIES_RESPONSE,
                 requestId: message.requestId,
                 payload: { entities }
             });
         }
-    } else if (message.type === 'viewer:get_state') {
+    } else if (message.type === MessageTypes.VIEWER.GET_STATE) {
         if (bot && process.send) {
             let blocks = undefined;
 
@@ -297,12 +298,12 @@ process.on('message', async (message) => {
             };
 
             process.send({
-                type: 'viewer:state_response',
+                type: MessageTypes.VIEWER.STATE_RESPONSE,
                 requestId: message.requestId,
                 payload: state
             });
         }
-    } else if (message.type === 'viewer:control') {
+    } else if (message.type === MessageTypes.VIEWER.CONTROL) {
         const { command } = message;
         if (!bot) return;
 
@@ -367,58 +368,12 @@ process.on('message', async (message) => {
         } catch (error) {
             sendLog(`[Viewer] Control error: ${error.message}`);
         }
-    } else if (message.type === 'execute_event_graph') {
-        // Выполнение event графа в child process
+    } else if (message.type === MessageTypes.GRAPH.EXECUTE_EVENT_GRAPH) {
         const { botId, graph, eventType, eventArgs } = message;
 
         try {
-
             const playerList = bot ? Object.keys(bot.players) : [];
-            const botApi = {
-                sendMessage: (chatType, message, recipient) => {
-                    if (!bot || !bot.messageQueue) {
-                        sendLog('[EventGraph] Bot not ready');
-                        return;
-                    }
-
-                    bot.messageQueue.enqueue(chatType, message, recipient);
-                },
-                executeCommand: (command) => {
-                    if (!bot || !bot.messageQueue) {
-                        sendLog('[EventGraph] Bot not ready');
-                        return;
-                    }
-                    bot.messageQueue.enqueue('command', command);
-                },
-                lookAt: async (x, y, z) => {
-                    if (!bot) return;
-                    const target = new Vec3(x, y, z);
-                    await bot.lookAt(target);
-                },
-                navigate: async (x, y, z) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
-                    await bot.pathfinder.goto(goal);
-                },
-                attack: (entityId) => {
-                    if (!bot) return;
-                    const entity = bot.entities[entityId];
-                    if (entity) bot.attack(entity);
-                },
-                follow: (username) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const player = bot.players[username];
-                    if (player && player.entity) {
-                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
-                        bot.pathfinder.setGoal(goal, true);
-                    }
-                },
-                stopFollow: () => {
-                    if (bot && bot.pathfinder) {
-                        bot.pathfinder.setGoal(null);
-                    }
-                }
-            };
+            const botApi = createBotApi(bot, { enableLogging: true });
 
             const context = {
                 bot: bot,  // Полный mineflayer bot
@@ -446,7 +401,7 @@ process.on('message', async (message) => {
             sendLog(`[EventGraph] Error executing ${eventType} graph: ${error.message}`);
             sendLog(`[EventGraph] Stack: ${error.stack}`);
         }
-    } else if (message.type === 'start') {
+    } else if (message.type === MessageTypes.BOT.START) {
         const config = message.config;
         sendLog(`[System] Получена команда на запуск бота ${config.username}...`);
         try {
@@ -524,7 +479,7 @@ process.on('message', async (message) => {
                     if (type === 'websocket') {
                         if (process.send) {
                             process.send({
-                                type: 'send_websocket_message',
+                                type: MessageTypes.WEBSOCKET.SEND_MESSAGE,
                                 payload: {
                                     botId: bot.config.id,
                                     message: message,
@@ -633,7 +588,7 @@ process.on('message', async (message) => {
 
                         if (process.send) {
                             process.send({
-                                type: 'register_command',
+                                type: MessageTypes.COMMAND.REGISTER,
                                 commandConfig: {
                                     name: command.name,
                                     description: command.description,
@@ -664,7 +619,7 @@ process.on('message', async (message) => {
 
                         if (process.send) {
                             process.send({
-                                type: 'request_user_action',
+                                type: MessageTypes.USER.REQUEST_ACTION,
                                 requestId,
                                 payload: {
                                     targetUsername: username,
@@ -791,7 +746,7 @@ process.on('message', async (message) => {
 
                     if (process.send) {
                         process.send({
-                            type: 'plugin:data',
+                            type: MessageTypes.PLUGIN.UI_DATA,
                             plugin: pluginName,
                             payload: newState
                         });
@@ -806,7 +761,7 @@ process.on('message', async (message) => {
 
                         if (process.send) {
                             process.send({
-                                type: 'update_credentials',
+                                type: MessageTypes.BOT.UPDATE_CREDENTIALS,
                                 requestId,
                                 payload: {
                                     botId: bot.config.id,
@@ -834,7 +789,7 @@ process.on('message', async (message) => {
 
                         if (process.send) {
                             process.send({
-                                type: 'restart_bot',
+                                type: MessageTypes.BOT.RESTART,
                                 requestId,
                                 payload: {
                                     botId: bot.config.id
@@ -860,7 +815,7 @@ process.on('message', async (message) => {
 
                         if (process.send) {
                             process.send({
-                                type: 'change_credentials',
+                                type: MessageTypes.BOT.CHANGE_CREDENTIALS,
                                 requestId,
                                 payload: {
                                     botId: bot.config.id,
@@ -892,7 +847,7 @@ process.on('message', async (message) => {
             const processApi = {
                 appendLog: (botId, message) => {
                     if (process.send) {
-                        process.send({ type: 'log', content: message });
+                        process.send({ type: MessageTypes.BOT.LOG, content: message });
                     }
                 }
             };
@@ -990,7 +945,7 @@ process.on('message', async (message) => {
             if (process.send) {
                 for (const cmd of bot.commands.values()) {
                     process.send({
-                        type: 'register_command',
+                        type: MessageTypes.COMMAND.REGISTER,
                         commandConfig: {
                             name: cmd.name,
                             description: cmd.description,
@@ -1028,7 +983,7 @@ process.on('message', async (message) => {
 
                 if (process.send && rawMessageText.trim()) {
                     process.send({
-                        type: 'viewer:chat',
+                        type: MessageTypes.VIEWER.CHAT,
                         payload: {
                             rawText: rawMessageText,
                             timestamp: Date.now()
@@ -1050,14 +1005,12 @@ process.on('message', async (message) => {
 
             bot.on('chat', (username, message) => {
                 if (messageHandledByCustomParser) return;
-                // Эмитируем событие для event graphs
                 bot.events.emit('chat:message', {
                     username,
                     message,
-                    type: 'chat',
+                    type: EventTypes.CHAT,
                     raw: message
                 });
-                handleIncomingCommand('chat', username, message);
             });
 
             bot.on('whisper', (username, message) => {
@@ -1065,10 +1018,9 @@ process.on('message', async (message) => {
                 bot.events.emit('chat:message', {
                     username,
                     message,
-                    type: 'whisper',
+                    type: EventTypes.WHISPER,
                     raw: message
                 });
-                handleIncomingCommand('whisper', username, message);
             });
 
             bot.on('userAction', async ({ action, target, ...data }) => {
@@ -1099,8 +1051,8 @@ process.on('message', async (message) => {
                 }
                 sendLog('[Event: login] Успешно залогинился!');
                 if (process.send && !botReadySent) {
-                    process.send({ type: 'bot_ready' });
-                    process.send({ type: 'status', status: 'running' });
+                    process.send({ type: MessageTypes.BOT.READY });
+                    process.send({ type: MessageTypes.BOT.STATUS, status: 'running' });
                     botReadySent = true;
                 }
             });
@@ -1193,7 +1145,7 @@ process.on('message', async (message) => {
                 // Отправка события для viewer
                 if (process.send) {
                     process.send({
-                        type: 'viewer:spawn',
+                        type: MessageTypes.VIEWER.SPAWN,
                         payload: {
                             position: bot.entity?.position,
                             yaw: bot.entity?.yaw,
@@ -1206,7 +1158,7 @@ process.on('message', async (message) => {
             bot.on('health', () => {
                 if (process.send) {
                     process.send({
-                        type: 'viewer:health',
+                        type: MessageTypes.VIEWER.HEALTH,
                         payload: {
                             health: bot.health,
                             food: bot.food
@@ -1218,7 +1170,7 @@ process.on('message', async (message) => {
             bot.on('move', () => {
                 if (process.send) {
                     process.send({
-                        type: 'viewer:move',
+                        type: MessageTypes.VIEWER.MOVE,
                         payload: {
                             position: bot.entity?.position,
                             yaw: bot.entity?.yaw,
@@ -1254,7 +1206,7 @@ process.on('message', async (message) => {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
         }
-    } else if (message.type === 'config:reload') {
+    } else if (message.type === MessageTypes.CONFIG.RELOAD) {
         sendLog('[System] Received config:reload command. Reloading configuration...');
         try {
             const newConfig = await fetchNewConfig(bot.config.id, prisma);
@@ -1271,7 +1223,7 @@ process.on('message', async (message) => {
         } catch (error) {
             sendLog(`[System] Error reloading configuration: ${error.message}`);
         }
-    } else if (message.type === 'stop') {
+    } else if (message.type === MessageTypes.BOT.STOP) {
         if (connectionTimeout) {
             clearTimeout(connectionTimeout);
             connectionTimeout = null;
@@ -1279,12 +1231,12 @@ process.on('message', async (message) => {
         botReadySent = false;
         if (bot) bot.quit();
         else process.exit(0);
-    } else if (message.type === 'chat') {
+    } else if (message.type === MessageTypes.CHAT.CHAT) {
         if (bot && bot.entity) {
             const { message: msg, chatType, username } = message.payload;
             bot.messageQueue.enqueue(chatType, msg, username);
         }
-    } else if (message.type === 'register_temp_command') {
+    } else if (message.type === MessageTypes.COMMAND.REGISTER_TEMP) {
         // Регистрация временной команды из главного процесса
         const { commandData } = message;
 
@@ -1316,7 +1268,7 @@ process.on('message', async (message) => {
         } catch (error) {
             sendLog(`[BotProcess] Ошибка регистрации временной команды: ${error.message}`);
         }
-    } else if (message.type === 'unregister_temp_command') {
+    } else if (message.type === MessageTypes.COMMAND.UNREGISTER_TEMP) {
         const { commandName, aliases } = message;
 
         try {
@@ -1334,7 +1286,7 @@ process.on('message', async (message) => {
         } catch (error) {
             sendLog(`[BotProcess] Ошибка удаления временной команды: ${error.message}`);
         }
-    } else if (message.type === 'execute_handler') {
+    } else if (message.type === MessageTypes.GRAPH.EXECUTE_HANDLER) {
         const { commandName, username, args, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
@@ -1357,7 +1309,7 @@ process.on('message', async (message) => {
                 }
             })();
         }
-    } else if (message.type === 'execute_command_request') {
+    } else if (message.type === MessageTypes.GRAPH.EXECUTE_COMMAND_REQUEST) {
         const { requestId, payload } = message;
         const { commandName, args, username, typeChat } = payload;
 
@@ -1381,7 +1333,7 @@ process.on('message', async (message) => {
                     if (typeChat === 'websocket') {
                         result = await commandInstance.handler(context);
                         if (process.send) {
-                            process.send({ type: 'execute_command_response', requestId, result });
+                            process.send({ type: MessageTypes.GRAPH.EXECUTE_COMMAND_RESPONSE, requestId, result });
                         }
                     } else {
                         commandInstance.handler(context).catch(e => {
@@ -1410,7 +1362,7 @@ process.on('message', async (message) => {
                             result = sendMessageCalled ? resultFromSendMessage : returnValue;
 
                             if (process.send) {
-                                process.send({ type: 'execute_command_response', requestId, result });
+                                process.send({ type: MessageTypes.GRAPH.EXECUTE_COMMAND_RESPONSE, requestId, result });
                             }
                         } finally {
                             bot.sendMessage = originalSendMessage;
@@ -1425,15 +1377,15 @@ process.on('message', async (message) => {
 
             } catch (error) {
                 if (process.send) {
-                    process.send({ type: 'execute_command_response', requestId, error: error.message });
+                    process.send({ type: MessageTypes.GRAPH.EXECUTE_COMMAND_RESPONSE, requestId, error: error.message });
                 }
             }
         })();
-    } else if (message.type === 'invalidate_user_cache') {
+    } else if (message.type === MessageTypes.USER.INVALIDATE_USER_CACHE) {
         if (message.username && bot && bot.config) {
             UserService.clearCache(message.username, bot.config.id);
         }
-    } else if (message.type === 'invalidate_all_user_cache') {
+    } else if (message.type === MessageTypes.USER.INVALIDATE_ALL_USER_CACHE) {
         if (bot && bot.config) {
             for (const [cacheKey, user] of UserService.cache.entries()) {
                 if (cacheKey.startsWith(`${bot.config.id}:`)) {
@@ -1442,7 +1394,7 @@ process.on('message', async (message) => {
             }
             sendLog(`[BotProcess] Кэш пользователей очищен для бота ${bot.config.id}`);
         }
-    } else if (message.type === 'handle_permission_error') {
+    } else if (message.type === MessageTypes.COMMAND.HANDLE_PERMISSION_ERROR) {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
@@ -1452,7 +1404,7 @@ process.on('message', async (message) => {
                 bot.api.sendMessage(typeChat, `У вас нет прав для выполнения команды ${commandName}.`, username);
             }
         }
-    } else if (message.type === 'handle_wrong_chat') {
+    } else if (message.type === MessageTypes.COMMAND.HANDLE_WRONG_CHAT) {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
@@ -1462,7 +1414,7 @@ process.on('message', async (message) => {
                 bot.api.sendMessage('private', `Команду ${commandName} нельзя использовать в этом типе чата - ${typeChat}.`, username);
             }
         }
-    } else if (message.type === 'handle_cooldown') {
+    } else if (message.type === MessageTypes.COMMAND.HANDLE_COOLDOWN) {
         const { commandName, username, typeChat, timeLeft } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
@@ -1472,7 +1424,7 @@ process.on('message', async (message) => {
                 bot.api.sendMessage(typeChat, `Команду ${commandName} можно будет использовать через ${timeLeft} сек.`, username);
             }
         }
-    } else if (message.type === 'handle_blacklist') {
+    } else if (message.type === MessageTypes.COMMAND.HANDLE_BLACKLIST) {
         const { commandName, username, typeChat } = message;
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
@@ -1480,12 +1432,12 @@ process.on('message', async (message) => {
                 commandInstance.onBlacklisted(bot, typeChat, { username });
             }
         }
-    } else if (message.type === 'send_message') {
+    } else if (message.type === MessageTypes.CHAT.SEND_MESSAGE) {
         const { typeChat, message: msg, username } = message;
         if (bot && bot.api) {
             bot.api.sendMessage(typeChat, msg, username);
         }
-    } else if (message.type === 'action') {
+    } else if (message.type === MessageTypes.CHAT.ACTION) {
         if (message.name === 'lookAt' && bot && message.payload.position) {
             const { x, y, z } = message.payload.position;
             if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
@@ -1494,7 +1446,7 @@ process.on('message', async (message) => {
                 sendLog(`[BotProcess] Ошибка lookAt: получены невалидные координаты: ${JSON.stringify(message.payload.position)}`);
             }
         }
-    } else if (message.type === 'plugins:reload') {
+    } else if (message.type === MessageTypes.PLUGINS.RELOAD) {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
         const newConfig = await fetchNewConfig(bot.config.id, prisma);
         if (newConfig) {
@@ -1508,12 +1460,11 @@ process.on('message', async (message) => {
         } else {
             sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
         }
-    } else if (message.type === 'server_command') {
+    } else if (message.type === MessageTypes.SERVER.COMMAND) {
         if (bot && bot.messageQueue && message.payload && message.payload.command) {
             bot.messageQueue.enqueue('command', message.payload.command);
         }
-    } else if (message.type === 'execute_event_graph') {
-        // Выполнение event графа в child process
+    } else if (message.type === MessageTypes.GRAPH.EXECUTE_EVENT_GRAPH) {
         const { graph, eventType, eventArgs } = message;
 
         try {
@@ -1528,44 +1479,7 @@ process.on('message', async (message) => {
                 return;
             }
 
-            const botApi = {
-                sendMessage: (chatType, messageText, recipient) => {
-                    if (!bot || !bot.messageQueue) return;
-                    bot.messageQueue.enqueue(chatType, messageText, recipient);
-                },
-                executeCommand: (command) => {
-                    if (!bot || !bot.messageQueue) return;
-                    bot.messageQueue.enqueue('command', command);
-                },
-                lookAt: async (x, y, z) => {
-                    if (!bot) return;
-                    const target = new Vec3(x, y, z);
-                    await bot.lookAt(target);
-                },
-                navigate: async (x, y, z) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const goal = new (require('mineflayer-pathfinder').goals.GoalBlock)(x, y, z);
-                    await bot.pathfinder.goto(goal);
-                },
-                attack: (entityId) => {
-                    if (!bot) return;
-                    const entity = bot.entities[entityId];
-                    if (entity) bot.attack(entity);
-                },
-                follow: (username) => {
-                    if (!bot || !bot.pathfinder) return;
-                    const player = bot.players[username];
-                    if (player && player.entity) {
-                        const goal = new (require('mineflayer-pathfinder').goals.GoalFollow)(player.entity, 3);
-                        bot.pathfinder.setGoal(goal, true);
-                    }
-                },
-                stopFollow: () => {
-                    if (bot && bot.pathfinder) {
-                        bot.pathfinder.setGoal(null);
-                    }
-                }
-            };
+            const botApi = createBotApi(bot);
 
             const players = bot ? Object.keys(bot.players) : [];
 

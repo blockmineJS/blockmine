@@ -22,11 +22,10 @@ class BotManager {
         this.eventGraphManager = eventGraphManager;
         this.logger = logger;
 
-        // Геттеры для обратной совместимости
         this.bots = this.processManager.getAllProcesses();
         this.nodeRegistry = require('./NodeRegistry');
         
-        // Массив для хранения ссылок на интервалы
+        this._cleanupRegistry = new Map();
         this.intervals = [];
 
         this._startBackgroundTasks();
@@ -36,16 +35,25 @@ class BotManager {
         this.resourceMonitor.startMonitoring(5000);
         this.telemetry.startHeartbeat(5 * 60 * 1000);
         
-        this.intervals.push(setInterval(() => this.updateAllResourceUsage(), 5000));
-        this.intervals.push(setInterval(() => this.syncBotStatuses(), 10000));
+        const usageInterval = setInterval(() => this.updateAllResourceUsage(), 5000);
+        const syncInterval = setInterval(() => this.syncBotStatuses(), 10000);
+        
+        this.intervals.push(usageInterval, syncInterval);
+        this._cleanupRegistry.set('usageInterval', () => clearInterval(usageInterval));
+        this._cleanupRegistry.set('syncInterval', () => clearInterval(syncInterval));
     }
     
-    /**
-     * Очистка интервалов при завершении работы
-     */
     cleanup() {
+        for (const fn of this._cleanupRegistry.values()) {
+            try { fn(); } catch {}
+        }
+        this._cleanupRegistry.clear();
         this.intervals.forEach(interval => clearInterval(interval));
         this.intervals = [];
+    }
+
+    registerCleanup(key, fn) {
+        this._cleanupRegistry.set(key, fn);
     }
 
     initialize() {

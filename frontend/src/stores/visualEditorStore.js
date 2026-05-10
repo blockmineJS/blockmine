@@ -155,9 +155,20 @@ export const useVisualEditorStore = create(
         
 
 
+        const EVENT_CATEGORY_KEYS = ['события', 'event', 'events'];
+        const sortedAvailableNodes = Object.fromEntries(
+          Object.entries(availableNodesData).sort(([a], [b]) => {
+            const aIsEvent = EVENT_CATEGORY_KEYS.includes(a.toLowerCase());
+            const bIsEvent = EVENT_CATEGORY_KEYS.includes(b.toLowerCase());
+            if (aIsEvent && !bIsEvent) return -1;
+            if (!aIsEvent && bIsEvent) return 1;
+            return 0;
+          })
+        );
+
         set({
             command: finalCommandState,
-            availableNodes: availableNodesData,
+            availableNodes: sortedAvailableNodes,
             permissions: permissionsData,
             availablePlugins: pluginsData,
             variables: finalVariables,

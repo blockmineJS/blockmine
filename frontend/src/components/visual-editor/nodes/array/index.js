@@ -7,3 +7,4 @@ export { arrayAddElementDefinition } from './arrayAddElement';
 export { arrayRemoveByIndexDefinition } from './arrayRemoveByIndex';
 export { arrayFindIndexDefinition } from './arrayFindIndex';
 export { arrayJoinDefinition } from './arrayJoin';
+export { arrayShuffleDefinition } from './arrayShuffle';

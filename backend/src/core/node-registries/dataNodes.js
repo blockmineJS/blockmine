@@ -244,6 +244,40 @@ const dataNodes = [
       { id: 'value', name: 'Массив', type: 'Array' }
     ],
     defaultData: {}
+  },
+  {
+    type: 'data:store_read',
+    label: 'Прочитать из Store',
+    category: 'Данные',
+    description: 'Читает значение из хранилища плагина (PluginDataStore) по ключу.',
+    graphType: GRAPH_TYPES.ALL,
+    evaluator: require('../../core/nodes/data/store_read').evaluate,
+    computeInputs: (data) => [
+      { id: 'plugin_name', name: 'Плагин', type: 'String', required: true, inlineField: true, placeholder: 'my-plugin' },
+      { id: 'key', name: 'Ключ', type: 'String', required: true, inlineField: true, placeholder: 'myKey' }
+    ],
+    computeOutputs: (data) => [
+      { id: 'value', name: 'Значение', type: 'Wildcard' }
+    ],
+    defaultData: { plugin_name: '', key: '' }
+  },
+  {
+    type: 'data:store_write',
+    label: 'Записать в Store',
+    category: 'Данные',
+    description: 'Сохраняет значение в хранилище плагина (PluginDataStore) по ключу.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../../core/nodes/data/store_write').execute,
+    computeInputs: (data) => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+      { id: 'plugin_name', name: 'Плагин', type: 'String', required: true, inlineField: true, placeholder: 'my-plugin' },
+      { id: 'key', name: 'Ключ', type: 'String', required: true, inlineField: true, placeholder: 'myKey' },
+      { id: 'value', name: 'Значение', type: 'Wildcard', required: true }
+    ],
+    computeOutputs: (data) => [
+      { id: 'exec', name: 'Далее', type: 'Exec' }
+    ],
+    defaultData: { plugin_name: '', key: '' }
   }
 ];
 

@@ -38,7 +38,7 @@ const flowNodes = [
   },
   {
     type: 'flow:for_each',
-    label: '🔁 Перебор массива (цикл)',
+    label: '🔁 Перебор (for)',
     category: 'Поток',
     description: 'Выполняет "Тело цикла" для каждого элемента в "Массиве".',
     graphType: GRAPH_TYPES.ALL,
@@ -78,9 +78,9 @@ const flowNodes = [
   },
   {
     type: 'flow:break',
-    label: '🛑 Выйти из цикла',
+    label: '🛑 Break (выйти из цикла)',
     category: 'Поток',
-    description: 'Немедленно прерывает выполнение цикла (For Each Loop) и передает управление на его выход Completed.',
+    description: 'Немедленно прерывает выполнение цикла и передает управление на его выход Завершено.',
     graphType: GRAPH_TYPES.ALL,
     executor: require('../../core/nodes/flow/break').execute,
     computeInputs: (data) => [
@@ -109,9 +109,9 @@ const flowNodes = [
   },
   {
     type: 'flow:switch',
-    label: '🔄 Switch (свитч)',
+    label: '🔀 Switch',
     category: 'Поток',
-    description: 'Выполняет разные действия в зависимости от значения. Автоматически определяет тип сравнения.',
+    description: 'Выполняет разные действия в зависимости от значения.',
     graphType: GRAPH_TYPES.ALL,
     dynamicPins: true,
     executor: require('../../core/nodes/flow/switch').execute,
@@ -124,7 +124,28 @@ const flowNodes = [
     ],
     defaultData: {},
     theme: { headerColor: '#10b981', accentColor: '#34d399' }
-  }
+  },
+  {
+    type: 'flow:timer',
+    label: '⏲️ Таймер',
+    category: 'Поток',
+    description: 'Выполняет тело цикла каждые N секунд. Можно прервать через Break.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../../core/nodes/flow/timer').execute,
+    evaluator: require('../../core/nodes/flow/timer').evaluate,
+    computeInputs: (data) => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
+      { id: 'interval', name: 'Интервал (сек)', type: 'Number', required: false, inlineField: true, placeholder: '1' },
+      { id: 'max_ticks', name: 'Макс. тиков (0 = ∞)', type: 'Number', required: false, inlineField: true, placeholder: '0' }
+    ],
+    computeOutputs: (data) => [
+      { id: 'loop_body', name: 'Тело цикла', type: 'Exec' },
+      { id: 'tick', name: 'Тик', type: 'Number' },
+      { id: 'completed', name: 'Завершено', type: 'Exec' }
+    ],
+    defaultData: { interval: 1, max_ticks: 0 },
+    theme: { headerColor: '#10b981', accentColor: '#34d399' }
+  },
 ];
 
 module.exports = flowNodes;

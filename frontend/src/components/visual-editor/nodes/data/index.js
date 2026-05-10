@@ -12,3 +12,5 @@ export { dataGetNearbyPlayersDefinition } from './dataGetNearbyPlayers';
 export { dataEntityInfoDefinition } from './dataEntityInfo';
 export { dataGetUserFieldDefinition } from './dataGetUserField';
 export { dataLengthDefinition } from './dataLength';
+export { dataStoreReadDefinition } from './dataStoreRead';
+export { dataStoreWriteDefinition } from './dataStoreWrite';

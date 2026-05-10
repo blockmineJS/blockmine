@@ -1,4 +1,6 @@
 export { eventCommandDefinition } from './eventCommand';
+export { eventCustomEventDefinition } from './eventCustomEvent';
+export { eventCallEventDefinition } from './eventCallEvent';
 export { eventChatDefinition } from './eventChat';
 export { eventRawMessageDefinition } from './eventRawMessage';
 export { eventPlayerJoinedDefinition } from './eventPlayerJoined';
