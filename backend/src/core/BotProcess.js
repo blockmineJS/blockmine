@@ -1069,6 +1069,11 @@ process.on('message', async (message) => {
                 });
             });
 
+            bot.on('resourcePack', (url, hash) => {
+                sendLog(`[ResourcePack] Получен запрос на скачивание пакета ресурсов. Отказываемся. URL: ${url ? url.substring(0, 50) + '...' : 'N/A'}`);
+                bot.denyResourcePack();
+            });
+
             bot.on('kicked', (reason) => {
                 let reasonText;
                 if (typeof reason === 'string') {
