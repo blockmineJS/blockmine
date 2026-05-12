@@ -16,13 +16,13 @@
 * пост инсталл скрипт теперь есть... ([c5248cb](https://github.com/blockmineJS/blockmine/commit/c5248cbb805057b52efaea67209bea325b2e0b31))
 * причина кика теперь корректно пишется ([08de739](https://github.com/blockmineJS/blockmine/commit/08de739fc03ce35ae136b3bd5cb5b822145139cf))
 * роут install local теперь может работать и через апи ключ ([03f1176](https://github.com/blockmineJS/blockmine/commit/03f117690cda3d2966a928be217ad78154d4ec87))
-* address PR79 review feedback ([5dceb17](https://github.com/blockmineJS/blockmine/commit/5dceb174ef3009f47cb5a94f48f5e90c4c790feb))
-* address remaining PR79 review feedback ([dde6905](https://github.com/blockmineJS/blockmine/commit/dde690593320344f181f9a13fc4dc4905872e2cf))
-* close active connection on API key deletion ([2f7db12](https://github.com/blockmineJS/blockmine/commit/2f7db123b0b46c3aedf806d7d543316d7aace1f5))
-* close remaining plugin workflow review issues ([9f2dd7f](https://github.com/blockmineJS/blockmine/commit/9f2dd7fa422b5b276df4da96f7b9302d489b5e9f))
-* polish language selector modal ([2cebe65](https://github.com/blockmineJS/blockmine/commit/2cebe6554b21191e7f6ce8a532e243832f2a2ded))
-* polish plugin list alignment and text clarity ([8c27d60](https://github.com/blockmineJS/blockmine/commit/8c27d6062625e5a55e76a193ed1d3500a88f8246))
-* remove remaining emoji from english visual editor ([5a4f356](https://github.com/blockmineJS/blockmine/commit/5a4f3563fad29a4054bc98b31b5bc79c0d0b8572))
+* address PR79 review feedback by САХАРОК ([5dceb17](https://github.com/blockmineJS/blockmine/commit/5dceb174ef3009f47cb5a94f48f5e90c4c790feb))
+* address remaining PR79 review feedback by САХАРОК ([dde6905](https://github.com/blockmineJS/blockmine/commit/dde690593320344f181f9a13fc4dc4905872e2cf))
+* close active connection on API key deletion by САХАРОК ([2f7db12](https://github.com/blockmineJS/blockmine/commit/2f7db123b0b46c3aedf806d7d543316d7aace1f5))
+* close remaining plugin workflow review issues by САХАРОК ([9f2dd7f](https://github.com/blockmineJS/blockmine/commit/9f2dd7fa422b5b276df4da96f7b9302d489b5e9f))
+* polish language selector modal by САХАРОК ([2cebe65](https://github.com/blockmineJS/blockmine/commit/2cebe6554b21191e7f6ce8a532e243832f2a2ded))
+* polish plugin list alignment and text clarity by САХАРОК ([8c27d60](https://github.com/blockmineJS/blockmine/commit/8c27d6062625e5a55e76a193ed1d3500a88f8246))
+* remove remaining emoji from english visual editor by САХАРОК ([5a4f356](https://github.com/blockmineJS/blockmine/commit/5a4f3563fad29a4054bc98b31b5bc79c0d0b8572))
 
 
 ### ✨ Новые возможности
@@ -38,11 +38,11 @@
 * новые ноды. проверить право у юзера, добавить/убрать из группы ([3249483](https://github.com/blockmineJS/blockmine/commit/32494831636432013aa72978daa41bc4668a51af))
 * обновлен сайдбар ([8d77a48](https://github.com/blockmineJS/blockmine/commit/8d77a4834bc60c76de6010a794b4b79926d3fed1))
 * обновление mineflayer. 4.33 -> 4.37.1 . Поддерживает новые версии майнкрафта ([b7f2317](https://github.com/blockmineJS/blockmine/commit/b7f23175ba983fda2a2108d31e54d291d9d17212))
-* improve plugin workflows and panel UX ([09f111a](https://github.com/blockmineJS/blockmine/commit/09f111a9c47e7fd639b345be3d95de4c203213a9))
-* polish management, viewer, and toast ux ([d52e9b3](https://github.com/blockmineJS/blockmine/commit/d52e9b3d5eb56bc45c0417e10f397ad87441809e))
-* polish panel ux, theming, and transitions ([1f347b4](https://github.com/blockmineJS/blockmine/commit/1f347b442cef70f579cdc74c207554f95e68d15a))
-* polish plugin UX and localize panel states ([ef32fc0](https://github.com/blockmineJS/blockmine/commit/ef32fc08494c41e7a15312a2d0ed251255f3bd2b))
-* refine visual editor and panel polish ([0118ec6](https://github.com/blockmineJS/blockmine/commit/0118ec6de81078845551b443e5129b41e6e064f9))
+* improve plugin workflows and panel UX by САХАРОК ([09f111a](https://github.com/blockmineJS/blockmine/commit/09f111a9c47e7fd639b345be3d95de4c203213a9))
+* polish management, viewer, and toast ux by САХАРОК ([d52e9b3](https://github.com/blockmineJS/blockmine/commit/d52e9b3d5eb56bc45c0417e10f397ad87441809e))
+* polish panel ux, theming, and transitions by САХАРОК ([1f347b4](https://github.com/blockmineJS/blockmine/commit/1f347b442cef70f579cdc74c207554f95e68d15a))
+* polish plugin UX and localize panel states by САХАРОК ([ef32fc0](https://github.com/blockmineJS/blockmine/commit/ef32fc08494c41e7a15312a2d0ed251255f3bd2b))
+* refine visual editor and panel polish by САХАРОК ([0118ec6](https://github.com/blockmineJS/blockmine/commit/0118ec6de81078845551b443e5129b41e6e064f9))
 
 ## [1.25.0](https://github.com/blockmineJS/blockmine/compare/v1.24.0...v1.25.0) (2025-12-22)
 
