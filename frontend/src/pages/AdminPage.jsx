@@ -4,24 +4,34 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Key } from 'lucide-react';
 import PanelUsersManager from '@/components/admin/PanelUsersManager';
 import PanelRolesManager from '@/components/admin/PanelRolesManager';
 import GlobalSettingsManager from '@/components/admin/GlobalSettingsManager';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminPage() {
     const { t } = useTranslation('admin');
+    const navigate = useNavigate();
+
     return (
         <div className="h-full flex flex-col p-4">
             <CardHeader className="px-0">
-                <div className="flex items-center gap-3">
-                    <ShieldCheck className="w-8 h-8 text-primary" />
-                    <div>
-                        <CardTitle>{t('title')}</CardTitle>
-                        <CardDescription>
-                            {t('description')}
-                        </CardDescription>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <ShieldCheck className="w-8 h-8 text-primary" />
+                        <div>
+                            <CardTitle>{t('title')}</CardTitle>
+                            <CardDescription>
+                                {t('description')}
+                            </CardDescription>
+                        </div>
                     </div>
+                    <Button variant="outline" onClick={() => navigate('/api-keys')}>
+                        <Key className="h-4 w-4 mr-2" />
+                        API Keys
+                    </Button>
                 </div>
             </CardHeader>
 

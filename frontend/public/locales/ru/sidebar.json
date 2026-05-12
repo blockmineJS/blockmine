@@ -1,10 +1,8 @@
 {
   "dashboard": "Дашборд",
   "scheduler": "Планировщик",
-  "graphStore": "Магазин графов",
   "apiKeys": "API Ключи",
   "proxy": "Прокси",
-  "changelog": "История версий",
   "bots": "Боты",
   "admin": "Администрирование",
   "servers": "Серверы",
@@ -24,8 +22,9 @@
     "cancel": "Отмена",
     "confirm": "Выйти"
   },
-  "whatsNew": "Что нового?",
   "openMenu": "Открыть меню",
+  "whatsNew": "Что нового?",
+  "askQuestion": "Задать вопрос",
   "theme": {
     "label": "Тема",
     "light": "Светлая",

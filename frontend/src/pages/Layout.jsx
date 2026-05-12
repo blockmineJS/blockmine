@@ -27,11 +27,9 @@ import {
     ChevronsRight,
     Server,
     ShieldCheck,
-    Store,
-    Lightbulb,
     Key,
-    MessageSquarePlus,
-    Globe
+    Globe,
+    Send
 } from 'lucide-react';
 import ImportBotDialog from '@/components/ImportBotDialog';
 import { cn } from "@/lib/utils";
@@ -63,7 +61,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import ContributeDialog from '@/components/ContributeDialog';
+import TelegramWidget from '@/components/TelegramWidget';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 const SIDEBAR_TRANSITION = 'duration-300 ease-out';
@@ -232,24 +230,6 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [isDragging, setIsDragging] = useState(false);
-    const [randomFeature, setRandomFeature] = useState({ text: t('contribute.improve'), icon: <Lightbulb className="h-4 w-4 flex-shrink-0" /> });
-    const [isContributeModalOpen, setIsContributeModalOpen] = useState(false);
-
-    useEffect(() => {
-        const texts = [
-            t('contribute.suggest'),
-            t('contribute.change'),
-            t('contribute.question'),
-            t('contribute.improve')
-        ];
-        const icons = [
-            <Lightbulb key="lightbulb" className="h-4 w-4 flex-shrink-0" />,
-            <MessageSquarePlus key="msg" className="h-4 w-4 flex-shrink-0" />
-        ];
-        const randomText = texts[Math.floor(Math.random() * texts.length)];
-        const randomIcon = icons[Math.floor(Math.random() * icons.length)];
-        setRandomFeature({ text: randomText, icon: randomIcon });
-    }, [t]);
 
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
 
@@ -416,52 +396,13 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                 </NavLink>
             )}
 
-            <NavLink to="/graph-store" onClick={onLinkClick} className={navLinkClasses}>
-                {iconAndText(<Store className="h-4 w-4 flex-shrink-0" />, t('graphStore'))}
-            </NavLink>
-
-            <NavLink to="/api-keys" onClick={onLinkClick} className={navLinkClasses}>
-                {iconAndText(<Key className="h-4 w-4 flex-shrink-0" />, t('apiKeys'))}
-            </NavLink>
-
             {hasPermission('bot:update') && (
                 <NavLink to="/proxy-config" onClick={onLinkClick} className={navLinkClasses}>
                     {iconAndText(<Globe className="h-4 w-4 flex-shrink-0" />, t('proxy'))}
                 </NavLink>
             )}
 
-            <Dialog open={isContributeModalOpen} onOpenChange={setIsContributeModalOpen}>
-                <DialogTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "w-full justify-start flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                            isCollapsed && "mx-auto h-9 w-9 justify-center gap-0 px-0"
-                        )}
-                        onClick={() => {
-                            setIsContributeModalOpen(true);
-                            if (typeof onLinkClick === 'function') onLinkClick();
-                        }}
-                    >
-                        {iconAndText(randomFeature.icon, randomFeature.text)}
-                    </Button>
-                </DialogTrigger>
-                <ContributeDialog onClose={() => setIsContributeModalOpen(false)} />
-            </Dialog>
-
-            <Button
-                variant="ghost"
-                className={cn(
-                    "w-full justify-start flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-accent",
-                    isCollapsed && "mx-auto h-9 w-9 justify-center gap-0 px-0"
-                )}
-                onClick={async () => {
-                    onLinkClick();
-                    await useAppStore.getState().openChangelogDialog();
-                }}
-            >
-                {iconAndText(<Github className="h-4 w-4 flex-shrink-0" />, t('changelog'))}
-            </Button>
+            <TelegramWidget isCollapsed={isCollapsed} />
 
             <Separator className="my-2" />
 
@@ -701,6 +642,22 @@ export default function Layout() {
                     >
                         <ShieldCheck className="h-4 w-4 flex-shrink-0" />
                         <span className={sidebarLabelClasses(isCollapsed)}>{t('admin')}</span>
+                    </NavLink>
+                )}
+                {hasPermission('api_key:list') && (
+                    <NavLink
+                        to="/api-keys"
+                        onClick={() => setIsSheetOpen(false)}
+                        className={({ isActive }) => cn(
+                            "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
+                            isActive
+                                ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                            isCollapsed && "mx-auto h-9 w-9 justify-center gap-0 px-0"
+                        )}
+                    >
+                        <Key className="h-4 w-4 flex-shrink-0" />
+                        <span className={sidebarLabelClasses(isCollapsed)}>{t('apiKeys')}</span>
                     </NavLink>
                 )}
                 {hasPermission('server:list') && (
