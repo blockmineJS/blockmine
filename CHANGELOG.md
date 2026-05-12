@@ -1,6 +1,49 @@
 # История версий
 
 
+## [1.27.0](https://github.com/blockmineJS/blockmine/compare/v1.25.0...v1.27.0) (2026-05-12)
+
+
+### 🛠 Рефакторинг
+
+* внутренний большой рефактор бэкенда ([eb27f26](https://github.com/blockmineJS/blockmine/commit/eb27f2600218f05a8b8707adfed3a5a2298531f6))
+* полноценный внутренний рефактор нод ([28387a9](https://github.com/blockmineJS/blockmine/commit/28387a917bf89e33e9715cbd03483accc136b9af))
+
+
+### 🐛 Исправления
+
+* нода "сообщение в чате" работает в локал мире ([17bbde8](https://github.com/blockmineJS/blockmine/commit/17bbde82115cecee646a10bc26f21ec23856e33e))
+* пост инсталл скрипт теперь есть... ([c5248cb](https://github.com/blockmineJS/blockmine/commit/c5248cbb805057b52efaea67209bea325b2e0b31))
+* причина кика теперь корректно пишется ([08de739](https://github.com/blockmineJS/blockmine/commit/08de739fc03ce35ae136b3bd5cb5b822145139cf))
+* роут install local теперь может работать и через апи ключ ([03f1176](https://github.com/blockmineJS/blockmine/commit/03f117690cda3d2966a928be217ad78154d4ec87))
+* address PR79 review feedback ([5dceb17](https://github.com/blockmineJS/blockmine/commit/5dceb174ef3009f47cb5a94f48f5e90c4c790feb))
+* address remaining PR79 review feedback ([dde6905](https://github.com/blockmineJS/blockmine/commit/dde690593320344f181f9a13fc4dc4905872e2cf))
+* close active connection on API key deletion ([2f7db12](https://github.com/blockmineJS/blockmine/commit/2f7db123b0b46c3aedf806d7d543316d7aace1f5))
+* close remaining plugin workflow review issues ([9f2dd7f](https://github.com/blockmineJS/blockmine/commit/9f2dd7fa422b5b276df4da96f7b9302d489b5e9f))
+* polish language selector modal ([2cebe65](https://github.com/blockmineJS/blockmine/commit/2cebe6554b21191e7f6ce8a532e243832f2a2ded))
+* polish plugin list alignment and text clarity ([8c27d60](https://github.com/blockmineJS/blockmine/commit/8c27d6062625e5a55e76a193ed1d3500a88f8246))
+* remove remaining emoji from english visual editor ([5a4f356](https://github.com/blockmineJS/blockmine/commit/5a4f3563fad29a4054bc98b31b5bc79c0d0b8572))
+
+
+### ✨ Новые возможности
+
+* большая переработка интерфейса и прочее ([d28e0fa](https://github.com/blockmineJS/blockmine/commit/d28e0fa4af1815476ad90ddd0fb5799db95707ea))
+* в лайв дебаге появилась функция которая дает опробовать ноды без запуска бота ([bbd669f](https://github.com/blockmineJS/blockmine/commit/bbd669f463d62bffacb65b8d6066d5345a0e237f))
+* новая нода - имя бота ([574eada](https://github.com/blockmineJS/blockmine/commit/574eada6af5e89b2b67159b82ca435a2f8446004))
+* новая нода - прочитать/записать в стор ([eeb588e](https://github.com/blockmineJS/blockmine/commit/eeb588e1305d8bfb68cf7e388abf8b092a7865c2))
+* новая нода - стоп бот ([0639ed4](https://github.com/blockmineJS/blockmine/commit/0639ed439d0263fda229f261f317d54df3876d8c))
+* новая нода - таймер ([1d7899d](https://github.com/blockmineJS/blockmine/commit/1d7899d243232ae3062a84d6bc46f0f05897b40d))
+* новая нода - шаффл. перемешать массив ([67e785a](https://github.com/blockmineJS/blockmine/commit/67e785aa7706eb19a489042fcf2aec20643a0b79))
+* новые ноды - события ([ae4db8e](https://github.com/blockmineJS/blockmine/commit/ae4db8e8a11dcdf9c72536a850d65032fa528661))
+* новые ноды. проверить право у юзера, добавить/убрать из группы ([3249483](https://github.com/blockmineJS/blockmine/commit/32494831636432013aa72978daa41bc4668a51af))
+* обновлен сайдбар ([8d77a48](https://github.com/blockmineJS/blockmine/commit/8d77a4834bc60c76de6010a794b4b79926d3fed1))
+* обновление mineflayer. 4.33 -> 4.37.1 . Поддерживает новые версии майнкрафта ([b7f2317](https://github.com/blockmineJS/blockmine/commit/b7f23175ba983fda2a2108d31e54d291d9d17212))
+* improve plugin workflows and panel UX ([09f111a](https://github.com/blockmineJS/blockmine/commit/09f111a9c47e7fd639b345be3d95de4c203213a9))
+* polish management, viewer, and toast ux ([d52e9b3](https://github.com/blockmineJS/blockmine/commit/d52e9b3d5eb56bc45c0417e10f397ad87441809e))
+* polish panel ux, theming, and transitions ([1f347b4](https://github.com/blockmineJS/blockmine/commit/1f347b442cef70f579cdc74c207554f95e68d15a))
+* polish plugin UX and localize panel states ([ef32fc0](https://github.com/blockmineJS/blockmine/commit/ef32fc08494c41e7a15312a2d0ed251255f3bd2b))
+* refine visual editor and panel polish ([0118ec6](https://github.com/blockmineJS/blockmine/commit/0118ec6de81078845551b443e5129b41e6e064f9))
+
 ## [1.25.0](https://github.com/blockmineJS/blockmine/compare/v1.24.0...v1.25.0) (2025-12-22)
 
 
