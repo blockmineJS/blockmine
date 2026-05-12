@@ -88,7 +88,15 @@ class MinecraftBotManager {
         });
 
         bot.on('kicked', (reason) => {
-            this.logger.warn(`[Minecraft] Bot kicked for session ${sessionId}: ${reason}`);
+            let reasonText;
+            if (typeof reason === 'string') {
+                try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
+            } else if (reason && typeof reason === 'object') {
+                reasonText = reason.text || reason.message || reason.reason || JSON.stringify(reason);
+            } else {
+                reasonText = String(reason);
+            }
+            this.logger.warn(`[Minecraft] Bot kicked for session ${sessionId}: ${reasonText}`);
         });
     }
 

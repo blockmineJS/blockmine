@@ -1071,7 +1071,13 @@ process.on('message', async (message) => {
 
             bot.on('kicked', (reason) => {
                 let reasonText;
-                try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
+                if (typeof reason === 'string') {
+                    try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
+                } else if (reason && typeof reason === 'object') {
+                    reasonText = reason.text || reason.message || reason.reason || JSON.stringify(reason);
+                } else {
+                    reasonText = String(reason);
+                }
                 sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
                 process.exit(0);
             });
