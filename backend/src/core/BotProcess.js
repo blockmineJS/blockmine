@@ -1070,8 +1070,10 @@ process.on('message', async (message) => {
             });
 
             bot.on('resourcePack', (url, hash) => {
-                sendLog(`[ResourcePack] Получен запрос на скачивание пакета ресурсов. Отказываемся. URL: ${url ? url.substring(0, 50) + '...' : 'N/A'}`);
-                bot.denyResourcePack();
+                sendLog(`[ResourcePack] Получен запрос на скачивание пакета ресурсов. URL: ${url ? url.substring(0, 50) + '...' : 'N/A'}`);
+                bot.acceptResourcePack().catch(err => {
+                    sendLog(`[ResourcePack] Ошибка принятия: ${err.message}`);
+                });
             });
 
             bot.on('kicked', (reason) => {
