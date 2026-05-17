@@ -29,6 +29,33 @@ let connectionTimeout = null;
 let botReadySent = false;
 let viewerRenderDistance = 24; // Динамический радиус отображения для viewer
 
+let __lastCpuUsage = process.cpuUsage();
+let __lastCpuMeasureAt = Date.now();
+const __resourceReporter = setInterval(() => {
+    if (!process.send) return;
+    try {
+        const diff = process.cpuUsage(__lastCpuUsage);
+        const now = Date.now();
+        const elapsedMs = now - __lastCpuMeasureAt;
+        const cpuMs = (diff.user + diff.system) / 1000;
+        const cpuCores = require('os').cpus().length || 1;
+        const cpuPercent = elapsedMs > 0
+            ? Math.min(100, (cpuMs / (elapsedMs * cpuCores)) * 100)
+            : 0;
+        __lastCpuUsage = process.cpuUsage();
+        __lastCpuMeasureAt = now;
+
+        const memMb = process.memoryUsage().rss / 1024 / 1024;
+
+        process.send({
+            type: MessageTypes.BOT.RESOURCE_USAGE,
+            cpu: parseFloat(cpuPercent.toFixed(1)),
+            memory: parseFloat(memMb.toFixed(1)),
+        });
+    } catch (_) {}
+}, 5000);
+__resourceReporter.unref?.();
+
 const originalJSONParse = JSON.parse
 JSON.parse = function (text, reviver) {
     if (typeof text !== 'string') return originalJSONParse(text, reviver)

@@ -62,7 +62,6 @@
     "multer": "^2.0.1",
     "node-cron": "^4.1.0",
     "openrouter-kit": "^0.1.81",
-    "pidusage": "^3.0.2",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
     "prisma": "^5.14.0",

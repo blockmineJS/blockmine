@@ -1,13 +1,33 @@
 const express = require('express');
 const { authenticate, authenticateUniversal } = require('../middleware/auth');
 const os = require('os');
-const pidusage = require('pidusage');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 
 
 const serverStartTime = Date.now();
+
+let __panelLastCpuUsage = process.cpuUsage();
+let __panelLastCpuMeasureAt = Date.now();
+
+function getPanelSelfUsage() {
+    const diff = process.cpuUsage(__panelLastCpuUsage);
+    const now = Date.now();
+    const elapsedMs = now - __panelLastCpuMeasureAt;
+    const cpuMs = (diff.user + diff.system) / 1000;
+    const cpuCores = os.cpus().length || 1;
+    const cpuPercent = elapsedMs > 0
+        ? Math.min(100, (cpuMs / (elapsedMs * cpuCores)) * 100)
+        : 0;
+    __panelLastCpuUsage = process.cpuUsage();
+    __panelLastCpuMeasureAt = now;
+    const memMb = process.memoryUsage().rss / 1024 / 1024;
+    return {
+        cpu: parseFloat(cpuPercent.toFixed(1)),
+        memory: parseFloat(memMb.toFixed(1)),
+    };
+}
 
 /**
  * Вычисляет системное использование CPU на основе средней загрузки
@@ -43,9 +63,9 @@ router.get('/health', authenticateUniversal, async (req, res) => {
         let panelCpu = 0;
         let panelMemory = 0;
         try {
-            const stats = await pidusage(process.pid);
-            panelCpu = parseFloat(stats.cpu.toFixed(1));
-            panelMemory = parseFloat((stats.memory / 1024 / 1024).toFixed(1)); // MB
+            const panelStats = getPanelSelfUsage();
+            panelCpu = panelStats.cpu;
+            panelMemory = panelStats.memory;
         } catch (error) {
             console.error('Ошибка получения статистики процесса:', error);
         }

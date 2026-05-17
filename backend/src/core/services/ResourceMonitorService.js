@@ -1,5 +1,3 @@
-const pidusage = require('pidusage');
-
 class ResourceMonitorService {
     constructor({ botProcessManager, logger }) {
         this.processManager = botProcessManager;
@@ -12,7 +10,8 @@ class ResourceMonitorService {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
         }
-        this.updateInterval = setInterval(() => this.updateAllResourceUsage(), intervalMs);
+        this.updateInterval = setInterval(() => this.pruneStaleEntries(), intervalMs);
+        this.updateInterval.unref?.();
     }
 
     stopMonitoring() {
@@ -22,46 +21,36 @@ class ResourceMonitorService {
         }
     }
 
-    async updateAllResourceUsage() {
+    pruneStaleEntries() {
         const processes = this.processManager.getAllProcesses();
-
         if (processes.size === 0) {
             if (this.resourceUsage.size > 0) {
                 this.resourceUsage.clear();
             }
-            return [];
+            return;
         }
-
-        const pids = Array.from(processes.values())
-            .map(child => child.pid)
-            .filter(Boolean);
-
-        if (pids.length === 0) return [];
-
-        try {
-            const stats = await pidusage(pids);
-            const usageData = [];
-
-            for (const pid in stats) {
-                if (!stats[pid]) continue;
-
-                const botId = this.getBotIdByPid(parseInt(pid, 10));
-                if (botId) {
-                    const usage = {
-                        botId: botId,
-                        cpu: parseFloat(stats[pid].cpu.toFixed(1)),
-                        memory: parseFloat((stats[pid].memory / 1024 / 1024).toFixed(1)),
-                    };
-                    this.resourceUsage.set(botId, usage);
-                    usageData.push(usage);
-                }
+        const aliveBotIds = new Set(processes.keys());
+        for (const botId of Array.from(this.resourceUsage.keys())) {
+            if (!aliveBotIds.has(botId)) {
+                this.resourceUsage.delete(botId);
             }
-
-            return usageData;
-        } catch (error) {
-            this.logger.error({ error }, 'Ошибка обновления ресурсов');
-            return [];
         }
+    }
+
+    updateFromIPC(botId, { cpu, memory }) {
+        if (botId == null) return;
+        const usage = {
+            botId,
+            cpu: parseFloat(Number(cpu).toFixed(1)),
+            memory: parseFloat(Number(memory).toFixed(1)),
+        };
+        this.resourceUsage.set(botId, usage);
+        return usage;
+    }
+
+    async updateAllResourceUsage() {
+        this.pruneStaleEntries();
+        return this.getAllResourceUsage();
     }
 
     getBotIdByPid(pid) {

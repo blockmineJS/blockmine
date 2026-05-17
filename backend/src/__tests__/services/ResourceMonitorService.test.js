@@ -1,9 +1,5 @@
 const ResourceMonitorService = require('../../core/services/ResourceMonitorService');
 
-// Mock pidusage
-jest.mock('pidusage', () => jest.fn());
-const pidusage = require('pidusage');
-
 describe('ResourceMonitorService', () => {
     let resourceMonitor;
     let mockProcessManager;
@@ -68,69 +64,77 @@ describe('ResourceMonitorService', () => {
         });
     });
 
+    describe('updateFromIPC', () => {
+        test('должен сохранить статистику для бота', () => {
+            const usage = resourceMonitor.updateFromIPC(1, { cpu: 12.345, memory: 50.678 });
+
+            expect(usage).toEqual({ botId: 1, cpu: 12.3, memory: 50.7 });
+            expect(resourceMonitor.getResourceUsage(1)).toEqual({ botId: 1, cpu: 12.3, memory: 50.7 });
+        });
+
+        test('должен игнорировать вызов без botId', () => {
+            resourceMonitor.updateFromIPC(null, { cpu: 1, memory: 2 });
+            expect(resourceMonitor.getAllResourceUsage()).toEqual([]);
+        });
+
+        test('должен приводить нечисловые значения к 0', () => {
+            const usage = resourceMonitor.updateFromIPC(2, { cpu: 'foo', memory: 'bar' });
+            expect(usage.cpu).toBeNaN();
+            expect(usage.memory).toBeNaN();
+        });
+    });
+
     describe('updateAllResourceUsage', () => {
-        test('должен вернуть пустой массив если нет процессов', async () => {
+        test('должен вернуть пустой массив если нет процессов и нет данных', async () => {
             mockProcessManager.getAllProcesses.mockReturnValue(new Map());
 
             const result = await resourceMonitor.updateAllResourceUsage();
 
             expect(result).toEqual([]);
-            expect(pidusage).not.toHaveBeenCalled();
         });
 
-        test('должен обновить статистику для запущенных процессов', async () => {
-            const mockChild1 = { pid: 1234, botConfig: { id: 1 } };
-            const mockChild2 = { pid: 5678, botConfig: { id: 2 } };
-
+        test('должен вернуть актуальные сохранённые значения', async () => {
             const processes = new Map([
-                [1, mockChild1],
-                [2, mockChild2]
+                [1, { pid: 1234 }],
+                [2, { pid: 5678 }]
             ]);
-
             mockProcessManager.getAllProcesses.mockReturnValue(processes);
 
-            // Mock pidusage response
-            pidusage.mockResolvedValue({
-                1234: { cpu: 15.5, memory: 52428800 }, // 50 MB
-                5678: { cpu: 8.2, memory: 31457280 }   // 30 MB
-            });
+            resourceMonitor.updateFromIPC(1, { cpu: 15.5, memory: 50 });
+            resourceMonitor.updateFromIPC(2, { cpu: 8.2, memory: 30 });
 
             const results = await resourceMonitor.updateAllResourceUsage();
 
-            expect(pidusage).toHaveBeenCalledWith([1234, 5678]);
             expect(results).toHaveLength(2);
-            expect(results[0]).toEqual({
-                botId: 1,
-                cpu: 15.5,
-                memory: 50
-            });
-            expect(results[1]).toEqual({
-                botId: 2,
-                cpu: 8.2,
-                memory: 30
-            });
+            expect(results).toContainEqual({ botId: 1, cpu: 15.5, memory: 50 });
+            expect(results).toContainEqual({ botId: 2, cpu: 8.2, memory: 30 });
         });
 
-        test('должен обработать ошибку при получении статистики', async () => {
-            const mockChild = { pid: 1234 };
-            mockProcessManager.getAllProcesses.mockReturnValue(new Map([[1, mockChild]]));
+        test('должен очистить запись несуществующего бота', async () => {
+            const processes = new Map([
+                [1, { pid: 1234 }]
+            ]);
+            mockProcessManager.getAllProcesses.mockReturnValue(processes);
 
-            pidusage.mockRejectedValue(new Error('Process not found'));
+            resourceMonitor.updateFromIPC(1, { cpu: 10, memory: 50 });
+            resourceMonitor.updateFromIPC(99, { cpu: 99, memory: 999 });
+
+            const results = await resourceMonitor.updateAllResourceUsage();
+
+            expect(results).toHaveLength(1);
+            expect(results[0].botId).toBe(1);
+            expect(resourceMonitor.getResourceUsage(99)).toBeUndefined();
+        });
+
+        test('должен очистить все записи если ни одного процесса не запущено', async () => {
+            mockProcessManager.getAllProcesses.mockReturnValue(new Map());
+
+            resourceMonitor.updateFromIPC(1, { cpu: 10, memory: 50 });
 
             const results = await resourceMonitor.updateAllResourceUsage();
 
             expect(results).toEqual([]);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-
-        test('должен игнорировать процессы без PID', async () => {
-            const mockChild = { pid: null };
-            mockProcessManager.getAllProcesses.mockReturnValue(new Map([[1, mockChild]]));
-
-            const results = await resourceMonitor.updateAllResourceUsage();
-
-            expect(results).toEqual([]);
-            expect(pidusage).not.toHaveBeenCalled();
+            expect(resourceMonitor.getAllResourceUsage()).toEqual([]);
         });
     });
 

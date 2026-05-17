@@ -3,6 +3,7 @@ class BotIPCMessageRouter {
         this.eventGraphManager = deps.eventGraphManager;
         this.commandExecutionService = deps.commandExecutionService;
         this.processManager = deps.processManager;
+        this.resourceMonitor = deps.resourceMonitor;
         this.logger = deps.logger;
         this.crashRestartManager = deps.crashRestartManager;
         this.appendLog = deps.appendLog;
@@ -58,6 +59,7 @@ class BotIPCMessageRouter {
             'restart_bot': () => this._handleRestartBot(botId, child, message),
             'stop': () => this._handleStopBot(botId),
             'change_credentials': () => this._handleChangeCredentials(botId, child, message),
+            'resource_usage': () => this._handleResourceUsage(botId, message),
         };
 
         const handler = handlers[message.type];
@@ -290,6 +292,13 @@ class BotIPCMessageRouter {
         }, 3000);
     }
 
+    _handleResourceUsage(botId, message) {
+        if (!this.resourceMonitor) return;
+        const cpu = typeof message.cpu === 'number' ? message.cpu : 0;
+        const memory = typeof message.memory === 'number' ? message.memory : 0;
+        this.resourceMonitor.updateFromIPC(botId, { cpu, memory });
+    }
+
     async _handleChangeCredentials(botId, child, message) {
         const { requestId, payload } = message;
         const { username, password } = payload;
@@ -320,6 +329,9 @@ class BotIPCMessageRouter {
 
     _handleExit(botId, botConfig, code, signal) {
         this.processManager.remove(botId);
+        if (this.resourceMonitor) {
+            this.resourceMonitor.clearResourceUsage(botId);
+        }
         this.emitStatusUpdate(botId, 'stopped', `Процесс завершился с кодом ${code} (сигнал: ${signal || 'none'}).`);
 
         try {

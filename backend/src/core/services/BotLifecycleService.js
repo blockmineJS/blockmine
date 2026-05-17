@@ -42,6 +42,7 @@ class BotLifecycleService {
             eventGraphManager: this.eventGraphManager,
             commandExecutionService: this.commandExecutionService,
             processManager: this.processManager,
+            resourceMonitor: this.resourceMonitor,
             logger: this.logger,
             crashRestartManager: this.crashRestartManager,
             appendLog: this.appendLog.bind(this),

@@ -32,6 +32,7 @@ const MessageTypes = {
     CHANGE_CREDENTIALS: 'change_credentials',
     UPDATE_CREDENTIALS: 'update_credentials',
     EVENT: 'event',
+    RESOURCE_USAGE: 'resource_usage',
   },
 
   GRAPH: {
