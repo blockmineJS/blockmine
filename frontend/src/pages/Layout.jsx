@@ -417,10 +417,15 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
 
             <div
                 className={cn(
-                    "flex-1 min-h-0 custom-scrollbar transition-[max-height,padding] " + SIDEBAR_TRANSITION + " md:overflow-y-auto",
-                    bots.length > 0 && "min-h-[96px]",
-                    bots.length >= 6 && "md:max-h-[35vh]"
+                    "min-h-0 custom-scrollbar transition-[max-height,padding] " + SIDEBAR_TRANSITION,
+                    // Список ботов всегда прокручиваемый, занимает гибкую часть высоты
+                    "flex-1 overflow-y-auto",
+                    bots.length > 0 && "min-h-[96px]"
                 )}
+                style={{
+                    // Минимум 120px для удобства, максимум — до 50% высоты sidebar
+                    maxHeight: bots.length > 4 ? '50vh' : 'auto',
+                }}
             >
                 {isSheetOpen ? (
                     <div className="space-y-0.5">

@@ -1,4 +1,5 @@
 import React from 'react';
+import ItemIcon from './ItemIcon.jsx';
 
 const MinecraftHotbar = ({ inventory, selectedSlot, onSlotSelect }) => {
     const hotbarSlots = Array.from({ length: 9 }, (_, index) => {
@@ -8,14 +9,6 @@ const MinecraftHotbar = ({ inventory, selectedSlot, onSlotSelect }) => {
         }
         return item || null;
     });
-
-    const getItemIconPath = (itemName) => {
-        const animatedItems = ['clock', 'compass', 'recovery_compass'];
-        if (animatedItems.includes(itemName)) {
-            return `/minecraft-assets/items/${itemName}_00.png`;
-        }
-        return `/minecraft-assets/items/${itemName}.png`;
-    };
 
     return (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-1 z-10 select-none">
@@ -61,32 +54,7 @@ const MinecraftHotbar = ({ inventory, selectedSlot, onSlotSelect }) => {
 
                         {item && (
                             <div className="flex items-center justify-center w-full h-full relative">
-                                {/* Иконка предмета */}
-                                <img
-                                    src={getItemIconPath(item.name)}
-                                    alt={item.displayName || item.name}
-                                    title={item.displayName || item.name}
-                                    className="w-12 h-12 object-contain"
-                                    style={{
-                                        imageRendering: 'pixelated',
-                                        filter: 'drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5))'
-                                    }}
-                                    onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        const fallback = e.target.nextSibling;
-                                        if (fallback) fallback.style.display = 'block';
-                                    }}
-                                />
-                                {/* Fallback - первая буква если иконка не найдена */}
-                                <div
-                                    className="text-2xl font-bold text-white"
-                                    style={{
-                                        display: 'none',
-                                        textShadow: '2px 2px 0 #000'
-                                    }}
-                                >
-                                    {item.name.charAt(0).toUpperCase()}
-                                </div>
+                                <ItemIcon name={item.name} size={48} style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }} />
 
                                 {/* Количество */}
                                 {item.count > 1 && (

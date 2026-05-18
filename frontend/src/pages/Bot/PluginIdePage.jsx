@@ -155,14 +155,22 @@ export default function PluginIdePage() {
                     description: t('ide.pluginRenamedDesc', { oldName: result.oldName, newName: result.newName })
                 });
 
-                // Перенаправить на новый URL через 1 секунду
-                setTimeout(() => {
-                    navigate(`/bots/${botId}/plugins/ide/${result.newName}`);
-                }, 1000);
-            } else {
-                toast({ title: t('ide.success'), description: t('ide.fileSaved', { name: currentTab.name }) });
+                // Сразу перенаправляем (replace=true чтобы старый URL не оставался в истории)
+                navigate(`/bots/${botId}/plugins/ide/${result.newName}`, { replace: true });
+                return;
             }
+            toast({ title: t('ide.success'), description: t('ide.fileSaved', { name: currentTab.name }) });
         } catch (e) {
+            // Если 404 (вероятно плагин был переименован параллельно) — попробуем найти его
+            if (e?.message?.includes('404') || e?.status === 404) {
+                toast({
+                    variant: 'destructive',
+                    title: t('ide.error'),
+                    description: 'Плагин не найден, возможно был переименован. Перенаправление...'
+                });
+                navigate(`/bots/${botId}/plugins`, { replace: true });
+                return;
+            }
             toast({ variant: 'destructive', title: t('ide.error'), description: t('ide.saveError') });
         }
     };
