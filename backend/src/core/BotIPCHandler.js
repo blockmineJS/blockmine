@@ -86,6 +86,11 @@ function handleIncomingCommand(bot, type, username, message, sendLog) {
     }
 }
 
+// ВНИМАНИЕ: этот файл — параллельная реализация IPC handler'ов, которая в текущем
+// коде НЕ подключена (createBotIPCHandler нигде не импортируется). Источник истины
+// для viewer:control — switch в backend/src/core/BotProcess.js. Файл сохранён
+// как заготовка будущего refactor'а в фабрику. Команды viewer:control здесь
+// должны соответствовать контракту в BotProcess.js (см. case 'viewer:control').
 function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLog, sendEvent, serializeEntity) {
     const handlers = {};
 
@@ -294,6 +299,38 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
             }
             case 'sneak_toggle':
                 bot.setControlState('sneak', !!command.active);
+                break;
+            case 'deactivate_item':
+                try { bot.deactivateItem(); }
+                catch (e) { sendLog(`[Viewer] deactivate_item: ${e.message}`); }
+                break;
+            case 'request_player_list':
+                // В этом lightweight-handler'е нет доступа к broadcast-функциям из BotProcess.
+                // Шлём slim-payload; источник истины — broadcaster в BotProcess.js.
+                if (process.send && bot.players) {
+                    const players = Object.values(bot.players).map(p => ({
+                        username: p.username,
+                        displayName: typeof p.displayName === 'string' ? p.displayName : p.username,
+                        ping: p.ping, gamemode: p.gamemode, uuid: p.uuid,
+                    }));
+                    process.send({ type: 'viewer:playerList', payload: { players } });
+                }
+                break;
+            case 'request_scoreboard':
+                if (process.send) {
+                    const sb = bot.scoreboard?.sidebar
+                        || (bot.scoreboards ? Object.values(bot.scoreboards).find(s => s) : null);
+                    process.send({
+                        type: 'viewer:scoreboard',
+                        payload: sb ? { name: sb.name, title: String(sb.title || sb.name), items: [] } : null,
+                    });
+                }
+                break;
+            case 'start_dig':
+            case 'stop_dig':
+            case 'right_click_interact':
+            case 'set_render_distance':
+                // No-op в этом handler'е; реальные реализации в BotProcess.js
                 break;
         }
         return null;

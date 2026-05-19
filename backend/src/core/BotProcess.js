@@ -29,7 +29,14 @@ let connectionTimeout = null;
 let botReadySent = false;
 let viewerRenderDistance = 24; // Динамический радиус отображения для viewer
 let viewerSubscriberCount = 0; // Сколько socket.io клиентов смотрят этого бота
-const viewerSnapshotControl = { startSnapshot: null, stopSnapshot: null };
+const viewerSnapshotControl = {
+    startSnapshot: null,
+    stopSnapshot: null,
+    // Расширенные broadcaster'ы — для использования в VIEWER.CONTROL case'ах
+    // (request_player_list / request_scoreboard). Set после bot.spawn.
+    broadcastPlayerList: null,
+    broadcastScoreboard: null,
+};
 let viewerVirtualInventoryOpen = false; // Открыто ли наше виртуальное E-окно
                                         // (mineflayer не открывает реальное окно для player inventory)
 
@@ -737,48 +744,19 @@ process.on('message', async (message) => {
                     break;
 
                 case 'request_player_list':
-                    if (process.send && bot.players) {
-                        const players = Object.values(bot.players).map(p => ({
-                            username: p.username,
-                            displayName: typeof p.displayName === 'string'
-                                ? p.displayName
-                                : (p.displayName?.toString?.() || p.username),
-                            ping: p.ping,
-                            gamemode: p.gamemode,
-                            uuid: p.uuid,
-                        }));
-                        process.send({ type: 'viewer:playerList', payload: { players } });
+                    // Переиспользуем тот же broadcaster, что и периодический snapshot,
+                    // чтобы payload содержал header/footer и team prefix/suffix.
+                    // Если bot ещё не до конца spawned — broadcaster может быть null.
+                    if (viewerSnapshotControl.broadcastPlayerList) {
+                        try { viewerSnapshotControl.broadcastPlayerList(); }
+                        catch (e) { sendLog(`[Viewer] request_player_list: ${e.message}`); }
                     }
                     break;
 
                 case 'request_scoreboard':
-                    if (process.send) {
-                        const sb = bot.scoreboard?.sidebar
-                            || (bot.scoreboards ? Object.values(bot.scoreboards).find(s => s) : null);
-                        let payload = null;
-                        if (sb) {
-                            try {
-                                const items = sb.itemsMap
-                                    ? Object.values(sb.itemsMap).map(item => ({
-                                        name: item.name,
-                                        displayName: typeof item.displayName === 'string'
-                                            ? item.displayName
-                                            : (item.displayName?.toString?.() || item.name),
-                                        value: item.value,
-                                    })).sort((a, b) => (b.value || 0) - (a.value || 0))
-                                    : [];
-                                payload = {
-                                    name: sb.name,
-                                    title: typeof sb.title === 'string'
-                                        ? sb.title
-                                        : (sb.title?.toString?.() || sb.name),
-                                    items,
-                                };
-                            } catch (e) {
-                                payload = null;
-                            }
-                        }
-                        process.send({ type: 'viewer:scoreboard', payload });
+                    if (viewerSnapshotControl.broadcastScoreboard) {
+                        try { viewerSnapshotControl.broadcastScoreboard(); }
+                        catch (e) { sendLog(`[Viewer] request_scoreboard: ${e.message}`); }
                     }
                     break;
 
@@ -2117,8 +2095,28 @@ process.on('message', async (message) => {
             const broadcastPlayerListThrottled = makeThrottled(broadcastPlayerList, 250);
 
             // === Регистрация листенеров с сохранением ссылок — для отписки на bot end ===
+            // Текущая подписка на updateSlot открытого Window. Подписку на bot.inventory
+            // достаточно одной (висит постоянно — игрок всегда имеет inventory).
+            // А вот listener на window НУЖНО переподписывать на каждый windowOpen,
+            // потому что window-объект меняется, и slot-события в обычных контейнерах
+            // (сундук, печь, верстак) эмитятся именно от window, а не от bot.inventory.
+            let currentWindowSlotListener = null;
+            const currentWindowSlotHandler = () => {
+                if (process.send && bot.currentWindow) broadcastWindowUpdate();
+            };
+
             const onWindowOpen = (window) => {
                 if (!process.send) return;
+                // Снимаем старый listener (на случай если windowOpen прилетел повторно)
+                if (currentWindowSlotListener) {
+                    try { currentWindowSlotListener.off?.('updateSlot', currentWindowSlotHandler); }
+                    catch (e) { /* ignore */ }
+                    currentWindowSlotListener = null;
+                }
+                // Подписываемся на slot-обновления НА window-объекте
+                window?.on?.('updateSlot', currentWindowSlotHandler);
+                currentWindowSlotListener = window;
+
                 process.send({
                     type: 'viewer:windowOpen',
                     payload: serializeWindow(window)
@@ -2127,12 +2125,20 @@ process.on('message', async (message) => {
             const onWindowClose = () => {
                 if (!process.send) return;
                 viewerVirtualInventoryOpen = false;
+                // Отписываемся от window listener
+                if (currentWindowSlotListener) {
+                    try { currentWindowSlotListener.off?.('updateSlot', currentWindowSlotHandler); }
+                    catch (e) { /* ignore */ }
+                    currentWindowSlotListener = null;
+                }
                 process.send({ type: 'viewer:windowClose', payload: {} });
             };
             const onInventoryUpdate = () => {
                 if (!process.send) return;
                 if (bot.currentWindow) {
-                    // Реальный GUI открыт — обновляем его слоты
+                    // Реальный GUI открыт — обновляем его слоты.
+                    // (Также может сработать listener на самом window — двойной emit
+                    // в худшем случае, но throttle на frontend это компенсирует.)
                     broadcastWindowUpdate();
                 } else if (viewerVirtualInventoryOpen) {
                     // Открыто наше виртуальное E-окно — пере-эмитим windowUpdate
@@ -2217,6 +2223,10 @@ process.on('message', async (message) => {
             };
             viewerSnapshotControl.startSnapshot = startSnapshot;
             viewerSnapshotControl.stopSnapshot = stopSnapshot;
+            // Экспортируем broadcaster'ы, чтобы request_player_list/request_scoreboard
+            // отсюда же шли через полный сериализатор (с header/footer, team prefix/suffix).
+            viewerSnapshotControl.broadcastPlayerList = broadcastPlayerList;
+            viewerSnapshotControl.broadcastScoreboard = broadcastScoreboard;
             // Если зрители уже были подключены до bot.spawn — стартуем сразу
             if (viewerSubscriberCount > 0) startSnapshot();
 
@@ -2225,10 +2235,17 @@ process.on('message', async (message) => {
                 stopSnapshot();
                 viewerSnapshotControl.startSnapshot = null;
                 viewerSnapshotControl.stopSnapshot = null;
+                viewerSnapshotControl.broadcastPlayerList = null;
+                viewerSnapshotControl.broadcastScoreboard = null;
                 try {
                     bot.off?.('windowOpen', onWindowOpen);
                     bot.off?.('windowClose', onWindowClose);
                     bot.inventory?.off?.('updateSlot', onInventoryUpdate);
+                    // Снимаем подписку с текущего открытого window (если есть)
+                    if (currentWindowSlotListener) {
+                        currentWindowSlotListener.off?.('updateSlot', currentWindowSlotHandler);
+                        currentWindowSlotListener = null;
+                    }
                     bot.off?.('playerJoined', onPlayerListChange);
                     bot.off?.('playerLeft', onPlayerListChange);
                     bot.off?.('playerUpdated', onPlayerListChange);
