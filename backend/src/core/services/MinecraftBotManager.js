@@ -172,7 +172,8 @@ class MinecraftBotManager {
             .filter(e => e.type === 'mob')
             .map(e => ({
                 name: e.name || e.displayName,
-                mobType: e.mobType,
+                // entity.mobType — deprecated в prismarine-entity, шлём displayName
+                mobType: e.displayName,
                 position: {
                     x: e.position.x,
                     y: e.position.y,

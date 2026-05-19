@@ -26,6 +26,12 @@ const MinecraftChat = ({ messages, isOpen, onClose, onSend, alwaysShowMessages =
     const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
+            // Останавливаем НАТИВНОЕ распространение — иначе window-listener в
+            // MinecraftViewerTab всё равно увидит ESC и при гонке (refs ещё не
+            // обновились) может открыть pause-меню. React's e.stopPropagation()
+            // останавливает только React-tree, native-event продолжает bubble.
+            e.nativeEvent?.stopImmediatePropagation?.();
+            e.stopPropagation();
             onClose();
         }
     };

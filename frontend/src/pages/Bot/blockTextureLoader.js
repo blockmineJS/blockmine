@@ -55,10 +55,11 @@ export const EMISSIVE_BLOCKS = new Map([
 //               'translucent' = blending (вода, лава)
 // shape: специальная форма блока ('full' по умолчанию, 'thin' для люков и плит, 'cross' для факелов и растений)
 export const SPECIAL_BLOCKS = new Map([
-    ['water',                { transparency: 'translucent', opacity: 0.7, shape: 'liquid', noTexture: false }],
-    ['flowing_water',        { transparency: 'translucent', opacity: 0.7, shape: 'liquid' }],
-    ['lava',                 { transparency: 'translucent', opacity: 0.95, shape: 'liquid' }],
-    ['flowing_lava',         { transparency: 'translucent', opacity: 0.95, shape: 'liquid' }],
+    // Жидкости: рендерим как полный куб (упрощение), геометрия 'liquid' не реализована
+    ['water',                { transparency: 'translucent', opacity: 0.7, shape: 'full', noTexture: false }],
+    ['flowing_water',        { transparency: 'translucent', opacity: 0.7, shape: 'full' }],
+    ['lava',                 { transparency: 'translucent', opacity: 0.95, shape: 'full' }],
+    ['flowing_lava',         { transparency: 'translucent', opacity: 0.95, shape: 'full' }],
     ['glass',                { transparency: 'translucent', opacity: 0.4, shape: 'full' }],
     ['ice',                  { transparency: 'translucent', opacity: 0.6, shape: 'full' }],
     ['oak_leaves',           { transparency: 'cutout', shape: 'full' }],
@@ -226,10 +227,14 @@ function configureTexture(texture) {
     texture.wrapT = THREE.RepeatWrapping;
     texture.generateMipmaps = false;
 
-    const srgbKey = 'SRGB' + 'ColorSpace';
-    const SRGB = THREE[srgbKey];
-    if ('colorSpace' in texture && SRGB) texture.colorSpace = SRGB;
-    else if ('encoding' in texture && THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+    // Three.js r152+ ввёл новый цветовой API; в r0.128 (наша версия) — старый.
+    // Динамический ключ через Array.join — чтобы rollup не выдавал warning.
+    const SRGB = THREE[['SRGB', 'ColorSpace'].join('')];
+    if ('colorSpace' in texture && SRGB) {
+        texture.colorSpace = SRGB;
+    } else if ('encoding' in texture && THREE.sRGBEncoding) {
+        texture.encoding = THREE.sRGBEncoding;
+    }
 }
 
 function tryLoadTexture(urls, material, cleanName, version, onAllFailed, options) {
@@ -258,33 +263,152 @@ function tryLoadTexture(urls, material, cleanName, version, onAllFailed, options
     );
 }
 
-async function loadTextureWithFallback(cleanName, material, options, versionIndex = 0) {
-    if (versionIndex >= MINECRAFT_VERSIONS.length) {
-        material.color.setHex(getBlockColor(cleanName));
-        return;
+// Локальный путь к vanilla MC текстурам (см. frontend/public/minecraft-assets/blocks/).
+// Это primary source — у нас уже лежат 1111 PNG, CDN нужен только как safety net.
+const LOCAL_BLOCKS_BASE = '/minecraft-assets/blocks';
+
+/**
+ * Биом-тинт для блоков, текстура которых в vanilla MC грейскейл и красится игрой
+ * на основе биома. Без тинта grass/leaves выглядят серыми/белыми.
+ * Используем средний цвет plains-биома — самый частый.
+ */
+const BIOME_TINTED_BLOCKS = new Map([
+    ['grass_block',          0x79c05a],
+    ['grass',                0x79c05a],
+    ['short_grass',          0x79c05a],
+    ['tall_grass',           0x79c05a],
+    ['fern',                 0x79c05a],
+    ['large_fern',           0x79c05a],
+    ['sugar_cane',           0x79c05a],
+    ['oak_leaves',           0x59ae30],
+    ['dark_oak_leaves',      0x59ae30],
+    ['jungle_leaves',        0x48b518],
+    ['acacia_leaves',        0x77ab2f],
+    ['mangrove_leaves',      0x59ae30],
+    ['azalea_leaves',        0x59ae30],
+    ['flowering_azalea_leaves', 0x59ae30],
+    // Birch/Spruce — фиксированные (не зависят от биома), но всё равно тонируются
+    ['birch_leaves',         0x80a755],
+    ['spruce_leaves',        0x619961],
+    // Cherry — розовая (фиксированный)
+    ['cherry_leaves',        0xeebef4],
+    ['vine',                 0x59ae30],
+    ['lily_pad',             0x208030],
+    ['water',                0x3f76e4],
+    ['flowing_water',        0x3f76e4],
+    ['water_cauldron',       0x3f76e4],
+    ['bubble_column',        0x3f76e4],
+]);
+
+export function getBlockTint(blockName) {
+    const cleanName = (blockName || '').replace(/^minecraft:/, '');
+    return BIOME_TINTED_BLOCKS.get(cleanName);
+}
+
+/**
+ * Возвращает упорядоченный список URL для попыток загрузки текстуры блока.
+ * Локальные приоритет — потом CDN как safety net.
+ *
+ * Спец-кейс для grass_block: всегда сначала пробуем _top (он зелёный с тинтом),
+ * потому что иначе бот видит "землю" сверху, что плохо распознаётся.
+ */
+function buildBlockTextureUrls(cleanName) {
+    const urls = [];
+
+    // Особые имена-маппинги (имя блока ≠ имя текстуры)
+    if (cleanName === 'grass_block') {
+        urls.push(`${LOCAL_BLOCKS_BASE}/grass_block_top.png`);
+        urls.push(`${LOCAL_BLOCKS_BASE}/grass_block_side.png`);
     }
 
-    const version = MINECRAFT_VERSIONS[versionIndex];
-    const baseUrl = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/${version}/blocks`;
+    // Прямое имя
+    urls.push(`${LOCAL_BLOCKS_BASE}/${cleanName}.png`);
+    // Композитные суффиксы (часто block name = '<thing>' а текстура — '<thing>_top')
+    urls.push(`${LOCAL_BLOCKS_BASE}/${cleanName}_top.png`);
+    urls.push(`${LOCAL_BLOCKS_BASE}/${cleanName}_side.png`);
+    urls.push(`${LOCAL_BLOCKS_BASE}/${cleanName}_front.png`);
 
-    const mapping = await loadTextureMapping(version);
-
-    let textureName = cleanName;
-    if (mapping && mapping.has(cleanName)) textureName = mapping.get(cleanName);
-
-    const urlsToTry = [`${baseUrl}/${textureName}.png`];
-    if (textureName !== cleanName) urlsToTry.push(`${baseUrl}/${cleanName}.png`);
-    if (textureName === cleanName) {
-        urlsToTry.push(
-            `${baseUrl}/${cleanName}_top.png`,
-            `${baseUrl}/${cleanName}_side.png`,
-            `${baseUrl}/${cleanName}_front.png`
-        );
+    // Лог: oak_log → oak_log (полное имя) или oak_log_top
+    if (cleanName.endsWith('_log') || cleanName.endsWith('_wood') || cleanName.endsWith('_stem')) {
+        urls.push(`${LOCAL_BLOCKS_BASE}/${cleanName}_top.png`);
     }
 
-    tryLoadTexture(urlsToTry, material, cleanName, version, () => {
-        loadTextureWithFallback(cleanName, material, options, versionIndex + 1);
-    }, options);
+    return urls;
+}
+
+// Префиксы/суффиксы, говорящие что имя — точно ИТЕМ, а не блок.
+// Не лезем за ними в CDN /blocks/ (там их нет, только мусорные 404).
+const ITEM_ONLY_SUFFIXES = [
+    '_helmet', '_chestplate', '_leggings', '_boots',
+    '_sword', '_axe', '_pickaxe', '_shovel', '_hoe',
+    '_bow', '_crossbow', '_trident', '_mace',
+    '_horse_armor', '_ingot', '_nugget',
+    '_bucket', '_minecart', '_boat',
+];
+const ITEM_ONLY_NAMES = new Set([
+    'mace', 'bow', 'crossbow', 'trident', 'arrow', 'spectral_arrow', 'tipped_arrow',
+    'shield', 'fishing_rod', 'flint_and_steel', 'shears', 'spyglass',
+    'bread', 'apple', 'golden_apple', 'cooked_beef', 'cooked_chicken',
+    'stick', 'flint', 'string', 'feather', 'gunpowder', 'sugar', 'paper',
+]);
+
+function looksLikeItemNotBlock(cleanName) {
+    if (ITEM_ONLY_NAMES.has(cleanName)) return true;
+    for (const suffix of ITEM_ONLY_SUFFIXES) {
+        if (cleanName.endsWith(suffix)) return true;
+    }
+    return false;
+}
+
+function loadTextureWithFallback(cleanName, material, options) {
+    // 1. Локальные текстуры — основной источник (1111 PNG в /minecraft-assets/blocks)
+    const localUrls = buildBlockTextureUrls(cleanName);
+
+    tryLoadTexture(
+        localUrls,
+        material,
+        cleanName,
+        'local',
+        () => {
+            // Если имя выглядит как ITEM (меч, броня, инструмент) — не идём в CDN /blocks,
+            // там этих текстур нет. Сразу fallback на solid color.
+            if (looksLikeItemNotBlock(cleanName)) {
+                const tint = getBlockTint(cleanName);
+                if (tint === undefined) {
+                    material.color.setHex(getBlockColor(cleanName));
+                    material.needsUpdate = true;
+                }
+                return;
+            }
+
+            // 2. CDN fallback — если локально блочная текстура отсутствует.
+            // Берём одну версию (1.21.4); нет смысла дёргать GitHub 13 раз подряд.
+            const cdnBase = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.21.4/blocks';
+            loadTextureMapping('1.21.4').then((mapping) => {
+                let textureName = cleanName;
+                if (mapping && mapping.has(cleanName)) textureName = mapping.get(cleanName);
+
+                const cdnUrls = [
+                    `${cdnBase}/${textureName}.png`,
+                    `${cdnBase}/${cleanName}.png`,
+                    `${cdnBase}/${cleanName}_top.png`,
+                    `${cdnBase}/${cleanName}_side.png`,
+                ];
+
+                tryLoadTexture(cdnUrls, material, cleanName, '1.21.4', () => {
+                    // 3. Последний fallback — solid color по имени блока.
+                    // Сохраняем тинт, если он уже был установлен (grass/leaves),
+                    // иначе ставим хардкоженный цвет из getBlockColor.
+                    const tint = getBlockTint(cleanName);
+                    if (tint === undefined) {
+                        material.color.setHex(getBlockColor(cleanName));
+                        material.needsUpdate = true;
+                    }
+                }, options);
+            });
+        },
+        options
+    );
 }
 
 export function getBlockEmissive(blockName) {
@@ -327,13 +451,20 @@ export function getBlockMaterial(blockName) {
         opacity = 0.5;
     }
 
-    const material = new THREE.MeshLambertMaterial({
-        color: 0xffffff,
+    // Biome-тинт: для grass/leaves vanilla текстура серая, MC красит её через биом-карту.
+    // Применяем средний цвет plains-биома как multiplier к материалу — серая текстура
+    // станет правильно зелёной/синей/розовой.
+    const tint = getBlockTint(cleanName);
+    const initialColor = tint !== undefined ? tint : 0xffffff;
+
+    const matParams = {
+        color: initialColor,
         transparent,
         opacity,
         side,
-        alphaTest: alphaTest > 0 ? alphaTest : undefined,
-    });
+    };
+    if (alphaTest > 0) matParams.alphaTest = alphaTest;
+    const material = new THREE.MeshLambertMaterial(matParams);
 
     applyEmissive(material, cleanName);
 
@@ -342,7 +473,7 @@ export function getBlockMaterial(blockName) {
     } else {
         loadTextureWithFallback(cleanName, material, {
             transparency: shape?.transparency,
-        }, 0);
+        });
     }
 
     textureCache.set(blockName, material);
@@ -353,15 +484,14 @@ export function getBlockMaterial(blockName) {
  * Возвращает специальную геометрию блока (для люков, лестниц, факелов и т.д.)
  * Если null - используется обычный куб.
  */
-export function getBlockGeometry(blockName) {
-    const cleanName = (blockName || '').replace(/^minecraft:/, '');
-    const shape = getBlockShape(cleanName);
+// Кэш geometry по shape-имени. Все блоки одной формы (например все люки)
+// шарят одну Geometry — это экономит память (раньше создавалось N штук на чанк)
+// и не диспозим её per-chunk (как и getSharedBlockCubeGeometry).
+const _shapeGeometryCache = new Map();
 
-    if (!shape) return null;
-
-    switch (shape.shape) {
+function buildShapeGeometry(shapeName) {
+    switch (shapeName) {
         case 'trapdoor': {
-            // Тонкая плита (люк): 1 x 0.1875 x 1, в нижней части блока
             const geo = new THREE.BoxGeometry(1, 0.1875, 1);
             geo.translate(0.5, 0.0938, 0.5);
             return geo;
@@ -376,29 +506,31 @@ export function getBlockGeometry(blockName) {
             geo.translate(0.5, 0.25, 0.5);
             return geo;
         }
-        case 'thin_x': { // двери (по X)
+        case 'stairs': {
+            const geo = new THREE.BoxGeometry(1, 0.5, 1);
+            geo.translate(0.5, 0.25, 0.5);
+            return geo;
+        }
+        case 'thin_x': {
             const geo = new THREE.BoxGeometry(1, 1, 0.1875);
             geo.translate(0.5, 0.5, 0.0938);
             return geo;
         }
-        case 'thin_z': { // лестницы (ladder)
+        case 'thin_z': {
             const geo = new THREE.BoxGeometry(1, 1, 0.1);
             geo.translate(0.5, 0.5, 0.05);
             return geo;
         }
-        case 'thin_pole': { // решётки/стеклянные панели — крест из двух плоских мешей
+        case 'thin_pole':
             return makeCrossGeometry(1, 1, 0.06);
-        }
-        case 'cross': { // факелы, цветы (X-крест)
+        case 'cross':
             return makeXCrossGeometry(0.7, 0.7);
-        }
-        case 'flat': { // рельсы
+        case 'flat': {
             const geo = new THREE.BoxGeometry(1, 0.0625, 1);
             geo.translate(0.5, 0.03, 0.5);
             return geo;
         }
         case 'fence': {
-            // Столб + планки — упрощаем до тонкого столба
             const geo = new THREE.BoxGeometry(0.25, 1, 0.25);
             geo.translate(0.5, 0.5, 0.5);
             return geo;
@@ -406,6 +538,16 @@ export function getBlockGeometry(blockName) {
         default:
             return null;
     }
+}
+
+export function getBlockGeometry(blockName) {
+    const cleanName = (blockName || '').replace(/^minecraft:/, '');
+    const shape = getBlockShape(cleanName);
+    if (!shape) return null;
+    if (_shapeGeometryCache.has(shape.shape)) return _shapeGeometryCache.get(shape.shape);
+    const geo = buildShapeGeometry(shape.shape);
+    if (geo) _shapeGeometryCache.set(shape.shape, geo);
+    return geo;
 }
 
 function makeXCrossGeometry(w, h) {

@@ -48,6 +48,46 @@ const INVENTORY_SLOTS = (() => {
 const SKIN_W = 16;
 const SKIN_H = 32;
 
+// Модульные кэши: один Image на ключ, дедупликация параллельных запросов.
+// Ключ = uuid (если есть) либо `user:<username>`. Хранит уже загруженный HTMLImageElement.
+const skinImageCache = new Map();    // key -> HTMLImageElement
+const skinFailedCache = new Set();   // key
+const skinPendingCache = new Map();  // key -> Promise<HTMLImageElement>
+
+function loadSkinImage(uuid, username) {
+    const key = uuid ? `uuid:${uuid.replace(/-/g, '')}` : (username ? `user:${username}` : null);
+    if (!key) return Promise.reject(new Error('no_identity'));
+    if (skinImageCache.has(key)) return Promise.resolve(skinImageCache.get(key));
+    if (skinFailedCache.has(key)) return Promise.reject(new Error('previously_failed'));
+    if (skinPendingCache.has(key)) return skinPendingCache.get(key);
+
+    const urls = [];
+    if (uuid) urls.push(`https://crafatar.com/skins/${uuid.replace(/-/g, '')}`);
+    if (username) urls.push(`https://mineskin.eu/skin/${encodeURIComponent(username)}`);
+
+    const promise = new Promise((resolve, reject) => {
+        const tryLoad = (idx) => {
+            if (idx >= urls.length) {
+                skinFailedCache.add(key);
+                reject(new Error('all_urls_failed'));
+                return;
+            }
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                skinImageCache.set(key, img);
+                resolve(img);
+            };
+            img.onerror = () => tryLoad(idx + 1);
+            img.src = urls[idx];
+        };
+        tryLoad(0);
+    }).finally(() => skinPendingCache.delete(key));
+
+    skinPendingCache.set(key, promise);
+    return promise;
+}
+
 const BotSkinView = ({ username, uuid, scale }) => {
     const canvasRef = useRef(null);
     const [hide, setHide] = useState(false);
@@ -59,30 +99,13 @@ const BotSkinView = ({ username, uuid, scale }) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const skinUrls = [];
-        if (uuid) {
-            const cleanUuid = uuid.replace(/-/g, '');
-            skinUrls.push(`https://crafatar.com/skins/${cleanUuid}`);
-        }
-        if (username) {
-            skinUrls.push(`https://mineskin.eu/skin/${encodeURIComponent(username)}`);
-        }
-        skinUrls.push('https://crafatar.com/skins/c06f89064c8a49119c29ea1dbd1aab82');
-
-        let loaded = false;
-        const tryLoad = (urls, idx = 0) => {
-            if (idx >= urls.length) { setHide(true); return; }
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                if (loaded) return;
-                loaded = true;
-                drawSkin(ctx, img, canvas.width, canvas.height);
-            };
-            img.onerror = () => tryLoad(urls, idx + 1);
-            img.src = urls[idx];
-        };
-        tryLoad(skinUrls);
+        let cancelled = false;
+        loadSkinImage(uuid, username)
+            .then((img) => {
+                if (!cancelled) drawSkin(ctx, img, canvas.width, canvas.height);
+            })
+            .catch(() => { if (!cancelled) setHide(true); });
+        return () => { cancelled = true; };
     }, [username, uuid]);
 
     if (hide) return null;

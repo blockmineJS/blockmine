@@ -28,6 +28,67 @@ const entityMoveThrottles = new Map();
 let connectionTimeout = null;
 let botReadySent = false;
 let viewerRenderDistance = 24; // Динамический радиус отображения для viewer
+let viewerSubscriberCount = 0; // Сколько socket.io клиентов смотрят этого бота
+const viewerSnapshotControl = { startSnapshot: null, stopSnapshot: null };
+let viewerVirtualInventoryOpen = false; // Открыто ли наше виртуальное E-окно
+                                        // (mineflayer не открывает реальное окно для player inventory)
+
+/**
+ * Сериализует equipment чужого игрока для viewer.
+ * mineflayer.Entity.equipment — массив длины 6:
+ *   [0] = main hand (held item)
+ *   [1] = off hand
+ *   [2] = boots
+ *   [3] = leggings
+ *   [4] = chestplate
+ *   [5] = helmet
+ * (см. https://prismarinejs.github.io/mineflayer/docs/api.html — entity.equipment)
+ */
+function serializePlayerEquipment(entity) {
+    if (!entity || !entity.equipment) return null;
+    const eq = entity.equipment;
+    const slotName = (item) => item ? item.name : null;
+    // Поддерживаем оба формата: array (старый mineflayer) и object
+    if (Array.isArray(eq)) {
+        return {
+            mainHand:   slotName(eq[0]),
+            offHand:    slotName(eq[1]),
+            boots:      slotName(eq[2]),
+            leggings:   slotName(eq[3]),
+            chestplate: slotName(eq[4]),
+            helmet:     slotName(eq[5]),
+        };
+    }
+    return {
+        mainHand:   slotName(eq.mainHand || eq.hand),
+        offHand:    slotName(eq.offHand),
+        boots:      slotName(eq.boots || eq.feet),
+        leggings:   slotName(eq.leggings || eq.legs),
+        chestplate: slotName(eq.chestplate || eq.chest),
+        helmet:     slotName(eq.helmet || eq.head),
+    };
+}
+
+function buildPlayerInventoryPayload(bot) {
+    const slots = (bot.inventory?.slots || []).map((item, idx) => {
+        if (!item) return { slot: idx, empty: true };
+        return {
+            slot: idx,
+            name: item.name,
+            displayName: item.displayName,
+            count: item.count,
+            type: item.type,
+        };
+    });
+    return {
+        id: 0,
+        type: 'inventory',
+        title: 'Inventory',
+        slotCount: slots.length || 46,
+        slots,
+        isPlayerInventory: true,
+    };
+}
 
 let __lastCpuUsage = process.cpuUsage();
 let __lastCpuMeasureAt = Date.now();
@@ -258,6 +319,14 @@ process.on('message', async (message) => {
                 payload: { entities }
             });
         }
+    } else if (message.type === 'viewer:subscribers_changed') {
+        const prev = viewerSubscriberCount;
+        viewerSubscriberCount = Math.max(0, Number(message.count) || 0);
+        if (prev === 0 && viewerSubscriberCount > 0) {
+            viewerSnapshotControl.startSnapshot?.();
+        } else if (prev > 0 && viewerSubscriberCount === 0) {
+            viewerSnapshotControl.stopSnapshot?.();
+        }
     } else if (message.type === MessageTypes.VIEWER.GET_STATE) {
         if (bot && process.send) {
             let blocks = undefined;
@@ -307,58 +376,51 @@ process.on('message', async (message) => {
                     count: item.count,
                     slot: item.slot
                 })) : [],
+                heldItem: bot.heldItem ? {
+                    name: bot.heldItem.name,
+                    displayName: bot.heldItem.displayName,
+                    count: bot.heldItem.count,
+                } : null,
+                offHand: bot.inventory?.slots?.[45] ? {
+                    name: bot.inventory.slots[45].name,
+                    displayName: bot.inventory.slots[45].displayName,
+                    count: bot.inventory.slots[45].count,
+                } : null,
+                armor: {
+                    helmet:     bot.inventory?.slots?.[5]?.name || null,
+                    chestplate: bot.inventory?.slots?.[6]?.name || null,
+                    leggings:   bot.inventory?.slots?.[7]?.name || null,
+                    boots:      bot.inventory?.slots?.[8]?.name || null,
+                },
                 nearbyPlayers: bot.entities ? Object.values(bot.entities)
                     .filter(e => e.type === 'player' && e.username !== bot.username)
                     .map(e => ({
+                        id: e.id,
                         username: e.username,
+                        uuid: e.uuid || bot.players?.[e.username]?.uuid || null,
                         position: { x: e.position.x, y: e.position.y, z: e.position.z },
                         yaw: e.yaw || 0,
                         pitch: e.pitch || 0,
-                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
+                        distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0,
+                        // Equipment: helmet/chestplate/leggings/boots/mainHand/offHand
+                        // mineflayer хранит в entity.equipment как массив [mainHand, offHand, boots, leggings, chestplate, helmet]
+                        // или объект — нормализуем
+                        equipment: serializePlayerEquipment(e),
                     })) : [],
                 nearbyMobs: bot.entities ? Object.values(bot.entities)
                     .filter(e => e.type === 'mob')
                     .map(e => ({
                         name: e.name || e.displayName,
-                        mobType: e.mobType,
+                        // entity.mobType — deprecated в prismarine-entity, шлёт displayName
+                        mobType: e.displayName,
                         position: { x: e.position.x, y: e.position.y, z: e.position.z },
                         distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
                     })) : []
             };
 
-            // currentWindow (открытый контейнер)
-            try {
-                if (bot.currentWindow) {
-                    const w = bot.currentWindow;
-                    state.currentWindow = {
-                        id: w.id,
-                        type: w.type,
-                        title: typeof w.title === 'string'
-                            ? w.title
-                            : (w.title?.text || w.title?.json?.text || ''),
-                        slotCount: w.slots ? w.slots.length : 0,
-                        inventoryStart: w.inventoryStart,
-                        inventoryEnd: w.inventoryEnd,
-                        hotbarStart: w.hotbarStart,
-                        slots: (w.slots || []).map((item, idx) => {
-                            if (!item) return { slot: idx, empty: true };
-                            return {
-                                slot: idx,
-                                name: item.name,
-                                displayName: item.displayName,
-                                count: item.count,
-                                type: item.type,
-                            };
-                        }),
-                    };
-                }
-            } catch (e) {
-                state.currentWindow = null;
-            }
-
-            // playerList и scoreboard НЕ включаем в state-stream —
-            // они шлются через отдельные события viewer:playerList / viewer:scoreboard
-            // с правильным парсингом JSON chat-component и team prefix/suffix
+            // currentWindow, playerList и scoreboard НЕ включаем в state-stream —
+            // они шлются через отдельные события viewer:windowOpen/Update/Close,
+            // viewer:playerList и viewer:scoreboard. Источник истины один, гонок нет.
 
             process.send({
                 type: MessageTypes.VIEWER.STATE_RESPONSE,
@@ -386,9 +448,104 @@ process.on('message', async (message) => {
                     break;
 
                 case 'dig':
+                    // Старый одиночный dig — оставлен для обратной совместимости
                     if (command.position) {
                         const block = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
                         if (block) bot.dig(block).catch(err => sendLog(`[Viewer] Dig error: ${err.message}`));
+                    }
+                    break;
+
+                case 'start_dig':
+                    // Hold-to-break: пользователь зажал ЛКМ.
+                    // Запускаем dig и шлём периодически viewer:digProgress пока копаем.
+                    if (command.position) {
+                        const block = bot.blockAt(new Vec3(
+                            command.position.x, command.position.y, command.position.z
+                        ));
+                        if (!block || block.type === 0) {
+                            sendLog(`[Viewer] start_dig: no block at ${command.position.x},${command.position.y},${command.position.z}`);
+                            break;
+                        }
+                        try {
+                            // Отменяем предыдущий dig (если есть) и ждём чтобы не было race
+                            if (bot.targetDigBlock) {
+                                try { bot.stopDigging(); } catch (e) { /* ignore */ }
+                            }
+                            // Безопасный расчёт времени копания
+                            let digTimeMs = 1000;
+                            try {
+                                if (typeof bot.digTime === 'function') {
+                                    const t = bot.digTime(block.type);
+                                    if (Number.isFinite(t) && t > 0) digTimeMs = t;
+                                }
+                            } catch (e) { /* ignore */ }
+
+                            const startedAt = Date.now();
+                            const digPos = { x: block.position.x, y: block.position.y, z: block.position.z };
+                            let intervalActive = true;
+
+                            // Сразу шлём progress=0 для мгновенной отрисовки overlay
+                            if (process.send) {
+                                process.send({
+                                    type: 'viewer:digProgress',
+                                    payload: { position: digPos, progress: 0, duration: digTimeMs }
+                                });
+                            }
+
+                            // Прогресс по времени, НЕ зависит от bot.targetDigBlock
+                            // (он устанавливается mineflayer'ом после await lookAt — лаг)
+                            const progressInterval = setInterval(() => {
+                                if (!intervalActive || !process.send) {
+                                    clearInterval(progressInterval);
+                                    return;
+                                }
+                                const elapsed = Date.now() - startedAt;
+                                const progress = Math.min(0.99, elapsed / digTimeMs);
+                                process.send({
+                                    type: 'viewer:digProgress',
+                                    payload: { position: digPos, progress, duration: digTimeMs }
+                                });
+                            }, 100);
+
+                            bot.dig(block)
+                                .then(() => {
+                                    intervalActive = false;
+                                    clearInterval(progressInterval);
+                                    if (process.send) {
+                                        process.send({
+                                            type: 'viewer:digProgress',
+                                            payload: { position: digPos, progress: 1, done: true }
+                                        });
+                                    }
+                                })
+                                .catch(err => {
+                                    intervalActive = false;
+                                    clearInterval(progressInterval);
+                                    if (process.send) {
+                                        process.send({
+                                            type: 'viewer:digProgress',
+                                            payload: { position: digPos, progress: 0, aborted: true }
+                                        });
+                                    }
+                                    // 'aborted' не логируем — нормальный stop по mouseup
+                                    const msg = err?.message || '';
+                                    if (!msg.includes('aborted') && !msg.includes('Digging aborted')) {
+                                        sendLog(`[Viewer] dig error: ${msg}`);
+                                    }
+                                });
+                        } catch (e) {
+                            sendLog(`[Viewer] start_dig: ${e.message}`);
+                        }
+                    }
+                    break;
+
+                case 'stop_dig':
+                    try {
+                        if (bot.targetDigBlock) {
+                            bot.stopDigging();
+                        }
+                    } catch (e) {
+                        // mineflayer кидает если нечего отменять — игнорим
                     }
                     break;
 
@@ -429,15 +586,55 @@ process.on('message', async (message) => {
                     break;
 
                 case 'click_window':
-                    if (bot.currentWindow && command.slot !== undefined) {
+                    if (command.slot !== undefined) {
                         const mouseButton = command.mouseButton ?? 0;
                         const mode = command.mode ?? 0;
-                        bot.clickWindow(command.slot, mouseButton, mode)
-                            .catch(err => sendLog(`[Viewer] clickWindow error: ${err.message}`));
+                        try {
+                            if (bot.currentWindow) {
+                                // Реальный GUI открыт — стандартный clickWindow
+                                bot.clickWindow(command.slot, mouseButton, mode)
+                                    .catch(err => sendLog(`[Viewer] clickWindow error: ${err.message}`));
+                            } else {
+                                // Открыт "виртуальный" inventory (наша Е-клавиша).
+                                // bot.clickWindow требует currentWindow → используем simpleClick
+                                // или fallback к moveSlotItem для shift+click.
+                                if (mode === 1 && bot.inventory) {
+                                    // Shift+click — быстрый перенос между inventory ↔ hotbar
+                                    const item = bot.inventory.slots?.[command.slot];
+                                    if (item) {
+                                        // Источник: если в hotbar (36-44) — переносим в inventory (9-35)
+                                        // если в inventory (9-35) — переносим в hotbar (36-44)
+                                        const isHotbar = command.slot >= 36 && command.slot <= 44;
+                                        const destRange = isHotbar ? [9, 35] : [36, 44];
+                                        // Ищем пустой слот в destRange или совместимый стак
+                                        let destSlot = -1;
+                                        for (let s = destRange[0]; s <= destRange[1]; s++) {
+                                            const existing = bot.inventory.slots?.[s];
+                                            if (!existing) { destSlot = s; break; }
+                                            if (existing.type === item.type && existing.count < existing.stackSize) {
+                                                destSlot = s; break;
+                                            }
+                                        }
+                                        if (destSlot >= 0 && typeof bot.moveSlotItem === 'function') {
+                                            bot.moveSlotItem(command.slot, destSlot)
+                                                .catch(err => sendLog(`[Viewer] moveSlotItem: ${err.message}`));
+                                        }
+                                    }
+                                } else if (bot.simpleClick?.leftMouse && mouseButton === 0) {
+                                    bot.simpleClick.leftMouse(command.slot);
+                                } else if (bot.simpleClick?.rightMouse && mouseButton === 1) {
+                                    bot.simpleClick.rightMouse(command.slot);
+                                }
+                            }
+                        } catch (e) {
+                            sendLog(`[Viewer] click_window error: ${e.message}`);
+                        }
                     }
                     break;
 
                 case 'close_window':
+                    // Закрываем либо реальное окно сервера, либо наше виртуальное E-окно
+                    viewerVirtualInventoryOpen = false;
                     if (bot.currentWindow) {
                         try {
                             bot.closeWindow(bot.currentWindow);
@@ -598,30 +795,14 @@ process.on('message', async (message) => {
                 }
 
                 case 'open_inventory': {
-                    // E — emit виртуальное окно инвентаря (нет настоящего windowOpen для инвентаря в mineflayer)
+                    // E — emit виртуальное окно инвентаря (mineflayer не имеет реального windowOpen
+                    // для player inventory, поэтому собираем slots вручную из bot.inventory)
                     if (process.send && bot.inventory) {
                         try {
-                            const win = bot.inventory;
-                            const slots = (win.slots || []).map((item, idx) => {
-                                if (!item) return { slot: idx, empty: true };
-                                return {
-                                    slot: idx,
-                                    name: item.name,
-                                    displayName: item.displayName,
-                                    count: item.count,
-                                    type: item.type,
-                                };
-                            });
+                            viewerVirtualInventoryOpen = true;
                             process.send({
                                 type: 'viewer:windowOpen',
-                                payload: {
-                                    id: 0,
-                                    type: 'inventory',
-                                    title: 'Inventory',
-                                    slotCount: slots.length || 46,
-                                    slots,
-                                    isPlayerInventory: true,
-                                }
+                                payload: buildPlayerInventoryPayload(bot)
                             });
                         } catch (e) {
                             sendLog(`[Viewer] open_inventory: ${e.message}`);
@@ -633,6 +814,45 @@ process.on('message', async (message) => {
                 case 'sneak_toggle':
                     bot.setControlState('sneak', !!command.active);
                     break;
+
+                case 'right_click_interact': {
+                    // Последовательная попытка: activate_block → place_block → use_item.
+                    // Останавливаемся, как только что-то сработало (открылось окно или
+                    // успешно поставили блок). Серверы с GUI-предметами реагируют на
+                    // activate_block, обычные сундуки/двери тоже; place_block нужен
+                    // только если первое не сработало; use_item — финальный fallback.
+                    (async () => {
+                        try {
+                            const hadWindow = !!bot.currentWindow;
+                            if (command.position) {
+                                const ref = bot.blockAt(new Vec3(
+                                    command.position.x, command.position.y, command.position.z
+                                ));
+                                if (ref) {
+                                    try { await bot.activateBlock(ref); }
+                                    catch (e) { /* not interactable */ }
+                                    // Окно открылось? значит сработало
+                                    if (!hadWindow && bot.currentWindow) return;
+                                    // place_block если в руке есть блок и есть грань
+                                    if (command.face && bot.heldItem) {
+                                        const faceVec = new Vec3(
+                                            command.face.x || 0, command.face.y || 0, command.face.z || 0
+                                        );
+                                        try {
+                                            await bot.placeBlock(ref, faceVec);
+                                            return;
+                                        } catch (e) { /* couldn't place */ }
+                                    }
+                                }
+                            }
+                            // финальный fallback — use_item (еда, лук, ведро воды)
+                            try { bot.activateItem(false); } catch (e) { /* ignore */ }
+                        } catch (e) {
+                            sendLog(`[Viewer] right_click_interact: ${e.message}`);
+                        }
+                    })();
+                    break;
+                }
             }
         } catch (error) {
             sendLog(`[Viewer] Control error: ${error.message}`);
@@ -719,6 +939,31 @@ process.on('message', async (message) => {
             }
 
             bot = mineflayer.createBot(botOptions);
+
+            // === Подавление PartialReadError и других некритичных protocol-ошибок ===
+            // Серверы с кастомными плагинами часто шлют entity metadata в формате,
+            // который protodef не может распарсить. Это спамит uncaught error в stderr,
+            // но на работу бота не влияет — пакет просто игнорируется.
+            // Глушим эти ошибки на уровне protocol client.
+            const handleClientProtocolError = (err) => {
+                const msg = err?.message || '';
+                const name = err?.name || '';
+                if (name === 'PartialReadError' || msg.includes('PartialReadError')
+                    || msg.includes('Read error') || msg.includes('Unexpected buffer end')
+                    || msg.includes('Chunk size is')) {
+                    // некритично — packet drop, не валим бота
+                    return;
+                }
+                sendLog(`[Protocol] ${err?.stack || err?.message || err}`);
+            };
+            if (bot._client) {
+                bot._client.on('error', handleClientProtocolError);
+            } else {
+                // _client инициализируется чуть позже — ждём
+                process.nextTick(() => {
+                    bot._client?.on?.('error', handleClientProtocolError);
+                });
+            }
 
             connectionTimeout = setTimeout(() => {
                 if (bot && !bot.player) {
@@ -1641,32 +1886,29 @@ process.on('message', async (message) => {
                 });
             };
 
-            bot.on('windowOpen', (window) => {
-                if (!process.send) return;
-                process.send({
-                    type: 'viewer:windowOpen',
-                    payload: serializeWindow(window)
-                });
-            });
-
-            bot.on('windowClose', () => {
-                if (!process.send) return;
-                process.send({
-                    type: 'viewer:windowClose',
-                    payload: {}
-                });
-            });
-
-            // Mineflayer: 'windowItemsChanged' — нет такого события, но есть updateSlot
-            bot.inventory?.on?.('updateSlot', () => {
-                if (bot.currentWindow) broadcastWindowUpdate();
-            });
-
-            // Также броадкаст обновлений хотбара через viewer:state
-            // (хотбар-слоты приходят через regular state stream)
+            // === Throttle helper (объявляем РАНЬШЕ листенеров чтобы избежать TDZ) ===
+            const makeThrottled = (fn, delay = 200) => {
+                let timer = null;
+                let lastArgs = null;
+                let lastRun = 0;
+                return (...args) => {
+                    lastArgs = args;
+                    const now = Date.now();
+                    const remaining = delay - (now - lastRun);
+                    if (remaining <= 0) {
+                        lastRun = now;
+                        fn(...lastArgs);
+                    } else if (!timer) {
+                        timer = setTimeout(() => {
+                            timer = null;
+                            lastRun = Date.now();
+                            fn(...lastArgs);
+                        }, remaining);
+                    }
+                };
+            };
 
             // === Viewer: список игроков (TAB) ===
-            // Сохраняем header/footer из пакета playerlist_header (mineflayer event)
             let tablistHeader = '';
             let tablistFooter = '';
 
@@ -1721,46 +1963,6 @@ process.on('message', async (message) => {
                 });
             };
 
-            bot.on('playerJoined', () => broadcastPlayerListThrottled());
-            bot.on('playerLeft', () => broadcastPlayerListThrottled());
-            bot.on('playerUpdated', () => broadcastPlayerListThrottled());
-
-            // mineflayer/protocol — пакет с header/footer TAB-меню в разных версиях называется по-разному
-            const handleTabHeaderFooter = (packet) => {
-                try {
-                    const headerRaw = packet.header ?? packet.headerJson;
-                    const footerRaw = packet.footer ?? packet.footerJson;
-                    tablistHeader = (() => {
-                        if (!headerRaw) return '';
-                        if (typeof headerRaw === 'string') {
-                            const t = headerRaw.trim();
-                            if (t.startsWith('{') || t.startsWith('[')) {
-                                try { return parseTextComponent(JSON.parse(t)); }
-                                catch (e) { return headerRaw; }
-                            }
-                            return headerRaw;
-                        }
-                        return parseTextComponent(headerRaw);
-                    })();
-                    tablistFooter = (() => {
-                        if (!footerRaw) return '';
-                        if (typeof footerRaw === 'string') {
-                            const t = footerRaw.trim();
-                            if (t.startsWith('{') || t.startsWith('[')) {
-                                try { return parseTextComponent(JSON.parse(t)); }
-                                catch (e) { return footerRaw; }
-                            }
-                            return footerRaw;
-                        }
-                        return parseTextComponent(footerRaw);
-                    })();
-                    broadcastPlayerListThrottled();
-                } catch (e) { /* ignore */ }
-            };
-            bot._client?.on?.('playerlist_header', handleTabHeaderFooter);
-            bot._client?.on?.('player_list_header_footer', handleTabHeaderFooter);
-            bot._client?.on?.('tab_list_header_footer', handleTabHeaderFooter);
-
             // === Viewer: скорборд (Sidebar) ===
             const serializeScoreboard = (sb) => {
                 if (!sb) return null;
@@ -1806,31 +2008,6 @@ process.on('message', async (message) => {
                 }
             };
 
-            // === Throttle для частых обновлений (scoreboard, playerList)
-            // Вместо реакции на каждое событие — делаем периодический snapshot
-            // raz в 500мс. Это гарантирует что когда мы шлём данные, они полностью
-            // консистентны: scoreboard + все team prefix/suffix уже на месте.
-            const makeThrottled = (fn, delay = 200) => {
-                let timer = null;
-                let lastArgs = null;
-                let lastRun = 0;
-                return (...args) => {
-                    lastArgs = args;
-                    const now = Date.now();
-                    const remaining = delay - (now - lastRun);
-                    if (remaining <= 0) {
-                        lastRun = now;
-                        fn(...lastArgs);
-                    } else if (!timer) {
-                        timer = setTimeout(() => {
-                            timer = null;
-                            lastRun = Date.now();
-                            fn(...lastArgs);
-                        }, remaining);
-                    }
-                };
-            };
-
             const broadcastScoreboard = () => {
                 if (!process.send) return;
                 const sb = bot.scoreboard?.sidebar
@@ -1840,43 +2017,147 @@ process.on('message', async (message) => {
                     payload: serializeScoreboard(sb)
                 });
             };
-            // Используем НЕ throttled — реактивно отправляем
-            // Но фильтруем "плохие" snapshot'ы на frontend
-            const broadcastScoreboardThrottled = makeThrottled(broadcastScoreboard, 250);
 
+            // Throttled варианты — теперь объявлены ДО регистрации листенеров.
+            // Mineflayer не эмитит эти события синхронно во время setup, но опираться
+            // на это нельзя: при изменении порядка инициализации легко словить TDZ.
+            const broadcastScoreboardThrottled = makeThrottled(broadcastScoreboard, 250);
             const broadcastPlayerListThrottled = makeThrottled(broadcastPlayerList, 250);
 
-            // === Периодический snapshot (главный механизм) ===
-            // Каждые 500мс собираем полный snapshot scoreboard и player list.
-            // Это гарантирует консистентность данных: даже если какое-то событие
-            // мы пропустили или пришло в "плохом" состоянии — следующий snapshot
-            // будет корректным.
-            const snapshotInterval = setInterval(() => {
+            // === Регистрация листенеров с сохранением ссылок — для отписки на bot end ===
+            const onWindowOpen = (window) => {
                 if (!process.send) return;
-                broadcastScoreboard();
-                broadcastPlayerList();
-            }, 500);
-            // Чистим при отключении бота
-            bot.once?.('end', () => clearInterval(snapshotInterval));
-            bot.once?.('error', () => clearInterval(snapshotInterval));
-
-            bot.on('scoreboardCreated', () => broadcastScoreboardThrottled());
-            bot.on('scoreboardDeleted', () => broadcastScoreboardThrottled());
-            bot.on('scoreboardTitleChanged', () => broadcastScoreboardThrottled());
-            bot.on('scoreUpdated', () => broadcastScoreboardThrottled());
-            bot.on('scoreRemoved', () => broadcastScoreboardThrottled());
-            bot.on('scoreboardPosition', () => broadcastScoreboardThrottled());
-
-            // Также пере-броадкаст при изменении команды (нужно для prefix/suffix)
+                process.send({
+                    type: 'viewer:windowOpen',
+                    payload: serializeWindow(window)
+                });
+            };
+            const onWindowClose = () => {
+                if (!process.send) return;
+                viewerVirtualInventoryOpen = false;
+                process.send({ type: 'viewer:windowClose', payload: {} });
+            };
+            const onInventoryUpdate = () => {
+                if (!process.send) return;
+                if (bot.currentWindow) {
+                    // Реальный GUI открыт — обновляем его слоты
+                    broadcastWindowUpdate();
+                } else if (viewerVirtualInventoryOpen) {
+                    // Открыто наше виртуальное E-окно — пере-эмитим windowUpdate
+                    // с актуальным состоянием bot.inventory (нужно после moveSlotItem).
+                    process.send({
+                        type: 'viewer:windowUpdate',
+                        payload: buildPlayerInventoryPayload(bot)
+                    });
+                }
+            };
+            const onPlayerListChange = () => broadcastPlayerListThrottled();
+            const handleTabHeaderFooter = (packet) => {
+                try {
+                    const headerRaw = packet.header ?? packet.headerJson;
+                    const footerRaw = packet.footer ?? packet.footerJson;
+                    const parseHF = (raw) => {
+                        if (!raw) return '';
+                        if (typeof raw === 'string') {
+                            const t = raw.trim();
+                            if (t.startsWith('{') || t.startsWith('[')) {
+                                try { return parseTextComponent(JSON.parse(t)); }
+                                catch (e) { return raw; }
+                            }
+                            return raw;
+                        }
+                        return parseTextComponent(raw);
+                    };
+                    tablistHeader = parseHF(headerRaw);
+                    tablistFooter = parseHF(footerRaw);
+                    broadcastPlayerListThrottled();
+                } catch (e) { /* ignore */ }
+            };
             const teamUpdateHandler = () => {
                 broadcastPlayerListThrottled();
                 broadcastScoreboardThrottled();
             };
+            const onScoreboardChange = () => broadcastScoreboardThrottled();
+
+            bot.on('windowOpen', onWindowOpen);
+            bot.on('windowClose', onWindowClose);
+            bot.inventory?.on?.('updateSlot', onInventoryUpdate);
+
+            bot.on('playerJoined', onPlayerListChange);
+            bot.on('playerLeft', onPlayerListChange);
+            bot.on('playerUpdated', onPlayerListChange);
+
+            bot._client?.on?.('playerlist_header', handleTabHeaderFooter);
+            bot._client?.on?.('player_list_header_footer', handleTabHeaderFooter);
+            bot._client?.on?.('tab_list_header_footer', handleTabHeaderFooter);
+
+            bot.on('scoreboardCreated', onScoreboardChange);
+            bot.on('scoreboardDeleted', onScoreboardChange);
+            bot.on('scoreboardTitleChanged', onScoreboardChange);
+            bot.on('scoreUpdated', onScoreboardChange);
+            bot.on('scoreRemoved', onScoreboardChange);
+            bot.on('scoreboardPosition', onScoreboardChange);
+
             bot.on('teamCreated', teamUpdateHandler);
             bot.on('teamRemoved', teamUpdateHandler);
             bot.on('teamUpdated', teamUpdateHandler);
             bot.on('teamMemberAdded', teamUpdateHandler);
             bot.on('teamMemberRemoved', teamUpdateHandler);
+
+            // === Периодический snapshot — теперь запускается ТОЛЬКО когда есть зрители ===
+            // Каждые 500мс собираем полный snapshot scoreboard и player list для
+            // защиты от потерянных событий. Без подписчиков — холостые IPC, поэтому
+            // включаем по сигналу viewer:subscribers_changed из MinecraftViewerService.
+            let snapshotInterval = null;
+            const startSnapshot = () => {
+                if (snapshotInterval) return;
+                snapshotInterval = setInterval(() => {
+                    if (!process.send) return;
+                    broadcastScoreboard();
+                    broadcastPlayerList();
+                }, 500);
+            };
+            const stopSnapshot = () => {
+                if (snapshotInterval) {
+                    clearInterval(snapshotInterval);
+                    snapshotInterval = null;
+                }
+            };
+            viewerSnapshotControl.startSnapshot = startSnapshot;
+            viewerSnapshotControl.stopSnapshot = stopSnapshot;
+            // Если зрители уже были подключены до bot.spawn — стартуем сразу
+            if (viewerSubscriberCount > 0) startSnapshot();
+
+            // === Отписка всех листенеров на bot end / error (предотвращает утечки) ===
+            const detachViewerListeners = () => {
+                stopSnapshot();
+                viewerSnapshotControl.startSnapshot = null;
+                viewerSnapshotControl.stopSnapshot = null;
+                try {
+                    bot.off?.('windowOpen', onWindowOpen);
+                    bot.off?.('windowClose', onWindowClose);
+                    bot.inventory?.off?.('updateSlot', onInventoryUpdate);
+                    bot.off?.('playerJoined', onPlayerListChange);
+                    bot.off?.('playerLeft', onPlayerListChange);
+                    bot.off?.('playerUpdated', onPlayerListChange);
+                    bot._client?.off?.('playerlist_header', handleTabHeaderFooter);
+                    bot._client?.off?.('player_list_header_footer', handleTabHeaderFooter);
+                    bot._client?.off?.('tab_list_header_footer', handleTabHeaderFooter);
+                    bot.off?.('scoreboardCreated', onScoreboardChange);
+                    bot.off?.('scoreboardDeleted', onScoreboardChange);
+                    bot.off?.('scoreboardTitleChanged', onScoreboardChange);
+                    bot.off?.('scoreUpdated', onScoreboardChange);
+                    bot.off?.('scoreRemoved', onScoreboardChange);
+                    bot.off?.('scoreboardPosition', onScoreboardChange);
+                    bot.off?.('teamCreated', teamUpdateHandler);
+                    bot.off?.('teamRemoved', teamUpdateHandler);
+                    bot.off?.('teamUpdated', teamUpdateHandler);
+                    bot.off?.('teamMemberAdded', teamUpdateHandler);
+                    bot.off?.('teamMemberRemoved', teamUpdateHandler);
+                } catch (e) { /* best-effort */ }
+            };
+            bot.once?.('end', detachViewerListeners);
+            bot.once?.('error', detachViewerListeners);
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);
@@ -2201,6 +2482,16 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 process.on('uncaughtException', (error) => {
+    // PartialReadError и подобные protocol-ошибки не должны валить процесс бота.
+    // Они происходят, когда minecraft-protocol не может распарсить кастомный пакет
+    // (часто на серверах с плагинами шлющими нестандартный entity_metadata).
+    const name = error?.name || '';
+    const msg = error?.message || '';
+    if (name === 'PartialReadError' || msg.includes('PartialReadError')
+        || msg.includes('Read error') || msg.includes('Unexpected buffer end')) {
+        sendLog(`[Protocol] Игнорирую некритичную ошибку парсинга пакета: ${msg}`);
+        return;
+    }
     const errorMsg = `[FATAL] Необработанное исключение: ${error.stack || error.message}`;
     sendLog(errorMsg);
     setTimeout(() => process.exit(1), 100);

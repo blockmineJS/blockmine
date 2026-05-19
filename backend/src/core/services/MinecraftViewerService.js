@@ -29,7 +29,11 @@ class MinecraftViewerService {
                 if (!this.activeViewers.has(botId)) {
                     this.activeViewers.set(botId, new Set());
                 }
+                const wasEmpty = this.activeViewers.get(botId).size === 0;
                 this.activeViewers.get(botId).add(socket.id);
+                if (wasEmpty) {
+                    this._notifySubscriberCount(botId);
+                }
 
                 this.logger.info(`[MinecraftViewer] Socket ${socket.id} connected to bot ${botId}`);
 
@@ -122,6 +126,8 @@ class MinecraftViewerService {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:playerList', message.payload);
             } else if (message.type === 'viewer:scoreboard') {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:scoreboard', message.payload);
+            } else if (message.type === 'viewer:digProgress') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:digProgress', message.payload);
             }
         });
     }
@@ -220,8 +226,23 @@ class MinecraftViewerService {
             viewers.delete(socketId);
             if (viewers.size === 0) {
                 this.activeViewers.delete(botId);
+                this._notifySubscriberCount(botId, 0);
+            } else {
+                this._notifySubscriberCount(botId);
             }
         }
+    }
+
+    _notifySubscriberCount(botId, explicitCount) {
+        const count = explicitCount !== undefined
+            ? explicitCount
+            : (this.activeViewers.get(botId)?.size || 0);
+        try {
+            this.processManager.sendMessage(botId, {
+                type: 'viewer:subscribers_changed',
+                count
+            });
+        } catch (e) { /* bot process may be gone */ }
     }
 }
 

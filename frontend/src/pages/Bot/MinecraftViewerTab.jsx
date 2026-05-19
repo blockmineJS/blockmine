@@ -14,6 +14,7 @@ import MinecraftPlayerList from '@/components/minecraft/MinecraftPlayerList';
 import MinecraftScoreboard from '@/components/minecraft/MinecraftScoreboard';
 import MinecraftPauseMenu from '@/components/minecraft/MinecraftPauseMenu';
 import MinecraftInventory from '@/components/minecraft/MinecraftInventory';
+import MinecraftHealthBar from '@/components/minecraft/MinecraftHealthBar';
 import {
     loadBlockTextures,
     getBlockMaterial,
@@ -22,8 +23,70 @@ import {
     disposeTextureCache,
 } from './blockTextureLoader';
 import { getEntityGeometry, getEntityMaterial, isEntityBlock as isEntityModel } from './entityModels';
+// playerModel/skinLoader откатили — у части скинов CORS блокирует загрузку
+// или геометрия не собирается полностью. Возврат к простой box-болванке.
+import { disposeSkinCache } from './skinLoader';
+
+// === Шаренная геометрия куба блока ===
+// КРИТИЧЕСКИ ВАЖНО: одна геометрия на ВСЕ блоки во ВСЕХ чанках. Если бы каждый
+// chunk создавал свою и мы её диспозили на update — соседние чанки (использующие
+// ту же reference) ломались бы. Делаем module-level singleton: создаётся один раз,
+// не диспозится никогда, переиспользуется всеми InstancedMesh / Mesh.
+let _sharedBlockCubeGeometry = null;
+function getSharedBlockCubeGeometry() {
+    if (!_sharedBlockCubeGeometry) {
+        _sharedBlockCubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+        _sharedBlockCubeGeometry.translate(0.5, 0.5, 0.5);
+    }
+    return _sharedBlockCubeGeometry;
+}
+
+// === Кэш текстур стадий разрушения блока (destroy_stage_0..9.png) ===
+// Загружаем 10 текстур один раз, переиспользуем для overlay. Без кэша каждый
+// progress-tick создавал новый TextureLoader → лишняя GC-нагрузка.
+const _digStageTextureCache = new Map();
+function getDigStageTexture(stage) {
+    if (_digStageTextureCache.has(stage)) return _digStageTextureCache.get(stage);
+    const tex = new THREE.TextureLoader().load(
+        `/minecraft-assets/blocks/destroy_stage_${stage}.png`
+    );
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    _digStageTextureCache.set(stage, tex);
+    return tex;
+}
+// Шаренная геометрия overlay-куба (1.01³) — одна на все блоки, не диспозить
+let _digOverlayGeometry = null;
+function getDigOverlayGeometry() {
+    if (!_digOverlayGeometry) {
+        _digOverlayGeometry = new THREE.BoxGeometry(1.01, 1.01, 1.01);
+    }
+    return _digOverlayGeometry;
+}
 import { useCoordinatePickerStore } from '@/stores/coordinatePickerStore';
 import FadeTransition from '@/components/FadeTransition';
+
+/**
+ * Ручной HSL→RGB. Three.js 0.128 не парсит дробные проценты (`hsl(240, 10%, 3.9%)`),
+ * а CSS variables shadcn/Tailwind часто содержат именно их.
+ */
+function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    s = Math.max(0, Math.min(100, s)) / 100;
+    l = Math.max(0, Math.min(100, l)) / 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r, g, b;
+    if (h < 60)       { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else              { r = c; g = 0; b = x; }
+    return [r + m, g + m, b + m];
+}
 
 const getThemeThreeColor = (variableName, fallback) => {
     if (typeof window === 'undefined') return new THREE.Color(fallback);
@@ -31,11 +94,14 @@ const getThemeThreeColor = (variableName, fallback) => {
     if (!rawValue) return new THREE.Color(fallback);
     const normalized = rawValue.replace(/\s+/g, ' ').split(' ');
     if (normalized.length < 3) return new THREE.Color(fallback);
-    const [h, s, l] = normalized;
-    const color = new THREE.Color();
-    try { color.setStyle(`hsl(${h}, ${s}, ${l})`); }
-    catch (e) { return new THREE.Color(fallback); }
-    return color;
+    const h = parseFloat(normalized[0]);
+    const s = parseFloat(normalized[1]); // "10%" → 10
+    const l = parseFloat(normalized[2]); // "3.9%" → 3.9
+    if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(l)) {
+        return new THREE.Color(fallback);
+    }
+    const [r, g, b] = hslToRgb(h, s, l);
+    return new THREE.Color(r, g, b);
 };
 
 const VIEWER_ERROR_TRANSLATION_KEYS = {
@@ -56,14 +122,14 @@ function detectWebGL() {
 const DEFAULT_SETTINGS = {
     renderDistance: 24,
     correctionSpeed: 1.0,
-    sensitivity: 1.0,
+    sensitivity: 0.5,
     localMovement: true,
     showDebug: false,
-    fxaa: true,
+    fxaa: false,             // выключен по умолчанию — не нужен, добавляет EffectComposer
     instancedRendering: true,
-    frustumCulling: true,
+    frustumCulling: false,   // выключен по умолчанию — иногда некорректно скрывает чанки
     throttleWhenHidden: true,
-    dynamicLighting: true,
+    dynamicLighting: false,  // выключен — точечные источники света могут плодить артефакты
 };
 
 const MAX_DYNAMIC_LIGHTS = 32;
@@ -108,6 +174,21 @@ const MinecraftViewerTab = () => {
     // (открытие окна/чата/меню/E/T/ESC). Если выход не инициирован — значит
     // браузер обработал ESC сам → открываем pause-меню.
     const intentionalUnlockRef = useRef(false);
+    // Timestamp последнего "закрытия UI" (inventory/окно/чат через ESC).
+    // Защищает от ложного открытия pause-меню, если pointerlockchange сработает
+    // ПОСЛЕ того, как ESC уже обработан и refs обновлены.
+    const recentUiCloseAtRef = useRef(0);
+    // Текущая позиция копаемого блока (для hold-to-break). null = не копаем.
+    const diggingPosRef = useRef(null);
+    // Прогресс копания блока для overlay: { position: {x,y,z}, progress: 0..1, mesh: Mesh }
+    const digOverlayRef = useRef(null);
+    // Отложенный teardown для защиты от React.StrictMode double-invoke в dev mode.
+    // В strict mode эффект монтируется → размонтируется → монтируется снова за один tick.
+    // Если бы мы диспозили renderer сразу в cleanup, второй mount получал бы битый canvas
+    // (forceContextLoss необратим). Откладываем cleanup на 100мс — если в это время
+    // эффект повторно монтируется, отменяем cleanup.
+    const pendingTeardownRef = useRef(null);
+    const webglListenersRef = useRef(null);
 
     const [connected, setConnected] = useState(false);
     const [chatOpen, setChatOpen] = useState(false);
@@ -115,6 +196,7 @@ const MinecraftViewerTab = () => {
     const [botState, setBotState] = useState(null);
     const [error, setError] = useState(null);
     const [selectedHotbarSlot, setSelectedHotbarSlot] = useState(0);
+    const selectedHotbarSlotRef = useRef(0);
     const [webglError, setWebglError] = useState(null);
     const [renderReady, setRenderReady] = useState(false);
     const [openWindow, setOpenWindow] = useState(null);
@@ -128,7 +210,7 @@ const MinecraftViewerTab = () => {
     const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
     const [pointerLocked, setPointerLocked] = useState(false);
     const [waitingForWindow, setWaitingForWindow] = useState(false);
-    const [, forceTick] = useState(0);
+    const [fpsDisplay, setFpsDisplay] = useState(0);
 
     const {
         isPickMode,
@@ -141,7 +223,15 @@ const MinecraftViewerTab = () => {
     const [settings, setSettings] = useState(() => {
         try {
             const saved = localStorage.getItem('minecraftViewerSettings');
-            if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+            const version = localStorage.getItem('minecraftViewerSettings:v');
+            // Schema version 2: сбрасываем frustumCulling/fxaa/dynamicLighting в false
+            // (они могли вызывать чёрный экран у части пользователей).
+            // Если сохранённая версия меньше — игнорируем старые настройки.
+            const CURRENT_VERSION = '3';
+            if (saved && version === CURRENT_VERSION) {
+                return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+            }
+            localStorage.setItem('minecraftViewerSettings:v', CURRENT_VERSION);
         } catch (e) { /* ignore */ }
         return DEFAULT_SETTINGS;
     });
@@ -151,6 +241,7 @@ const MinecraftViewerTab = () => {
     const localCameraRef = useRef({ yaw: 0, pitch: 0 });
 
     useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
+    useEffect(() => { selectedHotbarSlotRef.current = selectedHotbarSlot; }, [selectedHotbarSlot]);
     useEffect(() => { openWindowRef.current = openWindow; }, [openWindow]);
     useEffect(() => { inventoryOpenRef.current = inventoryOpen; }, [inventoryOpen]);
     useEffect(() => { pauseMenuOpenRef.current = pauseMenuOpen; }, [pauseMenuOpen]);
@@ -193,13 +284,19 @@ const MinecraftViewerTab = () => {
             const locked = document.pointerLockElement === canvasRef.current;
             setPointerLocked(locked);
             if (!locked) {
-                // Если выход из lock'а не инициирован самим клиентом
-                // (т.е. это браузерный ESC), и других UI не открыто → pause menu
+                // Открываем pause-menu только если:
+                //   - выход из lock не инициирован клиентом (т.е. браузерный ESC)
+                //   - нет открытого UI
+                //   - не было закрытия UI в последние 500мс (защита от race condition,
+                //     когда pointerlockchange сработал после того, как ESC закрыл inventory
+                //     и refs уже обновились на "ничего не открыто")
+                const recentUiClose = Date.now() - recentUiCloseAtRef.current < 500;
                 if (!intentionalUnlockRef.current
                     && !chatOpenRef.current
                     && !openWindowRef.current
                     && !inventoryOpenRef.current
-                    && !pauseMenuOpenRef.current) {
+                    && !pauseMenuOpenRef.current
+                    && !recentUiClose) {
                     setPauseMenuOpen(true);
                 }
                 intentionalUnlockRef.current = false;
@@ -226,14 +323,30 @@ const MinecraftViewerTab = () => {
 
     // === Initial connection ===
     useEffect(() => {
+        // Если в очереди есть отложенный teardown от предыдущего mount —
+        // отменяем его. Это значит был StrictMode double-invoke, и нам не нужно
+        // ничего убивать; продолжаем работать с тем что есть.
+        if (pendingTeardownRef.current) {
+            clearTimeout(pendingTeardownRef.current);
+            pendingTeardownRef.current = null;
+            return; // не создаём новый сокет, уже есть рабочий
+        }
+
         connectToBot();
         return () => {
-            cleanupScene();
-            if (socketRef.current) {
-                socketRef.current.emit('viewer:disconnect');
-                socketRef.current.disconnect();
-            }
-            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            // Откладываем cleanup. Если в течение 100мс эффект повторно монтируется
+            // (StrictMode dev), новый mount отменит этот timeout и cleanup не выполнится.
+            // На реальный unmount таймер всё равно сработает.
+            pendingTeardownRef.current = setTimeout(() => {
+                pendingTeardownRef.current = null;
+                cleanupScene();
+                if (socketRef.current) {
+                    socketRef.current.emit('viewer:disconnect');
+                    socketRef.current.disconnect();
+                    socketRef.current = null;
+                }
+                if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            }, 100);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [botId]);
@@ -242,6 +355,15 @@ const MinecraftViewerTab = () => {
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
+        }
+        // Снимаем webglcontextlost/restored listeners с canvas
+        if (webglListenersRef.current) {
+            const { canvas, onContextLost, onContextRestored } = webglListenersRef.current;
+            try {
+                canvas.removeEventListener('webglcontextlost', onContextLost);
+                canvas.removeEventListener('webglcontextrestored', onContextRestored);
+            } catch (e) { /* canvas might be gone */ }
+            webglListenersRef.current = null;
         }
         if (rendererRef.current) {
             try { rendererRef.current.dispose(); rendererRef.current.forceContextLoss?.(); }
@@ -252,14 +374,28 @@ const MinecraftViewerTab = () => {
             try { composerRef.current.dispose?.(); } catch (e) { /* ignore */ }
             composerRef.current = null;
         }
-        chunkCacheRef.current.forEach(cache => {
-            (cache.meshes || []).forEach(mesh => {
-                if (mesh.geometry) mesh.geometry.dispose();
-            });
-        });
+        // Chunks — meshes сами по себе освободятся GC после очистки группы и кэша.
+        // Шаренную геометрию (getSharedBlockCubeGeometry) НЕ диспозим — она module-level.
         chunkCacheRef.current.clear();
         lightCacheRef.current.clear();
         blocksMapRef.current.clear();
+        // Players — диспозим геометрии/материалы у каждой box-болванки
+        playersCacheRef.current.forEach(cached => {
+            cached.group?.traverse((obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                    else obj.material.dispose();
+                }
+            });
+        });
+        playersCacheRef.current.clear();
+        // Dig overlay (geometry шаренная, не диспозим; map тоже из общего кэша)
+        if (digOverlayRef.current?.mesh) {
+            digOverlayRef.current.mesh.material?.dispose();
+            digOverlayRef.current = null;
+        }
+        diggingPosRef.current = null;
         sceneInitializedRef.current = false;
         initialChunkReceivedRef.current = false;
         setRenderReady(false);
@@ -306,20 +442,29 @@ const MinecraftViewerTab = () => {
             preserveDrawingBuffer: false,
         });
 
-        canvas.addEventListener('webglcontextlost', (e) => {
+        // Сохраняем handlers в refs чтобы можно было отписаться при cleanup
+        const onContextLost = (e) => {
             e.preventDefault();
             setWebglError('context_lost');
-        });
-        canvas.addEventListener('webglcontextrestored', () => setWebglError(null));
+        };
+        const onContextRestored = () => setWebglError(null);
+        canvas.addEventListener('webglcontextlost', onContextLost);
+        canvas.addEventListener('webglcontextrestored', onContextRestored);
+        webglListenersRef.current = { canvas, onContextLost, onContextRestored };
 
         renderer.setSize(width, height);
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         renderer.setPixelRatio(pixelRatio);
 
-        const srgbKey = 'SRGB' + 'ColorSpace';
-        const SRGB = THREE[srgbKey];
-        if ('outputColorSpace' in renderer && SRGB) renderer.outputColorSpace = SRGB;
-        else if ('outputEncoding' in renderer && THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+        // Three.js r152+ ввёл новый цветовой API; в r0.128 (наша версия) — старый.
+        // Динамический ключ через Array.join, чтобы rollup не делал static fold
+        // и не выдавал предупреждение о несуществующем экспорте.
+        const SRGB = THREE[['SRGB', 'ColorSpace'].join('')];
+        if ('outputColorSpace' in renderer && SRGB) {
+            renderer.outputColorSpace = SRGB;
+        } else if ('outputEncoding' in renderer && THREE.sRGBEncoding) {
+            renderer.outputEncoding = THREE.sRGBEncoding;
+        }
 
         const scene = new THREE.Scene();
         const sceneBackground = getThemeThreeColor('--background', 0x0a0a0f);
@@ -397,7 +542,9 @@ const MinecraftViewerTab = () => {
         if (botState?.position) {
             camera.position.set(botState.position.x, botState.position.y + 1.6, botState.position.z);
             camera.rotation.order = 'ZYX';
-            camera.rotation.set(botState.pitch || 0, botState.yaw || 0, 0);
+            // Minecraft pitch: +π/2 = looking DOWN, -π/2 = up.
+            // Three.js rotation.x: +π/2 = looking UP. Инвертируем знак.
+            camera.rotation.set(-(botState.pitch || 0), botState.yaw || 0, 0);
         } else {
             camera.position.set(0, 70, 0);
             camera.lookAt(0, 0, 0);
@@ -416,7 +563,7 @@ const MinecraftViewerTab = () => {
                 fpsRef.current = fpsTickerRef.current.frames;
                 fpsTickerRef.current.frames = 0;
                 fpsTickerRef.current.lastUpdate = now;
-                if (settingsRef.current.showDebug) forceTick(v => v + 1);
+                if (settingsRef.current.showDebug) setFpsDisplay(fpsRef.current);
             }
 
             if (camera) {
@@ -429,9 +576,15 @@ const MinecraftViewerTab = () => {
                     frustum.setFromProjectionMatrix(projScreenMatrix);
                     if (blocksGroupRef.current) {
                         blocksGroupRef.current.children.forEach(mesh => {
-                            if (mesh.boundingSphere) {
-                                mesh.visible = frustum.intersectsSphere(mesh.boundingSphere);
+                            const bs = mesh.boundingSphere;
+                            // Защита от некорректного sphere: NaN центра, 0 радиус, отсутствие.
+                            // В таких случаях рендерим консервативно (видимый).
+                            if (!bs || !Number.isFinite(bs.radius) || bs.radius <= 0
+                                || !Number.isFinite(bs.center.x)) {
+                                mesh.visible = true;
+                                return;
                             }
+                            mesh.visible = frustum.intersectsSphere(bs);
                         });
                     }
                 } else if (blocksGroupRef.current) {
@@ -539,7 +692,8 @@ const MinecraftViewerTab = () => {
             setBotState(state);
             if (state.yaw !== undefined && state.pitch !== undefined) {
                 localCameraRef.current.yaw = state.yaw;
-                localCameraRef.current.pitch = state.pitch;
+                // Конверсия MC pitch (down=+) → three.js rotation.x (up=+). См. initializeScene.
+                localCameraRef.current.pitch = -state.pitch;
             }
             if (state.blocks?.length > 0) initialChunkReceivedRef.current = true;
             if (state.position && cameraRef.current) {
@@ -549,9 +703,9 @@ const MinecraftViewerTab = () => {
             }
             if (state.blocks && sceneInitializedRef.current) renderBlocks(state.blocks);
             if (state.nearbyPlayers) renderPlayers(state.nearbyPlayers);
-            if (state.currentWindow) setOpenWindow(state.currentWindow);
-            // playerList и scoreboard приходят через отдельные события viewer:playerList/viewer:scoreboard
-            // с защитой от деградации. НЕ перетираем их из общего state-stream.
+            // currentWindow / playerList / scoreboard приходят отдельными событиями
+            // (viewer:windowOpen/Update/Close, viewer:playerList, viewer:scoreboard).
+            // НЕ читаем их из state-stream чтобы исключить гонку источников.
         });
 
         socket.on('viewer:update', (state) => {
@@ -632,6 +786,60 @@ const MinecraftViewerTab = () => {
             setTablistHeader(payload?.header || '');
             setTablistFooter(payload?.footer || '');
         });
+
+        socket.on('viewer:digProgress', (payload) => {
+            // payload: { position, progress: 0..1, duration?, done?, aborted? }
+            if (!sceneRef.current || !payload?.position) return;
+            const { x, y, z } = payload.position;
+            const progress = payload.progress ?? 0;
+
+            // Очищаем overlay при done / aborted / progress=0
+            if (payload.done || payload.aborted || progress <= 0) {
+                if (digOverlayRef.current?.mesh) {
+                    sceneRef.current.remove(digOverlayRef.current.mesh);
+                    // Геометрия шаренная — не диспозим. Только material instance.
+                    digOverlayRef.current.mesh.material?.dispose();
+                }
+                digOverlayRef.current = null;
+                return;
+            }
+
+            // Определяем стадию 0..9 для destroy_stage_X.png
+            const stage = Math.min(9, Math.floor(progress * 10));
+
+            const existing = digOverlayRef.current;
+            if (existing
+                && existing.position.x === x
+                && existing.position.y === y
+                && existing.position.z === z) {
+                // Та же позиция — просто обновляем текстуру (из кэша)
+                if (existing.stage !== stage) {
+                    existing.stage = stage;
+                    const tex = getDigStageTexture(stage);
+                    existing.mesh.material.map = tex;
+                    existing.mesh.material.needsUpdate = true;
+                }
+            } else {
+                // Новая позиция — создаём overlay-меш с шаренной геометрией
+                if (existing?.mesh) {
+                    sceneRef.current.remove(existing.mesh);
+                    existing.mesh.material?.dispose(); // только material, геометрия шаренная
+                }
+                const material = new THREE.MeshBasicMaterial({
+                    map: getDigStageTexture(stage),
+                    transparent: true,
+                    opacity: 0.7,
+                    depthWrite: false,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -2,
+                });
+                const mesh = new THREE.Mesh(getDigOverlayGeometry(), material);
+                mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+                sceneRef.current.add(mesh);
+                digOverlayRef.current = { mesh, position: { x, y, z }, stage };
+            }
+        });
+
         socket.on('viewer:scoreboard', (payload) => {
             if (payload === null) {
                 // явный delete scoreboard
@@ -777,7 +985,10 @@ const MinecraftViewerTab = () => {
             const cached = chunkCacheRef.current.get(chunkKey);
             if (cached?.meshes) {
                 cached.meshes.forEach(mesh => {
-                    if (mesh.geometry) mesh.geometry.dispose();
+                    // НИЧЕГО не диспозим. Все block-геометрии теперь шарятся
+                    // на уровне модуля: cubeGeometry (getSharedBlockCubeGeometry)
+                    // и custom shapes (_shapeGeometryCache в blockTextureLoader).
+                    // Материалы тоже шарятся через textureCache.
                     blocksGroup.remove(mesh);
                 });
             }
@@ -792,9 +1003,8 @@ const MinecraftViewerTab = () => {
             chunkCacheRef.current.delete(chunkKey);
         });
 
-        // Default cube geometry (translated so that block min-corner = 0,0,0)
-        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        cubeGeometry.translate(0.5, 0.5, 0.5);
+        // Шаренная геометрия куба — одна на весь lifetime страницы
+        const cubeGeometry = getSharedBlockCubeGeometry();
 
         chanksToUpdate.forEach(chunkKey => {
             const list = chunkBlocks.get(chunkKey);
@@ -812,12 +1022,38 @@ const MinecraftViewerTab = () => {
                 }
                 groups.get(groupKey).blocks.push(block);
 
-                // Add PointLight for emissive blocks
-                if (useDynamicLighting && lightCacheRef.current.size < MAX_DYNAMIC_LIGHTS) {
+                // Add PointLight for emissive blocks (с LRU-эвикцией по дистанции от камеры)
+                if (useDynamicLighting) {
                     const emissive = getBlockEmissive(block.name);
                     if (emissive?.light) {
                         const lightKey = `${block.x},${block.y},${block.z}`;
                         if (!lightCacheRef.current.has(lightKey)) {
+                            // Если кэш заполнен — выкинуть самый далёкий от камеры свет.
+                            if (lightCacheRef.current.size >= MAX_DYNAMIC_LIGHTS) {
+                                const cam = cameraRef.current;
+                                if (cam) {
+                                    const blockDistSq = (block.x + 0.5 - cam.position.x) ** 2
+                                        + (block.y + 0.5 - cam.position.y) ** 2
+                                        + (block.z + 0.5 - cam.position.z) ** 2;
+                                    let farthestKey = null;
+                                    let farthestDistSq = blockDistSq;
+                                    for (const [k, l] of lightCacheRef.current.entries()) {
+                                        const dsq = (l.position.x - cam.position.x) ** 2
+                                            + (l.position.y - cam.position.y) ** 2
+                                            + (l.position.z - cam.position.z) ** 2;
+                                        if (dsq > farthestDistSq) {
+                                            farthestDistSq = dsq;
+                                            farthestKey = k;
+                                        }
+                                    }
+                                    if (!farthestKey) return; // новый блок дальше всех — пропускаем
+                                    const evicted = lightCacheRef.current.get(farthestKey);
+                                    lightsGroup?.remove(evicted);
+                                    lightCacheRef.current.delete(farthestKey);
+                                } else {
+                                    return; // камеры ещё нет — просто не добавляем
+                                }
+                            }
                             const pl = new THREE.PointLight(
                                 emissive.light.color,
                                 emissive.light.intensity,
@@ -873,6 +1109,16 @@ const MinecraftViewerTab = () => {
                     Math.pow(b.x + 0.5 - cx, 2) + Math.pow(b.y + 0.5 - cy, 2) + Math.pow(b.z + 0.5 - cz, 2)
                 ))) + 1;
                 mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), maxDist);
+
+                // ВАЖНО: отключаем three.js's встроенное frustum culling.
+                // Для InstancedMesh оно использует geometry.boundingSphere (для unit-куба),
+                // а не реальные позиции инстансов — может ложно отбрасывать чанки.
+                // Для Group с Mesh-детьми тоже выключаем — наша custom-логика
+                // в animate-loop проставляет mesh.visible сама.
+                mesh.frustumCulled = false;
+                if (mesh.children) {
+                    mesh.children.forEach(child => { child.frustumCulled = false; });
+                }
 
                 blocksGroup.add(mesh);
                 meshes.push(mesh);
@@ -984,15 +1230,21 @@ const MinecraftViewerTab = () => {
 
     const handleWindowClose = useCallback(() => {
         socketRef.current?.emit('viewer:control', { command: { type: 'close_window' } });
+        // Маркируем закрытие UI — pointerlockchange grace-period не даст pause-меню
+        // открыться по ошибке из-за асинхронных событий.
+        recentUiCloseAtRef.current = Date.now();
         setOpenWindow(null);
         setInventoryOpen(false);
         setWaitingForWindow(false);
         // Возвращаемся в игру — снова захватываем pointer
-        // Небольшая задержка чтобы React успел обновить state и убрать оверлей
+        // Небольшая задержка чтобы React успел обновить state и убрать оверлей.
+        // ВАЖНО: помечаем как intentionalUnlock на случай если Chrome cooldown
+        // отклонит запрос или произойдёт мгновенный exit.
         setTimeout(() => {
             if (!canvasRef.current) return;
             if (chatOpenRef.current || pauseMenuOpenRef.current) return;
             if (document.pointerLockElement === canvasRef.current) return;
+            intentionalUnlockRef.current = true;
             try { canvasRef.current.requestPointerLock(); }
             catch (err) { /* ignore */ }
         }, 50);
@@ -1001,12 +1253,18 @@ const MinecraftViewerTab = () => {
     // === Engage interaction (click on canvas to lock pointer) ===
     const engagePointerLock = useCallback(() => {
         if (!canvasRef.current) return;
-        if (chatOpenRef.current || openWindowRef.current || pauseMenuOpenRef.current) return;
+        if (chatOpenRef.current || openWindowRef.current || inventoryOpenRef.current
+            || pauseMenuOpenRef.current) return;
         if (document.pointerLockElement === canvasRef.current) return;
         try {
-            canvasRef.current.requestPointerLock();
+            // В некоторых браузерах requestPointerLock возвращает Promise;
+            // ошибки в нём проглатываются без catch. Логируем явно.
+            const result = canvasRef.current.requestPointerLock();
+            if (result && typeof result.then === 'function') {
+                result.catch(err => console.warn('[Viewer] pointer lock denied:', err));
+            }
         } catch (e) {
-            console.warn('[MinecraftViewer] requestPointerLock failed:', e);
+            console.warn('[Viewer] requestPointerLock threw:', e);
         }
     }, []);
 
@@ -1015,17 +1273,51 @@ const MinecraftViewerTab = () => {
         if (!connected) return;
 
         const handleKeyDown = (e) => {
-            // Pause menu key (ESC) — приоритет
+            // Pause menu key (ESC) — приоритет.
+            // Используем refs (не state) для всех проверок чтобы избежать stale-closure,
+            // и stopImmediatePropagation чтобы никакой другой listener не словил ESC.
             if (e.code === 'Escape') {
                 e.preventDefault();
-                if (chatOpen) { setChatOpen(false); return; }
-                if (openWindowRef.current || inventoryOpenRef.current) { handleWindowClose(); return; }
-                setPauseMenuOpen(prev => !prev);
+                e.stopImmediatePropagation();
+
+                // Belt-and-suspenders: если активный элемент — input/textarea (т.е.
+                // чат-инпут в фокусе), точно НЕ открываем pause-меню. Это защищает от
+                // race-condition между chat's onKeyDown и нашим window-handler.
+                const activeTag = document.activeElement?.tagName?.toLowerCase();
+                const inputFocused = activeTag === 'input' || activeTag === 'textarea';
+
+                if (chatOpenRef.current || inputFocused) {
+                    recentUiCloseAtRef.current = Date.now();
+                    setChatOpen(false);
+                    // Снимаем фокус с input на всякий случай
+                    if (inputFocused) document.activeElement?.blur?.();
+                    return;
+                }
+                if (openWindowRef.current || inventoryOpenRef.current) {
+                    // handleWindowClose сам помечает recentUiCloseAt
+                    handleWindowClose();
+                    return;
+                }
+                if (pauseMenuOpenRef.current) {
+                    recentUiCloseAtRef.current = Date.now();
+                    setPauseMenuOpen(false);
+                    return;
+                }
+                if (isPickMode) {
+                    // В режиме выбора координат ESC отменяет выбор, а не открывает меню
+                    cancelPicking?.();
+                    return;
+                }
+                // Ничего не открыто — открываем pause-меню.
+                // Дополнительная защита: не открываем если UI закрывался недавно
+                // (грейс-период покрывает остаточные events после закрытия).
+                if (Date.now() - recentUiCloseAtRef.current < 300) return;
+                setPauseMenuOpen(true);
                 intentionalExitPointerLock();
                 return;
             }
 
-            if (chatOpen) return;
+            if (chatOpenRef.current) return;
             if (pauseMenuOpenRef.current) return;
 
             // Window/Inventory открыт: можно закрыть на E
@@ -1106,14 +1398,11 @@ const MinecraftViewerTab = () => {
                 return;
             }
 
-            // === F5 — переключение перспективы (1-е/3-е лицо) ===
+            // F5 — переключение перспективы. Удалено: cameraMode переключается в settings,
+            // но фактического рендера от 3-го лица нет (требует отдельной реализации
+            // viewport-камеры за спиной бота). Возвращаем когда сделаем.
             if (e.code === 'F5') {
                 e.preventDefault();
-                setSettings(prev => {
-                    const modes = ['first', 'third_back', 'third_front'];
-                    const idx = modes.indexOf(prev.cameraMode || 'first');
-                    return { ...prev, cameraMode: modes[(idx + 1) % modes.length] };
-                });
                 return;
             }
 
@@ -1160,7 +1449,13 @@ const MinecraftViewerTab = () => {
             camera.rotation.set(localCameraRef.current.pitch, localCameraRef.current.yaw, 0);
 
             socketRef.current?.emit('viewer:control', {
-                command: { type: 'look', yaw: localCameraRef.current.yaw, pitch: localCameraRef.current.pitch }
+                // localCameraRef хранит pitch в three.js-конвенции (up=+).
+                // Бот в Minecraft ожидает MC-конвенцию (down=+) — инвертируем.
+                command: {
+                    type: 'look',
+                    yaw: localCameraRef.current.yaw,
+                    pitch: -localCameraRef.current.pitch,
+                }
             });
         };
 
@@ -1230,10 +1525,12 @@ const MinecraftViewerTab = () => {
                 return;
             }
 
-            // === ЛКМ — dig (или attack entity) ===
+            // === ЛКМ — start dig (hold-to-break). Останов на mouseup ===
             if (isLeft) {
+                // Сохраняем позицию текущего dig чтобы stop_dig корректно отменил
+                diggingPosRef.current = { x: bx, y: by, z: bz };
                 socketRef.current?.emit('viewer:control', {
-                    command: { type: 'dig', position: { x: bx, y: by, z: bz } }
+                    command: { type: 'start_dig', position: { x: bx, y: by, z: bz } }
                 });
                 return;
             }
@@ -1241,27 +1538,23 @@ const MinecraftViewerTab = () => {
             // === ПКМ — interact: попробовать активировать блок (сундук/рычаг/дверь),
             //   потом поставить блок, потом use_item ===
             if (isRight) {
-                // Вычисляем грань блока, по которой щелкнули, чтобы поставить блок туда
+                // Грань блока, по которой щёлкнули — нужна для place_block fallback
                 const face = hit.face;
                 const faceVec = face
                     ? { x: face.normal.x, y: face.normal.y, z: face.normal.z }
                     : { x: 0, y: 1, z: 0 };
 
-                // Возможно откроется GUI — ставим флаг ожидания
                 setWaitingForWindow(true);
                 setTimeout(() => setWaitingForWindow(false), 1500);
 
-                // Сначала пытаемся активировать (для дверей/сундуков/верстаков)
+                // Одна команда — backend последовательно пробует activate → place → use,
+                // останавливаясь как только что-то сработало. Никаких параллельных эмитов.
                 socketRef.current?.emit('viewer:control', {
-                    command: { type: 'activate_block', position: { x: bx, y: by, z: bz } }
-                });
-                // Параллельно — попытка place_block (бот сам разберёт что у него в руке)
-                socketRef.current?.emit('viewer:control', {
-                    command: { type: 'place_block', position: { x: bx, y: by, z: bz }, face: faceVec }
-                });
-                // Также use_item (если в руке еда/лук/компас с серверным меню)
-                socketRef.current?.emit('viewer:control', {
-                    command: { type: 'use_item' }
+                    command: {
+                        type: 'right_click_interact',
+                        position: { x: bx, y: by, z: bz },
+                        face: faceVec,
+                    }
                 });
                 return;
             }
@@ -1272,33 +1565,82 @@ const MinecraftViewerTab = () => {
             if (document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
             const delta = Math.sign(e.deltaY);
-            setSelectedHotbarSlot(prev => {
-                const newSlot = (prev + delta + 9) % 9;
-                socketRef.current?.emit('viewer:control', {
-                    command: { type: 'hotbar_slot', slot: newSlot }
-                });
-                return newSlot;
+            // Считаем next slot снаружи setState, чтобы side-effect (socket emit)
+            // не дёргался дважды в React.StrictMode double-invoke
+            const newSlot = (selectedHotbarSlotRef.current + delta + 9) % 9;
+            selectedHotbarSlotRef.current = newSlot;
+            setSelectedHotbarSlot(newSlot);
+            socketRef.current?.emit('viewer:control', {
+                command: { type: 'hotbar_slot', slot: newSlot }
             });
+        };
+
+        // Hold-to-break: на mouseup (или mouseleave/blur/visibilitychange) шлём stop_dig.
+        // Регистрируем на window чтобы поймать отпускание даже если курсор ушёл с canvas.
+        const cancelActiveDig = () => {
+            if (!diggingPosRef.current) return;
+            socketRef.current?.emit('viewer:control', { command: { type: 'stop_dig' } });
+            diggingPosRef.current = null;
+            // Сразу убираем overlay для отзывчивости (backend всё равно подтвердит aborted).
+            // Геометрию НЕ диспозим — она шаренная (см. getDigOverlayGeometry).
+            if (digOverlayRef.current?.mesh && sceneRef.current) {
+                sceneRef.current.remove(digOverlayRef.current.mesh);
+                digOverlayRef.current.mesh.material?.dispose();
+                digOverlayRef.current = null;
+            }
+        };
+        const handleMouseUp = (e) => {
+            if (e.button !== 0) return; // только ЛКМ
+            cancelActiveDig();
+        };
+        // Также прерываем dig при потере фокуса окна / переключении вкладки —
+        // иначе бот будет копать в фоне пока пользователь работает в другом app.
+        const handleWindowBlur = () => cancelActiveDig();
+        const handleVisibilityChange = () => { if (document.hidden) cancelActiveDig(); };
+
+        // Слушатель ставим на window (а не canvas) и фильтруем по target.
+        // canvasRef.current может быть null когда FadeTransition ещё не смонтировал
+        // содержимое — тогда canvas-level addEventListener был бы no-op'ом и
+        // ЛКМ не захватывал бы курсор. Через window мы ловим всё, потом проверяем
+        // что клик пришёл на canvas (или на overlay-обёртки внутри контейнера).
+        const handleMouseDownWindow = (e) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            // Принимаем клик если target — сам canvas ИЛИ контейнер (всё что внутри viewer-обёртки)
+            const container = containerRef.current;
+            if (e.target !== canvas && !container?.contains(e.target)) return;
+            // Если клик не по самому canvas (а по UI поверх) — пропускаем.
+            // Канвас лежит inset-0, UI элементы рендерятся поверх (hotbar, healthbar и пр.)
+            if (e.target !== canvas) return;
+            handleClickOnCanvas(e);
+        };
+        const handleContextMenu = (e) => {
+            const canvas = canvasRef.current;
+            if (e.target === canvas) e.preventDefault();
         };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('blur', handleWindowBlur);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('wheel', handleWheel, { passive: false });
-        const canvasNode = canvasRef.current;
-        canvasNode?.addEventListener('mousedown', handleClickOnCanvas);
-        const handleContextMenu = (e) => e.preventDefault();
-        canvasNode?.addEventListener('contextmenu', handleContextMenu);
+        window.addEventListener('mousedown', handleMouseDownWindow);
+        window.addEventListener('contextmenu', handleContextMenu);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('blur', handleWindowBlur);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('wheel', handleWheel);
-            canvasNode?.removeEventListener('mousedown', handleClickOnCanvas);
-            canvasNode?.removeEventListener('contextmenu', handleContextMenu);
+            window.removeEventListener('mousedown', handleMouseDownWindow);
+            window.removeEventListener('contextmenu', handleContextMenu);
         };
-    }, [connected, chatOpen, isPickMode, setSelectedCoords, tabHeld, handleWindowClose, engagePointerLock, intentionalExitPointerLock]);
+    }, [connected, isPickMode, cancelPicking, setSelectedCoords, tabHeld, handleWindowClose, engagePointerLock, intentionalExitPointerLock]);
 
     const sendChatMessage = (message) => {
         socketRef.current?.emit('viewer:control', { command: { type: 'chat', message } });
@@ -1331,7 +1673,10 @@ const MinecraftViewerTab = () => {
         return () => observer.disconnect();
     }, [connected]);
 
-    useEffect(() => () => disposeTextureCache(), []);
+    useEffect(() => () => {
+        disposeTextureCache();
+        disposeSkinCache();
+    }, []);
 
     const localizedError = error
         ? t(VIEWER_ERROR_TRANSLATION_KEYS[error] || error, { defaultValue: error })
@@ -1382,25 +1727,9 @@ const MinecraftViewerTab = () => {
                     </div>
                 )}
 
-                {/* "Click to play" prompt when pointer is not locked and nothing else is open */}
-                {connected && renderReady && !pointerLocked && !chatOpen && !openWindow && !inventoryOpen && !pauseMenuOpen && !isPickMode && !waitingForWindow && (
-                    <div
-                        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer"
-                        onClick={engagePointerLock}
-                    >
-                        <div
-                            className="px-6 py-3 text-white"
-                            style={{
-                                fontFamily: '"Minecraft", "Press Start 2P", monospace',
-                                background: 'rgba(0,0,0,0.55)',
-                                border: '2px solid rgba(255,255,255,0.1)',
-                                textShadow: '2px 2px 0 #3f3f3f',
-                            }}
-                        >
-                            {t('clickToPlay', { defaultValue: 'Нажмите чтобы играть' })}
-                        </div>
-                    </div>
-                )}
+                {/* "Click to play" overlay убран — пользователь и так может кликнуть
+                    в любое место canvas чтобы захватить курсор (см. handleClickOnCanvas).
+                    Pause-меню и переходы автоматически возвращают lock через requestPointerLock. */}
 
                 {/* Crosshair (only when pointer locked) */}
                 {pointerLocked && (
@@ -1417,19 +1746,29 @@ const MinecraftViewerTab = () => {
                     />
                 )}
 
-                {/* HUD: Health/food/coords (только если есть state) */}
+                {/* Vanilla MC HUD: сердца + еда над хотбаром.
+                    Скрывается в creative/spectator (как в настоящем MC). */}
+                {botState && !pauseMenuOpen && !openWindow && !inventoryOpen && !chatOpen && !settings.hideHud && (
+                    <MinecraftHealthBar
+                        health={botState.health ?? 20}
+                        food={botState.food ?? 20}
+                        gameMode={botState.gameMode}
+                    />
+                )}
+
+
+                {/* Координаты / FPS — отдельный overlay в углу */}
                 {botState && pointerLocked && !pauseMenuOpen && !openWindow && !inventoryOpen && !chatOpen && !settings.hideHud && (
                     <div className="absolute top-4 right-4 rounded bg-black bg-opacity-50 px-3 py-2 text-white pointer-events-none text-xs"
                         style={{ fontFamily: '"Minecraft", "Press Start 2P", monospace', textShadow: '1px 1px 0 #000' }}>
-                        <div>♥ {botState.health?.toFixed(1) || 20} | 🍗 {botState.food?.toFixed(1) || 20}</div>
                         {botState.position && (
-                            <div className="text-xs opacity-80 mt-1">
+                            <div className="text-xs opacity-80">
                                 {botState.position.x.toFixed(1)} {botState.position.y.toFixed(1)} {botState.position.z.toFixed(1)}
                             </div>
                         )}
                         {settings.showDebug && (
                             <div className="mt-1 text-[10px] opacity-60">
-                                FPS: {fpsRef.current} · Chunks: {chunkCacheRef.current.size} · Lights: {lightCacheRef.current.size}
+                                FPS: {fpsDisplay} · Chunks: {chunkCacheRef.current.size} · Lights: {lightCacheRef.current.size}
                             </div>
                         )}
                     </div>
@@ -1509,7 +1848,7 @@ const MinecraftViewerTab = () => {
                 {/* Container window overlay (chest, furnace, crafting bench, etc.) */}
                 {openWindow && !inventoryOpen && (
                     <MinecraftWindowOverlay
-                        window={openWindow}
+                        mcWindow={openWindow}
                         onSlotClick={handleWindowSlotClick}
                         onClose={handleWindowClose}
                     />
@@ -1528,7 +1867,21 @@ const MinecraftViewerTab = () => {
                 {/* Pause / Options menu (ESC) */}
                 <MinecraftPauseMenu
                     visible={pauseMenuOpen}
-                    onClose={() => setPauseMenuOpen(false)}
+                    onClose={() => {
+                        setPauseMenuOpen(false);
+                        // Авто-захват курсора при возврате в игру — пользователю не
+                        // нужно дополнительно кликать. Маленькая задержка чтобы React
+                        // успел скрыть оверлей меню (иначе курсор может застрять).
+                        setTimeout(() => {
+                            if (!canvasRef.current) return;
+                            if (chatOpenRef.current || openWindowRef.current
+                                || inventoryOpenRef.current) return;
+                            if (document.pointerLockElement === canvasRef.current) return;
+                            intentionalUnlockRef.current = true;
+                            try { canvasRef.current.requestPointerLock(); }
+                            catch (e) { /* ignore — браузер может отклонить без user gesture */ }
+                        }, 50);
+                    }}
                     onDisconnect={() => {
                         socketRef.current?.emit('viewer:disconnect');
                         socketRef.current?.disconnect();
@@ -1539,7 +1892,7 @@ const MinecraftViewerTab = () => {
                     updateSetting={updateSetting}
                     scoreboardVisible={scoreboardVisible}
                     setScoreboardVisible={setScoreboardVisible}
-                    gameInfo={`FPS: ${fpsRef.current} · Chunks: ${chunkCacheRef.current.size} · Lights: ${lightCacheRef.current.size}`}
+                    gameInfo={`FPS: ${fpsDisplay}`}
                 />
             </div>
         </FadeTransition>

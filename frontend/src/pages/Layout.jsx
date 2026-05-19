@@ -231,6 +231,45 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
     const { toast } = useToast();
     const [isDragging, setIsDragging] = useState(false);
 
+    // === Resizable bots list (PR #82) ===
+    // Высота прокручиваемого списка ботов, регулируемая drag-handle.
+    // Сохраняется в localStorage между сессиями.
+    const [botsListHeight, setBotsListHeight] = useState(() => {
+        const saved = parseInt(localStorage.getItem('botsListHeight'), 10);
+        if (Number.isFinite(saved) && saved >= 80 && saved <= 800) return saved;
+        return 240;
+    });
+    const [isResizingBotsList, setIsResizingBotsList] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('botsListHeight', String(botsListHeight));
+    }, [botsListHeight]);
+
+    useEffect(() => {
+        if (!isResizingBotsList) return;
+        const onMove = (e) => {
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            // Хэндл лежит ВНИЗУ блока — высота = clientY минус верхняя граница блока.
+            // Берём абсолютную позицию через стандартный path: container.getBoundingClientRect.
+            const containerEl = document.getElementById('bots-list-container');
+            if (!containerEl) return;
+            const rect = containerEl.getBoundingClientRect();
+            const next = Math.max(80, Math.min(800, clientY - rect.top));
+            setBotsListHeight(next);
+        };
+        const onUp = () => setIsResizingBotsList(false);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onUp);
+        return () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('touchmove', onMove);
+            window.removeEventListener('touchend', onUp);
+        };
+    }, [isResizingBotsList]);
+
     const activeBotId = location.pathname.match(/\/bots\/(\d+)/)?.[1];
 
     const handleNavClick = (e, botId) => {
@@ -416,15 +455,17 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
             </div>
 
             <div
+                id="bots-list-container"
                 className={cn(
                     "min-h-0 custom-scrollbar transition-[max-height,padding] " + SIDEBAR_TRANSITION,
-                    // Список ботов всегда прокручиваемый, занимает гибкую часть высоты
-                    "flex-1 overflow-y-auto",
+                    "overflow-y-auto",
                     bots.length > 0 && "min-h-[96px]"
                 )}
                 style={{
-                    // Минимум 120px для удобства, максимум — до 50% высоты sidebar
-                    maxHeight: bots.length > 4 ? '50vh' : 'auto',
+                    // Высота управляется пользователем через drag-handle (см. botsListHeight).
+                    // На свёрнутом sidebar и в режиме Sheet — auto.
+                    height: (isCollapsed || isSheetOpen) ? 'auto' : `${botsListHeight}px`,
+                    maxHeight: (isCollapsed || isSheetOpen) ? undefined : undefined,
                 }}
             >
                 {isSheetOpen ? (
@@ -468,6 +509,24 @@ const SidebarNav = ({ onLinkClick, isCollapsed, isSheetOpen }) => {
                 )}
                 <div className="pb-1"></div>
             </div>
+
+            {/* Resize handle (PR #82): drag для изменения высоты списка ботов.
+                Скрыт когда sidebar свёрнут / открыт как Sheet. */}
+            {!isCollapsed && !isSheetOpen && bots.length > 0 && (
+                <div
+                    onMouseDown={(e) => { e.preventDefault(); setIsResizingBotsList(true); }}
+                    onTouchStart={(e) => { e.preventDefault(); setIsResizingBotsList(true); }}
+                    className="group flex h-2 w-full cursor-row-resize items-center justify-center hover:bg-accent/40"
+                    style={{
+                        touchAction: 'none',
+                        userSelect: 'none',
+                    }}
+                    title="Перетащите чтобы изменить высоту списка ботов"
+                >
+                    <div className="h-0.5 w-8 rounded-full bg-muted-foreground/40 group-hover:bg-muted-foreground/70"
+                        style={{ pointerEvents: 'none' }} />
+                </div>
+            )}
         </nav>
     );
 };

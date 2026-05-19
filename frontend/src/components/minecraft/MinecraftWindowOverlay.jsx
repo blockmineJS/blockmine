@@ -151,20 +151,20 @@ const Slot = ({ item, x, y, scale, onMouseDown, onContextMenu, onHover, onLeave,
     </div>
 );
 
-const MinecraftWindowOverlay = ({ window: win, onSlotClick, onClose }) => {
+const MinecraftWindowOverlay = ({ mcWindow, onSlotClick, onClose }) => {
     const [hover, setHover] = useState(null);
     const [hoveredSlot, setHoveredSlot] = useState(-1);
 
-    const layout = useMemo(() => detectGuiLayout(win), [win]);
-    const slotCount = win?.slotCount || (win?.slots?.length ?? 0);
+    const layout = useMemo(() => detectGuiLayout(mcWindow), [mcWindow]);
+    const slotCount = mcWindow?.slotCount || (mcWindow?.slots?.length ?? 0);
     const slotPositions = useMemo(
         () => getSlotPositions(layout, slotCount),
         [layout, slotCount]
     );
 
-    if (!win) return null;
+    if (!mcWindow) return null;
 
-    const slots = win.slots || [];
+    const slots = mcWindow.slots || [];
 
     const handleSlotMouseDown = (e, slotIdx) => {
         e.preventDefault();
@@ -215,8 +215,8 @@ const MinecraftWindowOverlay = ({ window: win, onSlotClick, onClose }) => {
                         pointerEvents: 'none',
                     }}
                 >
-                    {win.title
-                        ? <McText text={win.title} fallbackColor="#404040" />
+                    {mcWindow.title
+                        ? <McText text={mcWindow.title} fallbackColor="#404040" />
                         : ''}
                 </div>
 

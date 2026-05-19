@@ -53,7 +53,8 @@ export function parseMcText(text, fallbackColor = '#fff') {
 
     for (let i = 0; i < text.length; i++) {
         const ch = text[i];
-        if (ch === '§' || ch === '\u00a7' || ch === '&') {
+        // Только § (§). Не ловим '&' — это валидный символ.
+        if (ch === '§' || ch === '\u00a7') {
             const next = text[i + 1]?.toLowerCase();
             if (!next) { current.text += ch; continue; }
             if (COLOR_MAP[next]) {

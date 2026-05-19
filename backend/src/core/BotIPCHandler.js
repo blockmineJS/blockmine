@@ -158,7 +158,7 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
                 blocks,
                 inventory: bot.inventory ? bot.inventory.items().map(item => ({ name: item.name, displayName: item.displayName, count: item.count, slot: item.slot })) : [],
                 nearbyPlayers: bot.entities ? Object.values(bot.entities).filter(e => e.type === 'player' && e.username !== bot.username).map(e => ({ username: e.username, position: { x: e.position.x, y: e.position.y, z: e.position.z }, yaw: e.yaw || 0, pitch: e.pitch || 0, distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0 })) : [],
-                nearbyMobs: bot.entities ? Object.values(bot.entities).filter(e => e.type === 'mob').map(e => ({ name: e.name || e.displayName, mobType: e.mobType, position: { x: e.position.x, y: e.position.y, z: e.position.z }, distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0 })) : []
+                nearbyMobs: bot.entities ? Object.values(bot.entities).filter(e => e.type === 'mob').map(e => ({ name: e.name || e.displayName, mobType: e.displayName, position: { x: e.position.x, y: e.position.y, z: e.position.z }, distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0 })) : []
             }
         };
     };
