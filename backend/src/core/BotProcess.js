@@ -69,15 +69,107 @@ function serializePlayerEquipment(entity) {
     };
 }
 
+// === Парсеры NBT/data-components для item display (module-level) ===
+// Те же функции используются ВНУТРИ замыкания bot start (там определены копии).
+// Здесь они доступны для buildPlayerInventoryPayload, чтобы инвентарь игрока
+// (виртуальное окно от клавиши E) тоже содержал customName/lore/metadata
+// для корректных tooltip'ов в UI.
+const _COLOR_TO_CODE = {
+    black: '0', dark_blue: '1', dark_green: '2', dark_aqua: '3',
+    dark_red: '4', dark_purple: '5', gold: '6', gray: '7',
+    dark_gray: '8', blue: '9', green: 'a', aqua: 'b',
+    red: 'c', light_purple: 'd', yellow: 'e', white: 'f',
+};
+function _parseTextComponent(comp) {
+    if (!comp) return '';
+    if (typeof comp === 'string') {
+        try { return _parseTextComponent(JSON.parse(comp)); }
+        catch (e) { return comp; }
+    }
+    let out = '';
+    if (comp.color && _COLOR_TO_CODE[comp.color]) out += '§' + _COLOR_TO_CODE[comp.color];
+    if (comp.bold) out += '§l';
+    if (comp.italic) out += '§o';
+    if (comp.underlined) out += '§n';
+    if (comp.strikethrough) out += '§m';
+    if (comp.obfuscated) out += '§k';
+    if (typeof comp.text === 'string') out += comp.text;
+    if (Array.isArray(comp.extra)) {
+        for (const e of comp.extra) out += _parseTextComponent(e);
+    }
+    return out;
+}
+function _tryParseJson(v) {
+    if (typeof v !== 'string') return v;
+    const t = v.trim();
+    if (t.startsWith('{') || t.startsWith('[')) {
+        try { return JSON.parse(t); } catch (e) { return v; }
+    }
+    return v;
+}
+function _extractItemDisplay(item) {
+    if (!item) return { displayName: null, lore: [] };
+    try {
+        let displayName = null;
+        let lore = [];
+        if (item.customName != null) {
+            displayName = _parseTextComponent(_tryParseJson(item.customName));
+        }
+        if (Array.isArray(item.customLore)) {
+            lore = item.customLore.map(l => _parseTextComponent(_tryParseJson(l))).filter(Boolean);
+        }
+        const components = item.components || item.componentMap;
+        if (components) {
+            if (!displayName) {
+                const cn = components['minecraft:custom_name']
+                    ?? components['custom_name']
+                    ?? components['minecraft:item_name']
+                    ?? components['item_name'];
+                if (cn != null) displayName = _parseTextComponent(_tryParseJson(cn));
+            }
+            if (lore.length === 0) {
+                const cl = components['minecraft:lore'] ?? components['lore'];
+                if (Array.isArray(cl)) {
+                    lore = cl.map(l => _parseTextComponent(_tryParseJson(l))).filter(Boolean);
+                } else if (cl?.lines && Array.isArray(cl.lines)) {
+                    lore = cl.lines.map(l => _parseTextComponent(_tryParseJson(l))).filter(Boolean);
+                }
+            }
+        }
+        if (item.nbt) {
+            const display = item.nbt?.value?.display?.value;
+            if (display) {
+                if (!displayName && display.Name?.value) {
+                    displayName = _parseTextComponent(_tryParseJson(display.Name.value));
+                }
+                if (lore.length === 0 && Array.isArray(display.Lore?.value?.value)) {
+                    lore = display.Lore.value.value
+                        .map(l => _parseTextComponent(_tryParseJson(l)))
+                        .filter(Boolean);
+                }
+            }
+        }
+        return { displayName, lore };
+    } catch (e) {
+        return { displayName: null, lore: [] };
+    }
+}
+
 function buildPlayerInventoryPayload(bot) {
     const slots = (bot.inventory?.slots || []).map((item, idx) => {
         if (!item) return { slot: idx, empty: true };
+        const { displayName: customName, lore } = _extractItemDisplay(item);
         return {
             slot: idx,
             name: item.name,
             displayName: item.displayName,
+            customName,             // § coded — для tooltip
+            lore,                   // массив строк с § кодами
             count: item.count,
             type: item.type,
+            metadata: item.metadata,
+            stackId: item.stackId,
+            nbt: item.nbt ? true : false,
         };
     });
     return {
