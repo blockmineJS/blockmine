@@ -34,6 +34,7 @@ const botStatusRoutes = require('./api/routes/botStatus');
 const nodeRegistryRoutes = require('./api/routes/nodeRegistry');
 const healthRoutes = require('./api/routes/health');
 const statsRoutes = require('./api/routes/stats');
+const mcpRouter = require('./api/mcp');
 
 const app = express();
 const server = http.createServer(app);
@@ -90,6 +91,7 @@ app.use('/api/traces', tracesRoutes);
 app.use('/api/nodes', nodeRegistryRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/mcp', mcpRouter);
 
 app.use(express.static(frontendPath));
 

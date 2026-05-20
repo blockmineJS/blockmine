@@ -27,6 +27,7 @@
     "ts-jest": "^29.4.5"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^20.1.1",
     "awilix": "^12.0.5",
     "date-fns": "^4.1.0",
