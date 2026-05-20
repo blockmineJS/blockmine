@@ -112,6 +112,16 @@ class MinecraftViewerService {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:chat', message.payload);
             } else if (message.type === 'viewer:blockUpdate') {
                 this.viewerNamespace.to(`bot:${botId}`).emit('viewer:blockUpdate', message.payload);
+            } else if (message.type === 'viewer:windowOpen') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:windowOpen', message.payload);
+            } else if (message.type === 'viewer:windowUpdate') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:windowUpdate', message.payload);
+            } else if (message.type === 'viewer:windowClose') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:windowClose', message.payload);
+            } else if (message.type === 'viewer:playerList') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:playerList', message.payload);
+            } else if (message.type === 'viewer:scoreboard') {
+                this.viewerNamespace.to(`bot:${botId}`).emit('viewer:scoreboard', message.payload);
             }
         });
     }

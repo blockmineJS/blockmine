@@ -1,7 +1,18 @@
 {
   "connecting": "Connecting to bot...",
+  "waitingChunks": "Waiting for world chunks...",
   "error": "Error",
-  "settingsButton": "Settings (Esc)",
+  "errors": {
+    "botNotRunning": "Bot is not running"
+  },
+  "webgl": {
+    "error": "WebGL Error",
+    "notSupported": "WebGL is not available in this browser. The 3D viewer cannot start.",
+    "contextLost": "WebGL context lost. Try reloading the page."
+  },
+  "settingsButton": "Settings",
+  "tabButton": "TAB - player list",
+  "scoreboardButton": "Scoreboard",
   "settings": {
     "title": "Settings",
     "renderDistance": "Render distance: {{value}} blocks",
@@ -10,11 +21,19 @@
     "sensitivity": "Mouse sensitivity: {{value}}x",
     "localMovement": "Predictions (local movement)",
     "showDebug": "Show debug info",
+    "fxaa": "FXAA (anti-aliasing)",
+    "instancedRendering": "Instanced rendering (optimization)",
+    "frustumCulling": "Frustum culling (camera-based)",
+    "throttleWhenHidden": "Throttle FPS on inactive tab",
+    "rendering": "Rendering",
+    "graphics": "Graphics",
+    "controls": "Controls",
     "reset": "Reset settings"
   },
   "hud": {
     "health": "Health",
-    "food": "Food"
+    "food": "Food",
+    "fps": "FPS"
   },
   "picker": {
     "clickOnBlock": "+ Click on a block",

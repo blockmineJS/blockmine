@@ -207,6 +207,94 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
                     sendLog(`[Viewer] Render distance set to ${viewerRenderDistance}`);
                 }
                 break;
+            case 'click_window':
+                if (bot.currentWindow && command.slot !== undefined) {
+                    const mouseButton = command.mouseButton ?? 0;
+                    const mode = command.mode ?? 0;
+                    bot.clickWindow(command.slot, mouseButton, mode)
+                        .catch(err => sendLog(`[Viewer] clickWindow error: ${err.message}`));
+                }
+                break;
+            case 'close_window':
+                if (bot.currentWindow) {
+                    try { bot.closeWindow(bot.currentWindow); }
+                    catch (e) { sendLog(`[Viewer] closeWindow error: ${e.message}`); }
+                }
+                break;
+            case 'drop_item': {
+                try {
+                    const heldItem = bot.heldItem;
+                    if (heldItem) {
+                        const count = command.full ? heldItem.count : 1;
+                        bot.toss(heldItem.type, heldItem.metadata, count)
+                            .catch(err => sendLog(`[Viewer] Drop error: ${err.message}`));
+                    }
+                } catch (e) { sendLog(`[Viewer] drop_item: ${e.message}`); }
+                break;
+            }
+            case 'swap_hands': {
+                try {
+                    if (typeof bot.swapHands === 'function') {
+                        bot.swapHands().catch(err => sendLog(`[Viewer] swap_hands error: ${err.message}`));
+                    } else if (bot._client) {
+                        bot._client.write('block_dig', { status: 6, location: bot.entity.position, face: 0 });
+                    }
+                } catch (e) { sendLog(`[Viewer] swap_hands: ${e.message}`); }
+                break;
+            }
+            case 'use_item': {
+                try {
+                    bot.activateItem(command.offHand === true);
+                } catch (e) { sendLog(`[Viewer] use_item: ${e.message}`); }
+                break;
+            }
+            case 'attack_entity': {
+                try {
+                    if (command.entityId && bot.entities[command.entityId]) {
+                        bot.attack(bot.entities[command.entityId]);
+                    }
+                } catch (e) { sendLog(`[Viewer] attack_entity: ${e.message}`); }
+                break;
+            }
+            case 'place_block': {
+                try {
+                    if (command.position && command.face) {
+                        const ref = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (ref) {
+                            const faceVec = new Vec3(command.face.x || 0, command.face.y || 0, command.face.z || 0);
+                            bot.placeBlock(ref, faceVec).catch(err => sendLog(`[Viewer] place_block: ${err.message}`));
+                        }
+                    }
+                } catch (e) { sendLog(`[Viewer] place_block: ${e.message}`); }
+                break;
+            }
+            case 'activate_block': {
+                try {
+                    if (command.position) {
+                        const block = bot.blockAt(new Vec3(command.position.x, command.position.y, command.position.z));
+                        if (block) bot.activateBlock(block).catch(err => sendLog(`[Viewer] activate_block: ${err.message}`));
+                    }
+                } catch (e) { sendLog(`[Viewer] activate_block: ${e.message}`); }
+                break;
+            }
+            case 'open_inventory': {
+                if (process.send && bot.inventory) {
+                    try {
+                        const slots = (bot.inventory.slots || []).map((item, idx) => {
+                            if (!item) return { slot: idx, empty: true };
+                            return { slot: idx, name: item.name, displayName: item.displayName, count: item.count, type: item.type };
+                        });
+                        process.send({
+                            type: 'viewer:windowOpen',
+                            payload: { id: 0, type: 'inventory', title: 'Inventory', slotCount: slots.length || 46, slots, isPlayerInventory: true }
+                        });
+                    } catch (e) { sendLog(`[Viewer] open_inventory: ${e.message}`); }
+                }
+                break;
+            }
+            case 'sneak_toggle':
+                bot.setControlState('sneak', !!command.active);
+                break;
         }
         return null;
     };

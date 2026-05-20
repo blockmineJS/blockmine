@@ -287,6 +287,8 @@ process.on('message', async (message) => {
 
             const state = {
                 status: bot._client ? 'online' : 'offline',
+                username: bot.username || bot.config?.username || null,
+                uuid: bot.player?.uuid || bot._client?.uuid || null,
                 health: bot.health || 20,
                 food: bot.food || 20,
                 position: bot.entity?.position ? {
@@ -323,6 +325,40 @@ process.on('message', async (message) => {
                         distance: bot.entity ? bot.entity.position.distanceTo(e.position) : 0
                     })) : []
             };
+
+            // currentWindow (открытый контейнер)
+            try {
+                if (bot.currentWindow) {
+                    const w = bot.currentWindow;
+                    state.currentWindow = {
+                        id: w.id,
+                        type: w.type,
+                        title: typeof w.title === 'string'
+                            ? w.title
+                            : (w.title?.text || w.title?.json?.text || ''),
+                        slotCount: w.slots ? w.slots.length : 0,
+                        inventoryStart: w.inventoryStart,
+                        inventoryEnd: w.inventoryEnd,
+                        hotbarStart: w.hotbarStart,
+                        slots: (w.slots || []).map((item, idx) => {
+                            if (!item) return { slot: idx, empty: true };
+                            return {
+                                slot: idx,
+                                name: item.name,
+                                displayName: item.displayName,
+                                count: item.count,
+                                type: item.type,
+                            };
+                        }),
+                    };
+                }
+            } catch (e) {
+                state.currentWindow = null;
+            }
+
+            // playerList и scoreboard НЕ включаем в state-stream —
+            // они шлются через отдельные события viewer:playerList / viewer:scoreboard
+            // с правильным парсингом JSON chat-component и team prefix/suffix
 
             process.send({
                 type: MessageTypes.VIEWER.STATE_RESPONSE,
@@ -390,6 +426,212 @@ process.on('message', async (message) => {
                         viewerRenderDistance = command.distance;
                         sendLog(`[Viewer] Render distance set to ${viewerRenderDistance}`);
                     }
+                    break;
+
+                case 'click_window':
+                    if (bot.currentWindow && command.slot !== undefined) {
+                        const mouseButton = command.mouseButton ?? 0;
+                        const mode = command.mode ?? 0;
+                        bot.clickWindow(command.slot, mouseButton, mode)
+                            .catch(err => sendLog(`[Viewer] clickWindow error: ${err.message}`));
+                    }
+                    break;
+
+                case 'close_window':
+                    if (bot.currentWindow) {
+                        try {
+                            bot.closeWindow(bot.currentWindow);
+                        } catch (e) {
+                            sendLog(`[Viewer] closeWindow error: ${e.message}`);
+                        }
+                    }
+                    break;
+
+                case 'request_player_list':
+                    if (process.send && bot.players) {
+                        const players = Object.values(bot.players).map(p => ({
+                            username: p.username,
+                            displayName: typeof p.displayName === 'string'
+                                ? p.displayName
+                                : (p.displayName?.toString?.() || p.username),
+                            ping: p.ping,
+                            gamemode: p.gamemode,
+                            uuid: p.uuid,
+                        }));
+                        process.send({ type: 'viewer:playerList', payload: { players } });
+                    }
+                    break;
+
+                case 'request_scoreboard':
+                    if (process.send) {
+                        const sb = bot.scoreboard?.sidebar
+                            || (bot.scoreboards ? Object.values(bot.scoreboards).find(s => s) : null);
+                        let payload = null;
+                        if (sb) {
+                            try {
+                                const items = sb.itemsMap
+                                    ? Object.values(sb.itemsMap).map(item => ({
+                                        name: item.name,
+                                        displayName: typeof item.displayName === 'string'
+                                            ? item.displayName
+                                            : (item.displayName?.toString?.() || item.name),
+                                        value: item.value,
+                                    })).sort((a, b) => (b.value || 0) - (a.value || 0))
+                                    : [];
+                                payload = {
+                                    name: sb.name,
+                                    title: typeof sb.title === 'string'
+                                        ? sb.title
+                                        : (sb.title?.toString?.() || sb.name),
+                                    items,
+                                };
+                            } catch (e) {
+                                payload = null;
+                            }
+                        }
+                        process.send({ type: 'viewer:scoreboard', payload });
+                    }
+                    break;
+
+                case 'drop_item': {
+                    // Q — выкинуть один предмет из текущего хотбар-слота
+                    // command.full = true → выкинуть весь стак (Ctrl+Q)
+                    try {
+                        const heldItem = bot.heldItem;
+                        if (heldItem) {
+                            const count = command.full ? heldItem.count : 1;
+                            bot.toss(heldItem.type, heldItem.metadata, count)
+                                .catch(err => sendLog(`[Viewer] Drop error: ${err.message}`));
+                        }
+                    } catch (e) {
+                        sendLog(`[Viewer] drop_item: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'swap_hands': {
+                    // F — поменять предметы между основной и второй рукой (offhand)
+                    try {
+                        if (typeof bot.swapHands === 'function') {
+                            bot.swapHands().catch(err => sendLog(`[Viewer] swap_hands error: ${err.message}`));
+                        } else if (bot._client) {
+                            // Ручной пакет, если функция отсутствует
+                            bot._client.write('block_dig', {
+                                status: 6, // SWAP_ITEM_WITH_OFFHAND
+                                location: bot.entity.position,
+                                face: 0
+                            });
+                        }
+                    } catch (e) {
+                        sendLog(`[Viewer] swap_hands: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'use_item': {
+                    // ПКМ — активировать предмет (use)
+                    // Не делаем auto-deactivate, т.к. серверные GUI плагины
+                    // могут не успеть открыть окно за 50мс. Для bow/crossbow
+                    // используется отдельная команда deactivate_item.
+                    try {
+                        bot.activateItem(command.offHand === true);
+                    } catch (e) {
+                        sendLog(`[Viewer] use_item: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'deactivate_item': {
+                    try { bot.deactivateItem(); } catch (e) { sendLog(`[Viewer] deactivate_item: ${e.message}`); }
+                    break;
+                }
+
+                case 'attack_entity': {
+                    // ЛКМ по entity (вместо блока)
+                    try {
+                        if (command.entityId && bot.entities[command.entityId]) {
+                            bot.attack(bot.entities[command.entityId]);
+                        }
+                    } catch (e) {
+                        sendLog(`[Viewer] attack_entity: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'place_block': {
+                    // ПКМ по блоку — поставить блок из руки на грань
+                    try {
+                        if (command.position && command.face) {
+                            const ref = bot.blockAt(new Vec3(
+                                command.position.x, command.position.y, command.position.z
+                            ));
+                            if (ref) {
+                                const faceVec = new Vec3(
+                                    command.face.x || 0, command.face.y || 0, command.face.z || 0
+                                );
+                                bot.placeBlock(ref, faceVec)
+                                    .catch(err => sendLog(`[Viewer] place_block error: ${err.message}`));
+                            }
+                        }
+                    } catch (e) {
+                        sendLog(`[Viewer] place_block: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'activate_block': {
+                    // ПКМ по блоку без предмета — открыть/активировать (сундук, рычаг и т.д.)
+                    try {
+                        if (command.position) {
+                            const block = bot.blockAt(new Vec3(
+                                command.position.x, command.position.y, command.position.z
+                            ));
+                            if (block) {
+                                bot.activateBlock(block)
+                                    .catch(err => sendLog(`[Viewer] activate_block error: ${err.message}`));
+                            }
+                        }
+                    } catch (e) {
+                        sendLog(`[Viewer] activate_block: ${e.message}`);
+                    }
+                    break;
+                }
+
+                case 'open_inventory': {
+                    // E — emit виртуальное окно инвентаря (нет настоящего windowOpen для инвентаря в mineflayer)
+                    if (process.send && bot.inventory) {
+                        try {
+                            const win = bot.inventory;
+                            const slots = (win.slots || []).map((item, idx) => {
+                                if (!item) return { slot: idx, empty: true };
+                                return {
+                                    slot: idx,
+                                    name: item.name,
+                                    displayName: item.displayName,
+                                    count: item.count,
+                                    type: item.type,
+                                };
+                            });
+                            process.send({
+                                type: 'viewer:windowOpen',
+                                payload: {
+                                    id: 0,
+                                    type: 'inventory',
+                                    title: 'Inventory',
+                                    slotCount: slots.length || 46,
+                                    slots,
+                                    isPlayerInventory: true,
+                                }
+                            });
+                        } catch (e) {
+                            sendLog(`[Viewer] open_inventory: ${e.message}`);
+                        }
+                    }
+                    break;
+                }
+
+                case 'sneak_toggle':
+                    bot.setControlState('sneak', !!command.active);
                     break;
             }
         } catch (error) {
@@ -1235,6 +1477,406 @@ process.on('message', async (message) => {
                     });
                 }
             });
+
+            // === Viewer: контейнеры (windowOpen / windowUpdate / windowClose) ===
+            // Извлечение текста из NBT-узла (mineflayer prismarine-nbt format)
+            const extractNbtString = (node) => {
+                if (node == null) return null;
+                if (typeof node === 'string') return node;
+                if (typeof node.value === 'string') return node.value;
+                if (Array.isArray(node)) return node.map(extractNbtString).filter(Boolean).join('');
+                return null;
+            };
+
+            // Парс JSON-component (как { text:..., extra:[{text:..., color:...}] }) в plain string с § кодами
+            const COLOR_TO_CODE = {
+                black: '0', dark_blue: '1', dark_green: '2', dark_aqua: '3',
+                dark_red: '4', dark_purple: '5', gold: '6', gray: '7',
+                dark_gray: '8', blue: '9', green: 'a', aqua: 'b',
+                red: 'c', light_purple: 'd', yellow: 'e', white: 'f',
+            };
+            const parseTextComponent = (comp) => {
+                if (!comp) return '';
+                if (typeof comp === 'string') {
+                    try { const j = JSON.parse(comp); return parseTextComponent(j); }
+                    catch (e) { return comp; }
+                }
+                let out = '';
+                if (comp.color && COLOR_TO_CODE[comp.color]) out += '§' + COLOR_TO_CODE[comp.color];
+                if (comp.bold) out += '§l';
+                if (comp.italic) out += '§o';
+                if (comp.underlined) out += '§n';
+                if (comp.strikethrough) out += '§m';
+                if (comp.obfuscated) out += '§k';
+                if (typeof comp.text === 'string') out += comp.text;
+                if (Array.isArray(comp.extra)) {
+                    for (const e of comp.extra) out += parseTextComponent(e);
+                }
+                return out;
+            };
+
+            // Парсинг NBT компонента display{Name,Lore} + новый customName/customLore (1.20.5+)
+            const extractItemDisplay = (item) => {
+                if (!item) return { displayName: null, lore: [] };
+                try {
+                    let displayName = null;
+                    let lore = [];
+
+                    const tryParseJson = (v) => {
+                        if (typeof v !== 'string') return v;
+                        const t = v.trim();
+                        if (t.startsWith('{') || t.startsWith('[')) {
+                            try { return JSON.parse(t); }
+                            catch (e) { return v; }
+                        }
+                        return v;
+                    };
+
+                    // mineflayer 1.20.5+: customName / customLore
+                    if (item.customName != null) {
+                        displayName = parseTextComponent(tryParseJson(item.customName));
+                    }
+                    if (Array.isArray(item.customLore)) {
+                        lore = item.customLore
+                            .map(line => parseTextComponent(tryParseJson(line)))
+                            .filter(Boolean);
+                    }
+
+                    // 1.20.5+ data components: item.components / item.componentMap
+                    const components = item.components || item.componentMap;
+                    if (components) {
+                        if (!displayName) {
+                            const cn = components['minecraft:custom_name']
+                                ?? components['custom_name']
+                                ?? components['minecraft:item_name']
+                                ?? components['item_name'];
+                            if (cn != null) displayName = parseTextComponent(tryParseJson(cn));
+                        }
+                        if (lore.length === 0) {
+                            const cl = components['minecraft:lore']
+                                ?? components['lore'];
+                            if (Array.isArray(cl)) {
+                                lore = cl.map(line => parseTextComponent(tryParseJson(line))).filter(Boolean);
+                            } else if (cl?.lines && Array.isArray(cl.lines)) {
+                                lore = cl.lines.map(line => parseTextComponent(tryParseJson(line))).filter(Boolean);
+                            }
+                        }
+                    }
+
+                    // Старый NBT формат: nbt.value.display.value.{Name,Lore}
+                    if (item.nbt) {
+                        const display = item.nbt?.value?.display?.value;
+                        if (display) {
+                            if (!displayName && display.Name?.value) {
+                                displayName = parseTextComponent(tryParseJson(display.Name.value));
+                            }
+                            if (lore.length === 0 && Array.isArray(display.Lore?.value?.value)) {
+                                lore = display.Lore.value.value
+                                    .map(line => parseTextComponent(tryParseJson(line)))
+                                    .filter(Boolean);
+                            }
+                        }
+                    }
+                    return { displayName, lore };
+                } catch (e) {
+                    return { displayName: null, lore: [] };
+                }
+            };
+
+            // Безопасное преобразование любого title (строка/JSON/component) в строку с § кодами
+            const titleToString = (t) => {
+                if (t == null) return '';
+                if (typeof t !== 'string') return parseTextComponent(t) || '';
+                const trimmed = t.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    try {
+                        return parseTextComponent(JSON.parse(trimmed));
+                    } catch (e) { return t; }
+                }
+                return t;
+            };
+
+            const serializeWindow = (window) => {
+                if (!window) return null;
+                try {
+                    const slots = (window.slots || []).map((item, idx) => {
+                        if (!item) return { slot: idx, empty: true };
+                        const { displayName: customName, lore } = extractItemDisplay(item);
+                        return {
+                            slot: idx,
+                            name: item.name,
+                            displayName: item.displayName,
+                            customName, // raw § coded
+                            lore,       // массив строк с § кодами
+                            count: item.count,
+                            type: item.type,
+                            metadata: item.metadata,
+                            stackId: item.stackId,
+                            nbt: item.nbt ? true : false,
+                        };
+                    });
+                    return {
+                        id: window.id,
+                        type: window.type,
+                        title: titleToString(window.title),
+                        slotCount: window.slots ? window.slots.length : 0,
+                        inventoryStart: window.inventoryStart,
+                        inventoryEnd: window.inventoryEnd,
+                        hotbarStart: window.hotbarStart,
+                        slots,
+                    };
+                } catch (e) {
+                    sendLog(`[Viewer] serializeWindow error: ${e.message}`);
+                    return null;
+                }
+            };
+
+            const broadcastWindowUpdate = () => {
+                if (!process.send) return;
+                const w = bot.currentWindow;
+                if (!w) return;
+                process.send({
+                    type: 'viewer:windowUpdate',
+                    payload: serializeWindow(w)
+                });
+            };
+
+            bot.on('windowOpen', (window) => {
+                if (!process.send) return;
+                process.send({
+                    type: 'viewer:windowOpen',
+                    payload: serializeWindow(window)
+                });
+            });
+
+            bot.on('windowClose', () => {
+                if (!process.send) return;
+                process.send({
+                    type: 'viewer:windowClose',
+                    payload: {}
+                });
+            });
+
+            // Mineflayer: 'windowItemsChanged' — нет такого события, но есть updateSlot
+            bot.inventory?.on?.('updateSlot', () => {
+                if (bot.currentWindow) broadcastWindowUpdate();
+            });
+
+            // Также броадкаст обновлений хотбара через viewer:state
+            // (хотбар-слоты приходят через regular state stream)
+
+            // === Viewer: список игроков (TAB) ===
+            // Сохраняем header/footer из пакета playerlist_header (mineflayer event)
+            let tablistHeader = '';
+            let tablistFooter = '';
+
+            const getTeamForPlayer = (username) => {
+                if (!bot.teamMap) return null;
+                const team = bot.teamMap[username];
+                if (!team) return null;
+                try {
+                    return {
+                        name: typeof team.name === 'string' ? team.name : (team.name?.toString?.() || ''),
+                        prefix: team.prefix,
+                        suffix: team.suffix,
+                        color: typeof team.color === 'string' ? team.color : null,
+                        nameTagVisibility: team.nameTagVisibility,
+                    };
+                } catch (e) { return null; }
+            };
+
+            const broadcastPlayerList = () => {
+                if (!process.send) return;
+                const toLegacy = (v) => {
+                    if (v == null) return '';
+                    if (typeof v !== 'string') return parseTextComponent(v) || '';
+                    const t = v.trim();
+                    if (t.startsWith('{') || t.startsWith('[')) {
+                        try { return parseTextComponent(JSON.parse(t)); }
+                        catch (e) { return v; }
+                    }
+                    return v;
+                };
+                const players = bot.players ? Object.values(bot.players).map(p => {
+                    const team = getTeamForPlayer(p.username);
+                    return {
+                        username: p.username,
+                        displayName: toLegacy(p.displayName) || p.username,
+                        ping: p.ping,
+                        gamemode: p.gamemode,
+                        uuid: p.uuid,
+                        prefix: toLegacy(team?.prefix),
+                        suffix: toLegacy(team?.suffix),
+                        teamColor: team?.color || null,
+                        teamName: team?.name || null,
+                    };
+                }) : [];
+                process.send({
+                    type: 'viewer:playerList',
+                    payload: {
+                        players,
+                        header: tablistHeader,
+                        footer: tablistFooter,
+                    }
+                });
+            };
+
+            bot.on('playerJoined', () => broadcastPlayerListThrottled());
+            bot.on('playerLeft', () => broadcastPlayerListThrottled());
+            bot.on('playerUpdated', () => broadcastPlayerListThrottled());
+
+            // mineflayer/protocol — пакет с header/footer TAB-меню в разных версиях называется по-разному
+            const handleTabHeaderFooter = (packet) => {
+                try {
+                    const headerRaw = packet.header ?? packet.headerJson;
+                    const footerRaw = packet.footer ?? packet.footerJson;
+                    tablistHeader = (() => {
+                        if (!headerRaw) return '';
+                        if (typeof headerRaw === 'string') {
+                            const t = headerRaw.trim();
+                            if (t.startsWith('{') || t.startsWith('[')) {
+                                try { return parseTextComponent(JSON.parse(t)); }
+                                catch (e) { return headerRaw; }
+                            }
+                            return headerRaw;
+                        }
+                        return parseTextComponent(headerRaw);
+                    })();
+                    tablistFooter = (() => {
+                        if (!footerRaw) return '';
+                        if (typeof footerRaw === 'string') {
+                            const t = footerRaw.trim();
+                            if (t.startsWith('{') || t.startsWith('[')) {
+                                try { return parseTextComponent(JSON.parse(t)); }
+                                catch (e) { return footerRaw; }
+                            }
+                            return footerRaw;
+                        }
+                        return parseTextComponent(footerRaw);
+                    })();
+                    broadcastPlayerListThrottled();
+                } catch (e) { /* ignore */ }
+            };
+            bot._client?.on?.('playerlist_header', handleTabHeaderFooter);
+            bot._client?.on?.('player_list_header_footer', handleTabHeaderFooter);
+            bot._client?.on?.('tab_list_header_footer', handleTabHeaderFooter);
+
+            // === Viewer: скорборд (Sidebar) ===
+            const serializeScoreboard = (sb) => {
+                if (!sb) return null;
+                try {
+                    const toLegacy = (v) => {
+                        if (v == null) return '';
+                        if (typeof v !== 'string') return parseTextComponent(v) || '';
+                        const t = v.trim();
+                        if (t.startsWith('{') || t.startsWith('[')) {
+                            try { return parseTextComponent(JSON.parse(t)); }
+                            catch (e) { return v; }
+                        }
+                        return v;
+                    };
+                    const items = sb.itemsMap
+                        ? Object.values(sb.itemsMap).map(item => {
+                            // Имя записи — это собственно текст строки на скорборде.
+                            // Если есть team у этого имени, prefix+suffix дают окрашенный текст.
+                            let line = '';
+                            const team = bot.teamMap?.[item.name];
+                            if (team) {
+                                const prefix = toLegacy(team.prefix);
+                                const suffix = toLegacy(team.suffix);
+                                line = prefix + item.name + suffix;
+                            } else {
+                                line = item.name;
+                            }
+                            return {
+                                name: item.name,
+                                line, // готовая строка с § кодами
+                                displayName: toLegacy(item.displayName) || item.name,
+                                value: item.value,
+                            };
+                        }).sort((a, b) => (b.value || 0) - (a.value || 0))
+                        : [];
+                    return {
+                        name: sb.name,
+                        title: toLegacy(sb.title) || sb.name,
+                        items,
+                    };
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            // === Throttle для частых обновлений (scoreboard, playerList)
+            // Вместо реакции на каждое событие — делаем периодический snapshot
+            // raz в 500мс. Это гарантирует что когда мы шлём данные, они полностью
+            // консистентны: scoreboard + все team prefix/suffix уже на месте.
+            const makeThrottled = (fn, delay = 200) => {
+                let timer = null;
+                let lastArgs = null;
+                let lastRun = 0;
+                return (...args) => {
+                    lastArgs = args;
+                    const now = Date.now();
+                    const remaining = delay - (now - lastRun);
+                    if (remaining <= 0) {
+                        lastRun = now;
+                        fn(...lastArgs);
+                    } else if (!timer) {
+                        timer = setTimeout(() => {
+                            timer = null;
+                            lastRun = Date.now();
+                            fn(...lastArgs);
+                        }, remaining);
+                    }
+                };
+            };
+
+            const broadcastScoreboard = () => {
+                if (!process.send) return;
+                const sb = bot.scoreboard?.sidebar
+                    || (bot.scoreboards ? Object.values(bot.scoreboards).find(s => s) : null);
+                process.send({
+                    type: 'viewer:scoreboard',
+                    payload: serializeScoreboard(sb)
+                });
+            };
+            // Используем НЕ throttled — реактивно отправляем
+            // Но фильтруем "плохие" snapshot'ы на frontend
+            const broadcastScoreboardThrottled = makeThrottled(broadcastScoreboard, 250);
+
+            const broadcastPlayerListThrottled = makeThrottled(broadcastPlayerList, 250);
+
+            // === Периодический snapshot (главный механизм) ===
+            // Каждые 500мс собираем полный snapshot scoreboard и player list.
+            // Это гарантирует консистентность данных: даже если какое-то событие
+            // мы пропустили или пришло в "плохом" состоянии — следующий snapshot
+            // будет корректным.
+            const snapshotInterval = setInterval(() => {
+                if (!process.send) return;
+                broadcastScoreboard();
+                broadcastPlayerList();
+            }, 500);
+            // Чистим при отключении бота
+            bot.once?.('end', () => clearInterval(snapshotInterval));
+            bot.once?.('error', () => clearInterval(snapshotInterval));
+
+            bot.on('scoreboardCreated', () => broadcastScoreboardThrottled());
+            bot.on('scoreboardDeleted', () => broadcastScoreboardThrottled());
+            bot.on('scoreboardTitleChanged', () => broadcastScoreboardThrottled());
+            bot.on('scoreUpdated', () => broadcastScoreboardThrottled());
+            bot.on('scoreRemoved', () => broadcastScoreboardThrottled());
+            bot.on('scoreboardPosition', () => broadcastScoreboardThrottled());
+
+            // Также пере-броадкаст при изменении команды (нужно для prefix/suffix)
+            const teamUpdateHandler = () => {
+                broadcastPlayerListThrottled();
+                broadcastScoreboardThrottled();
+            };
+            bot.on('teamCreated', teamUpdateHandler);
+            bot.on('teamRemoved', teamUpdateHandler);
+            bot.on('teamUpdated', teamUpdateHandler);
+            bot.on('teamMemberAdded', teamUpdateHandler);
+            bot.on('teamMemberRemoved', teamUpdateHandler);
         } catch (err) {
             sendLog(`[CRITICAL] Критическая ошибка при создании бота: ${err.stack}`);
             process.exit(1);

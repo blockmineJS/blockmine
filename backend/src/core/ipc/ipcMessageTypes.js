@@ -20,6 +20,11 @@ const MessageTypes = {
     HEALTH: 'viewer:health',
     MOVE: 'viewer:move',
     BLOCK_UPDATE: 'viewer:blockUpdate',
+    WINDOW_OPEN: 'viewer:windowOpen',
+    WINDOW_UPDATE: 'viewer:windowUpdate',
+    WINDOW_CLOSE: 'viewer:windowClose',
+    PLAYER_LIST: 'viewer:playerList',
+    SCOREBOARD: 'viewer:scoreboard',
   },
 
   BOT: {

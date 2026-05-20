@@ -76,3 +76,10 @@ landing
 docs/
 scripts/
 post/
+
+
+# Архивы и временные файлы
+*.rar
+*.zip
+.tmp_textures/
+test_parse.js

@@ -1,10 +1,18 @@
 {
   "connecting": "Подключение к боту...",
+  "waitingChunks": "Ожидание чанков мира...",
   "error": "Ошибка",
   "errors": {
     "botNotRunning": "Бот не запущен"
   },
-  "settingsButton": "Настройки (Esc)",
+  "webgl": {
+    "error": "Ошибка WebGL",
+    "notSupported": "WebGL недоступен в этом браузере. 3D-вьюер не может быть запущен.",
+    "contextLost": "Контекст WebGL потерян. Попробуйте перезагрузить страницу."
+  },
+  "settingsButton": "Настройки",
+  "tabButton": "TAB - список игроков",
+  "scoreboardButton": "Скорборд",
   "settings": {
     "title": "Настройки",
     "renderDistance": "Радиус отображения: {{value}} блоков",
@@ -13,11 +21,19 @@
     "sensitivity": "Чувствительность мыши: {{value}}x",
     "localMovement": "Предикты (локальное движение)",
     "showDebug": "Показывать отладку",
+    "fxaa": "FXAA (сглаживание)",
+    "instancedRendering": "Instanced Rendering (оптимизация)",
+    "frustumCulling": "Frustum Culling (отсечение по камере)",
+    "throttleWhenHidden": "Снижать FPS на неактивной вкладке",
+    "rendering": "Рендеринг",
+    "graphics": "Графика",
+    "controls": "Управление",
     "reset": "Сбросить настройки"
   },
   "hud": {
     "health": "Здоровье",
-    "food": "Еда"
+    "food": "Еда",
+    "fps": "FPS"
   },
   "picker": {
     "clickOnBlock": "+ Кликните на блок",
