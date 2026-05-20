@@ -1,4 +1,5 @@
 const prisma = require('../../lib/prisma');
+const { randomUUID } = require('crypto');
 
 /**
  * Сервис для сбора и управления трассировками выполнения графов
@@ -25,6 +26,29 @@ class TraceCollectorService {
     // Хранилище завершённых трассировок в памяти
     // Ключ: botId, Значение: [traces] (отсортированные по времени)
     this.completedTraces = new Map();
+
+    this._cleanupTimer = null;
+    this._startPeriodicCleanup();
+  }
+
+  _startPeriodicCleanup() {
+    const intervalMs = parseInt(process.env.TRACE_CLEANUP_INTERVAL_MS) || (60 * 60 * 1000);
+    if (this._cleanupTimer) clearInterval(this._cleanupTimer);
+    this._cleanupTimer = setInterval(() => {
+      this.cleanup().catch((error) => {
+        console.error('[TraceCollector] Periodic cleanup failed:', error);
+      });
+    }, intervalMs);
+    if (typeof this._cleanupTimer.unref === 'function') {
+      this._cleanupTimer.unref();
+    }
+  }
+
+  stopPeriodicCleanup() {
+    if (this._cleanupTimer) {
+      clearInterval(this._cleanupTimer);
+      this._cleanupTimer = null;
+    }
   }
 
   /**
@@ -460,7 +484,7 @@ class TraceCollectorService {
    * Генерировать уникальный ID трассировки
    */
   _generateTraceId() {
-    return `trace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `trace_${randomUUID()}`;
   }
 
   /**

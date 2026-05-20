@@ -2,6 +2,31 @@ const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 const RewindSignal = require('./RewindSignal');
 const { MAX_RECURSION_DEPTH } = require('./config/validation');
 
+const VOLATILE_NODE_TYPES = new Set([
+    'data:get_variable',
+    'data:get_argument',
+    'data:get_bot_look',
+    'data:get_server_players',
+    'data:get_entity_field',
+    'data:get_user_field',
+    'math:random_number',
+    'array:get_random_element',
+    'flow:for_each',
+    'time:now',
+    'time:current_timestamp',
+]);
+
+const VOLATILE_NODE_PREFIXES = ['event:', 'bot:', 'time:'];
+
+function isVolatileNodeType(type) {
+    if (!type) return false;
+    if (VOLATILE_NODE_TYPES.has(type)) return true;
+    for (const prefix of VOLATILE_NODE_PREFIXES) {
+        if (type.startsWith(prefix)) return true;
+    }
+    return false;
+}
+
 class GraphDebugHandler {
     constructor(context) {
         this.context = context;
@@ -54,7 +79,7 @@ class GraphDebugHandler {
                 }
             });
 
-            return this.processOverrides(overrides);
+            return this.processOverrides(overrides, node);
 
         } catch (error) {
             if (error instanceof RewindSignal) throw error;
@@ -101,7 +126,7 @@ class GraphDebugHandler {
                 }
             });
 
-            return this.processOverrides(overrides);
+            return this.processOverrides(overrides, node);
 
         } catch (error) {
             if (error instanceof RewindSignal) throw error;
@@ -137,7 +162,7 @@ class GraphDebugHandler {
         }
     }
 
-    processOverrides(overrides) {
+    processOverrides(overrides, currentNode = null) {
         if (!overrides) return null;
 
         if (overrides.__stopped) {
@@ -148,14 +173,12 @@ class GraphDebugHandler {
             throw new RewindSignal(overrides.target);
         }
 
-        this.applyWhatIfOverrides(overrides);
+        this.applyWhatIfOverrides(currentNode, overrides);
         return overrides;
     }
 
     applyWhatIfOverrides(node, overrides) {
         if (!overrides || typeof overrides !== 'object') return;
-
-        console.log(`[Debug] Applying what-if overrides to node ${node.id}:`, overrides);
 
         for (const [key, value] of Object.entries(overrides)) {
             if (key === '__stopped' || key === '__rewind' || key === 'target') continue;
@@ -183,9 +206,11 @@ class GraphDebugHandler {
                 continue;
             }
 
-            this._inputOverrides.set(`${node.id}:${key}`, value);
-            if (!node.data) node.data = {};
-            node.data[key] = value;
+            if (node) {
+                this._inputOverrides.set(`${node.id}:${key}`, value);
+                if (!node.data) node.data = {};
+                node.data[key] = value;
+            }
         }
     }
 
@@ -210,13 +235,19 @@ class GraphDebugHandler {
         if (visited.has(node.id)) return false;
         visited.add(node.id);
 
-        if (node.type === 'data:get_variable') return true;
+        if (isVolatileNodeType(node.type)) return true;
 
         if (!activeGraph || !activeGraph.connections) return false;
 
-        const connections = activeGraph.connections.filter(c => c.targetNodeId === node.id);
-        for (const conn of connections) {
-            const sourceNode = activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
+        const sources = activeGraph.connectionsByTarget
+            ? activeGraph.connectionsByTarget.get(node.id) || []
+            : activeGraph.connections.filter(c => c.targetNodeId === node.id);
+
+        const nodesById = activeGraph.nodesById;
+        for (const conn of sources) {
+            const sourceNode = nodesById
+                ? nodesById.get(conn.sourceNodeId)
+                : activeGraph.nodes.find(n => n.id === conn.sourceNodeId);
             if (GraphDebugHandler.checkVolatility(sourceNode, activeGraph, visited, depth + 1)) {
                 return true;
             }
@@ -225,5 +256,9 @@ class GraphDebugHandler {
         return false;
     }
 }
+
+GraphDebugHandler.VOLATILE_NODE_TYPES = VOLATILE_NODE_TYPES;
+GraphDebugHandler.VOLATILE_NODE_PREFIXES = VOLATILE_NODE_PREFIXES;
+GraphDebugHandler.isVolatileNodeType = isVolatileNodeType;
 
 module.exports = GraphDebugHandler;

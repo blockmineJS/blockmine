@@ -1,6 +1,8 @@
 const Command = require('./system/Command');
 const { loadCommands } = require('./system/CommandRegistry');
 const { MessageTypes } = require('./ipc/ipcMessageTypes');
+const GraphExecutionEngine = require('./GraphExecutionEngine');
+const NodeRegistry = require('./NodeRegistry');
 
 async function loadBotCommands(bot, config, prisma) {
     bot.commands = await loadCommands();
@@ -107,7 +109,8 @@ function createVisualCommand(bot, dbCommand) {
             }
         };
 
-        return botInstance.graphExecutionEngine.execute(visualCommand.graphJson, context);
+        const engine = new GraphExecutionEngine(NodeRegistry, botInstance);
+        return engine.execute(visualCommand.graphJson, context);
     };
 
     return visualCommand;

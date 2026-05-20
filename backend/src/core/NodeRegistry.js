@@ -84,6 +84,22 @@ class NodeRegistry {
     return this.nodes.has(nodeType);
   }
 
+  unregisterNodeType(nodeType) {
+    return this.nodes.delete(nodeType);
+  }
+
+  unregisterByPredicate(predicate) {
+    if (typeof predicate !== 'function') return 0;
+    let removed = 0;
+    for (const [type, node] of this.nodes.entries()) {
+      if (predicate(node, type)) {
+        this.nodes.delete(type);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   getNodesByTypes(types) {
     return types.map(type => this.nodes.get(type)).filter(Boolean);
   }

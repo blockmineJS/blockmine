@@ -4,10 +4,9 @@ const { parseVariables } = require('./utils/variableParser');
 const validationService = require('./services/ValidationService');
 const botHistoryStore = require('./BotHistoryStore');
 
-const prisma = prismaService.getClient();
-
 class EventGraphManager {
-    constructor() {
+    constructor({ prisma } = {}) {
+        this.prisma = prisma || prismaService.getClient();
         this._botManager = null;
         this.activeGraphs = new Map();
         this.graphStates = new Map();
@@ -23,7 +22,7 @@ class EventGraphManager {
 
     async loadGraphsForBot(botId) {
         console.log(`[EventGraphs] Загрузка графов для бота ${botId}...`);
-        const botGraphs = await prisma.eventGraph.findMany({
+        const botGraphs = await this.prisma.eventGraph.findMany({
             where: { botId, isEnabled: true },
             include: { triggers: true },
         });
@@ -88,18 +87,17 @@ class EventGraphManager {
                 await this.executeGraphInChildProcess(botId, eventType, graph, args);
             } catch (error) {
                 console.error(`[EventGraphManager] Error sending event to child process for '${eventType}':`, error);
-                this.botManager.appendLog(botId, `[ERROR] Error in event graph: ${error.message}`);
+                if (this.botManager?.appendLog) {
+                    this.botManager.appendLog(botId, `[ERROR] Error in event graph: ${error.message}`);
+                }
             }
         }
     }
 
-    /**
-     * Отправляет граф в child process для выполнения
-     */
     async executeGraphInChildProcess(botId, eventType, graph, eventArgs) {
         if (!graph || !graph.nodes || graph.nodes.length === 0) return;
 
-        const childProcess = this.botManager.getChildProcess(botId);
+        const childProcess = this.botManager?.getChildProcess?.(botId);
         if (!childProcess || !childProcess.send) {
             console.error(`[EventGraphManager] No child process found for bot ${botId}`);
             return;
@@ -107,19 +105,15 @@ class EventGraphManager {
 
         childProcess.send({
             type: 'execute_event_graph',
-            botId: botId,
-            graph: graph,
-            eventType: eventType,
-            eventArgs: eventArgs
+            botId,
+            graph,
+            eventType,
+            eventArgs,
         });
     }
 
-    /**
-     * Отправляет события в WebSocket API
-     */
     broadcastEventToApi(botId, eventType, args) {
         try {
-            // Динамический импорт для избежания циклической зависимости
             const { getIOSafe } = require('../real-time/socketHandler');
             const { broadcastToApiClients } = require('../real-time/botApi');
 
@@ -130,53 +124,46 @@ class EventGraphManager {
                 case 'chat':
                 case 'private':
                 case 'global':
-                case 'clan':
+                case 'clan': {
                     const chatData = {
                         type: eventType,
                         username: args.username,
                         message: args.message,
                         raw_message: args.rawText || args.raw_message,
                     };
-
                     broadcastToApiClients(io, botId, 'chat:message', chatData);
-
                     botHistoryStore.addChatMessage(botId, {
                         type: eventType,
                         username: args.username,
-                        message: args.message
+                        message: args.message,
                     });
                     break;
-
+                }
                 case 'playerJoined':
                     broadcastToApiClients(io, botId, 'player:join', {
                         username: args.user?.username || args.username,
                     });
                     break;
-
                 case 'playerLeft':
                     broadcastToApiClients(io, botId, 'player:leave', {
                         username: args.user?.username || args.username,
                     });
                     break;
-
                 case 'health':
                     broadcastToApiClients(io, botId, 'bot:health', {
                         health: args.health,
                         food: args.food,
                     });
                     break;
-
                 case 'death':
                     broadcastToApiClients(io, botId, 'bot:death', {});
                     break;
             }
         } catch (error) {
+            console.warn(`[EventGraphManager] broadcastEventToApi failed: ${error.message}`);
         }
     }
 
-    /**
-     * Отправляет кастомное событие от плагина в WebSocket API
-     */
     emitCustomApiEvent(botId, eventName, payload = {}) {
         try {
             const { getIOSafe } = require('../real-time/socketHandler');
@@ -191,7 +178,7 @@ class EventGraphManager {
                 timestamp: new Date().toISOString(),
             });
         } catch (error) {
-            // Игнорируем другие ошибки
+            console.warn(`[EventGraphManager] emitCustomApiEvent failed for ${eventName}: ${error.message}`);
         }
     }
 }

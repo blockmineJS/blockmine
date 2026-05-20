@@ -1,27 +1,24 @@
+const { randomUUID } = require('crypto');
 const debugConfig = require('../config/debug.config');
 
 const pendingDebugRequests = new Map();
 
+function settleRequest(requestId, value) {
+    const entry = pendingDebugRequests.get(requestId);
+    if (!entry) return;
+    if (entry.timeoutId) clearTimeout(entry.timeoutId);
+    pendingDebugRequests.delete(requestId);
+    entry.resolve(value);
+}
+
 function handleDebugResponse(message) {
-    const { requestId, overrides } = message;
-    const resolve = pendingDebugRequests.get(requestId);
-
-    if (resolve) {
-        const timeoutId = pendingDebugRequests.get(`${requestId}_timeout`);
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-            pendingDebugRequests.delete(`${requestId}_timeout`);
-        }
-
-        pendingDebugRequests.delete(requestId);
-        resolve(overrides);
-    }
+    settleRequest(message.requestId, message.overrides);
 }
 
 function attachDebugIpcHandler() {
     if (process.on && !attachDebugIpcHandler._attached) {
         process.on('message', (message) => {
-            if (message.type === 'debug:breakpoint_response' || message.type === 'debug:step_response') {
+            if (message?.type === 'debug:breakpoint_response' || message?.type === 'debug:step_response') {
                 handleDebugResponse(message);
             }
         });
@@ -29,17 +26,11 @@ function attachDebugIpcHandler() {
     }
 }
 
-async function checkBreakpointViaIpc(node, context, captureNodeInputs, currentTraceId, traceCollector) {
-    const { randomUUID } = require('crypto');
+function sendDebugRequest(messageType, node, context, inputs, executedSteps, timeoutMs) {
     const requestId = randomUUID();
 
-    const inputs = await captureNodeInputs(node);
-    const executedSteps = currentTraceId
-        ? await traceCollector.getTrace(currentTraceId)
-        : null;
-
     process.send({
-        type: 'debug:check_breakpoint',
+        type: messageType,
         requestId,
         payload: {
             graphId: context.graphId,
@@ -51,67 +42,36 @@ async function checkBreakpointViaIpc(node, context, captureNodeInputs, currentTr
                 user: context.user,
                 variables: context.variables,
                 commandArguments: context.commandArguments,
-            }
-        }
+            },
+        },
     });
 
     return new Promise((resolve) => {
-        pendingDebugRequests.set(requestId, resolve);
-
         const timeoutId = setTimeout(() => {
-            if (pendingDebugRequests.has(requestId)) {
-                pendingDebugRequests.delete(requestId);
-                resolve(null);
-            }
-        }, debugConfig.BREAKPOINT_TIMEOUT);
+            settleRequest(requestId, null);
+        }, timeoutMs);
 
-        pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
+        pendingDebugRequests.set(requestId, { resolve, timeoutId });
     });
+}
+
+async function checkBreakpointViaIpc(node, context, captureNodeInputs, currentTraceId, traceCollector) {
+    const inputs = await captureNodeInputs(node);
+    const executedSteps = currentTraceId ? await traceCollector.getTrace(currentTraceId) : null;
+    return sendDebugRequest('debug:check_breakpoint', node, context, inputs, executedSteps, debugConfig.BREAKPOINT_TIMEOUT);
 }
 
 async function checkStepModeViaIpc(node, context, captureNodeInputs, currentTraceId, traceCollector) {
-    const { randomUUID } = require('crypto');
-    const requestId = randomUUID();
-
     const inputs = await captureNodeInputs(node);
-    const executedSteps = currentTraceId
-        ? await traceCollector.getTrace(currentTraceId)
-        : null;
-
-    process.send({
-        type: 'debug:check_step_mode',
-        requestId,
-        payload: {
-            graphId: context.graphId,
-            nodeId: node.id,
-            nodeType: node.type,
-            inputs,
-            executedSteps,
-            context: {
-                user: context.user,
-                variables: context.variables,
-                commandArguments: context.commandArguments,
-            }
-        }
-    });
-
-    return new Promise((resolve) => {
-        pendingDebugRequests.set(requestId, resolve);
-
-        const timeoutId = setTimeout(() => {
-            if (pendingDebugRequests.has(requestId)) {
-                pendingDebugRequests.delete(requestId);
-                resolve(null);
-            }
-        }, debugConfig.STEP_MODE_TIMEOUT);
-
-        pendingDebugRequests.set(`${requestId}_timeout`, timeoutId);
-    });
+    const executedSteps = currentTraceId ? await traceCollector.getTrace(currentTraceId) : null;
+    return sendDebugRequest('debug:check_step_mode', node, context, inputs, executedSteps, debugConfig.STEP_MODE_TIMEOUT);
 }
+
+attachDebugIpcHandler();
 
 module.exports = {
     attachDebugIpcHandler,
     checkBreakpointViaIpc,
     checkStepModeViaIpc,
-    pendingDebugRequests
+    pendingDebugRequests,
 };

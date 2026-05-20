@@ -1,12 +1,17 @@
 const { parseVariables } = require('./utils/variableParser');
 const GraphValidation = require('./GraphValidation');
 const GraphDebugHandler = require('./GraphDebugHandler');
+const GraphTraversal = require('./GraphTraversal');
+const { buildGraphIndices } = require('./GraphTraversal');
 const { attachDebugIpcHandler } = require('./GraphDebugIPC');
 const { getTraceCollector } = require('./services/TraceCollectorService');
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 const { MessageTypes } = require('./ipc/ipcMessageTypes');
 const RewindSignal = require('./RewindSignal');
 const BreakLoopSignal = require('./BreakLoopSignal');
+
+const MAX_REWINDS = 100;
+const PIN_TYPE_EXEC = 'Exec';
 
 class GraphExecutionEngine {
     constructor(nodeRegistry, botManagerOrApi = null) {
@@ -21,9 +26,8 @@ class GraphExecutionEngine {
         this.traceCollector = getTraceCollector();
         this.currentTraceId = null;
         this.debugHandler = null;
-        this._inputOverrides = new Map();
-
-        attachDebugIpcHandler();
+        this.traversal = null;
+        this.volatileNodeIds = new Set();
     }
 
     async execute(graph, context, eventType) {
@@ -32,7 +36,7 @@ class GraphExecutionEngine {
             return context;
         }
 
-        const parsedGraph = validation.graph;
+        const parsedGraph = buildGraphIndices(validation.graph);
         const graphId = context.graphId || null;
         const botId = context.botId || null;
 
@@ -45,6 +49,8 @@ class GraphExecutionEngine {
         try {
             this.activeGraph = parsedGraph;
             this.context = context;
+            this.traversal = new GraphTraversal(this.activeGraph, this.memo);
+            this._precomputeVolatility();
 
             if (!this.context.variables) {
                 this.context.variables = parseVariables(this.activeGraph.variables, 'GraphExecutionEngine');
@@ -55,10 +61,8 @@ class GraphExecutionEngine {
             }
 
             this.debugHandler = new GraphDebugHandler(this.context);
-            this._inputOverrides = new Map();
 
             let rewindAttempts = 0;
-            const MAX_REWINDS = 100;
 
             while (true) {
                 this.memo.clear();
@@ -68,7 +72,7 @@ class GraphExecutionEngine {
                 const startNode = GraphValidation.findStartNode(this.activeGraph, eventType);
                 if (!startNode) {
                     if (!eventType) {
-                        throw new Error(`Не найдена стартовая нода события (event:command) в графе.`);
+                        throw new Error('Не найдена стартовая нода события (event:command) в графе.');
                     }
                     break;
                 }
@@ -99,7 +103,7 @@ class GraphExecutionEngine {
                         if (this.currentTraceId && graphId && botId) {
                             try {
                                 await this.traceCollector.completeTrace(this.currentTraceId);
-                            } catch (e) {}
+                            } catch {}
                             this.currentTraceId = await this.traceCollector.startTrace(
                                 botId, graphId, eventType || 'command', context.eventArgs || {}
                             );
@@ -111,12 +115,42 @@ class GraphExecutionEngine {
             }
 
             await this._finalizeTrace(graphId);
-
         } catch (error) {
             await this._handleExecutionError(error, graphId);
         }
 
         return this.context;
+    }
+
+    _precomputeVolatility() {
+        this.volatileNodeIds = new Set();
+        if (!this.activeGraph?.nodes) return;
+        for (const node of this.activeGraph.nodes) {
+            if (GraphDebugHandler.isVolatileNodeType(node.type)) {
+                this.volatileNodeIds.add(node.id);
+            }
+        }
+        const propagate = () => {
+            let changed = false;
+            for (const node of this.activeGraph.nodes) {
+                if (this.volatileNodeIds.has(node.id)) continue;
+                const incoming = this.activeGraph.connectionsByTarget?.get(node.id) || [];
+                for (const conn of incoming) {
+                    if (this.volatileNodeIds.has(conn.sourceNodeId)) {
+                        this.volatileNodeIds.add(node.id);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return changed;
+        };
+        while (propagate()) {}
+    }
+
+    _isVolatile(node) {
+        if (!node) return false;
+        return this.volatileNodeIds.has(node.id);
     }
 
     async _applyReplayState(graphId) {
@@ -133,7 +167,19 @@ class GraphExecutionEngine {
                     this.context.commandArguments = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
                 }
             }
-        } catch (e) {}
+        } catch {}
+    }
+
+    _sendTraceToParent(trace) {
+        if (!trace || !process.send) return;
+        process.send({
+            type: MessageTypes.GRAPH.TRACE_COMPLETED,
+            trace: {
+                ...trace,
+                steps: trace.steps,
+                eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs),
+            },
+        });
     }
 
     async _finalizeTrace(graphId) {
@@ -142,17 +188,7 @@ class GraphExecutionEngine {
         await this._captureAllDataNodeOutputs();
 
         const trace = await this.traceCollector.completeTrace(this.currentTraceId);
-
-        if (trace && process.send) {
-            process.send({
-                type: MessageTypes.GRAPH.TRACE_COMPLETED,
-                trace: {
-                    ...trace,
-                    steps: trace.steps,
-                    eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
-                }
-            });
-        }
+        this._sendTraceToParent(trace);
 
         if (graphId) {
             try {
@@ -160,10 +196,10 @@ class GraphExecutionEngine {
                 const debugState = debugManager.get(graphId);
                 if (debugState && debugState.activeExecution) {
                     debugState.broadcast('debug:completed', {
-                        trace: await this.traceCollector.getTrace(this.currentTraceId)
+                        trace: await this.traceCollector.getTrace(this.currentTraceId),
                     });
                 }
-            } catch (error) {}
+            } catch {}
         }
 
         this.currentTraceId = null;
@@ -174,22 +210,11 @@ class GraphExecutionEngine {
             try {
                 await this._captureAllDataNodeOutputs();
             } catch (captureError) {
-                console.error(`[GraphExecutor] Error capturing outputs on failure:`, captureError);
+                console.error('[GraphExecutor] Error capturing outputs on failure:', captureError);
             }
 
             const trace = await this.traceCollector.failTrace(this.currentTraceId, error);
-
-            if (trace && process.send) {
-                process.send({
-                    type: MessageTypes.GRAPH.TRACE_COMPLETED,
-                    trace: {
-                        ...trace,
-                        steps: trace.steps,
-                        eventArgs: typeof trace.eventArgs === 'string' ? trace.eventArgs : JSON.stringify(trace.eventArgs)
-                    }
-                });
-            }
-
+            this._sendTraceToParent(trace);
             this.currentTraceId = null;
         }
 
@@ -202,14 +227,10 @@ class GraphExecutionEngine {
     }
 
     async traverse(node, fromPinId) {
-        const connection = this.activeGraph.connections.find(c => {
-            if (c.sourceNodeId !== node.id || c.sourcePinId !== fromPinId) return false;
-            const targetExists = this.activeGraph.nodes.some(n => n.id === c.targetNodeId);
-            return targetExists;
-        });
+        const connection = this.traversal.findConnection(node.id, fromPinId);
         if (!connection) return;
 
-        const nextNode = this.activeGraph.nodes.find(n => n.id === connection.targetNodeId);
+        const nextNode = this.traversal.findNextNode(connection);
         if (!nextNode) return;
 
         if (this.currentTraceId) {
@@ -220,6 +241,10 @@ class GraphExecutionEngine {
     }
 
     async executeNode(node) {
+        const execCacheKey = `${node.id}_executed`;
+        if (this.memo.has(execCacheKey)) return;
+        this.memo.set(execCacheKey, true);
+
         const startTime = Date.now();
 
         if (this.currentTraceId) {
@@ -234,7 +259,7 @@ class GraphExecutionEngine {
         }
 
         if (this.debugHandler) {
-            const bpResult = await this.debugHandler.checkBreakpoint(
+            await this.debugHandler.checkBreakpoint(
                 node,
                 this._captureNodeInputs.bind(this),
                 this._captureNodeOutputs.bind(this),
@@ -249,38 +274,19 @@ class GraphExecutionEngine {
         }
 
         const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
-        if (nodeConfig && typeof nodeConfig.executor === 'function') {
-            const helpers = {
-                resolvePinValue: this.resolvePinValue.bind(this),
-                traverse: this.traverse.bind(this),
-                memo: this.memo,
-                clearLoopBodyMemo: this.clearLoopBodyMemo.bind(this),
-            };
-
-            try {
-                await nodeConfig.executor.call(this, node, this.context, helpers);
-
-                const executionTime = Date.now() - startTime;
-                if (this.currentTraceId) {
-                    this.traceCollector.updateStepOutputs(this.currentTraceId, node.id, await this._captureNodeOutputs(node));
-                    this.traceCollector.updateStepDuration(this.currentTraceId, node.id, executionTime);
-                }
-            } catch (error) {
-                if (this.currentTraceId) {
-                    this.traceCollector.updateStepError(this.currentTraceId, node.id, error.message, Date.now() - startTime);
-                }
-                throw error;
-            }
-
-            return;
-        }
-
-        const execCacheKey = `${node.id}_executed`;
-        if (this.memo.has(execCacheKey)) return;
-        this.memo.set(execCacheKey, true);
-
         try {
-            await this._executeLegacyNode(node);
+            if (nodeConfig && typeof nodeConfig.executor === 'function') {
+                const helpers = {
+                    resolvePinValue: this.resolvePinValue.bind(this),
+                    traverse: this.traverse.bind(this),
+                    memo: this.memo,
+                    clearLoopBodyMemo: this.clearLoopBodyMemo.bind(this),
+                };
+
+                await nodeConfig.executor.call(this, node, this.context, helpers);
+            } else {
+                await this._executeLegacyNode(node);
+            }
 
             const executionTime = Date.now() - startTime;
             if (this.currentTraceId) {
@@ -318,47 +324,16 @@ class GraphExecutionEngine {
     }
 
     clearLoopBodyMemo(loopNode) {
-        const nodesToClear = new Set();
-        const queue = [];
-
-        const initialConnection = this.activeGraph.connections.find(
-            c => c.sourceNodeId === loopNode.id && c.sourcePinId === 'loop_body'
-        );
-        if (initialConnection) {
-            const firstNode = this.activeGraph.nodes.find(n => n.id === initialConnection.targetNodeId);
-            if (firstNode) queue.push(firstNode);
-        }
-
-        const visited = new Set();
-        while (queue.length > 0) {
-            const currentNode = queue.shift();
-            if (visited.has(currentNode.id)) continue;
-            visited.add(currentNode.id);
-            nodesToClear.add(currentNode.id);
-
-            const connections = this.activeGraph.connections.filter(c => c.sourceNodeId === currentNode.id);
-            for (const conn of connections) {
-                const nextNode = this.activeGraph.nodes.find(n => n.id === conn.targetNodeId);
-                if (nextNode) queue.push(nextNode);
-            }
-        }
-
-        for (const nodeId of nodesToClear) {
-            for (const key of this.memo.keys()) {
-                if (key.startsWith(nodeId)) this.memo.delete(key);
-            }
-        }
+        this.traversal.clearLoopBodyMemo(loopNode);
     }
 
     async resolvePinValue(node, pinId, defaultValue = null) {
         const overrideValue = this.debugHandler?.getInputOverride(node.id, pinId);
         if (overrideValue !== undefined) return overrideValue;
 
-        const connection = this.activeGraph.connections.find(
-            c => c.targetNodeId === node.id && c.targetPinId === pinId
-        );
+        const connection = this.traversal.findIncomingConnection(node.id, pinId);
         if (connection) {
-            const sourceNode = this.activeGraph.nodes.find(n => n.id === connection.sourceNodeId);
+            const sourceNode = this.traversal.getNode(connection.sourceNodeId);
             return await this.evaluateOutputPin(sourceNode, connection.sourcePinId, defaultValue);
         }
 
@@ -374,12 +349,15 @@ class GraphExecutionEngine {
     async _replaceVariablesInString(text, node) {
         const variablePattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
         const matches = [...text.matchAll(variablePattern)];
+        const seen = new Set();
         let result = text;
 
         for (const match of matches) {
             const varName = match[1];
+            if (seen.has(varName)) continue;
+            seen.add(varName);
             const varValue = await this.resolvePinValue(node, `var_${varName}`, '');
-            result = result.replace(match[0], String(varValue));
+            result = result.split(`{${varName}}`).join(String(varValue));
         }
 
         return result;
@@ -398,7 +376,7 @@ class GraphExecutionEngine {
 
         const result = this._evaluateLegacyNode(node, pinId, defaultValue);
 
-        if (!GraphDebugHandler.checkVolatility(node, this.activeGraph)) {
+        if (!this._isVolatile(node)) {
             this.memo.set(cacheKey, result);
         }
 
@@ -411,7 +389,7 @@ class GraphExecutionEngine {
         const traceKey = `trace_recorded:${node.id}`;
         const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
         const outputPins = GraphValidation.getNodeOutputPins(nodeConfig, node.data);
-        const isDataNode = !inputPins.some(p => p && p.type === 'Exec');
+        const isDataNode = !inputPins.some(p => p && p.type === PIN_TYPE_EXEC);
 
         if (this.currentTraceId && isDataNode && !this.memo.has(traceKey)) {
             this.traceCollector.recordStep(this.currentTraceId, {
@@ -423,7 +401,7 @@ class GraphExecutionEngine {
 
         const result = await nodeConfig.evaluator.call(this, node, pinId, this.context, helpers);
 
-        if (!GraphDebugHandler.checkVolatility(node, this.activeGraph)) {
+        if (!this._isVolatile(node)) {
             this.memo.set(cacheKey, result);
         }
 
@@ -431,7 +409,7 @@ class GraphExecutionEngine {
         if (this.currentTraceId && isDataNode && this.memo.has(traceKey) && !this.memo.has(traceOutputsKey)) {
             const outputs = {};
             for (const outputPin of outputPins) {
-                if (outputPin && outputPin.type !== 'Exec') {
+                if (outputPin && outputPin.type !== PIN_TYPE_EXEC) {
                     const outKey = `${node.id}:${outputPin.id}`;
                     if (this.memo.has(outKey)) outputs[outputPin.id] = this.memo.get(outKey);
                 }
@@ -503,10 +481,7 @@ class GraphExecutionEngine {
     }
 
     hasConnection(node, pinId) {
-        if (!this.activeGraph || !this.activeGraph.connections) return false;
-        return this.activeGraph.connections.some(conn =>
-            conn.targetNodeId === node.id && conn.targetPinId === pinId
-        );
+        return this.traversal ? this.traversal.hasConnection(node.id, pinId) : false;
     }
 
     async _captureAllDataNodeOutputs() {
@@ -519,14 +494,14 @@ class GraphExecutionEngine {
             if (step.type === 'traversal') continue;
             if (step.outputs && Object.keys(step.outputs).length > 0) continue;
 
-            const node = this.activeGraph.nodes.find(n => n.id === step.nodeId);
+            const node = this.traversal.getNode(step.nodeId);
             if (!node) continue;
 
             const nodeConfig = this.nodeRegistry.getNodeConfig(node.type);
             if (!nodeConfig) continue;
 
             const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
-            if (inputPins.some(p => p && p.type === 'Exec')) continue;
+            if (inputPins.some(p => p && p.type === PIN_TYPE_EXEC)) continue;
 
             try {
                 const outputs = await this._captureNodeOutputs(node);
@@ -547,10 +522,10 @@ class GraphExecutionEngine {
         const inputPins = GraphValidation.getNodeInputPins(nodeConfig, node.data);
 
         for (const inputPin of inputPins) {
-            if (!inputPin || inputPin.type === 'Exec') continue;
+            if (!inputPin || inputPin.type === PIN_TYPE_EXEC) continue;
             try {
                 inputs[inputPin.id] = await this.resolvePinValue(node, inputPin.id);
-            } catch (error) {
+            } catch {
                 inputs[inputPin.id] = '<error capturing>';
             }
         }
@@ -565,15 +540,17 @@ class GraphExecutionEngine {
         const outputPins = GraphValidation.getNodeOutputPins(nodeConfig, node.data);
 
         for (const outputPin of outputPins) {
-            if (!outputPin || outputPin.type === 'Exec') continue;
+            if (!outputPin || outputPin.type === PIN_TYPE_EXEC) continue;
             try {
                 outputs[outputPin.id] = await this.evaluateOutputPin(node, outputPin.id);
-            } catch (error) {
+            } catch {
                 outputs[outputPin.id] = '<error capturing>';
             }
         }
         return outputs;
     }
 }
+
+attachDebugIpcHandler();
 
 module.exports = GraphExecutionEngine;

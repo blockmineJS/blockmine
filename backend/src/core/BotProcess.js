@@ -1121,8 +1121,6 @@ process.on('message', async (message) => {
                 }
             };
 
-            bot.graphExecutionEngine = new GraphExecutionEngine(NodeRegistry, processApi);
-
             bot.commands = await loadCommands();
 
             const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
