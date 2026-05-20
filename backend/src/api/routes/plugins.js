@@ -1,73 +1,53 @@
 const express = require('express');
+const prisma = require('../../lib/prisma');
 const { authenticateUniversal, authorize } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
-const router = express.Router();
+const { checkBotAccess, checkPluginBotAccess } = require('../middleware/botAccess');
 const { pluginManager } = require('../../core/services');
+const {
+    tryParseGithubRepoUrl,
+    fetchGithubReadme,
+    renderGithubMarkdown,
+    fetchLatestGithubReleaseBody,
+} = require('../../core/utils/github');
+const TtlCache = require('../../core/utils/ttlCache');
+const { filterSecretSettings, parseManifest, isGroupedSettings } = require('../../core/utils/pluginSettings');
 
-const prisma = new PrismaClient();
-const OFFICIAL_CATALOG_URL = "https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json";
+const router = express.Router();
+const OFFICIAL_CATALOG_URL = 'https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json';
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 const PLUGIN_DETAIL_TTL_MS = 10 * 60 * 1000;
 const PLUGIN_CHANGELOG_TTL_MS = 10 * 60 * 1000;
+const CATALOG_FETCH_TIMEOUT_MS = 10000;
 
-let catalogCache = {
-    data: null,
-    expiresAt: 0,
-    pending: null,
-};
+const pluginDetailCache = new TtlCache({ ttlMs: PLUGIN_DETAIL_TTL_MS, cleanupIntervalMs: 5 * 60 * 1000, maxSize: 500 });
+const pluginChangelogCache = new TtlCache({ ttlMs: PLUGIN_CHANGELOG_TTL_MS, cleanupIntervalMs: 5 * 60 * 1000, maxSize: 500 });
 
-const pluginDetailCache = new Map();
-const pluginChangelogCache = new Map();
-const GITHUB_REQUEST_TIMEOUT_MS = 10000;
-
-function getGithubHeaders(extra = {}) {
-    const headers = {
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'BlockMine',
-        ...extra
-    };
-
-    if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
-
-    return headers;
-}
-
-async function fetchWithTimeout(url, options = {}) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
-    try {
-        return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-        clearTimeout(timeoutId);
-    }
-}
+let catalogCache = { data: null, expiresAt: 0, pending: null };
 
 async function fetchOfficialCatalog(force = false) {
     const now = Date.now();
-
     if (!force && catalogCache.data && catalogCache.expiresAt > now) {
         return catalogCache.data;
     }
-
-    if (catalogCache.pending) {
-        return catalogCache.pending;
-    }
+    if (catalogCache.pending) return catalogCache.pending;
 
     catalogCache.pending = (async () => {
-        const response = await fetchWithTimeout(OFFICIAL_CATALOG_URL);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[API Error] Failed to fetch catalog from GitHub. Status: ${response.status}, Response: ${errorText}`);
-            throw new Error(`GitHub returned status ${response.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CATALOG_FETCH_TIMEOUT_MS);
+        try {
+            const response = await fetch(OFFICIAL_CATALOG_URL, { signal: controller.signal });
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[API Error] Failed to fetch catalog from GitHub. Status: ${response.status}, Response: ${errorText}`);
+                throw new Error(`GitHub returned status ${response.status}`);
+            }
+            const data = await response.json();
+            catalogCache.data = data;
+            catalogCache.expiresAt = Date.now() + CATALOG_TTL_MS;
+            return data;
+        } finally {
+            clearTimeout(timeoutId);
         }
-
-        const data = await response.json();
-        catalogCache.data = data;
-        catalogCache.expiresAt = Date.now() + CATALOG_TTL_MS;
-        return data;
     })();
 
     try {
@@ -81,140 +61,19 @@ async function fetchOfficialCatalog(force = false) {
     }
 }
 
-function getCachedTimedValue(cache, key) {
-    const cached = cache.get(key);
-    if (!cached) return null;
-    if (cached.expiresAt <= Date.now()) {
-        cache.delete(key);
-        return null;
-    }
-    return cached.data;
-}
+function maskStoreValues(plugin, raw) {
+    const manifest = parseManifest(plugin);
+    const manifestStore = manifest.store || null;
+    if (!manifestStore || typeof manifestStore !== 'object') return raw;
 
-function setCachedTimedValue(cache, key, data, ttlMs) {
-    cache.set(key, {
-        data,
-        expiresAt: Date.now() + ttlMs,
-    });
-}
-
-function getCachedPluginDetail(pluginName) {
-    return getCachedTimedValue(pluginDetailCache, pluginName);
-}
-
-function setCachedPluginDetail(pluginName, data) {
-    setCachedTimedValue(pluginDetailCache, pluginName, data, PLUGIN_DETAIL_TTL_MS);
-}
-
-function getCachedPluginChangelog(pluginName) {
-    return getCachedTimedValue(pluginChangelogCache, pluginName);
-}
-
-function setCachedPluginChangelog(pluginName, data) {
-    setCachedTimedValue(pluginChangelogCache, pluginName, data, PLUGIN_CHANGELOG_TTL_MS);
-}
-
-function parseGithubRepoInfo(repoUrl) {
-    if (typeof repoUrl !== 'string') {
-        return null;
-    }
-
-    try {
-        const parsedUrl = new URL(repoUrl);
-        const hostname = parsedUrl.hostname.toLowerCase();
-        if (!['github.com', 'www.github.com'].includes(hostname)) {
-            return null;
+    const result = { ...raw };
+    for (const key of Object.keys(manifestStore)) {
+        if (manifestStore[key]?.secret === true && key in result) {
+            result[key] = '********';
         }
-
-        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-        if (pathParts.length < 2) {
-            return null;
-        }
-
-        return {
-            owner: pathParts[0],
-            repo: pathParts[1].replace(/\.git$/i, '')
-        };
-    } catch {
-        return null;
     }
+    return result;
 }
-
-async function fetchGithubReadme(owner, repo) {
-    const response = await fetchWithTimeout(
-        `https://api.github.com/repos/${owner}/${repo}/readme`,
-        { headers: getGithubHeaders({ 'Accept': 'application/vnd.github.raw+json' }) }
-    );
-
-    if (!response.ok) {
-        if (response.status === 403) {
-            const remaining = response.headers.get('x-ratelimit-remaining');
-            if (remaining === '0') {
-                console.warn(`[GitHub README] Rate limit reached while loading README for ${owner}/${repo}.`);
-            }
-        }
-        return null;
-    }
-
-    return response.text();
-}
-
-async function renderGithubMarkdown(markdown, owner, repo) {
-    if (!markdown) {
-        return null;
-    }
-
-    const response = await fetchWithTimeout('https://api.github.com/markdown', {
-        method: 'POST',
-        headers: getGithubHeaders({
-            'Accept': 'text/html',
-            'Content-Type': 'application/json'
-        }),
-        body: JSON.stringify({
-            text: markdown,
-            mode: 'gfm',
-            context: `${owner}/${repo}`
-        })
-    });
-
-    if (!response.ok) {
-        if (response.status === 403) {
-            const remaining = response.headers.get('x-ratelimit-remaining');
-            if (remaining === '0') {
-                console.warn(`[GitHub Markdown] Rate limit reached while rendering ${owner}/${repo}.`);
-            }
-        }
-        return null;
-    }
-
-    return response.text();
-}
-
-async function fetchLatestGithubReleaseBody(repoUrl) {
-    const repoInfo = parseGithubRepoInfo(repoUrl);
-    if (!repoInfo) {
-        return null;
-    }
-
-    const response = await fetchWithTimeout(
-        `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/releases/latest`,
-        { headers: getGithubHeaders() }
-    );
-
-    if (!response.ok) {
-        if (response.status === 403) {
-            const remaining = response.headers.get('x-ratelimit-remaining');
-            if (remaining === '0') {
-                console.warn(`[GitHub Releases] Rate limit reached while loading changelog for ${repoInfo.owner}/${repoInfo.repo}.`);
-            }
-        }
-        return null;
-    }
-
-    const release = await response.json();
-    return typeof release?.body === 'string' ? release.body : null;
-}
-
 
 router.get('/catalog', async (req, res) => {
     try {
@@ -228,32 +87,30 @@ router.get('/catalog', async (req, res) => {
     }
 });
 
-router.post('/check-updates/:botId', authenticateUniversal, authorize('plugin:update'), async (req, res) => {
+router.post('/check-updates/:botId', authenticateUniversal, checkBotAccess, authorize('plugin:update'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
-        
         const catalog = await fetchOfficialCatalog();
-
         const updates = await pluginManager.checkForUpdates(botId, catalog);
         res.json(updates);
     } catch (error) {
-        console.error("[API Error] /check-updates:", error);
+        console.error('[API Error] /check-updates:', error);
         res.status(500).json({ error: 'Не удалось проверить обновления.' });
     }
 });
 
-router.post('/update/:pluginId', authenticateUniversal, authorize('plugin:update'), async (req, res) => {
+router.post('/update/:pluginId', authenticateUniversal, authorize('plugin:update'), checkPluginBotAccess({ pluginIdParam: 'pluginId' }), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.pluginId);
-        const { targetTag } = req.body; // Получаем тег из тела запроса (если указан)
-        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag, req.body?.targetRepoUrl);
+        const { targetTag, targetRepoUrl } = req.body || {};
+        const updatedPlugin = await pluginManager.updatePlugin(pluginId, targetTag, targetRepoUrl);
         res.json(updatedPlugin);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-router.post('/:id/clear-data', authenticateUniversal, authorize('plugin:settings:edit'), async (req, res) => {
+router.post('/:id/clear-data', authenticateUniversal, authorize('plugin:settings:edit'), checkPluginBotAccess(), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.id);
         await pluginManager.clearPluginData(pluginId);
@@ -264,24 +121,20 @@ router.post('/:id/clear-data', authenticateUniversal, authorize('plugin:settings
     }
 });
 
-router.post('/:id/reload', authenticateUniversal, authorize('plugin:settings:edit'), async (req, res) => {
+router.post('/:id/reload', authenticateUniversal, authorize('plugin:settings:edit'), checkPluginBotAccess(), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.id);
         const updatedPlugin = await pluginManager.reloadLocalPlugin(pluginId);
-        res.status(200).json({
-            message: 'Плагин перезагружен, настройки сброшены.',
-            plugin: updatedPlugin
-        });
+        res.status(200).json({ message: 'Плагин перезагружен, настройки сброшены.', plugin: updatedPlugin });
     } catch (error) {
         console.error(`[API Error] /plugins/:id/reload:`, error);
         res.status(500).json({ error: error.message || 'Не удалось перезагрузить плагин.' });
     }
 });
 
-router.get('/:id/info', authenticateUniversal, authorize('plugin:list'), async (req, res) => {
+router.get('/:id/info', authenticateUniversal, authorize('plugin:list'), checkPluginBotAccess(), async (req, res) => {
     try {
         const pluginId = parseInt(req.params.id);
-        
         const plugin = await prisma.installedPlugin.findUnique({
             where: { id: pluginId },
             select: {
@@ -298,42 +151,41 @@ router.get('/:id/info', authenticateUniversal, authorize('plugin:list'), async (
                 settings: true,
                 createdAt: true,
                 commands: {
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                        isEnabled: true,
-                        isVisual: true,
-                        owner: true
-                    }
+                    select: { id: true, name: true, description: true, isEnabled: true, isVisual: true, owner: true },
                 },
                 eventGraphs: {
-                    select: {
-                        id: true,
-                        name: true,
-                        isEnabled: true,
-                        createdAt: true,
-                        updatedAt: true
-                    }
-                }
-            }
+                    select: { id: true, name: true, isEnabled: true, createdAt: true, updatedAt: true },
+                },
+            },
         });
 
         if (!plugin) {
             return res.status(404).json({ error: 'Плагин не найден.' });
         }
 
-        res.json(plugin);
+        const manifest = parseManifest(plugin);
+        const manifestSettings = manifest.settings || {};
+        let safePlugin = plugin;
+        if (plugin.settings) {
+            try {
+                const parsed = JSON.parse(plugin.settings);
+                const filtered = filterSecretSettings(parsed, manifestSettings, isGroupedSettings(manifestSettings));
+                safePlugin = { ...plugin, settings: JSON.stringify(filtered) };
+            } catch (e) {
+                console.warn(`[API] Не удалось распарсить settings плагина ${plugin.name}: ${e.message}`);
+            }
+        }
+
+        res.json(safePlugin);
     } catch (error) {
         console.error(`[API Error] /plugins/:id/info:`, error);
         res.status(500).json({ error: 'Не удалось получить информацию о плагине.' });
     }
 });
 
-router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async (req, res) => {
+router.get('/bot/:botId', authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
-        
         const plugins = await prisma.installedPlugin.findMany({
             where: { botId },
             select: {
@@ -350,29 +202,29 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
                 settings: true,
                 createdAt: true,
                 commands: {
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                        isEnabled: true,
-                        isVisual: true,
-                        owner: true
-                    }
+                    select: { id: true, name: true, description: true, isEnabled: true, isVisual: true, owner: true },
                 },
                 eventGraphs: {
-                    select: {
-                        id: true,
-                        name: true,
-                        isEnabled: true,
-                        createdAt: true,
-                        updatedAt: true
-                    }
-                }
+                    select: { id: true, name: true, isEnabled: true, createdAt: true, updatedAt: true },
+                },
             },
-            orderBy: { name: 'asc' }
+            orderBy: { name: 'asc' },
         });
 
-        res.json(plugins);
+        const safePlugins = plugins.map((plugin) => {
+            const manifest = parseManifest(plugin);
+            const manifestSettings = manifest.settings || {};
+            if (!plugin.settings) return plugin;
+            try {
+                const parsed = JSON.parse(plugin.settings);
+                const filtered = filterSecretSettings(parsed, manifestSettings, isGroupedSettings(manifestSettings));
+                return { ...plugin, settings: JSON.stringify(filtered) };
+            } catch {
+                return plugin;
+            }
+        });
+
+        res.json(safePlugins);
     } catch (error) {
         console.error(`[API Error] /plugins/bot/:botId:`, error);
         res.status(500).json({ error: 'Не удалось получить список плагинов.' });
@@ -382,22 +234,19 @@ router.get('/bot/:botId', authenticateUniversal, authorize('plugin:list'), async
 router.get('/catalog/:name/changelog', async (req, res) => {
     try {
         const pluginName = req.params.name;
-        const cachedChangelog = getCachedPluginChangelog(pluginName);
-
-        if (cachedChangelog !== null) {
-            return res.json({ body: cachedChangelog });
+        const cached = pluginChangelogCache.get(pluginName);
+        if (cached !== null) {
+            return res.json({ body: cached });
         }
 
         const catalog = await fetchOfficialCatalog();
         const pluginInfo = catalog.find((plugin) => plugin.name === pluginName);
-
         if (!pluginInfo) {
             return res.status(404).json({ error: 'Plugin not found in catalog.' });
         }
 
         const changelogBody = (await fetchLatestGithubReleaseBody(pluginInfo.repoUrl)) || '';
-        setCachedPluginChangelog(pluginName, changelogBody);
-
+        pluginChangelogCache.set(pluginName, changelogBody);
         return res.json({ body: changelogBody });
     } catch (error) {
         console.error(`[API Error] /catalog/:name/changelog:`, error);
@@ -408,15 +257,13 @@ router.get('/catalog/:name/changelog', async (req, res) => {
 router.get('/catalog/:name', async (req, res) => {
     try {
         const pluginName = req.params.name;
-        const cachedDetail = getCachedPluginDetail(pluginName);
-
-        if (cachedDetail) {
-            return res.json(cachedDetail);
+        const cached = pluginDetailCache.get(pluginName);
+        if (cached) {
+            return res.json(cached);
         }
 
         const catalog = await fetchOfficialCatalog();
-        const pluginInfo = catalog.find(p => p.name === pluginName);
-
+        const pluginInfo = catalog.find((p) => p.name === pluginName);
         if (!pluginInfo) {
             return res.status(404).json({ error: 'Плагин с таким именем не найден в каталоге.' });
         }
@@ -424,31 +271,21 @@ router.get('/catalog/:name', async (req, res) => {
         let readmeContent = pluginInfo.description || 'Описание для этого плагина не предоставлено.';
         let readmeHtml = null;
 
-        try {
-            const urlParts = new URL(pluginInfo.repoUrl);
-            const pathParts = urlParts.pathname.split('/').filter(p => p);
-
-            if (pathParts.length >= 2) {
-                const owner = pathParts[0];
-                const repo = pathParts[1].replace('.git', '');
-
-                const fetchedReadme = await fetchGithubReadme(owner, repo);
+        const repoInfo = tryParseGithubRepoUrl(pluginInfo.repoUrl);
+        if (repoInfo) {
+            try {
+                const fetchedReadme = await fetchGithubReadme(repoInfo.owner, repoInfo.repo);
                 if (fetchedReadme) {
                     readmeContent = fetchedReadme;
-                    readmeHtml = await renderGithubMarkdown(fetchedReadme, owner, repo);
+                    readmeHtml = await renderGithubMarkdown(fetchedReadme, repoInfo.owner, repoInfo.repo);
                 }
+            } catch (readmeError) {
+                console.error(`[API] Не удалось загрузить README для ${pluginName}:`, readmeError.message);
             }
-        } catch (readmeError) {
-            console.error(`[API] Не удалось загрузить README для ${pluginName}:`, readmeError.message);
         }
 
-        const finalPluginData = {
-            ...pluginInfo,
-            fullDescription: readmeContent,
-            readmeHtml
-        };
-
-        setCachedPluginDetail(pluginName, finalPluginData);
+        const finalPluginData = { ...pluginInfo, fullDescription: readmeContent, readmeHtml };
+        pluginDetailCache.set(pluginName, finalPluginData);
         res.json(finalPluginData);
     } catch (error) {
         console.error(`[API Error] /catalog/:name :`, error);
@@ -456,61 +293,63 @@ router.get('/catalog/:name', async (req, res) => {
     }
 });
 
-router.get('/bot/:botId/:pluginName/store', authenticateUniversal, authorize('plugin:list'), async (req, res) => {
+async function loadPluginForRequest(req, res, next) {
+    try {
+        const botId = parseInt(req.params.botId, 10);
+        const pluginName = req.params.pluginName;
+        if (isNaN(botId) || !pluginName) {
+            return res.status(400).json({ error: 'Некорректные параметры.' });
+        }
+        const plugin = await prisma.installedPlugin.findFirst({
+            where: { botId, name: pluginName },
+            select: { id: true, manifest: true },
+        });
+        if (!plugin) {
+            return res.status(404).json({ error: 'Плагин не найден.' });
+        }
+        req.targetPluginInfo = plugin;
+        next();
+    } catch (e) {
+        console.error('[plugins/store] loadPluginForRequest error', e);
+        res.status(500).json({ error: 'Ошибка получения плагина.' });
+    }
+}
+
+router.get('/bot/:botId/:pluginName/store', authenticateUniversal, checkBotAccess, authorize('plugin:list'), loadPluginForRequest, async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const pluginName = req.params.pluginName;
-
         const storeData = await prisma.pluginDataStore.findMany({
-            where: {
-                botId,
-                pluginName
-            },
-            select: {
-                key: true,
-                value: true,
-                createdAt: true,
-                updatedAt: true
-            }
+            where: { botId, pluginName },
+            select: { key: true, value: true, createdAt: true, updatedAt: true },
         });
-
         const result = {};
-        storeData.forEach(item => {
+        storeData.forEach((item) => {
             try {
                 result[item.key] = JSON.parse(item.value);
-            } catch (e) {
+            } catch {
                 result[item.key] = item.value;
             }
         });
 
-        res.json(result);
+        const safe = maskStoreValues(req.targetPluginInfo, result);
+        res.json(safe);
     } catch (error) {
         console.error(`[API Error] GET /plugins/bot/:botId/:pluginName/store:`, error);
         res.status(500).json({ error: 'Не удалось получить данные store плагина.' });
     }
 });
 
-router.get('/bot/:botId/:pluginName/store/:key', authenticateUniversal, authorize('plugin:list'), async (req, res) => {
+router.get('/bot/:botId/:pluginName/store/:key', authenticateUniversal, checkBotAccess, authorize('plugin:list'), loadPluginForRequest, async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const pluginName = req.params.pluginName;
         const key = req.params.key;
 
         const storeItem = await prisma.pluginDataStore.findUnique({
-            where: {
-                pluginName_botId_key: {
-                    pluginName,
-                    botId,
-                    key
-                }
-            },
-            select: {
-                value: true,
-                createdAt: true,
-                updatedAt: true
-            }
+            where: { pluginName_botId_key: { pluginName, botId, key } },
+            select: { value: true, createdAt: true, updatedAt: true },
         });
-
         if (!storeItem) {
             return res.status(404).json({ error: 'Ключ не найден в store.' });
         }
@@ -518,23 +357,19 @@ router.get('/bot/:botId/:pluginName/store/:key', authenticateUniversal, authoriz
         let parsedValue;
         try {
             parsedValue = JSON.parse(storeItem.value);
-        } catch (e) {
+        } catch {
             parsedValue = storeItem.value;
         }
 
-        res.json({
-            key,
-            value: parsedValue,
-            createdAt: storeItem.createdAt,
-            updatedAt: storeItem.updatedAt
-        });
+        const wrapped = maskStoreValues(req.targetPluginInfo, { [key]: parsedValue });
+        res.json({ key, value: wrapped[key], createdAt: storeItem.createdAt, updatedAt: storeItem.updatedAt });
     } catch (error) {
         console.error(`[API Error] GET /plugins/bot/:botId/:pluginName/store/:key:`, error);
         res.status(500).json({ error: 'Не удалось получить значение из store.' });
     }
 });
 
-router.put('/bot/:botId/:pluginName/store/:key', authenticateUniversal, authorize('plugin:settings:edit'), async (req, res) => {
+router.put('/bot/:botId/:pluginName/store/:key', authenticateUniversal, checkBotAccess, authorize('plugin:settings:edit'), loadPluginForRequest, async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const pluginName = req.params.pluginName;
@@ -544,49 +379,26 @@ router.put('/bot/:botId/:pluginName/store/:key', authenticateUniversal, authoriz
         const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
 
         const storeItem = await prisma.pluginDataStore.upsert({
-            where: {
-                pluginName_botId_key: {
-                    pluginName,
-                    botId,
-                    key
-                }
-            },
-            update: {
-                value: stringValue
-            },
-            create: {
-                pluginName,
-                botId,
-                key,
-                value: stringValue
-            }
+            where: { pluginName_botId_key: { pluginName, botId, key } },
+            update: { value: stringValue },
+            create: { pluginName, botId, key, value: stringValue },
         });
 
-        res.json({
-            key,
-            value: value,
-            updatedAt: storeItem.updatedAt
-        });
+        res.json({ key, value, updatedAt: storeItem.updatedAt });
     } catch (error) {
         console.error(`[API Error] PUT /plugins/bot/:botId/:pluginName/store/:key:`, error);
         res.status(500).json({ error: 'Не удалось сохранить значение в store.' });
     }
 });
 
-router.delete('/bot/:botId/:pluginName/store/:key', authenticateUniversal, authorize('plugin:settings:edit'), async (req, res) => {
+router.delete('/bot/:botId/:pluginName/store/:key', authenticateUniversal, checkBotAccess, authorize('plugin:settings:edit'), loadPluginForRequest, async (req, res) => {
     try {
         const botId = parseInt(req.params.botId);
         const pluginName = req.params.pluginName;
         const key = req.params.key;
 
         await prisma.pluginDataStore.delete({
-            where: {
-                pluginName_botId_key: {
-                    pluginName,
-                    botId,
-                    key
-                }
-            }
+            where: { pluginName_botId_key: { pluginName, botId, key } },
         });
 
         res.json({ message: 'Значение удалено из store.' });

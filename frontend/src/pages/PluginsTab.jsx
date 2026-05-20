@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,6 +55,7 @@ export default function PluginsTab() {
         return saved || 'installed';
     });
     const navigate = useNavigate();
+    const lastUpdateCheckBotIdRef = useRef(null);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -68,14 +69,22 @@ export default function PluginsTab() {
     }, [bot, intBotId, fetchInstalledPlugins]);
 
     useEffect(() => {
-        if (activeTab === 'installed' && bot && installedPlugins.length > 0 && !isLoading) {
-            checkForUpdates(intBotId);
-        }
-    }, [installedPlugins.length, isLoading, activeTab, bot, intBotId, checkForUpdates]);
+        if (isLoading || !bot || installedPlugins.length === 0) return;
+        if (lastUpdateCheckBotIdRef.current === intBotId) return;
+        lastUpdateCheckBotIdRef.current = intBotId;
+        checkForUpdates(intBotId);
+    }, [installedPlugins.length, isLoading, bot, intBotId, checkForUpdates]);
+
+    useEffect(() => {
+        return () => {
+            lastUpdateCheckBotIdRef.current = null;
+        };
+    }, [intBotId]);
 
     const handleCheckForUpdates = async () => {
         setIsCheckingUpdates(true);
         try {
+            lastUpdateCheckBotIdRef.current = intBotId;
             await checkForUpdates(intBotId);
         } finally {
             setIsCheckingUpdates(false);

@@ -35,7 +35,7 @@ export default function LocalInstallDialog({ onInstall, onCancel, isInstalling }
                         value={path}
                         onChange={(e) => setPath(e.target.value)}
                         placeholder={t('localInstall.pathPlaceholder', {
-                            defaultValue: 'Например, /home/user/my-bot-plugins/super-plugin',
+                            defaultValue: 'Полный путь к папке плагина',
                         })}
                         required
                     />

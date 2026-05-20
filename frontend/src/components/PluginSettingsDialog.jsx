@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 import { shouldShowField } from '@/lib/pluginSettingsUtils';
 import PluginDetailInfo from './PluginDetailInfo';
+import ConfirmationDialog from './ConfirmationDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -21,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 function JsonEditorDialog({ initialValue, onSave, onCancel }) {
     const { t } = useTranslation('plugins');
+    const { toast } = useToast();
     const [jsonString, setJsonString] = useState('');
 
     useEffect(() => {
@@ -35,7 +37,11 @@ function JsonEditorDialog({ initialValue, onSave, onCancel }) {
         try {
             onSave(JSON.parse(jsonString));
         } catch {
-            alert(t('settingsDialog.jsonEditor.invalidJson'));
+            toast({
+                variant: 'destructive',
+                title: t('ui.error'),
+                description: t('settingsDialog.jsonEditor.invalidJson'),
+            });
         }
     };
 
@@ -274,6 +280,8 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     const [dataFormKey, setDataFormKey] = useState('');
     const [dataFormValue, setDataFormValue] = useState('');
     const [isEditMode, setIsEditMode] = useState(false);
+    const [confirmClearData, setConfirmClearData] = useState(false);
+    const [keyPendingDelete, setKeyPendingDelete] = useState(null);
 
     const isGrouped = useMemo(() => {
         if (Object.keys(manifestSettings).length === 0) return false;
@@ -282,29 +290,34 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     }, [manifestSettings]);
 
     useEffect(() => {
-        const fetchSettings = async () => {
-            setSettings(null);
-            try {
-                setSettings(await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/settings`));
-            } catch (error) {
-                toast({ variant: 'destructive', title: t('ui.error'), description: error.message || t('settingsDialog.loadError') });
+        let cancelled = false;
+        setSettings(null);
+        setDataItems(null);
+
+        Promise.allSettled([
+            apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/settings`),
+            apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data`),
+        ]).then(([settingsResult, dataResult]) => {
+            if (cancelled) return;
+
+            if (settingsResult.status === 'fulfilled') {
+                setSettings(settingsResult.value);
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: t('ui.error'),
+                    description: settingsResult.reason?.message || t('settingsDialog.loadError'),
+                });
                 setSettings({});
             }
-        };
-        fetchSettings();
-    }, [bot.id, plugin.id, t, toast]);
 
-    useEffect(() => {
-        const fetchDataItems = async () => {
-            setDataItems(null);
-            try {
-                setDataItems(await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data`));
-            } catch {
-                setDataItems([]);
-            }
+            setDataItems(dataResult.status === 'fulfilled' ? dataResult.value : []);
+        });
+
+        return () => {
+            cancelled = true;
         };
-        fetchDataItems();
-    }, [bot.id, plugin.id]);
+    }, [bot.id, plugin.id, t, toast]);
 
     const handleSettingChange = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
 
@@ -322,8 +335,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         }
     };
 
-    const handleClearData = async () => {
-        if (!confirm(t('settingsDialog.confirmClearData', { name: plugin.name }))) return;
+    const performClearData = async () => {
         setIsClearing(true);
         try {
             await apiHelper(`/api/plugins/${plugin.id}/clear-data`, { method: 'POST' }, t('settingsDialog.toasts.clearedData'));
@@ -334,14 +346,23 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
         }
     };
 
-    const handleDeleteKey = async (key) => {
-        if (!confirm(t('settingsDialog.confirmDeleteKey', { key }))) return;
-        if (readOnly) return;
+    const performDeleteKey = async (key) => {
+        if (readOnly || !key) return;
         try {
             await apiHelper(`/api/bots/${bot.id}/plugins/${plugin.id}/data/${encodeURIComponent(key)}`, { method: 'DELETE' }, t('settingsDialog.toasts.entryDeleted'));
             setDataItems((prev) => (prev || []).filter((item) => item.key !== key));
         } catch {
         }
+    };
+
+    const handleClearData = () => {
+        if (readOnly) return;
+        setConfirmClearData(true);
+    };
+
+    const handleDeleteKey = (key) => {
+        if (readOnly) return;
+        setKeyPendingDelete(key);
     };
 
     const openCreateDialog = () => {
@@ -594,6 +615,30 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                     <PluginDetailInfo plugin={plugin} botId={bot.id} />
                 </TabsContent>
             </Tabs>
+
+            <ConfirmationDialog
+                open={confirmClearData}
+                onOpenChange={setConfirmClearData}
+                title={t('settingsDialog.confirmClearDataTitle', { name: plugin.name, defaultValue: 'Очистить данные плагина "{{name}}"?' })}
+                description={t('settingsDialog.confirmClearDataDescription', { defaultValue: 'Все сохранённые ключи плагина будут удалены безвозвратно.' })}
+                onConfirm={performClearData}
+                confirmText={t('settingsDialog.confirmClearDataAction', { defaultValue: 'Очистить' })}
+                cancelText={t('actions.cancel', { defaultValue: 'Отмена' })}
+            />
+
+            <ConfirmationDialog
+                open={!!keyPendingDelete}
+                onOpenChange={(open) => !open && setKeyPendingDelete(null)}
+                title={t('settingsDialog.confirmDeleteKeyTitle', { key: keyPendingDelete || '', defaultValue: 'Удалить ключ "{{key}}"?' })}
+                description={t('settingsDialog.confirmDeleteKeyDescription', { defaultValue: 'Это действие необратимо.' })}
+                onConfirm={() => {
+                    const key = keyPendingDelete;
+                    setKeyPendingDelete(null);
+                    performDeleteKey(key);
+                }}
+                confirmText={t('actions.delete', { defaultValue: 'Удалить' })}
+                cancelText={t('actions.cancel', { defaultValue: 'Отмена' })}
+            />
         </DialogContent>
     );
 }

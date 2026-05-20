@@ -255,17 +255,23 @@ function InstalledPluginCard({
       {onDelete && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant={compact ? 'ghost' : 'outline'}
-              size={compact ? 'icon' : 'sm'}
-              className={cn(compact ? 'h-8 w-8' : hasUpdateAction ? 'h-9 w-9 shrink-0 px-0' : 'h-9 min-w-0 flex-1')}
-              onClick={() => onDelete(plugin)}
-              disabled={displayEnabled}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <span>
+              <Button
+                variant={compact ? 'ghost' : 'outline'}
+                size={compact ? 'icon' : 'sm'}
+                className={cn(compact ? 'h-8 w-8' : hasUpdateAction ? 'h-9 w-9 shrink-0 px-0' : 'h-9 min-w-0 flex-1')}
+                onClick={() => onDelete(plugin)}
+                disabled={displayEnabled}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </span>
           </TooltipTrigger>
-          <TooltipContent>{t('tooltips.delete', { defaultValue: 'Удалить' })}</TooltipContent>
+          <TooltipContent>
+            {displayEnabled
+              ? t('tooltips.disableBeforeDelete', { defaultValue: 'Сначала выключите плагин' })
+              : t('tooltips.delete', { defaultValue: 'Удалить' })}
+          </TooltipContent>
         </Tooltip>
       )}
     </>
@@ -652,7 +658,13 @@ export default function InstalledPluginsView({
   }, [installedPlugins, updates]);
 
   const sortedAndFilteredPlugins = useMemo(() => {
-    const sorted = [...installedPlugins].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sorted = [...installedPlugins].sort((a, b) => {
+      const diff = new Date(b.createdAt) - new Date(a.createdAt);
+      if (diff !== 0) return diff;
+      const nameA = (a.displayName || a.name || '').toLowerCase();
+      const nameB = (b.displayName || b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
     const byFilter = (() => {
       switch (filter) {
         case 'enabled':
@@ -684,9 +696,18 @@ export default function InstalledPluginsView({
   }, [viewMode]);
 
   React.useLayoutEffect(() => {
-    if (!updatesFilterContentRef.current) return;
-    setUpdatesFilterWidth(updatesFilterContentRef.current.scrollWidth);
-  }, [stats.updates, t]);
+    const node = updatesFilterContentRef.current;
+    if (!node) return undefined;
+
+    setUpdatesFilterWidth(node.scrollWidth);
+
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      setUpdatesFilterWidth(node.scrollWidth);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [stats.updates]);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {

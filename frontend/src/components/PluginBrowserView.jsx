@@ -18,6 +18,7 @@ import {
   PLUGIN_BROWSER_CATEGORIES,
   pluginMatchesCategory,
   translatePluginCategory,
+  normalizeGithubRepoUrl,
 } from '@/utils/pluginPresentation';
 
 const SORT_OPTIONS = [
@@ -40,6 +41,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   const [sortBy, setSortBy] = useState('popular');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('plugin-browser-view-mode') || 'grid');
   const [isCatalogReady, setIsCatalogReady] = useState(false);
+  const [dependencyInstall, setDependencyInstall] = useState(null);
   const [dependencyDialogState, setDependencyDialogState] = useState({
     isOpen: false,
     mainPlugin: null,
@@ -47,6 +49,9 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   });
 
   const containerRef = useRef(null);
+  const gridRef = useRef(null);
+  const listRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -169,17 +174,43 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
     const missingDependencies = dependencies.filter((dependency) => !dependency.isInstalled);
     if (!mainPlugin) return;
 
+    const totalSteps = missingDependencies.length + 1;
     setDependencyDialogState({ isOpen: false, mainPlugin: null, dependencies: [] });
+    setDependencyInstall({ pluginName: mainPlugin.displayName || mainPlugin.name, current: 0, total: totalSteps, stepLabel: '' });
 
-    for (const dependency of missingDependencies) {
-      await installSinglePlugin(dependency);
+    try {
+      for (let i = 0; i < missingDependencies.length; i += 1) {
+        const dependency = missingDependencies[i];
+        setDependencyInstall({
+          pluginName: mainPlugin.displayName || mainPlugin.name,
+          current: i + 1,
+          total: totalSteps,
+          stepLabel: dependency.displayName || dependency.name,
+        });
+        const ok = await installSinglePlugin(dependency);
+        if (!ok) {
+          setDependencyInstall(null);
+          return;
+        }
+      }
+      setDependencyInstall({
+        pluginName: mainPlugin.displayName || mainPlugin.name,
+        current: totalSteps,
+        total: totalSteps,
+        stepLabel: mainPlugin.displayName || mainPlugin.name,
+      });
+      await installSinglePlugin(mainPlugin);
+    } finally {
+      setDependencyInstall(null);
     }
-
-    await installSinglePlugin(mainPlugin);
   };
 
   const installedPluginUrls = useMemo(
-    () => new Set(installedPlugins.map((plugin) => plugin.sourceUri)),
+    () => new Set(
+      installedPlugins
+        .map((plugin) => normalizeGithubRepoUrl(plugin.sourceUri) || plugin.sourceUri)
+        .filter(Boolean)
+    ),
     [installedPlugins]
   );
   const installedPluginNames = useMemo(
@@ -219,7 +250,13 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   }, [catalog, searchQuery, selectedCategory, sortBy]);
 
   const isPluginInstalled = useCallback(
-    (plugin) => installedPluginUrls.has(plugin.repoUrl) || installedPluginNames.has(plugin.name),
+    (plugin) => {
+      if (installedPluginNames.has(plugin.name)) return true;
+      const normalized = normalizeGithubRepoUrl(plugin.repoUrl);
+      if (normalized && installedPluginUrls.has(normalized)) return true;
+      if (plugin.repoUrl && installedPluginUrls.has(plugin.repoUrl)) return true;
+      return false;
+    },
     [installedPluginNames, installedPluginUrls]
   );
 
@@ -234,6 +271,20 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   const hasMeasuredViewport = size.width > 0 && size.height > 0;
   const canRenderCatalogContent = filteredAndSortedCatalog.length === 0 || hasMeasuredViewport;
   const isCatalogContentReady = isCatalogReady && !isLoading && canRenderCatalogContent;
+
+  useEffect(() => {
+    if (viewMode !== 'grid') return;
+    if (!gridRef.current || scrollOffsetRef.current <= 0) return;
+    gridRef.current.scrollTo({ scrollTop: scrollOffsetRef.current });
+  }, [columnCount, viewMode]);
+
+  const handleGridScroll = useCallback(({ scrollTop }) => {
+    scrollOffsetRef.current = scrollTop;
+  }, []);
+
+  const handleListScroll = useCallback(({ scrollOffset }) => {
+    scrollOffsetRef.current = scrollOffset;
+  }, []);
 
   const Row = ({ index, style }) => {
     const plugin = filteredAndSortedCatalog[index];
@@ -348,6 +399,30 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
         </div>
       </div>
 
+      {dependencyInstall && (
+        <div className="border-b border-blue-500/30 bg-blue-500/10 px-6 py-3">
+          <div className="flex items-center gap-3 text-sm">
+            <Icons.Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            <div className="flex-1">
+              <div className="font-medium">
+                {t('browser.dependencyInstall.title', {
+                  pluginName: dependencyInstall.pluginName,
+                  defaultValue: 'Установка зависимостей для {{pluginName}}',
+                })}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {t('browser.dependencyInstall.progress', {
+                  current: dependencyInstall.current,
+                  total: dependencyInstall.total,
+                  step: dependencyInstall.stepLabel,
+                  defaultValue: 'Шаг {{current}}/{{total}}: {{step}}',
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden" ref={containerRef}>
         <FadeTransition
           transitionKey={`${viewMode}-${selectedCategory}-${sortBy}`}
@@ -364,6 +439,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
         {filteredAndSortedCatalog.length > 0 && size.width > 0 ? (
           viewMode === 'grid' ? (
             <FixedSizeGrid
+              ref={gridRef}
               height={size.height}
               width={size.width}
               columnCount={columnCount}
@@ -372,16 +448,19 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
               rowHeight={gridRowHeight}
               overscanRowCount={1}
               overscanColumnCount={1}
+              onScroll={handleGridScroll}
             >
               {Cell}
             </FixedSizeGrid>
           ) : (
             <FixedSizeList
+              ref={listRef}
               height={size.height}
               width={size.width}
               itemCount={filteredAndSortedCatalog.length}
               itemSize={170}
               overscanCount={5}
+              onScroll={handleListScroll}
             >
               {Row}
             </FixedSizeList>

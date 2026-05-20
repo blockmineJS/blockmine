@@ -1,62 +1,41 @@
-
 const path = require('path');
 const fs = require('fs/promises');
-const { execSync } = require('child_process');
 const fssync = require('fs');
+const { createRequire } = require('module');
+const { pathToFileURL } = require('url');
 const PluginStore = require('../plugins/PluginStore');
 const { deepMergeSettings } = require('./utils/settingsMerger');
-const { createRequire } = require('module');
-const { execSync: execSyncRaw } = require('child_process');
+const { installDependencies, installSinglePackage, getPeerDependencies, isValidPackageName } = require('./utils/npmInstall');
 
-const projectRoot = path.resolve(__dirname, '..');
+const SYSTEM_LOG_PATTERNS = [
+    /^\[Config\]/,
+    /^\[System\]/,
+    /^\[Internal\]/,
+    /^\[Graph\]/,
+    /\[Graph Log\]/,
+];
 
-// Проверяет и устанавливает зависимости для всех плагинов
 async function ensurePluginDependencies(installedPlugins = [], sendLog = console.log) {
-    if (!installedPlugins || installedPlugins.length === 0) return;
+    if (!installedPlugins.length) return;
 
     sendLog(`[PluginLoader] Проверка зависимостей ${installedPlugins.length} плагинов...`);
 
     for (const plugin of installedPlugins) {
-        if (!plugin || !plugin.path) continue;
-
+        if (!plugin?.path) continue;
         try {
             const packageJsonPath = path.join(plugin.path, 'package.json');
-
-            // Проверяем есть ли package.json
-            if (!fssync.existsSync(packageJsonPath)) {
-                continue;
-            }
+            if (!fssync.existsSync(packageJsonPath)) continue;
 
             const packageJson = JSON.parse(fssync.readFileSync(packageJsonPath, 'utf-8'));
-            const dependencies = packageJson.dependencies || {};
+            const hasDeps = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
+            if (!hasDeps) continue;
 
-            if (Object.keys(dependencies).length === 0) {
-                continue;
-            }
-
-            // Проверяем есть ли node_modules
             const nodeModulesPath = path.join(plugin.path, 'node_modules');
-            const needsInstall = !fssync.existsSync(nodeModulesPath);
+            if (fssync.existsSync(nodeModulesPath)) continue;
 
-            if (needsInstall) {
-                sendLog(`[PluginLoader] Установка зависимостей для ${plugin.name}...`);
-
-                try {
-                    execSync('npm install --omit=dev --no-audit --no-fund', {
-                        cwd: plugin.path,
-                        stdio: 'inherit'
-                    });
-                    sendLog(`[PluginLoader] ✓ Зависимости установлены для ${plugin.name}`);
-                } catch (e1) {
-                    sendLog(`[PluginLoader] Повторная попытка с --legacy-peer-deps для ${plugin.name}...`);
-                    execSync('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund', {
-                        cwd: plugin.path,
-                        stdio: 'inherit'
-                    });
-                    sendLog(`[PluginLoader] ✓ Зависимости установлены для ${plugin.name}`);
-                }
-            }
-
+            sendLog(`[PluginLoader] Установка зависимостей для ${plugin.name}...`);
+            await installDependencies(plugin.path, { sendLog });
+            sendLog(`[PluginLoader] ✓ Зависимости установлены для ${plugin.name}`);
         } catch (error) {
             sendLog(`[PluginLoader] [WARN] Не удалось проверить зависимости для ${plugin.name}: ${error.message}`);
         }
@@ -65,42 +44,26 @@ async function ensurePluginDependencies(installedPlugins = [], sendLog = console
     sendLog(`[PluginLoader] Проверка зависимостей завершена`);
 }
 
-// Создаёт обёрнутый console для перехвата логов плагина
 function createPluginConsole(botId, pluginName, originalConsole) {
     const emitLog = (level, args) => {
         try {
-            const message = args.map(arg =>
-                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-            ).join(' ');
+            const message = args
+                .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
+                .join(' ');
 
-            // Фильтруем системные логи (не отправляем в IDE)
-            const systemLogPatterns = [
-                /^\[Config\]/,           // [Config] сообщения
-                /^\[System\]/,           // [System] сообщения
-                /^\[Internal\]/,         // [Internal] сообщения
-                /^\[Graph\]/,            // [Graph] логи от визуальных графов
-                /\[Graph Log\]/,         // [Graph Log] логи от нод графов
-            ];
+            if (SYSTEM_LOG_PATTERNS.some((pattern) => pattern.test(message))) return;
 
-            const isSystemLog = systemLogPatterns.some(pattern => pattern.test(message));
-            if (isSystemLog) {
-                return; // Не отправляем системные логи в IDE
-            }
-
-            const logData = {
-                botId,
-                pluginName,
-                level,
-                message,
-                source: 'plugin',
-                timestamp: Date.now()
-            };
-
-            // Отправляем лог в parent process через IPC
             if (process.send) {
                 process.send({
                     type: 'plugin-log',
-                    log: logData
+                    log: {
+                        botId,
+                        pluginName,
+                        level,
+                        message,
+                        source: 'plugin',
+                        timestamp: Date.now(),
+                    },
                 });
             }
         } catch (error) {
@@ -108,275 +71,234 @@ function createPluginConsole(botId, pluginName, originalConsole) {
         }
     };
 
+    const wrap = (level) => (...args) => {
+        originalConsole[level === 'info' ? 'log' : level](`[${pluginName}]`, ...args);
+        emitLog(level === 'log' ? 'info' : level, args);
+    };
+
     return {
-        log: (...args) => {
-            originalConsole.log(`[${pluginName}]`, ...args);
-            emitLog('info', args);
-        },
-        info: (...args) => {
-            originalConsole.info(`[${pluginName}]`, ...args);
-            emitLog('info', args);
-        },
-        warn: (...args) => {
-            originalConsole.warn(`[${pluginName}]`, ...args);
-            emitLog('warn', args);
-        },
-        error: (...args) => {
-            originalConsole.error(`[${pluginName}]`, ...args);
-            emitLog('error', args);
-        },
-        debug: (...args) => {
-            originalConsole.debug(`[${pluginName}]`, ...args);
-            emitLog('debug', args);
-        }
+        log: wrap('log'),
+        info: wrap('info'),
+        warn: wrap('warn'),
+        error: wrap('error'),
+        debug: wrap('debug'),
     };
 }
 
+async function buildPluginDefaultSettings(plugin, manifest, sendLog) {
+    const defaultSettings = {};
+    if (!manifest.settings) return defaultSettings;
+
+    for (const key of Object.keys(manifest.settings)) {
+        const config = manifest.settings[key];
+        if (config.type === 'json_file' && config.defaultPath) {
+            const configFilePath = path.join(plugin.path, config.defaultPath);
+            try {
+                const fileContent = await fs.readFile(configFilePath, 'utf-8');
+                defaultSettings[key] = JSON.parse(fileContent);
+            } catch {
+                sendLog(`[PluginLoader] WARN: Не удалось прочитать defaultPath '${config.defaultPath}' для плагина ${plugin.name}.`);
+                defaultSettings[key] = config.type === 'string[]' || config.type === 'json_file' ? [] : {};
+            }
+        } else {
+            try {
+                defaultSettings[key] = JSON.parse(config.default || 'null');
+            } catch {
+                defaultSettings[key] = config.default;
+            }
+        }
+    }
+    return defaultSettings;
+}
+
+async function loadPluginModule(entryPointPath, pluginRequire) {
+    const normalizedPath = entryPointPath.replace(/\\/g, '/');
+    try {
+        return pluginRequire(normalizedPath);
+    } catch (e) {
+        if (e.code === 'ERR_REQUIRE_ESM' || /Cannot use import statement|Unexpected token 'export'|Unexpected identifier 'import'/.test(e.message)) {
+            const moduleUrl = pathToFileURL(entryPointPath).href;
+            const esmModule = await import(moduleUrl);
+            return esmModule && esmModule.default ? esmModule.default : esmModule;
+        }
+        throw e;
+    }
+}
+
+function invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog) {
+    if (typeof pluginModule === 'function') {
+        pluginModule(bot, pluginOptions);
+    } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
+        pluginModule.onLoad(bot, pluginOptions);
+    } else if (pluginModule?.default && typeof pluginModule.default === 'function') {
+        pluginModule.default(bot, pluginOptions);
+    } else if (pluginModule?.default && typeof pluginModule.default.onLoad === 'function') {
+        pluginModule.default.onLoad(bot, pluginOptions);
+    } else {
+        sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
+    }
+
+    if (pluginModule?.exports && typeof pluginModule.exports === 'object' && bot.pluginRegistry) {
+        bot.pluginRegistry.set(plugin.name, pluginModule.exports);
+    } else if (pluginModule?.default?.exports && bot.pluginRegistry) {
+        bot.pluginRegistry.set(plugin.name, pluginModule.default.exports);
+    }
+}
+
+function clearRequireCacheForPath(targetPath) {
+    for (const key of Object.keys(require.cache)) {
+        if (key.startsWith(targetPath)) {
+            delete require.cache[key];
+        }
+    }
+}
+
+function extractMissingModule(errorMessage) {
+    const match = errorMessage.match(/Cannot find module '([^']+)'/);
+    return match ? match[1] : null;
+}
+
+function isFilePathLikeModule(name) {
+    return (
+        name.startsWith('/') ||
+        name.startsWith('./') ||
+        name.startsWith('../') ||
+        name.startsWith('\\') ||
+        /^[A-Za-z]:[\\/]/.test(name) ||
+        /\.(js|json|node|ts|mjs|cjs)$/i.test(name)
+    );
+}
+
+async function tryAutoInstallAndReload({ plugin, missingModule, pluginRequire, loadAndInit, sendLog }) {
+    sendLog(`[PluginLoader] [WARN] Модуль ${missingModule} не найден для плагина ${plugin.name}. Пытаюсь установить автоматически...`);
+
+    try {
+        await installDependencies(plugin.path, { sendLog });
+    } catch (error) {
+        sendLog(`[PluginLoader] [ERROR] Не удалось установить зависимости: ${error.message}`);
+        return false;
+    }
+
+    clearRequireCacheForPath(plugin.path);
+
+    try {
+        pluginRequire.resolve(missingModule);
+        await loadAndInit();
+        return true;
+    } catch {
+        sendLog(`[PluginLoader] [DEBUG] ${missingModule} всё ещё не резолвится после общего npm install.`);
+    }
+
+    if (!isValidPackageName(missingModule)) {
+        sendLog(`[PluginLoader] [ERROR] Некорректное имя пакета: ${missingModule}`);
+        return false;
+    }
+
+    try {
+        sendLog(`[PluginLoader] [WARN] Адресная установка ${missingModule}...`);
+        installSinglePackage(missingModule, plugin.path, { sendLog });
+        clearRequireCacheForPath(plugin.path);
+
+        const peers = getPeerDependencies(missingModule, plugin.path);
+        if (peers.length > 0) {
+            sendLog(`[PluginLoader] [INFO] Установка peerDependencies для ${missingModule}: ${peers.join(', ')}`);
+            for (const peer of peers) {
+                try {
+                    installSinglePackage(peer, plugin.path, { sendLog, legacyPeerDeps: true });
+                } catch (peerError) {
+                    sendLog(`[PluginLoader] [WARN] Не удалось установить peer ${peer}: ${peerError.message}`);
+                }
+            }
+        }
+
+        pluginRequire.resolve(missingModule);
+        await loadAndInit();
+        return true;
+    } catch (installError) {
+        sendLog(`[PluginLoader] [ERROR] Адресная установка ${missingModule} не удалась: ${installError.message}`);
+        return false;
+    }
+}
+
 async function initializePlugins(bot, installedPlugins = [], prisma) {
-    if (!installedPlugins || installedPlugins.length === 0) return;
-    
+    if (!installedPlugins.length) return;
+
     const sendLog = bot.sendLog || console.log;
     sendLog(`[PluginLoader] Загрузка ${installedPlugins.length} плагинов...`);
 
     for (const plugin of installedPlugins) {
-        if (plugin && plugin.path) {
+        if (!plugin?.path) continue;
+
+        try {
+            const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
+            const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
+            const defaultSettings = await buildPluginDefaultSettings(plugin, manifest, sendLog);
+            const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
+            const store = new PluginStore(prisma, bot.config.id, plugin.name);
+
+            const mainFile = manifest.main || 'index.js';
+            const entryPointPath = path.join(plugin.path, mainFile);
+            const pluginRequire = createRequire(entryPointPath);
+
+            const loadAndInit = async () => {
+                const pluginModule = await loadPluginModule(entryPointPath, pluginRequire);
+                const pluginConsole = createPluginConsole(bot.config.id, plugin.name, global.console);
+                bot.console = pluginConsole;
+                const pluginOptions = { settings: finalSettings, store, console: pluginConsole };
+                invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog);
+            };
+
+            sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version})`);
+
             try {
-                const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
-                const savedSettings = plugin.settings ? JSON.parse(plugin.settings) : {};
-                const defaultSettings = {};
-
-                if (manifest.settings) {
-                    for (const key in manifest.settings) {
-                        const config = manifest.settings[key];
-                        if (config.type === 'json_file' && config.defaultPath) {
-                            const configFilePath = path.join(plugin.path, config.defaultPath);
-                            try {
-                                const fileContent = await fs.readFile(configFilePath, 'utf-8');
-                                defaultSettings[key] = JSON.parse(fileContent);
-                            } catch (e) {
-                                sendLog(`[PluginLoader] WARN: Не удалось прочитать defaultPath '${config.defaultPath}' для плагина ${plugin.name}.`);
-                                defaultSettings[key] = (config.type === 'string[]' || config.type === 'json_file') ? [] : {};
-                            }
-                        } else {
-                            try {
-                                defaultSettings[key] = JSON.parse(config.default || 'null');
-                            } catch {
-                                defaultSettings[key] = config.default;
-                            }
-                        }
-                    }
-                }
-                
-                const finalSettings = deepMergeSettings(defaultSettings, savedSettings);
-                const store = new PluginStore(prisma, bot.config.id, plugin.name);
-                
-                const mainFile = manifest.main || 'index.js';
-                const entryPointPath = path.join(plugin.path, mainFile);
-                const normalizedPath = entryPointPath.replace(/\\/g, '/');
-                const pluginRequire = createRequire(entryPointPath);
-                const { pathToFileURL } = require('url');
-
-                const loadAndInit = async () => {
-                    let pluginModule;
-                    try {
-                        pluginModule = pluginRequire(normalizedPath);
-                    } catch (e) {
-                        if (e.code === 'ERR_REQUIRE_ESM' || /Cannot use import statement|Unexpected token 'export'|Unexpected identifier 'import'/.test(e.message)) {
-                            const moduleUrl = pathToFileURL(entryPointPath).href;
-                            const esmModule = await import(moduleUrl);
-                            pluginModule = esmModule && esmModule.default ? esmModule.default : esmModule;
-                        } else {
-                            throw e;
-                        }
-                    }
-
-                    // Создаём обёрнутый console для перехвата логов плагина
-                    const originalConsole = global.console;
-                    const pluginConsole = createPluginConsole(bot.config.id, plugin.name, originalConsole);
-
-                    // Добавляем кастомный console в bot объект для использования плагинами
-                    bot.console = pluginConsole;
-
-                    // Опции плагина с кастомным console
-                    const pluginOptions = {
-                        settings: finalSettings,
-                        store,
-                        console: pluginConsole  // Передаём обёрнутый console в опциях
-                    };
-
-                    if (typeof pluginModule === 'function') {
-                        pluginModule(bot, pluginOptions);
-                    } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-                        pluginModule.onLoad(bot, pluginOptions);
-                    } else if (pluginModule && pluginModule.default && typeof pluginModule.default === 'function') {
-                        pluginModule.default(bot, pluginOptions);
-                    } else if (pluginModule && pluginModule.default && typeof pluginModule.default.onLoad === 'function') {
-                        pluginModule.default.onLoad(bot, pluginOptions);
-                    } else {
-                        sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
-                    }
-
-                    if (pluginModule && pluginModule.exports && typeof pluginModule.exports === 'object') {
-                        if (bot.pluginRegistry) {
-                            bot.pluginRegistry.set(plugin.name, pluginModule.exports);
-                        }
-                    } else if (pluginModule && pluginModule.default && pluginModule.default.exports) {
-                        if (bot.pluginRegistry) {
-                            bot.pluginRegistry.set(plugin.name, pluginModule.default.exports);
-                        }
-                    }
-                };
-
-                sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version}) из ${normalizedPath}`);
-
-                try {
-                    await loadAndInit();
-
-                    // Отправляем сообщение об успешной загрузке в IDE console
-                    const { getIOSafe } = require('../real-time/socketHandler');
-                    const io = getIOSafe();
-                    if (io) {
-                        const room = `plugin-logs:${bot.config.id}:${plugin.name}`;
-                        io.to(room).emit('plugin-log', {
-                            botId: bot.config.id,
-                            pluginName: plugin.name,
-                            level: 'success',
-                            message: `✓ Плагин ${plugin.name} v${plugin.version} успешно загружен`,
-                            source: 'system',
-                            timestamp: Date.now()
-                        });
-                    }
-                } catch (error) {
-                    let handled = false;
-                    let lastError = error;
-                    // Проверяем не только сообщение ошибки, но и весь стек
-                    const errorString = error.message + '\n' + (error.stack || '');
-                    const isModuleError = errorString.includes('Cannot find module');
-                    if (isModuleError) {
-                        const moduleMatch = error.message.match(/Cannot find module '([^']+)'/);
-                        const missingModule = moduleMatch ? moduleMatch[1] : null;
-                        if (missingModule) {
-                            const isFilePath = missingModule.startsWith('/') ||
-                                               missingModule.startsWith('./') ||
-                                               missingModule.startsWith('../') ||
-                                               missingModule.startsWith('\\') ||
-                                               /^[A-Za-z]:[\\/]/.test(missingModule) || // Windows absolute path
-                                               /\.(js|json|node|ts|mjs|cjs)$/i.test(missingModule);
-
-                            if (isFilePath) {
-                                sendLog(`[PluginLoader] [ERROR] Файл не найден: ${missingModule}`);
-                                sendLog(`[PluginLoader] [ERROR] Плагин ${plugin.name} содержит ошибку — отсутствует файл. Проверьте код плагина.`);
-                                throw error;
-                            }
-
-                            try {
-                                pluginRequire.resolve(missingModule);
-                                sendLog(`[PluginLoader] [DEBUG] ${missingModule} уже резолвится до установки? Это неожиданно.`);
-                            } catch {
-                                sendLog(`[PluginLoader] [DEBUG] ${missingModule} не резолвится до установки.`);
-                            }
-                            sendLog(`[PluginLoader] [WARN] Модуль ${missingModule} не найден для плагина ${plugin.name}. Пытаюсь установить автоматически...`);
-                            try {
-                                // Сначала пробуем установить все зависимости из package.json плагина
-                                try {
-                                    execSync('npm install --omit=dev --no-audit --no-fund', { cwd: plugin.path, stdio: 'inherit' });
-                                } catch (e1) {
-                                    sendLog(`[PluginLoader] [WARN] npm install завершился с ошибкой, пробую с --legacy-peer-deps...`);
-                                    execSync('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund', { cwd: plugin.path, stdio: 'inherit' });
-                                }
-                                sendLog(`[PluginLoader] [INFO] Зависимости установлены. Повторная загрузка плагина ${plugin.name}...`);
-                                // Очистим кэш require для файлов плагина перед повторной загрузкой
-                                for (const key of Object.keys(require.cache)) {
-                                    if (key.startsWith(plugin.path)) {
-                                        delete require.cache[key];
-                                    }
-                                }
-                                // Если конкретный модуль всё ещё не резолвится, попробуем точечно
-                                let needTargetedInstall = false;
-                                try {
-                                    pluginRequire.resolve(missingModule);
-                                    sendLog(`[PluginLoader] [DEBUG] ${missingModule} резолвится после общего npm install.`);
-                                } catch {
-                                    sendLog(`[PluginLoader] [DEBUG] ${missingModule} всё ещё не резолвится после общего npm install.`);
-                                    needTargetedInstall = true;
-                                }
-                                if (needTargetedInstall) {
-                                    throw new Error(`Cannot find module '${missingModule}' after npm install`);
-                                }
-                                await loadAndInit();
-                                handled = true;
-                            } catch (retryErr) {
-                                lastError = retryErr;
-                                // Если после общей установки модуль всё ещё отсутствует, пробуем поставить точечно
-                                if (retryErr.message && retryErr.message.includes('Cannot find module') && missingModule) {
-                                    try {
-                                        sendLog(`[PluginLoader] [WARN] Повторная попытка: устанавливаю ${missingModule} адресно...`);
-                                        // Простая валидация имени пакета для безопасности
-                                        const safeName = /^[a-zA-Z0-9@_/\\.\-]+$/.test(missingModule) ? missingModule : null;
-                                        if (!safeName) {
-                                            throw new Error(`Некорректное имя пакета: ${missingModule}`);
-                                        }
-                                        try {
-                                            execSync(`npm install ${safeName} --omit=dev --no-audit --no-fund`, { cwd: plugin.path, stdio: 'inherit' });
-                                        } catch (e2) {
-                                            sendLog(`[PluginLoader] [WARN] Адресная установка ${missingModule} завершилась с ошибкой, пробую с --legacy-peer-deps...`);
-                                            execSync(`npm install ${safeName} --omit=dev --legacy-peer-deps --no-audit --no-fund`, { cwd: plugin.path, stdio: 'inherit' });
-                                        }
-                                        sendLog(`[PluginLoader] [INFO] Модуль ${missingModule} установлен. Повторная загрузка ${plugin.name}...`);
-                                        for (const key of Object.keys(require.cache)) {
-                                            if (key.startsWith(plugin.path)) {
-                                                delete require.cache[key];
-                                            }
-                                        }
-                                        // Если у пакета есть peerDependencies, установим их
-                                        try {
-                                            const out = execSyncRaw(`npm view ${safeName} peerDependencies --json`, { cwd: plugin.path });
-                                            const text = String(out || '').trim();
-                                            if (text && text !== 'null' && text !== 'undefined') {
-                                                const peersObj = JSON.parse(text);
-                                                const peers = Object.keys(peersObj || {});
-                                                if (peers.length > 0) {
-                                                    sendLog(`[PluginLoader] [INFO] Установка peerDependencies для ${missingModule}: ${peers.join(', ')}`);
-                                                    const installLine = `npm install ${peers.join(' ')} --omit=dev --legacy-peer-deps --no-audit --no-fund`;
-                                                    execSync(installLine, { cwd: plugin.path, stdio: 'inherit' });
-                                                }
-                                            }
-                                        } catch (peerErr) {
-                                            sendLog(`[PluginLoader] [WARN] Не удалось получить/установить peerDependencies для ${missingModule}: ${peerErr.message}`);
-                                        }
-                                        // Проверим, что модуль теперь доступен
-                                        try {
-                                            const paths = pluginRequire.resolve.paths ? pluginRequire.resolve.paths(missingModule) : [];
-                                            sendLog(`[PluginLoader] [DEBUG] Пути резолва для ${missingModule}: ${JSON.stringify(paths)}`);
-                                            pluginRequire.resolve(missingModule);
-                                        } catch (rErr) {
-                                            sendLog(`[PluginLoader] [ERROR] ${missingModule} всё ещё не резолвится после адресной установки: ${rErr.message}`);
-                                            throw rErr;
-                                        }
-                                        sendLog(`[PluginLoader] [DEBUG] ${missingModule} резолвится после адресной установки.`);
-                                        await loadAndInit();
-                                        handled = true;
-                                    } catch (installErr) {
-                                        lastError = installErr;
-                                        sendLog(`[PluginLoader] [ERROR] Автоустановка модуля ${missingModule} для ${plugin.name} не удалась: ${installErr.message}`);
-                                    }
-                                } else {
-                                    sendLog(`[PluginLoader] [ERROR] Не удалось автоматически установить зависимости для ${plugin.name}: ${retryErr.message}`);
-                                }
-                            }
-                        } else {
-                            sendLog(`[PluginLoader] [ERROR] Не удалось определить отсутствующий модуль для плагина ${plugin.name}.`);
-                        }
-                    }
-                    if (!handled) {
-                        throw lastError;
-                    }
-                }
-
+                await loadAndInit();
+                emitLoadSuccess(bot, plugin);
             } catch (error) {
-                sendLog(`[PluginLoader] [FATAL] Не удалось загрузить плагин ${plugin.name}: ${error.stack}`);
+                const errorString = `${error.message}\n${error.stack || ''}`;
+                if (!errorString.includes('Cannot find module')) throw error;
+
+                const missingModule = extractMissingModule(error.message);
+                if (!missingModule) {
+                    sendLog(`[PluginLoader] [ERROR] Не удалось определить отсутствующий модуль для плагина ${plugin.name}.`);
+                    throw error;
+                }
+                if (isFilePathLikeModule(missingModule)) {
+                    sendLog(`[PluginLoader] [ERROR] Файл не найден: ${missingModule}`);
+                    throw error;
+                }
+
+                const handled = await tryAutoInstallAndReload({
+                    plugin,
+                    missingModule,
+                    pluginRequire,
+                    loadAndInit,
+                    sendLog,
+                });
+
+                if (!handled) throw error;
+                emitLoadSuccess(bot, plugin);
             }
+        } catch (error) {
+            sendLog(`[PluginLoader] [FATAL] Не удалось загрузить плагин ${plugin.name}: ${error.stack}`);
         }
+    }
+}
+
+function emitLoadSuccess(bot, plugin) {
+    try {
+        const { getIOSafe } = require('../real-time/socketHandler');
+        const io = getIOSafe();
+        if (!io) return;
+        const room = `plugin-logs:${bot.config.id}:${plugin.name}`;
+        io.to(room).emit('plugin-log', {
+            botId: bot.config.id,
+            pluginName: plugin.name,
+            level: 'success',
+            message: `✓ Плагин ${plugin.name} v${plugin.version} успешно загружен`,
+            source: 'system',
+            timestamp: Date.now(),
+        });
+    } catch {
     }
 }
 

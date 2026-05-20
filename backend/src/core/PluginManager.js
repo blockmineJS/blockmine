@@ -1,231 +1,69 @@
 const path = require('path');
 const fse = require('fs-extra');
 const os = require('os');
-const { execSync } = require('child_process');
-const { PrismaClient } = require('@prisma/client');
 const AdmZip = require('adm-zip');
 const semver = require('semver');
 const PluginHooks = require('./PluginHooks');
-
-const prisma = new PrismaClient();
+const {
+    tryParseGithubRepoUrl,
+    normalizeGithubRepoUrl,
+    tryNormalizeGithubRepoUrl,
+    getGithubRepoName,
+    fetchGithubRepoInfo,
+    downloadGithubArchive,
+    fetchGithubPackageVersion,
+    fetchLatestGithubVersionTag,
+} = require('./utils/github');
+const { installDependencies } = require('./utils/npmInstall');
+const TtlCache = require('./utils/ttlCache');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 
-const TELEMETRY_ENABLED = true;
+const TELEMETRY_ENABLED = process.env.BLOCKMINE_TELEMETRY !== 'false';
 const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
 
-function normalizeGithubRepoUrl(repoUrl) {
-    if (!repoUrl || typeof repoUrl !== 'string') return null;
-
-    let trimmed = repoUrl.trim();
-    if (!trimmed) return null;
-
-    try {
-        trimmed = trimmed.replace(/^git\+/i, '');
-        if (/^github\.com\//i.test(trimmed)) {
-            trimmed = `https://${trimmed}`;
-        }
-
-        const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
-        if (sshMatch) {
-            const owner = sshMatch[1].toLowerCase();
-            const repo = sshMatch[2].toLowerCase();
-            return `https://github.com/${owner}/${repo}`;
-        }
-
-        const parsed = new URL(trimmed);
-        const hostname = parsed.hostname.toLowerCase();
-        if (hostname !== 'github.com' && hostname !== 'www.github.com') return null;
-
-        const pathParts = parsed.pathname.split('/').filter(Boolean);
-        if (pathParts.length < 2) return null;
-
-        const owner = pathParts[0].toLowerCase();
-        const repo = pathParts[1].replace(/\.git$/i, '').toLowerCase();
-        return `https://github.com/${owner}/${repo}`;
-    } catch {
-        return null;
-    }
-}
-
-function parseGithubOwnerRepo(repoUrl) {
-    const normalized = normalizeGithubRepoUrl(repoUrl);
-    if (!normalized) return null;
-    try {
-        const parsed = new URL(normalized);
-        const parts = parsed.pathname.split('/').filter(Boolean);
-        if (parts.length < 2) return null;
-        return { owner: parts[0], repo: parts[1] };
-    } catch {
-        return null;
-    }
-}
-
-function getGithubRepoName(repoUrl) {
-    const ownerRepo = parseGithubOwnerRepo(repoUrl);
-    return ownerRepo?.repo || null;
-}
-
-function getGithubHeaders(extra = {}) {
-    const headers = {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'BlockMine',
-        ...extra
-    };
-
-    if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
-
-    return headers;
-}
-
-async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const response = await fetch(url, { headers: getGithubHeaders(), signal: controller.signal });
-        if (!response.ok) {
-            return null;
-        }
-        return response.json();
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timeoutId);
-    }
-}
-
-async function fetchGithubResponseWithTimeout(url, options = {}, timeoutMs = 10000) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const response = await fetch(url, {
-            ...options,
-            headers: getGithubHeaders(options.headers || {}),
-            signal: controller.signal
-        });
-
-        if (!response.ok) {
-            const error = new Error(`GitHub request failed with status ${response.status}.`);
-            error.status = response.status;
-            throw error;
-        }
-
-        return response;
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            const timeoutError = new Error('GitHub request timed out.');
-            timeoutError.name = 'AbortError';
-            throw timeoutError;
-        }
-
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
-    }
-}
-
-async function fetchGithubRepoInfo(repoUrl) {
-    const ownerRepo = parseGithubOwnerRepo(repoUrl);
-    if (!ownerRepo) return null;
-
-    return fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}`);
-}
-
-async function downloadGithubArchive(repoUrl, ref) {
-    const ownerRepo = parseGithubOwnerRepo(repoUrl);
-    if (!ownerRepo) {
-        throw new Error('Invalid GitHub repository URL.');
-    }
-
-    const response = await fetchGithubResponseWithTimeout(
-        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/zipball/${encodeURIComponent(ref)}`,
-        { headers: { Accept: 'application/vnd.github+json' } },
-        15000
-    );
-
-    return response;
-}
-
-async function fetchGithubPackageVersion(repoUrl, ref = null) {
-    const ownerRepo = parseGithubOwnerRepo(repoUrl);
-    if (!ownerRepo) return null;
-
-    const resolvedRef = ref || (await fetchGithubRepoInfo(repoUrl))?.default_branch;
-    if (!resolvedRef) return null;
-
-    const packageJsonData = await fetchJsonWithTimeout(
-        `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/contents/package.json?ref=${encodeURIComponent(resolvedRef)}`
-    );
-
-    if (!packageJsonData?.content) {
-        return null;
-    }
-
-    try {
-        const packageJsonRaw = Buffer.from(packageJsonData.content, packageJsonData.encoding || 'base64').toString('utf8');
-        const packageJson = JSON.parse(packageJsonRaw);
-        return typeof packageJson?.version === 'string' ? packageJson.version : null;
-    } catch {
-        return null;
-    }
-}
-
-async function fetchLatestGithubVersionTag(repoUrl) {
-    const ownerRepo = parseGithubOwnerRepo(repoUrl);
-    if (!ownerRepo) return null;
-
-    const releaseData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/releases/latest`);
-    const releaseTag = typeof releaseData?.tag_name === 'string' ? releaseData.tag_name : null;
-    if (releaseTag) return releaseTag;
-
-    const tagsData = await fetchJsonWithTimeout(`https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}/tags?per_page=20`);
-    if (!Array.isArray(tagsData) || tagsData.length === 0) return null;
-
-    const semverTags = tagsData
-        .map(item => item?.name)
-        .filter(Boolean)
-        .map(tag => ({ tag, normalized: semver.coerce(tag)?.version || null }))
-        .filter(item => item.normalized);
-
-    if (semverTags.length > 0) {
-        semverTags.sort((a, b) => semver.rcompare(a.normalized, b.normalized));
-        return semverTags[0].tag;
-    }
-
-    const firstTag = tagsData[0]?.name;
-    return typeof firstTag === 'string' ? firstTag : null;
-}
+const LATEST_TAG_TTL_MS = 30 * 60 * 1000;
+const LATEST_VERSION_TTL_MS = 30 * 60 * 1000;
 
 function reportPluginDownload(pluginName) {
     if (!TELEMETRY_ENABLED) return;
 
-    console.log(`[Telemetry] Попытка отправить статистику по плагину: ${pluginName}`);
-
     fetch(`${STATS_SERVER_URL}/api/plugins/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plugin_name: pluginName })
+        body: JSON.stringify({ plugin_name: pluginName }),
     })
-    .then(res => {
-        if (res.ok) {
-            console.log(`[Telemetry] Статистика для плагина ${pluginName} успешно отправлена.`);
-        } else {
-            console.error(`[Telemetry] Сервер статистики вернул ошибку для плагина ${pluginName}: ${res.statusText}`);
-        }
-    })
-    .catch(error => {
-        console.error(`[Telemetry] Не удалось отправить статистику по плагину ${pluginName}: ${error.message}`);
-    });
+        .then((res) => {
+            if (!res.ok) {
+                console.error(`[Telemetry] Сервер статистики вернул ошибку для плагина ${pluginName}: ${res.statusText}`);
+            }
+        })
+        .catch((error) => {
+            console.error(`[Telemetry] Не удалось отправить статистику по плагину ${pluginName}: ${error.message}`);
+        });
 }
 
+async function safeRemove(targetPath) {
+    if (!targetPath) return;
+    try {
+        if (await fse.pathExists(targetPath)) {
+            await fse.remove(targetPath);
+        }
+    } catch (error) {
+        console.warn(`[PluginManager] Не удалось удалить ${targetPath}: ${error.message}`);
+    }
+}
 
 class PluginManager {
-    constructor({ botManager } = {}) {
+    constructor({ botManager, prisma } = {}) {
+        if (!prisma) {
+            throw new Error('PluginManager requires a prisma client.');
+        }
         this.botManager = botManager;
+        this.prisma = prisma;
+        this.latestTagCache = new TtlCache({ ttlMs: LATEST_TAG_TTL_MS, cleanupIntervalMs: 5 * 60 * 1000, maxSize: 500 });
+        this.latestVersionCache = new TtlCache({ ttlMs: LATEST_VERSION_TTL_MS, cleanupIntervalMs: 5 * 60 * 1000, maxSize: 500 });
         this.ensureBaseDirExists();
     }
 
@@ -233,45 +71,28 @@ class PluginManager {
         await fse.mkdir(PLUGINS_BASE_DIR, { recursive: true }).catch(console.error);
     }
 
-    /**
-     * Проверяет зависимости плагина из package.json
-     * @param {number} botId - ID бота
-     * @param {object} packageJson - package.json плагина
-     * @returns {Promise<{isValid: boolean, missing: string[], warnings: string[]}>}
-     */
     async checkPluginDependencies(botId, packageJson) {
-        const result = {
-            isValid: true,
-            missing: [],
-            warnings: []
-        };
-
-        // Проверяем зависимости из botpanel.dependencies
+        const result = { isValid: true, missing: [], warnings: [] };
         const pluginDeps = packageJson.botpanel?.dependencies || {};
-        if (Object.keys(pluginDeps).length === 0) {
-            return result; // Нет зависимостей
-        }
+        if (Object.keys(pluginDeps).length === 0) return result;
 
-        const installedPlugins = await prisma.installedPlugin.findMany({
+        const installedPlugins = await this.prisma.installedPlugin.findMany({
             where: { botId },
-            select: { name: true, version: true }
+            select: { name: true, version: true },
         });
-
-        const installedMap = new Map(installedPlugins.map(p => [p.name, p.version]));
+        const installedMap = new Map(installedPlugins.map((p) => [p.name, p.version]));
 
         for (const [depName, depVersion] of Object.entries(pluginDeps)) {
             if (!installedMap.has(depName)) {
                 result.missing.push(`${depName} (требуется ${depVersion})`);
                 result.isValid = false;
-            } else {
-                const installedVersion = installedMap.get(depName);
-                if (depVersion.startsWith('^') || depVersion.startsWith('~')) {
-                    const requiredBase = depVersion.slice(1);
-                    if (!installedVersion.startsWith(requiredBase.split('.')[0])) {
-                        result.warnings.push(
-                            `${depName}: установлена v${installedVersion}, требуется ${depVersion}`
-                        );
-                    }
+                continue;
+            }
+            const installedVersion = installedMap.get(depName);
+            if ((depVersion.startsWith('^') || depVersion.startsWith('~'))) {
+                const requiredBase = depVersion.slice(1);
+                if (!installedVersion.startsWith(requiredBase.split('.')[0])) {
+                    result.warnings.push(`${depName}: установлена v${installedVersion}, требуется ${depVersion}`);
                 }
             }
         }
@@ -280,84 +101,36 @@ class PluginManager {
     }
 
     async _installDependencies(pluginPath) {
-        const packageJsonPath = path.join(pluginPath, 'package.json');
         try {
-            if (await fse.pathExists(packageJsonPath)) {
-                const packageJson = await fse.readJson(packageJsonPath);
-                const hasDeps = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
-                if (!hasDeps) return;
-
-                console.log(`[PluginManager] Установка зависимостей для плагина в ${pluginPath}...`);
-
-                const tryExec = (cmd) => {
-                    try {
-                        execSync(cmd, { cwd: pluginPath, stdio: 'inherit' });
-                        return true;
-                    } catch (e) {
-                        return false;
-                    }
-                };
-
-                const packageManagerField = typeof packageJson.packageManager === 'string' ? packageJson.packageManager : '';
-                const prefersPnpm = /pnpm/i.test(packageManagerField);
-                const prefersYarn = /yarn/i.test(packageManagerField);
-                const hasPackageLock = await fse.pathExists(path.join(pluginPath, 'package-lock.json'));
-                const hasPnpmLock = await fse.pathExists(path.join(pluginPath, 'pnpm-lock.yaml'));
-                const hasYarnLock = await fse.pathExists(path.join(pluginPath, 'yarn.lock'));
-
-                let installed = false;
-
-                if (!installed && (prefersPnpm || hasPnpmLock)) {
-                    installed = tryExec('pnpm install --prod --no-frozen-lockfile');
-                }
-                if (!installed && (prefersYarn || hasYarnLock)) {
-                    installed = tryExec('yarn install --production --no-immutable');
-                }
-
-                if (!installed) {
-                    if (hasPackageLock) {
-                        installed = tryExec('npm ci --omit=dev --no-audit --no-fund');
-                    }
-                    if (!installed) {
-                        installed = tryExec('npm install --omit=dev --no-audit --no-fund');
-                    }
-                    if (!installed) {
-                        installed = tryExec('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund');
-                    }
-                }
-
-                if (!installed) {
-                    throw new Error('Не удалось установить зависимости плагина стандартными способами.');
-                }
-
-                console.log(`[PluginManager] Зависимости успешно установлены.`);
-            }
+            await installDependencies(pluginPath, { sendLog: (msg) => console.log(`[PluginManager] ${msg}`) });
         } catch (error) {
             console.error(`[PluginManager] Ошибка при установке зависимостей в ${pluginPath}:`, error);
             throw new Error('Не удалось установить зависимости плагина.');
         }
     }
 
-    async installFromLocalPath(botId, directoryPath) {
-        // Проверяем зависимости плагина перед установкой
-        const packageJsonPath = path.join(directoryPath, 'package.json');
-        const packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
-
+    async _logDependencyWarnings(botId, packageJson) {
         const depCheck = await this.checkPluginDependencies(botId, packageJson);
         if (!depCheck.isValid) {
             const missingList = depCheck.missing.join(', ');
-            console.warn(`[PluginManager] ⚠️ Плагин ${packageJson.name} требует: ${missingList}`);
-            console.warn(`[PluginManager] Плагин будет установлен, но может работать некорректно без зависимостей.`);
+            console.warn(`[PluginManager] Плагин ${packageJson.name} требует: ${missingList}`);
+            console.warn('[PluginManager] Плагин будет установлен, но может работать некорректно без зависимостей.');
         }
-        if (depCheck.warnings.length > 0) {
-            depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
-        }
+        depCheck.warnings.forEach((w) => console.warn(`[PluginManager] ${w}`));
+    }
+
+    async installFromLocalPath(botId, directoryPath) {
+        const packageJsonPath = path.join(directoryPath, 'package.json');
+        const packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
+
+        await this._logDependencyWarnings(botId, packageJson);
 
         const newPlugin = await this.registerPlugin(botId, directoryPath, 'LOCAL', directoryPath);
+
         try {
             reportPluginDownload(packageJson.name);
-        } catch(e) {
-            console.error('Не удалось прочитать package.json для отправки статистики локального плагина');
+        } catch (e) {
+            console.error('Не удалось отправить статистику по локальному плагину', e?.message);
         }
 
         await this._installDependencies(directoryPath);
@@ -370,88 +143,113 @@ class PluginManager {
         return newPlugin;
     }
 
-    async installFromGithub(botId, repoUrl, prismaClient = prisma, isUpdate = false, tag = null) {
-        const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
-        await fse.mkdir(botPluginsDir, { recursive: true });
-        let sourceRefType = tag ? 'tag' : 'branch';
-        let sourceRef = tag || 'main';
+    async _downloadAndExtract(repoUrl, ref, destinationDir) {
+        const response = await downloadGithubArchive(repoUrl, ref);
+        const buffer = await response.arrayBuffer();
+        const zip = new AdmZip(Buffer.from(buffer));
+        const zipEntries = zip.getEntries();
+        if (zipEntries.length === 0) {
+            throw new Error('Скачанный архив плагина пуст.');
+        }
+        const rootFolderName = zipEntries[0].entryName.split('/')[0];
+        await fse.mkdir(destinationDir, { recursive: true });
+        zip.extractAllTo(destinationDir, true);
+        const extractedPath = path.join(destinationDir, rootFolderName);
+        if (!await fse.pathExists(extractedPath)) {
+            throw new Error('Архив плагина имеет неожиданную структуру.');
+        }
+        return extractedPath;
+    }
 
-        if (!isUpdate) {
-        const existing = await prismaClient.installedPlugin.findFirst({ where: { botId, sourceUri: repoUrl } });
-        if (existing) throw new Error(`Плагин из ${repoUrl} уже установлен.`);
+    async _resolveSourceRef({ tag, repoUrl }) {
+        if (tag) {
+            return { sourceRefType: 'tag', sourceRef: tag, repoInfo: null };
+        }
+        const repoInfo = await fetchGithubRepoInfo(repoUrl);
+        if (repoInfo?.default_branch) {
+            return { sourceRefType: 'branch', sourceRef: repoInfo.default_branch, repoInfo };
+        }
+        return { sourceRefType: 'branch', sourceRef: 'main', repoInfo: null };
+    }
+
+    async _downloadToTemp(repoUrl, ref, tag, repoInfo) {
+        const tempDir = await fse.mkdtemp(path.join(os.tmpdir(), 'blockmine-plugin-'));
+        try {
+            try {
+                const extracted = await this._downloadAndExtract(repoUrl, ref, tempDir);
+                return { extracted, tempDir, sourceRef: ref };
+            } catch (err) {
+                if (!tag && !repoInfo && ref !== 'master') {
+                    console.log(`[PluginManager] Ветка '${ref}' не найдена для ${repoUrl}, пробую 'master'...`);
+                    const extracted = await this._downloadAndExtract(repoUrl, 'master', tempDir);
+                    return { extracted, tempDir, sourceRef: 'master' };
+                }
+                throw err;
+            }
+        } catch (err) {
+            await safeRemove(tempDir);
+            throw err;
+        }
+    }
+
+    async installFromGithub(botId, repoUrl, prismaClient = null, isUpdate = false, tag = null) {
+        const prisma = prismaClient || this.prisma;
+        const normalizedRepoUrl = normalizeGithubRepoUrl(repoUrl);
+        const ownerRepo = tryParseGithubRepoUrl(normalizedRepoUrl);
+        if (!ownerRepo) {
+            throw new Error('Invalid GitHub repository URL.');
         }
 
-        try {
-            const url = new URL(repoUrl);
-            const repoPath = url.pathname.replace(/^\/|\.git$/g, '');
-            const repoInfo = tag ? null : await fetchGithubRepoInfo(repoUrl);
-            if (repoInfo?.default_branch) {
-                sourceRef = repoInfo.default_branch;
-            }
-            
-            let response;
-            
-            if (tag) {
-                console.log(`[PluginManager] Скачиваем релиз ${tag} из ${repoUrl}...`);
-                try {
-                    response = await downloadGithubArchive(repoUrl, tag);
-                } catch (err) {
-                    throw new Error(`Ошибка сети при скачивании релиза ${tag}: ${err.message || err}`);
-                }
-            } else {
-                try {
-                    response = await downloadGithubArchive(repoUrl, sourceRef);
-                } catch (err) {
-                    if (!repoInfo && sourceRef !== 'master') {
-                        console.log(`[PluginManager] Ветка '${sourceRef}' не найдена для ${repoUrl}, пробую 'master'...`);
-                        sourceRef = 'master';
-                        response = await downloadGithubArchive(repoUrl, sourceRef);
-                    } else {
-                        throw new Error(`Не удалось скачать архив плагина: ${err.message || err}`);
-                    }
-                }
-            }
-            
-            const buffer = await response.arrayBuffer();
+        if (!isUpdate) {
+            const existing = await prisma.installedPlugin.findFirst({ where: { botId, sourceUri: normalizedRepoUrl } });
+            if (existing) throw new Error(`Плагин из ${normalizedRepoUrl} уже установлен.`);
+        }
 
-            const zip = new AdmZip(Buffer.from(buffer));
-            const zipEntries = zip.getEntries();
-            if (zipEntries.length === 0) {
-                throw new Error('Скачанный архив плагина пуст.');
+        const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
+        await fse.mkdir(botPluginsDir, { recursive: true });
+
+        const { sourceRefType, sourceRef: initialRef, repoInfo } = await this._resolveSourceRef({ tag, repoUrl: normalizedRepoUrl });
+
+        let extractedPath;
+        let tempDir;
+        let resolvedSourceRef = initialRef;
+        try {
+            const downloaded = await this._downloadToTemp(normalizedRepoUrl, initialRef, tag, repoInfo);
+            extractedPath = downloaded.extracted;
+            tempDir = downloaded.tempDir;
+            resolvedSourceRef = downloaded.sourceRef;
+        } catch (err) {
+            const message = err?.message || String(err);
+            if (/fetch|AbortError|timed out/i.test(message)) {
+                throw new Error(`Не удалось подключиться к GitHub или репозиторий не найден. Проверьте ссылку и ваше интернет-соединение.`);
             }
-            const rootFolderName = zipEntries[0].entryName.split('/')[0];
-            const repoName = path.basename(repoPath);
-            const localPath = path.join(botPluginsDir, repoName);
-            
+            throw new Error(`Не удалось скачать архив плагина: ${message}`);
+        }
+
+        const localPath = path.join(botPluginsDir, ownerRepo.repo);
+
+        try {
+            const packageJsonPath = path.join(extractedPath, 'package.json');
+            if (!await fse.pathExists(packageJsonPath)) {
+                throw new Error('В архиве плагина отсутствует package.json.');
+            }
+            const packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
+            if (!packageJson.name || !packageJson.version) {
+                throw new Error('package.json не содержит обязательных полей name и version.');
+            }
+
+            await this._logDependencyWarnings(botId, packageJson);
+
             if (await fse.pathExists(localPath)) {
                 await fse.remove(localPath);
             }
-            const tempExtractPath = path.join(botPluginsDir, rootFolderName);
-            if (await fse.pathExists(tempExtractPath)) {
-                await fse.remove(tempExtractPath);
-            }
-            
-            zip.extractAllTo(botPluginsDir, true);
-            
-            await fse.move(tempExtractPath, localPath, { overwrite: true });
+            await fse.move(extractedPath, localPath, { overwrite: true });
 
             await this._installDependencies(localPath);
 
-
-            const packageJson = JSON.parse(await fse.readFile(path.join(localPath, 'package.json'), 'utf-8'));
-            const depCheck = await this.checkPluginDependencies(botId, packageJson);
-            if (!depCheck.isValid) {
-                const missingList = depCheck.missing.join(', ');
-                console.warn(`[PluginManager] ⚠️ Плагин ${packageJson.name} требует: ${missingList}`);
-                console.warn(`[PluginManager] Плагин будет установлен, но может работать некорректно без зависимостей.`);
-            }
-            if (depCheck.warnings.length > 0) {
-                depCheck.warnings.forEach(w => console.warn(`[PluginManager] ⚠️ ${w}`));
-            }
-
-            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', repoUrl, prismaClient, {
+            const newPlugin = await this.registerPlugin(botId, localPath, 'GITHUB', normalizedRepoUrl, prisma, {
                 sourceRefType,
-                sourceRef
+                sourceRef: resolvedSourceRef,
             });
 
             reportPluginDownload(packageJson.name);
@@ -461,19 +259,18 @@ class PluginManager {
             if (this.botManager) {
                 await this.botManager.reloadPlugins(botId);
             }
-            
-            return newPlugin;
 
+            return newPlugin;
         } catch (error) {
-            console.error(`[PluginManager] Ошибка установки с GitHub: ${error.message}`);
-            if (error.message.includes('fetch')) {
-                 throw new Error(`Не удалось подключиться к GitHub или репозиторий не найден. Проверьте ссылку и ваше интернет-соединение.`);
-            }
+            await safeRemove(localPath);
             throw error;
+        } finally {
+            await safeRemove(tempDir);
         }
     }
 
-    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = prisma, extraData = {}) {
+    async registerPlugin(botId, directoryPath, sourceType, sourceUri, prismaClient = null, extraData = {}) {
+        const prisma = prismaClient || this.prisma;
         const packageJsonPath = path.join(directoryPath, 'package.json');
         let packageJson;
         try {
@@ -481,11 +278,11 @@ class PluginManager {
         } catch (e) {
             throw new Error(`Не удалось прочитать или распарсить package.json в плагине по пути: ${directoryPath}`);
         }
-        
+
         if (!packageJson.name || !packageJson.version) {
             throw new Error('package.json не содержит обязательных полей name и version');
         }
-        
+
         const pluginData = {
             botId,
             name: packageJson.name,
@@ -497,102 +294,95 @@ class PluginManager {
             manifest: JSON.stringify(packageJson.botpanel || {}),
             ...extraData,
         };
-        
-        return prismaClient.installedPlugin.upsert({
+
+        return prisma.installedPlugin.upsert({
             where: { botId_name: { botId, name: packageJson.name } },
             update: pluginData,
             create: pluginData,
         });
     }
 
+    _clearPluginRequireCache(pluginPath) {
+        if (!pluginPath) return;
+        const normalized = path.resolve(pluginPath);
+        for (const key of Object.keys(require.cache)) {
+            if (key.startsWith(normalized)) {
+                delete require.cache[key];
+            }
+        }
+    }
+
     async deletePlugin(pluginId) {
-        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin) throw new Error('Плагин не найден');
 
         const pluginOwnerId = `plugin:${plugin.name}`;
-        console.log(`[PluginManager] Начало удаления плагина ${plugin.name} (ID: ${plugin.id}) и его ресурсов.`);
-        console.log(`[PluginManager] Идентификатор владельца для очистки: ${pluginOwnerId}`);
+        console.log(`[PluginManager] Удаление плагина ${plugin.name} (ID: ${plugin.id})`);
 
         try {
             const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
             const mainFile = manifest.main || 'index.js';
             const entryPointPath = path.join(plugin.path, mainFile);
-            
             if (await fse.pathExists(entryPointPath)) {
-                if (require.cache[require.resolve(entryPointPath)]) {
-                    delete require.cache[require.resolve(entryPointPath)];
-                }
-                
+                this._clearPluginRequireCache(plugin.path);
                 const pluginModule = require(entryPointPath);
-
                 if (pluginModule && typeof pluginModule.onUnload === 'function') {
-                    console.log(`[PluginManager] Вызов хука onUnload для плагина ${plugin.name}...`);
-                    await pluginModule.onUnload({ botId: plugin.botId, prisma });
-                    console.log(`[PluginManager] Хук onUnload для ${plugin.name} успешно выполнен.`);
+                    await pluginModule.onUnload({ botId: plugin.botId, prisma: this.prisma });
                 }
-            } else {
-                 console.warn(`[PluginManager] Главный файл плагина ${entryPointPath} не найден. Хук onUnload пропущен.`);
+                this._clearPluginRequireCache(plugin.path);
             }
         } catch (error) {
             console.error(`[PluginManager] Ошибка при выполнении хука onUnload для плагина ${plugin.name}:`, error);
         }
 
         try {
-            await prisma.$transaction(async (tx) => {
-                const deletedCommands = await tx.command.deleteMany({
-                    where: { botId: plugin.botId, pluginOwnerId: plugin.id },
-                });
-                if (deletedCommands.count > 0) console.log(`[DB Cleanup] Удалено команд: ${deletedCommands.count}`);
-
-                const deletedEventGraphs = await tx.eventGraph.deleteMany({
-                    where: { botId: plugin.botId, pluginOwnerId: plugin.id },
-                });
-                if (deletedEventGraphs.count > 0) console.log(`[DB Cleanup] Удалено графов событий: ${deletedEventGraphs.count}`);
-
-                const deletedPermissions = await tx.permission.deleteMany({
-                    where: { botId: plugin.botId, owner: pluginOwnerId },
-                });
-                 if (deletedPermissions.count > 0) console.log(`[DB Cleanup] Удалено прав: ${deletedPermissions.count}`);
-
-                const deletedGroups = await tx.group.deleteMany({
-                    where: { botId: plugin.botId, owner: pluginOwnerId },
-                });
-                if (deletedGroups.count > 0) console.log(`[DB Cleanup] Удалено групп: ${deletedGroups.count}`);
-
+            await this.prisma.$transaction(async (tx) => {
+                await tx.command.deleteMany({ where: { botId: plugin.botId, pluginOwnerId: plugin.id } });
+                await tx.eventGraph.deleteMany({ where: { botId: plugin.botId, pluginOwnerId: plugin.id } });
+                await tx.permission.deleteMany({ where: { botId: plugin.botId, owner: pluginOwnerId } });
+                await tx.group.deleteMany({ where: { botId: plugin.botId, owner: pluginOwnerId } });
                 await tx.installedPlugin.delete({ where: { id: pluginId } });
-                console.log(`[DB Cleanup] Запись о плагине ${plugin.name} удалена.`);
             });
         } catch (dbError) {
-             console.error(`[PluginManager] Ошибка при очистке БД для плагина ${plugin.name}:`, dbError);
-             throw new Error('Ошибка при удалении данных плагина из БД. Файлы не были удалены.');
+            console.error(`[PluginManager] Ошибка при очистке БД для плагина ${plugin.name}:`, dbError);
+            throw new Error('Ошибка при удалении данных плагина из БД. Файлы не были удалены.');
         }
 
         if (plugin.path && plugin.path.startsWith(PLUGINS_BASE_DIR)) {
-            try {
-                if (await fse.pathExists(plugin.path)) {
-                    await fse.remove(plugin.path);
-                    console.log(`[PluginManager] Папка плагина ${plugin.path} успешно удалена.`);
-                } else {
-                    console.log(`[PluginManager] Папка плагина ${plugin.path} не найдена, удаление не требуется.`);
-                }
-            } catch (fileError) {
-                console.error(`Не удалось удалить папку плагина ${plugin.path}:`, fileError);
-            }
+            await safeRemove(plugin.path);
         }
     }
 
+    async _resolveLatestTagWithCache(repoUrl) {
+        if (!repoUrl) return null;
+        const cached = this.latestTagCache.get(repoUrl);
+        if (cached !== null) return cached;
+        const fetched = await fetchLatestGithubVersionTag(repoUrl);
+        this.latestTagCache.set(repoUrl, fetched);
+        return fetched;
+    }
+
+    async _resolveLatestVersionWithCache(repoUrl, ref) {
+        if (!repoUrl) return null;
+        const cacheKey = `${repoUrl}::${ref || 'default'}`;
+        const cached = this.latestVersionCache.get(cacheKey);
+        if (cached !== null) return cached;
+        const fetched = await fetchGithubPackageVersion(repoUrl, ref);
+        this.latestVersionCache.set(cacheKey, fetched);
+        return fetched;
+    }
+
     async checkForUpdates(botId, catalog) {
-        const githubPlugins = await prisma.installedPlugin.findMany({
-            where: { botId, sourceType: 'GITHUB' }
+        const githubPlugins = await this.prisma.installedPlugin.findMany({
+            where: { botId, sourceType: 'GITHUB' },
         });
         const updatesAvailable = [];
         const catalogMapByRepo = new Map();
         const catalogMapByName = new Map();
         const catalogMapByRepoName = new Map();
-        const latestTagCache = new Map();
 
         for (const item of catalog) {
-            const normalizedRepoUrl = normalizeGithubRepoUrl(item.repoUrl);
+            const normalizedRepoUrl = tryNormalizeGithubRepoUrl(item.repoUrl);
             if (normalizedRepoUrl) {
                 catalogMapByRepo.set(normalizedRepoUrl, item);
                 const repoName = getGithubRepoName(normalizedRepoUrl);
@@ -607,14 +397,14 @@ class PluginManager {
 
         for (const plugin of githubPlugins) {
             try {
-                const normalizedSourceUri = normalizeGithubRepoUrl(plugin.sourceUri);
+                const normalizedSourceUri = tryNormalizeGithubRepoUrl(plugin.sourceUri);
                 const repoName = getGithubRepoName(normalizedSourceUri || plugin.sourceUri);
                 const catalogInfo =
                     (normalizedSourceUri ? catalogMapByRepo.get(normalizedSourceUri) : null) ||
                     catalogMapByName.get(String(plugin.name).toLowerCase()) ||
                     (repoName ? catalogMapByRepoName.get(repoName) : null);
 
-                const targetRepoUrl = catalogInfo?.repoUrl || normalizedSourceUri || normalizeGithubRepoUrl(plugin.sourceUri) || plugin.sourceUri;
+                const targetRepoUrl = catalogInfo?.repoUrl || normalizedSourceUri || tryNormalizeGithubRepoUrl(plugin.sourceUri) || plugin.sourceUri;
                 let latestTagRaw =
                     catalogInfo?.latestTag ||
                     catalogInfo?.recommendedVersion ||
@@ -623,26 +413,19 @@ class PluginManager {
                     catalogInfo?.tag;
 
                 if (!latestTagRaw) {
-                    const cacheKey = targetRepoUrl || plugin.name;
-                    if (latestTagCache.has(cacheKey)) {
-                        latestTagRaw = latestTagCache.get(cacheKey);
-                    } else {
-                        const fetchedTag = targetRepoUrl ? await fetchLatestGithubVersionTag(targetRepoUrl) : null;
-                        latestTagCache.set(cacheKey, fetchedTag);
-                        latestTagRaw = fetchedTag;
-                    }
+                    latestTagRaw = await this._resolveLatestTagWithCache(targetRepoUrl);
                 }
 
                 let latestVersionRaw = latestTagRaw;
                 if (!latestVersionRaw && targetRepoUrl) {
-                    latestVersionRaw = await fetchGithubPackageVersion(
+                    latestVersionRaw = await this._resolveLatestVersionWithCache(
                         targetRepoUrl,
                         plugin.sourceRefType === 'branch' ? plugin.sourceRef : null
                     );
                 }
 
                 if (!latestVersionRaw) continue;
-                
+
                 const localSemver = semver.coerce(plugin.version);
                 const remoteSemver = semver.coerce(latestVersionRaw);
                 if (!localSemver || !remoteSemver) continue;
@@ -666,86 +449,124 @@ class PluginManager {
     }
 
     async updatePlugin(pluginId, targetTag = null, targetRepoUrl = null) {
-        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin || plugin.sourceType !== 'GITHUB') {
             throw new Error('Плагин не найден или не является GitHub-плагином.');
         }
 
-        console.log(`[PluginManager] Начало обновления плагина ${plugin.name}${targetTag ? ` до версии ${targetTag}` : ''}...`);
-
         const repoUrl = targetRepoUrl || plugin.sourceUri;
         const botId = plugin.botId;
         const oldVersion = plugin.version;
+        const oldPath = plugin.path;
 
         const backupData = {
             name: plugin.name,
             settings: plugin.settings,
             isEnabled: plugin.isEnabled,
         };
-        console.log(`[PluginManager] Настройки плагина ${plugin.name} сохранены для миграции.`);
 
-        await this.deletePlugin(pluginId);
-        console.log(`[PluginManager] Старая версия ${plugin.name} удалена, устанавливаем новую...`);
+        let backupPath = null;
+        if (oldPath && await fse.pathExists(oldPath)) {
+            backupPath = `${oldPath}.bak-${Date.now()}`;
+            try {
+                await fse.move(oldPath, backupPath, { overwrite: true });
+            } catch (moveError) {
+                console.warn(`[PluginManager] Не удалось создать резервную копию ${oldPath}: ${moveError.message}`);
+                backupPath = null;
+            }
+        }
 
-        const newPlugin = await this.installFromGithub(botId, repoUrl, prisma, true, targetTag);
+        try {
+            await this.deletePlugin(pluginId);
+        } catch (deleteError) {
+            if (backupPath) {
+                await fse.move(backupPath, oldPath, { overwrite: true }).catch(() => {});
+            }
+            throw deleteError;
+        }
+
+        let newPlugin;
+        try {
+            newPlugin = await this.installFromGithub(botId, repoUrl, this.prisma, true, targetTag);
+        } catch (installError) {
+            if (backupPath) {
+                try {
+                    await fse.move(backupPath, oldPath, { overwrite: true });
+                    const restored = await this.registerPlugin(botId, oldPath, 'GITHUB', repoUrl, this.prisma, {
+                        sourceRefType: plugin.sourceRefType,
+                        sourceRef: plugin.sourceRef,
+                    });
+                    await this.prisma.installedPlugin.update({
+                        where: { id: restored.id },
+                        data: {
+                            settings: backupData.settings,
+                            isEnabled: backupData.isEnabled,
+                        },
+                    });
+                    await this.loadPluginGraphs(botId, restored.id, oldPath);
+                    if (this.botManager) {
+                        await this.botManager.reloadPlugins(botId);
+                    }
+                    console.warn(`[PluginManager] Обновление ${plugin.name} провалилось, восстановлена прежняя версия ${oldVersion}.`);
+                } catch (restoreError) {
+                    console.error(`[PluginManager] Не удалось восстановить плагин ${plugin.name} после неудачного обновления:`, restoreError);
+                }
+            }
+            throw installError;
+        }
+
+        if (backupPath) {
+            await safeRemove(backupPath);
+        }
 
         const oldMajor = semver.major(semver.coerce(oldVersion) || '0.0.0');
         const newMajor = semver.major(semver.coerce(newPlugin.version) || '0.0.0');
         const isMajorUpdate = newMajor > oldMajor;
 
         if (isMajorUpdate) {
-            console.log(`[PluginManager] Мажорное обновление ${oldVersion} → ${newPlugin.version}. Настройки сброшены к дефолтным.`);
-            await prisma.installedPlugin.update({
+            await this.prisma.installedPlugin.update({
                 where: { id: newPlugin.id },
                 data: { isEnabled: backupData.isEnabled },
             });
-        } else if (backupData.settings && newPlugin) {
+        } else if (backupData.settings) {
             try {
-                await prisma.installedPlugin.update({
+                await this.prisma.installedPlugin.update({
                     where: { id: newPlugin.id },
                     data: {
                         settings: backupData.settings,
                         isEnabled: backupData.isEnabled,
                     },
                 });
-                console.log(`[PluginManager] Настройки успешно восстановлены для ${plugin.name}`);
             } catch (settingsError) {
                 console.error(`[PluginManager] Не удалось восстановить настройки для ${plugin.name}:`, settingsError);
             }
         }
 
-        // Вызываем хук onUpdate для миграции данных плагина
         try {
-            const pluginHooks = new PluginHooks({ prisma });
+            const pluginHooks = new PluginHooks({ prisma: this.prisma });
             await pluginHooks.callOnUpdate(newPlugin.id, oldVersion, newPlugin.version);
         } catch (hookError) {
             console.error(`[PluginManager] Ошибка выполнения хука onUpdate для ${plugin.name}:`, hookError);
-            // Не прерываем обновление из-за ошибки в хуке
         }
 
         return newPlugin;
     }
 
     async loadPluginGraphs(botId, pluginId, pluginPath) {
-        const plugin = await prisma.installedPlugin.findUnique({
-            where: { id: pluginId }
-        });
-        
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin) {
             console.error(`[PluginManager] Плагин с ID ${pluginId} не найден`);
             return;
         }
+
         try {
             const graphDir = path.join(pluginPath, 'graph');
             if (!await fse.pathExists(graphDir)) {
-                console.log(`[PluginManager] Папка graph не найдена в плагине: ${graphDir}`);
                 return;
             }
 
             const graphFiles = await fse.readdir(graphDir);
-            const jsonFiles = graphFiles.filter(file => file.endsWith('.json'));
-
-            console.log(`[PluginManager] Найдено ${jsonFiles.length} файлов графов в плагине`);
+            const jsonFiles = graphFiles.filter((file) => file.endsWith('.json'));
 
             for (const fileName of jsonFiles) {
                 try {
@@ -753,46 +574,31 @@ class PluginManager {
                     const graphPath = path.join(graphDir, fileName);
                     const graphData = await fse.readJson(graphPath);
 
+                    const hasCommandNode = graphData.nodes?.some((node) => node.type === 'event:command');
+                    const hasEventNode = graphData.nodes?.some((node) => node.type?.startsWith('event:') && node.type !== 'event:command');
 
-                    
-                    const hasCommandNode = graphData.nodes?.some(node => node.type === 'event:command');
-                    const hasEventNode = graphData.nodes?.some(node => node.type?.startsWith('event:') && node.type !== 'event:command');
-                    
-                    const isCommand = hasCommandNode;
-                    const isEventGraph = hasEventNode;
-
-                    if (isEventGraph) {
-                        const existingEventGraph = await prisma.eventGraph.findFirst({
-                            where: { botId, name: graphName }
+                    if (hasEventNode) {
+                        const existing = await this.prisma.eventGraph.findFirst({
+                            where: { botId, name: graphName, pluginOwnerId: pluginId },
                         });
+                        if (existing) continue;
 
-                        if (existingEventGraph) {
-                            console.log(`[PluginManager] Граф события ${graphName} уже существует, пропускаем`);
-                            continue;
-                        }
-
-                        const newEventGraph = await prisma.eventGraph.create({
+                        await this.prisma.eventGraph.create({
                             data: {
                                 botId,
                                 name: graphName,
                                 graphJson: JSON.stringify(graphData),
                                 isEnabled: true,
-                                pluginOwnerId: pluginId
-                            }
+                                pluginOwnerId: pluginId,
+                            },
                         });
-
-                        console.log(`[PluginManager] Загружен граф события: ${graphName} (ID: ${newEventGraph.id})`);
-                    } else if (isCommand) {
-                        const existingCommand = await prisma.command.findFirst({
-                            where: { botId, name: graphName }
+                    } else if (hasCommandNode) {
+                        const existing = await this.prisma.command.findFirst({
+                            where: { botId, name: graphName, pluginOwnerId: pluginId },
                         });
+                        if (existing) continue;
 
-                        if (existingCommand) {
-                            console.log(`[PluginManager] Команда ${graphName} уже существует, пропускаем`);
-                            continue;
-                        }
-
-                        const newCommand = await prisma.command.create({
+                        await this.prisma.command.create({
                             data: {
                                 botId,
                                 name: graphName,
@@ -801,15 +607,12 @@ class PluginManager {
                                 isEnabled: true,
                                 pluginOwnerId: pluginId,
                                 owner: `plugin:${plugin.name}`,
-                                isVisual: true
-                            }
+                                isVisual: true,
+                            },
                         });
-
-                        console.log(`[PluginManager] Загружена команда: ${graphName} (ID: ${newCommand.id}) с pluginOwnerId: ${pluginId}`);
                     } else {
                         console.warn(`[PluginManager] Неизвестный тип графа в файле ${fileName}, пропускаем`);
                     }
-
                 } catch (error) {
                     console.error(`[PluginManager] Ошибка загрузки графа ${fileName}:`, error);
                 }
@@ -820,29 +623,21 @@ class PluginManager {
     }
 
     async clearPluginData(pluginId) {
-        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin) {
             throw new Error('Плагин не найден.');
         }
 
-        console.log(`[PluginManager] Очистка данных для плагина ${plugin.name} (Bot ID: ${plugin.botId})`);
-
-        const { count } = await prisma.pluginDataStore.deleteMany({
-            where: {
-                pluginName: plugin.name,
-                botId: plugin.botId,
-            },
+        const { count } = await this.prisma.pluginDataStore.deleteMany({
+            where: { pluginName: plugin.name, botId: plugin.botId },
         });
 
-        console.log(`[PluginManager] Удалено ${count} записей из хранилища.`);
         return { count };
     }
 
     async reloadLocalPlugin(pluginId) {
-        const plugin = await prisma.installedPlugin.findUnique({ where: { id: pluginId } });
-        if (!plugin) {
-            throw new Error('Плагин не найден.');
-        }
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
+        if (!plugin) throw new Error('Плагин не найден.');
 
         if (plugin.sourceType !== 'LOCAL' && plugin.sourceType !== 'LOCAL_IDE') {
             throw new Error('Перезагрузка доступна только для локальных плагинов.');
@@ -850,12 +645,9 @@ class PluginManager {
 
         const pluginPath = plugin.path;
         const packageJsonPath = path.join(pluginPath, 'package.json');
-
         if (!await fse.pathExists(packageJsonPath)) {
             throw new Error(`package.json не найден: ${packageJsonPath}`);
         }
-
-        console.log(`[PluginManager] Перезагрузка локального плагина ${plugin.name} из ${pluginPath}`);
 
         let packageJson;
         try {
@@ -869,13 +661,17 @@ class PluginManager {
 
         if (manifest.settings) {
             for (const [key, config] of Object.entries(manifest.settings)) {
-                if (config.default !== undefined) {
-                    defaultSettings[key] = config.default;
+                if (config?.default !== undefined) {
+                    try {
+                        defaultSettings[key] = JSON.parse(config.default);
+                    } catch {
+                        defaultSettings[key] = config.default;
+                    }
                 }
             }
         }
 
-        const updatedPlugin = await prisma.installedPlugin.update({
+        const updatedPlugin = await this.prisma.installedPlugin.update({
             where: { id: pluginId },
             data: {
                 version: packageJson.version,
@@ -884,8 +680,6 @@ class PluginManager {
                 settings: JSON.stringify(defaultSettings),
             },
         });
-
-        console.log(`[PluginManager] Плагин ${plugin.name} перезагружен. Версия: ${packageJson.version}, настройки сброшены.`);
 
         if (this.botManager) {
             await this.botManager.reloadPlugins(plugin.botId);

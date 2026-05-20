@@ -26,9 +26,15 @@ const os = require('os');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+const {
+    parseGithubRepoUrl,
+    normalizeGithubRepoUrl,
+    fetchGithubJson,
+    fetchGithubReadme,
+    renderGithubMarkdown,
+} = require('../../core/utils/github');
+
 const router = express.Router();
-const GITHUB_REQUEST_TIMEOUT_MS = 10000;
-const GITHUB_OWNER_REPO_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 const githubPreviewLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -45,142 +51,6 @@ const githubInstallLimiter = rateLimit({
     legacyHeaders: false,
     message: { message: 'Too many GitHub install requests. Try again later.' },
 });
-
-function getGithubHeaders(extra = {}) {
-    const headers = {
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'BlockMine',
-        ...extra
-    };
-
-    if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
-
-    return headers;
-}
-
-function parseGithubRepoUrl(repoUrl) {
-    if (typeof repoUrl !== 'string') {
-        throw new Error('Repository URL is required.');
-    }
-
-    const trimmed = repoUrl.trim();
-    if (!trimmed) {
-        throw new Error('Repository URL is required.');
-    }
-
-    let parsedUrl;
-    try {
-        parsedUrl = new URL(trimmed);
-    } catch (error) {
-        throw new Error('Invalid GitHub repository URL.');
-    }
-
-    if (!['github.com', 'www.github.com'].includes(parsedUrl.hostname)) {
-        throw new Error('Only GitHub repository links are supported.');
-    }
-
-    const pathParts = parsedUrl.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
-    if (pathParts.length < 2) {
-        throw new Error('GitHub repository URL must include owner and repository name.');
-    }
-
-    const owner = pathParts[0];
-    const repo = pathParts[1].replace(/\.git$/i, '');
-
-    if (!owner || !repo) {
-        throw new Error('GitHub repository URL must include owner and repository name.');
-    }
-    if (!GITHUB_OWNER_REPO_PATTERN.test(owner) || !GITHUB_OWNER_REPO_PATTERN.test(repo)) {
-        throw new Error('GitHub repository URL contains unsupported owner or repository characters.');
-    }
-
-    return {
-        owner,
-        repo,
-        normalizedUrl: `https://github.com/${owner}/${repo}`
-    };
-}
-
-function normalizeGithubRepoUrl(repoUrl) {
-    return parseGithubRepoUrl(repoUrl).normalizedUrl;
-}
-
-async function fetchGithubJson(url) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
-    let response;
-    try {
-        response = await fetch(url, {
-            headers: getGithubHeaders(),
-            signal: controller.signal
-        });
-    } finally {
-        clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-        const error = new Error(`GitHub API request failed with status ${response.status}.`);
-        error.status = response.status;
-        throw error;
-    }
-
-    return response.json();
-}
-
-async function fetchGithubReadme(owner, repo) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
-    let response;
-    try {
-        response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-            headers: getGithubHeaders({ 'Accept': 'application/vnd.github.raw+json' }),
-            signal: controller.signal
-        });
-    } finally {
-        clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-        return null;
-    }
-
-    return response.text();
-}
-
-async function renderGithubMarkdown(markdown, owner, repo) {
-    if (!markdown) {
-        return null;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
-    let response;
-    try {
-        response = await fetch('https://api.github.com/markdown', {
-            method: 'POST',
-            headers: getGithubHeaders({
-                'Accept': 'text/html',
-                'Content-Type': 'application/json',
-            }),
-            signal: controller.signal,
-            body: JSON.stringify({
-                text: markdown,
-                mode: 'gfm',
-                context: `${owner}/${repo}`
-            })
-        });
-    } finally {
-        clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-        return null;
-    }
-
-    return response.text();
-}
 
 const conditionalRestartAuth = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {

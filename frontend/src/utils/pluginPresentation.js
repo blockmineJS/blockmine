@@ -116,6 +116,36 @@ export const pluginMatchesCategory = (categories = [], selectedCategoryId = 'all
   return categories.some((category) => getPluginCategoryId(category) === selectedCategoryId);
 };
 
+export const normalizeGithubRepoUrl = (repoUrl) => {
+  if (!repoUrl || typeof repoUrl !== 'string') return null;
+  let trimmed = repoUrl.trim();
+  if (!trimmed) return null;
+
+  trimmed = trimmed.replace(/^git\+/i, '');
+
+  const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (sshMatch) {
+    return `https://github.com/${sshMatch[1].toLowerCase()}/${sshMatch[2].toLowerCase()}`;
+  }
+
+  if (/^github\.com\//i.test(trimmed)) {
+    trimmed = `https://${trimmed}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname !== 'github.com' && hostname !== 'www.github.com') return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    const owner = parts[0].toLowerCase();
+    const repo = parts[1].replace(/\.git$/i, '').toLowerCase();
+    return `https://github.com/${owner}/${repo}`;
+  } catch {
+    return null;
+  }
+};
+
 export const translatePluginSourceType = (sourceType, t) => {
   const definition = SOURCE_TYPE_DEFINITIONS[sourceType];
   if (!definition) {

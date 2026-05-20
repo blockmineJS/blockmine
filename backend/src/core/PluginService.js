@@ -1,19 +1,9 @@
-
 const fs = require('fs/promises');
 const path = require('path');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 class PluginService {
-    /**
-     * Регистрирует плагин по указанному пути к папке.
-     * Читает package.json, извлекает манифест и создает запись в БД.
-     * @param {string} directoryPath - Путь к папке с плагином.
-     * @returns {Promise<object>} - Созданный или обновленный объект плагина.
-     */
     async registerPluginFromPath(directoryPath) {
-        console.log(`[PluginService] Попытка регистрации плагина из: ${directoryPath}`);
-        
         const absolutePath = path.resolve(directoryPath);
         const packageJsonPath = path.join(absolutePath, 'package.json');
 
@@ -27,7 +17,6 @@ class PluginService {
             }
 
             const manifest = packageJson.botpanel || {};
-
             const pluginData = {
                 name: packageJson.name,
                 description: packageJson.description || '',
@@ -35,22 +24,22 @@ class PluginService {
                 path: path.join(absolutePath, packageJson.main),
                 sourceType: 'LOCAL',
                 sourceUri: absolutePath,
-                manifest: manifest,
+                manifest,
             };
 
-            const plugin = await prisma.plugin.upsert({
+            return prisma.plugin.upsert({
                 where: { name: pluginData.name },
                 update: { ...pluginData },
                 create: { ...pluginData },
             });
-
-            console.log(`[PluginService] Плагин "${plugin.name}" успешно зарегистрирован/обновлен.`);
-            return plugin;
-
         } catch (error) {
             console.error(`[PluginService] Ошибка регистрации плагина из ${directoryPath}:`, error.message);
             throw new Error(`Не удалось зарегистрировать плагин: ${error.message}`);
         }
+    }
+
+    async syncPluginsWithDb() {
+        return { ok: true };
     }
 }
 
