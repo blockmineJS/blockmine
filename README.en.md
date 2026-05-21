@@ -88,6 +88,14 @@ More examples at - https://t.me/blockmineJs
   <em>Interactive panel for working with WebSocket API</em>
 </p>
 
+### 🤖 MCP Server (for AI assistants)
+- **Built-in** [Model Context Protocol](https://modelcontextprotocol.io/) endpoint at `POST /api/mcp`
+- **25 tools**: bot management, plugins, users/groups/permissions, plugin file authoring straight on the host
+- **Auth** via Panel API Key (`pk_*`) — same keys used by the WebSocket API
+- **Connect from anywhere** — Claude Desktop, Cursor, Cline, Claude Code, and any MCP-compatible client
+- **`plugin-author` prompt** — full plugin-development guide served by the MCP itself, AI clients fetch it with a single `prompts/get`
+- **npm package [`blockmine-mcp`](https://www.npmjs.com/package/blockmine-mcp)** — thin stdio↔HTTP bridge for clients without native HTTP MCP support
+
 ---
 
 ## ✨ Quick Start with `npx`
@@ -302,9 +310,72 @@ Automate bot actions on schedule:
 
 ---
 
+## 🤖 MCP — drive BlockMine with AI assistants
+
+BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api/mcp`. Any MCP-compatible AI client — Claude Desktop, Cursor, Cline, Claude Code — can manage your bots, author plugins, read settings and logs through a normal chat with the AI.
+
+### What the AI gets through MCP
+
+- **Bots:** `list_bots`, `get_bot_states`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_bot_logs`
+- **Plugins:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `install_local_plugin`
+- **Plugin authoring on the host:** `create_plugin`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
+- **Management:** `get_bot_users`, `get_user_info`, `get_bot_groups`, `get_bot_permissions`, `get_bot_commands`
+- **`plugin-author` prompt** — the full BlockMine plugin-development guide, served by MCP and fetched by the AI with a single `prompts/get`
+
+### Setup
+
+#### 1. Get a Panel API Key
+
+In the BlockMine panel: **Settings → API Keys → Create key**. The key starts with `pk_`.
+
+#### 2a. Through the npm wrapper (recommended — works in any MCP client)
+
+```bash
+npx blockmine-mcp setup
+```
+
+The wizard asks for your panel URL and token, verifies the connection and writes the right config into Claude Desktop / Claude Code / etc.
+
+Manually for Claude Code:
+```bash
+claude mcp add blockmine --scope user \
+  -e BLOCKMINE_URL=http://localhost:3001 \
+  -e BLOCKMINE_API_TOKEN=pk_your_key \
+  -- npx -y blockmine-mcp
+```
+
+#### 2b. Native HTTP (for clients with built-in HTTP MCP support)
+
+```bash
+claude mcp add blockmine --scope user --transport http \
+  http://localhost:3001/api/mcp \
+  --header "Authorization: Bearer pk_your_key"
+```
+
+Or in `mcp.json` / `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "blockmine": {
+      "type": "http",
+      "url": "http://localhost:3001/api/mcp",
+      "headers": { "Authorization": "Bearer pk_your_key" }
+    }
+  }
+}
+```
+
+### Remote hosting
+
+The MCP endpoint comes up together with the panel. If BlockMine runs on a VPS, just use its public URL instead of `localhost:3001`. Auth is per-request via `Authorization: Bearer pk_*` — same keys as the WebSocket API.
+
+More about the npm package: [`blockmineJS/blockmine-mcp`](https://github.com/blockmineJS/blockmine-mcp).
+
+---
+
 ## 🧑‍💻 For Developers and Contributors
 
-> **🤖 For AI Agents:** If you are an AI agent that wants to create plugins for BlockMine, read the file [backend/src/ai/plugin-assistant-system-prompt.md](D:\webstormproject\blockmine\backend\src\ai\plugin-assistant-system-prompt.md) for plugin development instructions.
+> **🤖 For AI Agents:** If you are an AI agent connected via MCP, you already have the `plugin-author` prompt (call `prompts/get` with that name). Without MCP, see [backend/src/ai/plugin-assistant-system-prompt.md](./backend/src/ai/plugin-assistant-system-prompt.md).
 
 If you want to contribute to the project or run it in development mode.
 
