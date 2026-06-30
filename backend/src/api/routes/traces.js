@@ -1,9 +1,14 @@
 const express = require('express');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkBotAccess } = require('../middleware/botAccess');
 const router = express.Router();
 const { getTraceCollector } = require('../../core/services/TraceCollectorService');
 
 router.use(authenticate);
+router.use('/:botId', (req, res, next) => {
+    if (!/^\d+$/.test(req.params.botId)) return next();
+    return checkBotAccess(req, res, next);
+});
 
 /**
  * GET /api/traces/:botId

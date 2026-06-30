@@ -2,9 +2,21 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticateUniversal, authorize } = require('../middleware/auth');
+const { encrypt } = require('../../core/utils/crypto');
 const prisma = new PrismaClient();
 
 router.use(authenticateUniversal);
+
+function sanitizeProxy(proxy) {
+    if (!proxy) return proxy;
+    const { password, ...rest } = proxy;
+    return { ...rest, hasPassword: !!password };
+}
+
+function isValidPort(port) {
+    const n = parseInt(port, 10);
+    return Number.isInteger(n) && n >= 1 && n <= 65535;
+}
 
 router.get('/', authorize('proxy:list'), async (req, res) => {
     try {
@@ -17,7 +29,7 @@ router.get('/', authorize('proxy:list'), async (req, res) => {
             }
         });
         res.json({
-            items: proxies,
+            items: proxies.map(sanitizeProxy),
             total: proxies.length
         });
     } catch (error) {
@@ -40,7 +52,7 @@ router.get('/:id', authorize('proxy:list'), async (req, res) => {
         if (!proxy) {
             return res.status(404).json({ error: 'Прокси не найден' });
         }
-        res.json(proxy);
+        res.json(sanitizeProxy(proxy));
     } catch (error) {
         console.error("[API /api/proxies/:id] Ошибка получения прокси:", error);
         res.status(500).json({ error: 'Не удалось получить прокси' });
@@ -53,6 +65,9 @@ router.post('/', authorize('proxy:create'), async (req, res) => {
         if (!name || !host || !port) {
             return res.status(400).json({ error: 'Имя, хост и порт прокси обязательны' });
         }
+        if (!isValidPort(port)) {
+            return res.status(400).json({ error: 'Порт должен быть в диапазоне 1..65535' });
+        }
         if (type && !['socks5', 'http'].includes(type)) {
             return res.status(400).json({ error: 'Тип прокси должен быть socks5 или http' });
         }
@@ -63,11 +78,11 @@ router.post('/', authorize('proxy:create'), async (req, res) => {
                 host,
                 port: parseInt(port, 10),
                 username: username || null,
-                password: password || null,
+                password: password ? encrypt(password) : null,
                 note: note || null
             },
         });
-        res.status(201).json(newProxy);
+        res.status(201).json(sanitizeProxy(newProxy));
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ error: 'Прокси с таким именем уже существует' });
         console.error("[API /api/proxies] Ошибка создания прокси:", error);
@@ -86,13 +101,17 @@ router.put('/:id', authorize('proxy:create'), async (req, res) => {
             return res.status(400).json({ error: 'Тип прокси должен быть socks5 или http' });
         }
 
+        if (port !== undefined && port !== '' && !isValidPort(port)) {
+            return res.status(400).json({ error: 'Порт должен быть в диапазоне 1..65535' });
+        }
+
         const dataToUpdate = {};
         if (name !== undefined) dataToUpdate.name = name;
         if (type !== undefined) dataToUpdate.type = type;
         if (host !== undefined) dataToUpdate.host = host;
         if (port !== undefined && port !== '') dataToUpdate.port = parseInt(port, 10);
         if (username !== undefined) dataToUpdate.username = username || null;
-        if (password !== undefined) dataToUpdate.password = password || null;
+        if (password !== undefined && password !== '') dataToUpdate.password = encrypt(password);
         if (note !== undefined) dataToUpdate.note = note || null;
 
         Object.keys(dataToUpdate).forEach(k => { if (dataToUpdate[k] === undefined) delete dataToUpdate[k]; });
@@ -103,7 +122,7 @@ router.put('/:id', authorize('proxy:create'), async (req, res) => {
         }
 
         const updated = await prisma.proxy.update({ where: { id: proxyId }, data: dataToUpdate });
-        res.json(updated);
+        res.json(sanitizeProxy(updated));
     } catch (error) {
         console.error('[API /api/proxies] Ошибка обновления прокси:', error);
         res.status(500).json({ error: 'Не удалось обновить прокси' });

@@ -6,6 +6,9 @@ async function handleExecuteCommand(socket, payload) {
     const botId = socket.botId;
 
     try {
+        if (socket.permissions === 'Read') {
+            return socket.emit('command:error', { error: 'Read-only API key cannot execute commands.' });
+        }
         if (!botManager.isBotRunning(botId)) {
             return socket.emit('command:error', { error: 'Bot is not running' });
         }

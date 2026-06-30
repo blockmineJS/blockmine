@@ -36,6 +36,7 @@ class BotLifecycleService {
         this.logger = logger;
 
         this.logCache = new Map();
+        this.startingBots = new Set();
         this.crashRestartManager = new CrashRestartManager(5, 60000);
 
         this.ipcRouter = new BotIPCMessageRouter({
@@ -56,18 +57,21 @@ class BotLifecycleService {
     async startBot(botConfig) {
         const botId = botConfig.id;
 
-        if (this.processManager.isRunning(botId)) {
+        if (this.processManager.isRunning(botId) || this.startingBots.has(botId)) {
             this.appendLog(botId, `[SYSTEM-ERROR] Попытка повторного запуска. Запуск отменен.`);
             return { success: false, message: 'Бот уже запущен или запускается.' };
         }
 
+        this.startingBots.add(botId);
+        try {
         await this._syncSystemPermissions(botId);
         await this.loadConfigForBot(botId);
         this.logCache.set(botId, []);
         this.emitStatusUpdate(botId, 'starting', '');
 
-        const allPluginsForBot = await this.pluginRepository.findEnabledByBotId(botId);
-        const { sortedPlugins, hasCriticalIssues, pluginInfo } = dependencyResolver.resolve(allPluginsForBot, allPluginsForBot);
+        const allPluginsForBot = await this.pluginRepository.findByBotId(botId);
+        const enabledPluginsForBot = allPluginsForBot.filter((p) => p.isEnabled);
+        const { sortedPlugins, hasCriticalIssues, pluginInfo } = dependencyResolver.resolve(enabledPluginsForBot, allPluginsForBot);
 
         if (hasCriticalIssues) {
             this.appendLog(botId, '[DependencyManager] Обнаружены критические проблемы с зависимостями, запуск отменен.');
@@ -131,6 +135,9 @@ class BotLifecycleService {
         this.emitStatusUpdate(botId, 'starting');
 
         return child;
+        } finally {
+            this.startingBots.delete(botId);
+        }
     }
 
     async stopBot(botId) {
@@ -144,7 +151,7 @@ class BotLifecycleService {
 
             child.send({ type: 'stop' });
 
-            setTimeout(() => {
+            const killTimer = setTimeout(() => {
                 if (!child.killed) {
                     this.logger.warn({ botId }, 'Принудительное завершение процесса');
                     try {
@@ -154,6 +161,8 @@ class BotLifecycleService {
                     }
                 }
             }, 5000);
+            if (typeof killTimer.unref === 'function') killTimer.unref();
+            if (typeof child.once === 'function') child.once('exit', () => clearTimeout(killTimer));
 
             this.cache.clearBotCache(botId);
             return { success: true };

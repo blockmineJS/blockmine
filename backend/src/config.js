@@ -12,12 +12,12 @@ function generateInitialConfig() {
     console.log('[Config] Файл конфигурации не найден. Генерируем новый...');
 
     const isLinux = process.platform === 'linux';
-    
+
     const newConfig = {
         server: {
-            host: isLinux ? '0.0.0.0' : '127.0.0.1',
+            host: '127.0.0.1',
             port: 3001,
-            allowExternalAccess: isLinux,
+            allowExternalAccess: false,
         },
         security: {
             jwtSecret: crypto.randomBytes(64).toString('hex'),
@@ -39,12 +39,11 @@ function generateInitialConfig() {
     console.log('ВАЖНО: Конфигурация сгенерирована!');
     console.log(`Файл сохранен в: ${CONFIG_PATH}`);
     
-    if (isLinux) {
-        console.log('\n[Linux] Обнаружена система Linux. Внешний доступ к панели включен по умолчанию.');
-        console.log('Просмотр панели будет доступен с внешнего IP адреса вашего сервера.');
-        console.log(`Чтобы отключить это, измените "allowExternalAccess" на false в файле конфигурации:`);
-        console.log(CONFIG_PATH);
-    }
+    console.log('\nПанель по умолчанию слушает только 127.0.0.1 (локально).');
+    console.log('Для доступа извне включите "Внешний доступ" в настройках панели или установите');
+    console.log(`"allowExternalAccess": true в файле конфигурации. Рекомендуется ставить панель за`);
+    console.log('reverse-proxy с HTTPS (nginx/Caddy) и закрывать порт фаерволом:');
+    console.log(CONFIG_PATH);
     
     console.log('\nПожалуйста, сохраните этот код восстановления в безопасном месте.');
     console.log('Он понадобится для сброса пароля администратора.');

@@ -13,6 +13,22 @@ function generateApiKey() {
 }
 
 /**
+ * Проверяет, что запрошенные scope являются подмножеством прав создателя ключа.
+ * Пользователь не может выпустить ключ с правами, которых у него самого нет.
+ */
+function validateCustomScopes(requested, ownerPermissions) {
+    if (requested === undefined || requested === null) return { ok: true, value: null };
+    if (!Array.isArray(requested)) return { ok: false, error: 'customScopes должен быть массивом строк' };
+    const owner = Array.isArray(ownerPermissions) ? ownerPermissions : [];
+    if (owner.includes('*')) return { ok: true, value: requested };
+    const invalid = requested.filter((s) => typeof s !== 'string' || s === '*' || !owner.includes(s));
+    if (invalid.length > 0) {
+        return { ok: false, error: `Недостаточно прав для запрошенных scope: ${invalid.join(', ')}` };
+    }
+    return { ok: true, value: requested };
+}
+
+/**
  * GET /api/panel/api-keys
  * Получить список API ключей пользователя
  */
@@ -62,6 +78,11 @@ router.post('/', authenticateUniversal, async (req, res) => {
             return res.status(400).json({ error: 'Имя ключа обязательно' });
         }
 
+        const scopeCheck = validateCustomScopes(customScopes, req.user.permissions);
+        if (!scopeCheck.ok) {
+            return res.status(403).json({ error: scopeCheck.error });
+        }
+
         const apiKey = generateApiKey();
         const keyHash = await bcrypt.hash(apiKey, 10);
         const prefix = apiKey.substring(0, 10);
@@ -72,7 +93,7 @@ router.post('/', authenticateUniversal, async (req, res) => {
                 name: name.trim(),
                 keyHash,
                 prefix,
-                customScopes: customScopes ? JSON.stringify(customScopes) : null,
+                customScopes: scopeCheck.value ? JSON.stringify(scopeCheck.value) : null,
                 expiresAt: expiresAt ? new Date(expiresAt) : null
             }
         });

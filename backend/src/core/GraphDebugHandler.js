@@ -1,6 +1,7 @@
 const { getGlobalDebugManager } = require('./services/DebugSessionManager');
 const RewindSignal = require('./RewindSignal');
 const { MAX_RECURSION_DEPTH } = require('./config/validation');
+const { evaluateSafeExpression } = require('./utils/safeExpression');
 
 const VOLATILE_NODE_TYPES = new Set([
     'data:get_variable',
@@ -150,12 +151,7 @@ class GraphDebugHandler {
                 context: this.context
             };
 
-            const fn = new Function(
-                ...Object.keys(sandbox),
-                `return (${breakpoint.condition})`
-            );
-
-            return Boolean(fn(...Object.values(sandbox)));
+            return Boolean(evaluateSafeExpression(breakpoint.condition, sandbox));
         } catch (error) {
             console.error(`[Debug] Error evaluating breakpoint condition: ${error.message}`);
             return false;

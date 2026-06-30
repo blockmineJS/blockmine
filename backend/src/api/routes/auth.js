@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { PrismaClient } = require('@prisma/client');
 const config = require('../../config');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -11,6 +12,14 @@ const os = require('os');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Слишком много попыток. Повторите позже.' },
+});
 
 const JWT_SECRET = config.security.jwtSecret;
 const JWT_EXPIRES_IN = '7d';
@@ -112,7 +121,7 @@ router.get('/config-path', (req, res) => {
  * @desc    Создает первого пользователя с ролью администратора
  * @access  Public (только если нет других пользователей)
  */
-router.post('/setup', async (req, res) => {
+router.post('/setup', authLimiter, async (req, res) => {
     try {
         const userCount = await prisma.panelUser.count();
         if (userCount > 0) {
@@ -186,7 +195,7 @@ router.post('/setup', async (req, res) => {
  * @desc    Проверка кода восстановления
  * @access  Public
  */
-router.post('/recovery/verify', async (req, res) => {
+router.post('/recovery/verify', authLimiter, async (req, res) => {
     try {
         const { recoveryCode } = req.body;
         
@@ -247,7 +256,7 @@ router.post('/recovery/verify', async (req, res) => {
  * @desc    Сброс пароля с использованием токена
  * @access  Public (с валидным токеном сброса)
  */
-router.post('/recovery/reset', async (req, res) => {
+router.post('/recovery/reset', authLimiter, async (req, res) => {
     try {
         const { resetToken, newPassword } = req.body;
         
@@ -311,7 +320,7 @@ router.post('/recovery/reset', async (req, res) => {
  * @desc    Аутентифицирует пользователя и возвращает токен
  * @access  Public
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) {

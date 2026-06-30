@@ -12,6 +12,18 @@ class MinecraftViewerService {
         this._setupIPCHandlers();
     }
 
+    _addPendingRequest(requestId, { resolve, reject }) {
+        const timer = setTimeout(() => {
+            const pending = this.pendingRequests.get(requestId);
+            if (pending) {
+                this.pendingRequests.delete(requestId);
+                try { pending.reject(new Error('Viewer state request timed out')); } catch (e) {}
+            }
+        }, 5000);
+        if (timer.unref) timer.unref();
+        this.pendingRequests.set(requestId, { resolve, reject, timer });
+    }
+
     _setupNamespace() {
         this.viewerNamespace.on('connection', (socket) => {
             this.logger.info(`[MinecraftViewer] Client connected: ${socket.id}`);
@@ -34,21 +46,23 @@ class MinecraftViewerService {
                 this.logger.info(`[MinecraftViewer] Socket ${socket.id} connected to bot ${botId}`);
 
                 const requestId = uuidv4();
-                this.processManager.sendMessage(botId, {
+                const sent = this.processManager.sendMessage(botId, {
                     type: 'viewer:get_state',
                     requestId,
                     includeBlocks: true
                 });
 
-                this.pendingRequests.set(requestId, {
-                    resolve: (state) => {
-                        socket.emit('viewer:connected', { botId });
-                        socket.emit('viewer:state', state);
-                    },
-                    reject: (error) => {
-                        socket.emit('viewer:error', { message: error.message });
-                    }
-                });
+                if (sent) {
+                    this._addPendingRequest(requestId, {
+                        resolve: (state) => {
+                            socket.emit('viewer:connected', { botId });
+                            socket.emit('viewer:state', state);
+                        },
+                        reject: (error) => {
+                            socket.emit('viewer:error', { message: error.message });
+                        }
+                    });
+                }
 
                 this._startStateStream(botId);
             });
@@ -99,6 +113,7 @@ class MinecraftViewerService {
             if (message.type === 'viewer:state_response') {
                 const pending = this.pendingRequests.get(message.requestId);
                 if (pending) {
+                    if (pending.timer) clearTimeout(pending.timer);
                     pending.resolve(message.payload);
                     this.pendingRequests.delete(message.requestId);
                 }
@@ -139,13 +154,14 @@ class MinecraftViewerService {
                     const shouldSendBlocks = tickCounter % 60 === 0;
 
                     const requestId = uuidv4();
-                    this.processManager.sendMessage(botId, {
+                    const sent = this.processManager.sendMessage(botId, {
                         type: 'viewer:get_state',
                         requestId,
                         includeBlocks: shouldSendBlocks
                     });
 
-                    this.pendingRequests.set(requestId, {
+                    if (sent) {
+                    this._addPendingRequest(requestId, {
                         resolve: (state) => {
                             const currentPos = state.position;
 
@@ -207,6 +223,7 @@ class MinecraftViewerService {
                         },
                         reject: () => {}
                     });
+                    }
                 } else {
                     clearInterval(interval);
                 }

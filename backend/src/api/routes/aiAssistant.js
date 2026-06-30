@@ -9,6 +9,19 @@ const Diff = require('diff');
 
 const prisma = new PrismaClient();
 const { botManager } = require('../../core/services');
+const { assertPublicUrl } = require('../../core/utils/ssrfGuard');
+
+async function validateApiEndpoint(apiEndpoint, res) {
+    if (apiEndpoint && apiEndpoint !== 'https://openrouter.ai/api/v1') {
+        try {
+            await assertPublicUrl(apiEndpoint);
+        } catch (e) {
+            res.status(400).json({ error: `Недопустимый apiEndpoint: ${e.message}` });
+            return false;
+        }
+    }
+    return true;
+}
 
 // Хранилище истории чатов в памяти: Map<"botId_pluginName", messages[]>
 const chatHistoryStore = new Map();
@@ -964,6 +977,8 @@ router.post('/chat', resolvePluginPath, async (req, res) => {
         const { message, provider, apiKey, apiEndpoint, model, history, includeFiles, proxy, applyMode, temperature, maxTokens, customSystemPrompt, aiMode, autoFormat } = req.body;
         const { botId, pluginName } = req.params;
 
+        if (!(await validateApiEndpoint(apiEndpoint, res))) return;
+
         // Проверка rate limit (защита от злоупотребления)
         const rateLimitKey = `${botId}_${pluginName}`;
         if (!checkRateLimit(rateLimitKey)) {
@@ -1280,6 +1295,8 @@ router.post('/inline', resolvePluginPath, async (req, res) => {
     try {
         const { prompt, systemInstruction, action, context, provider, apiKey, apiEndpoint, model, proxy, temperature, maxTokens } = req.body;
         const { botId, pluginName } = req.params;
+
+        if (!(await validateApiEndpoint(apiEndpoint, res))) return;
 
         const rateLimitKey = `${botId}_${pluginName}_inline`;
         if (!checkRateLimit(rateLimitKey)) {

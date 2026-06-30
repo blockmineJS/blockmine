@@ -124,10 +124,10 @@ router.get('/:graphId',
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { graphId } = req.params;
-    const eventGraph = await prisma.eventGraph.findUnique({ 
-      where: { id: parseInt(graphId) },
-      include: { 
+    const { graphId, botId } = req.params;
+    const eventGraph = await prisma.eventGraph.findFirst({
+      where: { id: parseInt(graphId), botId: parseInt(botId) },
+      include: {
         triggers: true,
         pluginOwner: {
           select: {
@@ -137,9 +137,9 @@ router.get('/:graphId',
             sourceType: true
           }
         }
-      } 
+      }
     });
-    
+
 
     if (!eventGraph) {
       return res.status(404).json({ error: 'Event graph not found' });
@@ -163,12 +163,20 @@ router.put('/:graphId',
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { graphId } = req.params;
+    const { graphId, botId } = req.params;
     const { name, isEnabled, graphJson, variables, pluginOwnerId } = req.body;
     
 
 
     try {
+      const owned = await prisma.eventGraph.findFirst({
+        where: { id: parseInt(graphId), botId: parseInt(botId) },
+        select: { id: true }
+      });
+      if (!owned) {
+        return res.status(404).json({ error: 'Event graph not found' });
+      }
+
       const dataToUpdate = {};
       if (name !== undefined) dataToUpdate.name = name;
       if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
@@ -246,11 +254,14 @@ router.delete('/:graphId',
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    const { graphId } = req.params;
+    const { graphId, botId } = req.params;
     try {
-      await prisma.eventGraph.delete({
-        where: { id: parseInt(graphId) },
+      const result = await prisma.eventGraph.deleteMany({
+        where: { id: parseInt(graphId), botId: parseInt(botId) },
       });
+      if (result.count === 0) {
+        return res.status(404).json({ error: 'Event graph not found' });
+      }
       res.status(204).send();
     } catch (error) {
       console.error('Failed to delete event graph:', error);
@@ -268,10 +279,10 @@ router.get('/:graphId/export',
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { graphId } = req.params;
+    const { graphId, botId } = req.params;
     try {
-      const eventGraph = await prisma.eventGraph.findUnique({
-        where: { id: parseInt(graphId) },
+      const eventGraph = await prisma.eventGraph.findFirst({
+        where: { id: parseInt(graphId), botId: parseInt(botId) },
         include: { triggers: true },
       });
 
@@ -394,8 +405,8 @@ router.post('/:graphId/duplicate',
     const { botId, graphId } = req.params;
 
     try {
-      const originalGraph = await prisma.eventGraph.findUnique({
-        where: { id: parseInt(graphId) },
+      const originalGraph = await prisma.eventGraph.findFirst({
+        where: { id: parseInt(graphId), botId: parseInt(botId) },
         include: { triggers: true },
       });
 

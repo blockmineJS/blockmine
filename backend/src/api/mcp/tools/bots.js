@@ -34,10 +34,26 @@ function register(server, { user }) {
     }));
 
     server.registerTool('get_bot_states', {
-        description: 'Get the running state of every bot (running/stopped, uptime, etc).',
+        description: 'Get the running state of every bot accessible to the current API key (running/stopped, uptime, etc).',
         inputSchema: {},
     }, wrap('get_bot_states', async () => {
-        return ok(botManager.getFullState());
+        const allowedIds = await getAllowedBotIds(user.userId);
+        const state = botManager.getFullState();
+        if (allowedIds === null) return ok(state);
+        const allowed = new Set(allowedIds);
+        const filterByBotId = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+            const out = {};
+            for (const key of Object.keys(obj)) {
+                if (allowed.has(parseInt(key, 10))) out[key] = obj[key];
+            }
+            return out;
+        };
+        const filtered = {};
+        for (const topKey of Object.keys(state)) {
+            filtered[topKey] = filterByBotId(state[topKey]);
+        }
+        return ok(filtered);
     }));
 
     server.registerTool('start_bot', {

@@ -9,9 +9,21 @@ const { getTraceCollector } = require('../core/services/TraceCollectorService');
 const { initializeDebugManager, getGlobalDebugManager } = require('../core/services/DebugSessionManager');
 const { initializeCollaborationManager, getGlobalCollaborationManager } = require('../core/services/GraphCollaborationManager');
 const MinecraftViewerService = require('../core/services/MinecraftViewerService');
+const { userCanAccessBot } = require('../api/middleware/botAccess');
 
 let io;
 let minecraftViewerService;
+
+async function socketCanAccessBot(socket, botId) {
+    const userId = socket.decoded?.userId;
+    const id = parseInt(botId, 10);
+    if (!userId || Number.isNaN(id)) return false;
+    try {
+        return await userCanAccessBot(userId, id);
+    } catch {
+        return false;
+    }
+}
 
 // Буфер логов для каждого плагина (последние 100 логов)
 const pluginLogsBuffer = new Map(); // key: 'botId:pluginName', value: array of logs
@@ -26,7 +38,8 @@ function initializeSocket(httpServer) {
 
     io = new Server(httpServer, {
         cors: corsOptions,
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        maxHttpBufferSize: 1e6
     });
 
     // Инициализируем TraceCollector с Socket.IO
@@ -55,19 +68,21 @@ function initializeSocket(httpServer) {
         logger
     });
 
-    io.on('connection', (socket) => {
-        // Сохраняем decoded информацию о пользователе из токена
+    io.use((socket, next) => {
         const token = socket.handshake?.auth?.token;
-        if (token) {
-            const jwt = require('jsonwebtoken');
-            const config = require('../config');
-            try {
-                socket.decoded = jwt.verify(token, config.security.jwtSecret, { algorithms: ['HS256'] });
-            } catch (e) {
-                console.warn('[Socket] Failed to decode token:', e.message);
-            }
+        if (!token) {
+            return next(new Error('unauthorized'));
         }
+        try {
+            const jwt = require('jsonwebtoken');
+            socket.decoded = jwt.verify(token, config.security.jwtSecret, { algorithms: ['HS256'] });
+            return next();
+        } catch (e) {
+            return next(new Error('unauthorized'));
+        }
+    });
 
+    io.on('connection', (socket) => {
         presence.handleConnection(io, socket);
 
         socket.on('disconnect', () => {
@@ -87,11 +102,15 @@ function initializeSocket(httpServer) {
             }
         });
 
-        socket.on('plugin:ui:subscribe', ({ botId, pluginName }) => {
+        socket.on('plugin:ui:subscribe', async ({ botId, pluginName }) => {
+            if (!await socketCanAccessBot(socket, botId)) return;
             botManager.subscribeToPluginUi(botId, pluginName, socket);
         });
 
-        socket.on('debug:join', ({ botId, graphId }) => {
+        socket.on('debug:join', async ({ botId, graphId }) => {
+            if (!await socketCanAccessBot(socket, botId)) {
+                return socket.emit('debug:error', { message: 'Access denied' });
+            }
             try {
                 const debugManager = getGlobalDebugManager();
                 const username = socket.decoded?.username || 'Anonymous';
@@ -255,6 +274,7 @@ function initializeSocket(httpServer) {
 
         // Hot reload графов при сохранении
         socket.on('graph:updated', async ({ botId, graphId }) => {
+            if (!await socketCanAccessBot(socket, botId)) return;
 
             try {
                 const eventGraphManager = botManager.eventGraphManager;
@@ -391,7 +411,8 @@ function initializeSocket(httpServer) {
         });
 
         // Plugin Logs - подписка на логи плагина
-        socket.on('subscribe-plugin-logs', ({ botId, pluginName }) => {
+        socket.on('subscribe-plugin-logs', async ({ botId, pluginName }) => {
+            if (!await socketCanAccessBot(socket, botId)) return;
             const room = `plugin-logs:${botId}:${pluginName}`;
             socket.join(room);
 

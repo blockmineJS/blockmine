@@ -92,7 +92,12 @@ async function buildPluginDefaultSettings(plugin, manifest, sendLog) {
     for (const key of Object.keys(manifest.settings)) {
         const config = manifest.settings[key];
         if (config.type === 'json_file' && config.defaultPath) {
-            const configFilePath = path.join(plugin.path, config.defaultPath);
+            const configFilePath = path.resolve(plugin.path, config.defaultPath);
+            if (!isPathInside(path.resolve(plugin.path), configFilePath)) {
+                sendLog(`[PluginLoader] WARN: defaultPath '${config.defaultPath}' выходит за пределы плагина ${plugin.name}, пропускаем.`);
+                defaultSettings[key] = config.type === 'string[]' ? [] : {};
+                continue;
+            }
             try {
                 const fileContent = await fs.readFile(configFilePath, 'utf-8');
                 defaultSettings[key] = JSON.parse(fileContent);
@@ -146,9 +151,66 @@ function invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog) {
 }
 
 function clearRequireCacheForPath(targetPath) {
+    if (!targetPath) return;
+    const normalized = path.resolve(targetPath);
+    const prefix = normalized + path.sep;
     for (const key of Object.keys(require.cache)) {
-        if (key.startsWith(targetPath)) {
+        if (key === normalized || key.startsWith(prefix)) {
             delete require.cache[key];
+        }
+    }
+}
+
+function isPathInside(parent, child) {
+    const rel = path.relative(parent, child);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+function trackEmitter(bot, emitter) {
+    if (!emitter || emitter.__bmListenerTracked) return;
+    if (typeof emitter.on !== 'function' || typeof emitter.removeListener !== 'function') return;
+    emitter.__bmListenerTracked = true;
+    for (const method of ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener']) {
+        const original = emitter[method];
+        if (typeof original !== 'function') continue;
+        emitter[method] = function (event, handler) {
+            const active = bot.__activePluginCleanup;
+            if (active && typeof handler === 'function') {
+                active.listeners.push({ emitter, event, handler });
+            }
+            return original.call(this, event, handler);
+        };
+    }
+}
+
+async function teardownPreviousPlugins(bot) {
+    const cleanups = bot.__pluginCleanups;
+    if (!Array.isArray(cleanups) || cleanups.length === 0) return;
+    const sendLog = bot.sendLog || console.log;
+
+    for (const cleanup of cleanups.splice(0)) {
+        for (const { emitter, event, handler } of cleanup.listeners) {
+            try {
+                emitter.removeListener(event, handler);
+            } catch {
+            }
+        }
+        try {
+            const mod = cleanup.module;
+            const onUnload = mod && typeof mod.onUnload === 'function'
+                ? mod.onUnload
+                : (mod && mod.default && typeof mod.default.onUnload === 'function' ? mod.default.onUnload : null);
+            if (onUnload) {
+                await onUnload({ botId: bot.config.id, bot });
+            }
+        } catch (error) {
+            sendLog(`[PluginLoader] [WARN] Ошибка onUnload для ${cleanup.name}: ${error.message}`);
+        }
+        if (bot.pluginRegistry && cleanup.name) {
+            try {
+                bot.pluginRegistry.delete(cleanup.name);
+            } catch {
+            }
         }
     }
 }
@@ -221,13 +283,22 @@ async function tryAutoInstallAndReload({ plugin, missingModule, pluginRequire, l
 }
 
 async function initializePlugins(bot, installedPlugins = [], prisma) {
+    const sendLog = bot.sendLog || console.log;
+
+    await teardownPreviousPlugins(bot);
+    bot.__pluginCleanups = [];
+    bot.__activePluginCleanup = null;
+    trackEmitter(bot, bot);
+    trackEmitter(bot, bot.events);
+
     if (!installedPlugins.length) return;
 
-    const sendLog = bot.sendLog || console.log;
     sendLog(`[PluginLoader] Загрузка ${installedPlugins.length} плагинов...`);
 
     for (const plugin of installedPlugins) {
         if (!plugin?.path) continue;
+
+        const cleanup = { name: plugin.name, listeners: [], module: null };
 
         try {
             const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
@@ -241,7 +312,9 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
             const pluginRequire = createRequire(entryPointPath);
 
             const loadAndInit = async () => {
+                clearRequireCacheForPath(plugin.path);
                 const pluginModule = await loadPluginModule(entryPointPath, pluginRequire);
+                cleanup.module = pluginModule;
                 const pluginConsole = createPluginConsole(bot.config.id, plugin.name, global.console);
                 bot.console = pluginConsole;
                 const pluginOptions = { settings: finalSettings, store, console: pluginConsole };
@@ -250,35 +323,42 @@ async function initializePlugins(bot, installedPlugins = [], prisma) {
 
             sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version})`);
 
+            bot.__pluginCleanups.push(cleanup);
+            bot.__activePluginCleanup = cleanup;
             try {
-                await loadAndInit();
-                emitLoadSuccess(bot, plugin);
-            } catch (error) {
-                const errorString = `${error.message}\n${error.stack || ''}`;
-                if (!errorString.includes('Cannot find module')) throw error;
+                try {
+                    await loadAndInit();
+                    emitLoadSuccess(bot, plugin);
+                } catch (error) {
+                    const errorString = `${error.message}\n${error.stack || ''}`;
+                    if (!errorString.includes('Cannot find module')) throw error;
 
-                const missingModule = extractMissingModule(error.message);
-                if (!missingModule) {
-                    sendLog(`[PluginLoader] [ERROR] Не удалось определить отсутствующий модуль для плагина ${plugin.name}.`);
-                    throw error;
+                    const missingModule = extractMissingModule(error.message);
+                    if (!missingModule) {
+                        sendLog(`[PluginLoader] [ERROR] Не удалось определить отсутствующий модуль для плагина ${plugin.name}.`);
+                        throw error;
+                    }
+                    if (isFilePathLikeModule(missingModule)) {
+                        sendLog(`[PluginLoader] [ERROR] Файл не найден: ${missingModule}`);
+                        throw error;
+                    }
+
+                    const handled = await tryAutoInstallAndReload({
+                        plugin,
+                        missingModule,
+                        pluginRequire,
+                        loadAndInit,
+                        sendLog,
+                    });
+
+                    if (!handled) throw error;
+                    emitLoadSuccess(bot, plugin);
                 }
-                if (isFilePathLikeModule(missingModule)) {
-                    sendLog(`[PluginLoader] [ERROR] Файл не найден: ${missingModule}`);
-                    throw error;
-                }
-
-                const handled = await tryAutoInstallAndReload({
-                    plugin,
-                    missingModule,
-                    pluginRequire,
-                    loadAndInit,
-                    sendLog,
-                });
-
-                if (!handled) throw error;
-                emitLoadSuccess(bot, plugin);
+            } finally {
+                bot.__activePluginCleanup = null;
             }
         } catch (error) {
+            bot.__activePluginCleanup = null;
             sendLog(`[PluginLoader] [FATAL] Не удалось загрузить плагин ${plugin.name}: ${error.stack}`);
         }
     }

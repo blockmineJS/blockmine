@@ -376,7 +376,23 @@ router.put('/bot/:botId/:pluginName/store/:key', authenticateUniversal, checkBot
         const key = req.params.key;
         const { value } = req.body;
 
-        const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+        if (value === undefined) {
+            return res.status(400).json({ error: 'Поле value обязательно.' });
+        }
+
+        let stringValue;
+        if (typeof value === 'string') {
+            stringValue = value;
+        } else {
+            try {
+                stringValue = JSON.stringify(value);
+            } catch (e) {
+                return res.status(400).json({ error: 'Значение нельзя сериализовать в JSON.' });
+            }
+        }
+        if (stringValue === undefined) {
+            return res.status(400).json({ error: 'Недопустимое значение.' });
+        }
 
         const storeItem = await prisma.pluginDataStore.upsert({
             where: { pluginName_botId_key: { pluginName, botId, key } },

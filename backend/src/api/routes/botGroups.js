@@ -1,10 +1,13 @@
 const express = require('express');
 const prisma = require('../../lib/prisma');
 const { authenticateUniversal, authorize } = require('../middleware/auth');
+const { checkBotAccess } = require('../middleware/botAccess');
 const { botManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 
 const router = express.Router();
+
+router.use('/:botId/groups', authenticateUniversal, checkBotAccess);
 
 router.get('/:botId/groups', authenticateUniversal, authorize('management:view'), async (req, res) => {
     try {

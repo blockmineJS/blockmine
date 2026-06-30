@@ -62,28 +62,26 @@ export default function ImportBotDialog({ onImportSuccess, onCancel, servers }) 
     };
 
     const handleFormSubmit = async (formData) => {
+        if (!selectedFile) {
+            toast({ variant: 'destructive', title: t('import.error'), description: t('import.selectFileError') });
+            return;
+        }
+
         setIsImporting(true);
         try {
-
-            let body;
-            try {
-                body = JSON.stringify({
-                    ...formData,
-                    importData: importedData
-                });
-                console.log('[Import Create] JSON.stringify successful. Body length:', body.length);
-            } catch (e) {
-                console.error('[Import Create] Error during JSON.stringify:', e);
-                toast({ variant: 'destructive', title: t('import.clientError'), description: t('import.prepareError') + ' ' + e.message });
-                setIsImporting(false);
-                return;
-            }
+            const body = new FormData();
+            body.append('file', selectedFile);
+            Object.entries(formData).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    body.append(key, value);
+                }
+            });
 
             const data = await apiHelper('/api/bots/import/create', {
                 method: 'POST',
-                body: body,
+                body,
             });
-            
+
             onImportSuccess(data);
             toast({ title: t('import.success'), description: t('import.createSuccess') });
 

@@ -3,6 +3,7 @@ const prisma = require('../../lib/prisma');
 
 const keyCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 1000;
 
 /**
  * Аутентификация запросов Panel API с использованием API ключей
@@ -32,8 +33,10 @@ async function authenticatePanelApiKey(req, res, next) {
     }
 
     try {
-        const allKeys = await prisma.panelApiKey.findMany({
+        const prefix = apiKey.substring(0, 10);
+        const candidates = await prisma.panelApiKey.findMany({
             where: {
+                prefix,
                 isActive: true,
                 OR: [
                     { expiresAt: null },
@@ -50,7 +53,7 @@ async function authenticatePanelApiKey(req, res, next) {
         });
 
         let matchedKey = null;
-        for (const keyRecord of allKeys) {
+        for (const keyRecord of candidates) {
             if (await bcrypt.compare(apiKey, keyRecord.keyHash)) {
                 matchedKey = keyRecord;
                 break;
@@ -68,17 +71,19 @@ async function authenticatePanelApiKey(req, res, next) {
 
         let permissions;
         try {
+            const rolePermissions = JSON.parse(matchedKey.user.role.permissions);
             if (matchedKey.customScopes) {
-                permissions = JSON.parse(matchedKey.customScopes);
+                const scopes = JSON.parse(matchedKey.customScopes);
+                permissions = rolePermissions.includes('*')
+                    ? scopes
+                    : scopes.filter((s) => rolePermissions.includes(s));
             } else {
-                permissions = JSON.parse(matchedKey.user.role.permissions);
+                permissions = rolePermissions;
             }
         } catch (parseError) {
             console.error('Ошибка парсинга прав доступа:', parseError);
             return res.status(500).json({ error: 'Ошибка обработки прав доступа' });
         }
-
-        console.log(`[Panel API Key] User: ${matchedKey.user.username}, Key: ${matchedKey.name}, Permissions:`, permissions);
 
         const user = {
             id: matchedKey.user.id,
@@ -98,6 +103,10 @@ async function authenticatePanelApiKey(req, res, next) {
             prefix: matchedKey.prefix
         };
 
+        if (keyCache.size >= MAX_CACHE_SIZE) {
+            const oldest = keyCache.keys().next().value;
+            keyCache.delete(oldest);
+        }
         keyCache.set(apiKey, {
             user,
             keyData: req.apiKey,

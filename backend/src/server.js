@@ -47,8 +47,16 @@ app.set('pluginManager', pluginManager);
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use((req, res, next) => {
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+    next();
+});
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 const rootPath = path.resolve(__dirname, '..', '..');
@@ -97,7 +105,7 @@ app.use(express.static(frontendPath));
 
 app.get(/^(?!\/api).*/, (req, res) => {
     const indexPath = path.join(frontendPath, 'index.html');
-    
+
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
@@ -108,21 +116,36 @@ app.get(/^(?!\/api).*/, (req, res) => {
     }
 });
 
+app.use((err, req, res, next) => {
+    console.error('[Express Error]', err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({ error: 'Внутренняя ошибка сервера' });
+});
+
 async function runStartupMigrations() {
+    const safeParseArray = (raw) => {
+        try {
+            const v = JSON.parse(raw);
+            return Array.isArray(v) ? v : [];
+        } catch {
+            return [];
+        }
+    };
     try {
-        // Удаляем серверы с невалидными портами напрямую через SQL,
-        // потому что Prisma не может их прочитать если значение не помещается в INT
         const result = await prisma.$executeRawUnsafe(
-            `DELETE FROM Server WHERE length(CAST(port AS TEXT)) > 5 OR port > 65535 OR port < 1`
+            `UPDATE Server SET port = 25565 WHERE length(CAST(port AS TEXT)) > 5 OR port > 65535 OR port < 1`
         );
 
         if (result > 0) {
-            console.log(`[Migration] Удалено ${result} серверов с невалидными портами.`);
+            console.log(`[Migration] Исправлено ${result} серверов с невалидными портами (порт сброшен на 25565).`);
         }
 
         const adminRole = await prisma.panelRole.findUnique({ where: { name: 'Admin' } });
         if (adminRole) {
-            const permissions = JSON.parse(adminRole.permissions);
+            const permissions = safeParseArray(adminRole.permissions);
             if (permissions.includes('*')) {
                 const newPermissions = ALL_PERMISSIONS
                     .map(p => p.id)
@@ -145,7 +168,7 @@ async function runStartupMigrations() {
         const rootUser = await prisma.panelUser.findUnique({ where: { id: 1 }, include: { role: true } });
         if (rootUser && rootUser.role) {
             const allPermissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
-            const currentPermissions = JSON.parse(rootUser.role.permissions);
+            const currentPermissions = safeParseArray(rootUser.role.permissions);
 
             if (JSON.stringify(allPermissions.sort()) !== JSON.stringify(currentPermissions.sort())) {
                  await prisma.panelRole.update({
@@ -225,6 +248,13 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2 (nodemon)'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT (Ctrl+C)'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err);
+});
 
 
 module.exports = { startServer, app, server };

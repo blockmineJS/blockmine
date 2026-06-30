@@ -12,10 +12,18 @@ function parseDefaultValue(rawDefault) {
     }
 }
 
+function isPathInside(parent, child) {
+    const rel = path.relative(parent, child);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 async function resolveSettingDefault(pluginPath, config) {
     if (!config) return undefined;
     if (config.type === 'json_file' && config.defaultPath) {
-        const configFilePath = path.join(pluginPath, config.defaultPath);
+        const configFilePath = path.resolve(pluginPath, config.defaultPath);
+        if (!isPathInside(path.resolve(pluginPath), configFilePath)) {
+            return {};
+        }
         try {
             const fileContent = await fs.readFile(configFilePath, 'utf-8');
             return JSON.parse(fileContent);

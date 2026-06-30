@@ -1,8 +1,11 @@
 const express = require('express');
 const { authenticateUniversal, authorize } = require('../middleware/auth');
+const { checkBotAccess } = require('../middleware/botAccess');
 const { botManager } = require('../../core/services');
 
 const router = express.Router();
+
+router.use('/:id/status', authenticateUniversal, checkBotAccess);
 
 router.get('/:id/status', authenticateUniversal, authorize('bot:list'), async (req, res) => {
     try {

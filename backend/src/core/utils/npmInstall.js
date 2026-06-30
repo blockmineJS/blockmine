@@ -48,11 +48,11 @@ async function installDependencies(pluginPath, options = {}) {
     const hasYarnLock = await fse.pathExists(path.join(pluginPath, 'yarn.lock'));
 
     const attempts = [];
-    if (prefersPnpm || hasPnpmLock) attempts.push('pnpm install --prod --no-frozen-lockfile');
-    if (prefersYarn || hasYarnLock) attempts.push('yarn install --production --no-immutable');
-    if (hasPackageLock) attempts.push('npm ci --omit=dev --no-audit --no-fund');
-    attempts.push('npm install --omit=dev --no-audit --no-fund');
-    attempts.push('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund');
+    if (prefersPnpm || hasPnpmLock) attempts.push('pnpm install --prod --no-frozen-lockfile --ignore-scripts');
+    if (prefersYarn || hasYarnLock) attempts.push('yarn install --production --no-immutable --ignore-scripts');
+    if (hasPackageLock) attempts.push('npm ci --omit=dev --no-audit --no-fund --ignore-scripts');
+    attempts.push('npm install --omit=dev --no-audit --no-fund --ignore-scripts');
+    attempts.push('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts');
 
     for (const cmd of attempts) {
         const result = runCommand(cmd, pluginPath, { timeoutMs, sendLog });
@@ -70,7 +70,7 @@ function installSinglePackage(packageName, pluginPath, options = {}) {
         throw new Error(`Некорректное имя пакета: ${packageName}`);
     }
     const { sendLog = console.log, timeoutMs = DEFAULT_TIMEOUT_MS, legacyPeerDeps = false } = options;
-    const flags = legacyPeerDeps ? '--omit=dev --legacy-peer-deps --no-audit --no-fund' : '--omit=dev --no-audit --no-fund';
+    const flags = legacyPeerDeps ? '--omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts' : '--omit=dev --no-audit --no-fund --ignore-scripts';
     const cmd = `npm install ${packageName} ${flags}`;
     const result = runCommand(cmd, pluginPath, { timeoutMs, sendLog });
     if (!result.ok && !legacyPeerDeps) {

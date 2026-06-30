@@ -14,8 +14,9 @@ class PluginHooks {
     _clearRequireCache(pluginPath) {
         if (!pluginPath) return;
         const normalized = path.resolve(pluginPath);
+        const prefix = normalized + path.sep;
         for (const key of Object.keys(require.cache)) {
-            if (key.startsWith(normalized)) {
+            if (key === normalized || key.startsWith(prefix)) {
                 delete require.cache[key];
             }
         }
@@ -67,11 +68,12 @@ class PluginHooks {
                 ...payloadExtras,
             });
 
-            this._clearRequireCache(plugin.path);
             return true;
         } catch (error) {
             console.error(`[PluginHooks] Ошибка выполнения ${hookName} для плагина ${plugin?.name}:`, error);
             return false;
+        } finally {
+            this._clearRequireCache(plugin.path);
         }
     }
 

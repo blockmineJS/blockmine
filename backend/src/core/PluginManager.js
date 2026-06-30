@@ -15,10 +15,23 @@ const {
     fetchLatestGithubVersionTag,
 } = require('./utils/github');
 const { installDependencies } = require('./utils/npmInstall');
+const { assertSafeZip } = require('./utils/zipSafe');
 const TtlCache = require('./utils/ttlCache');
+const { deepMergeSettings } = require('./utils/settingsMerger');
+const { buildDefaultSettings } = require('./utils/pluginSettings');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
+
+function isPathInside(parent, child) {
+    const rel = path.relative(parent, child);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+function sanitizePluginDirName(name) {
+    const cleaned = String(name || '').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/^\.+/, '');
+    return cleaned || 'plugin';
+}
 
 const TELEMETRY_ENABLED = process.env.BLOCKMINE_TELEMETRY !== 'false';
 const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
@@ -120,12 +133,59 @@ class PluginManager {
     }
 
     async installFromLocalPath(botId, directoryPath) {
-        const packageJsonPath = path.join(directoryPath, 'package.json');
+        if (typeof directoryPath !== 'string' || !directoryPath.trim()) {
+            throw new Error('Не указан путь к директории плагина.');
+        }
+
+        let realSource;
+        try {
+            realSource = await fse.realpath(directoryPath);
+        } catch (e) {
+            throw new Error('Директория плагина не найдена.');
+        }
+
+        const stat = await fse.stat(realSource);
+        if (!stat.isDirectory()) {
+            throw new Error('Указанный путь не является директорией.');
+        }
+
+        const packageJsonPath = path.join(realSource, 'package.json');
+        if (!await fse.pathExists(packageJsonPath)) {
+            throw new Error('В указанной директории отсутствует package.json.');
+        }
         const packageJson = JSON.parse(await fse.readFile(packageJsonPath, 'utf-8'));
+        if (!packageJson.name || !packageJson.version) {
+            throw new Error('package.json не содержит обязательных полей name и version.');
+        }
 
         await this._logDependencyWarnings(botId, packageJson);
 
-        const newPlugin = await this.registerPlugin(botId, directoryPath, 'LOCAL', directoryPath);
+        const botPluginsDir = path.join(PLUGINS_BASE_DIR, `bot_${botId}`);
+        await fse.mkdir(botPluginsDir, { recursive: true });
+        const realBase = await fse.realpath(PLUGINS_BASE_DIR);
+
+        let managedPath;
+        if (isPathInside(realBase, realSource)) {
+            managedPath = realSource;
+        } else {
+            managedPath = path.join(botPluginsDir, sanitizePluginDirName(packageJson.name));
+            if (await fse.pathExists(managedPath)) {
+                await fse.remove(managedPath);
+            }
+            await fse.copy(realSource, managedPath, {
+                filter: (src) => {
+                    const base = path.basename(src);
+                    return base !== 'node_modules' && base !== '.git';
+                },
+            });
+        }
+
+        const preexisting = await this.prisma.installedPlugin
+            .findUnique({ where: { botId_name: { botId, name: packageJson.name } } })
+            .catch(() => null);
+        const wasNew = !preexisting;
+
+        const newPlugin = await this.registerPlugin(botId, managedPath, 'LOCAL', `local:${packageJson.name}`);
 
         try {
             reportPluginDownload(packageJson.name);
@@ -133,11 +193,21 @@ class PluginManager {
             console.error('Не удалось отправить статистику по локальному плагину', e?.message);
         }
 
-        await this._installDependencies(directoryPath);
-        await this.loadPluginGraphs(botId, newPlugin.id, directoryPath);
+        try {
+            await this._installDependencies(managedPath);
+            await this.loadPluginGraphs(botId, newPlugin.id, managedPath);
 
-        if (this.botManager) {
-            await this.botManager.reloadPlugins(botId);
+            if (this.botManager) {
+                await this.botManager.reloadPlugins(botId);
+            }
+        } catch (error) {
+            if (wasNew) {
+                await this.prisma.installedPlugin.delete({ where: { id: newPlugin.id } }).catch(() => {});
+                if (managedPath !== realSource && managedPath.startsWith(PLUGINS_BASE_DIR)) {
+                    await safeRemove(managedPath);
+                }
+            }
+            throw error;
         }
 
         return newPlugin;
@@ -153,6 +223,7 @@ class PluginManager {
         }
         const rootFolderName = zipEntries[0].entryName.split('/')[0];
         await fse.mkdir(destinationDir, { recursive: true });
+        assertSafeZip(zip, destinationDir);
         zip.extractAllTo(destinationDir, true);
         const extractedPath = path.join(destinationDir, rootFolderName);
         if (!await fse.pathExists(extractedPath)) {
@@ -227,6 +298,7 @@ class PluginManager {
         }
 
         const localPath = path.join(botPluginsDir, ownerRepo.repo);
+        let registeredPluginId = null;
 
         try {
             const packageJsonPath = path.join(extractedPath, 'package.json');
@@ -251,6 +323,7 @@ class PluginManager {
                 sourceRefType,
                 sourceRef: resolvedSourceRef,
             });
+            registeredPluginId = newPlugin.id;
 
             reportPluginDownload(packageJson.name);
 
@@ -262,6 +335,11 @@ class PluginManager {
 
             return newPlugin;
         } catch (error) {
+            if (!isUpdate && registeredPluginId !== null) {
+                await prisma.installedPlugin
+                    .delete({ where: { id: registeredPluginId } })
+                    .catch(() => {});
+            }
             await safeRemove(localPath);
             throw error;
         } finally {
@@ -305,8 +383,9 @@ class PluginManager {
     _clearPluginRequireCache(pluginPath) {
         if (!pluginPath) return;
         const normalized = path.resolve(pluginPath);
+        const prefix = normalized + path.sep;
         for (const key of Object.keys(require.cache)) {
-            if (key.startsWith(normalized)) {
+            if (key === normalized || key.startsWith(prefix)) {
                 delete require.cache[key];
             }
         }
@@ -329,10 +408,11 @@ class PluginManager {
                 if (pluginModule && typeof pluginModule.onUnload === 'function') {
                     await pluginModule.onUnload({ botId: plugin.botId, prisma: this.prisma });
                 }
-                this._clearPluginRequireCache(plugin.path);
             }
         } catch (error) {
             console.error(`[PluginManager] Ошибка при выполнении хука onUnload для плагина ${plugin.name}:`, error);
+        } finally {
+            this._clearPluginRequireCache(plugin.path);
         }
 
         try {
@@ -356,9 +436,9 @@ class PluginManager {
     async _resolveLatestTagWithCache(repoUrl) {
         if (!repoUrl) return null;
         const cached = this.latestTagCache.get(repoUrl);
-        if (cached !== null) return cached;
+        if (cached !== null) return cached.value;
         const fetched = await fetchLatestGithubVersionTag(repoUrl);
-        this.latestTagCache.set(repoUrl, fetched);
+        this.latestTagCache.set(repoUrl, { value: fetched });
         return fetched;
     }
 
@@ -366,9 +446,9 @@ class PluginManager {
         if (!repoUrl) return null;
         const cacheKey = `${repoUrl}::${ref || 'default'}`;
         const cached = this.latestVersionCache.get(cacheKey);
-        if (cached !== null) return cached;
+        if (cached !== null) return cached.value;
         const fetched = await fetchGithubPackageVersion(repoUrl, ref);
-        this.latestVersionCache.set(cacheKey, fetched);
+        this.latestVersionCache.set(cacheKey, { value: fetched });
         return fetched;
     }
 
@@ -577,22 +657,7 @@ class PluginManager {
                     const hasCommandNode = graphData.nodes?.some((node) => node.type === 'event:command');
                     const hasEventNode = graphData.nodes?.some((node) => node.type?.startsWith('event:') && node.type !== 'event:command');
 
-                    if (hasEventNode) {
-                        const existing = await this.prisma.eventGraph.findFirst({
-                            where: { botId, name: graphName, pluginOwnerId: pluginId },
-                        });
-                        if (existing) continue;
-
-                        await this.prisma.eventGraph.create({
-                            data: {
-                                botId,
-                                name: graphName,
-                                graphJson: JSON.stringify(graphData),
-                                isEnabled: true,
-                                pluginOwnerId: pluginId,
-                            },
-                        });
-                    } else if (hasCommandNode) {
+                    if (hasCommandNode) {
                         const existing = await this.prisma.command.findFirst({
                             where: { botId, name: graphName, pluginOwnerId: pluginId },
                         });
@@ -608,6 +673,21 @@ class PluginManager {
                                 pluginOwnerId: pluginId,
                                 owner: `plugin:${plugin.name}`,
                                 isVisual: true,
+                            },
+                        });
+                    } else if (hasEventNode) {
+                        const existing = await this.prisma.eventGraph.findFirst({
+                            where: { botId, name: graphName, pluginOwnerId: pluginId },
+                        });
+                        if (existing) continue;
+
+                        await this.prisma.eventGraph.create({
+                            data: {
+                                botId,
+                                name: graphName,
+                                graphJson: JSON.stringify(graphData),
+                                isEnabled: true,
+                                pluginOwnerId: pluginId,
                             },
                         });
                     } else {
@@ -657,19 +737,17 @@ class PluginManager {
         }
 
         const manifest = packageJson.botpanel || {};
-        const defaultSettings = {};
 
-        if (manifest.settings) {
-            for (const [key, config] of Object.entries(manifest.settings)) {
-                if (config?.default !== undefined) {
-                    try {
-                        defaultSettings[key] = JSON.parse(config.default);
-                    } catch {
-                        defaultSettings[key] = config.default;
-                    }
-                }
+        let savedSettings = {};
+        if (plugin.settings) {
+            try {
+                savedSettings = JSON.parse(plugin.settings) || {};
+            } catch {
+                savedSettings = {};
             }
         }
+        const defaultSettings = await buildDefaultSettings(pluginPath, manifest.settings || {});
+        const mergedSettings = deepMergeSettings(defaultSettings, savedSettings);
 
         const updatedPlugin = await this.prisma.installedPlugin.update({
             where: { id: pluginId },
@@ -677,7 +755,7 @@ class PluginManager {
                 version: packageJson.version,
                 description: packageJson.description || '',
                 manifest: JSON.stringify(manifest),
-                settings: JSON.stringify(defaultSettings),
+                settings: JSON.stringify(mergedSettings),
             },
         });
 

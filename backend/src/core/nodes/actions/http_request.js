@@ -6,6 +6,8 @@
  * @param {function} helpers.traverse - Функция для перехода к следующему узлу.
  * @param {Map} helpers.memo - Карта для мемоизации значений.
  */
+const { safeFetch } = require('../../utils/ssrfGuard');
+
 async function execute(node, context, helpers) {
     const { resolvePinValue, traverse, memo } = helpers;
 
@@ -70,7 +72,7 @@ async function execute(node, context, helpers) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const response = await fetch(url, {
+        const response = await safeFetch(url, {
             method,
             headers,
             body: requestBody,

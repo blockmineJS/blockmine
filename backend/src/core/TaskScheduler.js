@@ -5,6 +5,7 @@ const { botManager } = require('./services');
 class TaskScheduler {
     constructor() {
         this.scheduledJobs = new Map();
+        this.runningTasks = new Set();
         console.log('[TaskScheduler] Сервис планировщика инициализирован.');
     }
 
@@ -30,6 +31,11 @@ class TaskScheduler {
     }
 
     async executeTask(task) {
+        if (this.runningTasks.has(task.id)) {
+            console.warn(`[TaskScheduler] Задача "${task.name}" (ID: ${task.id}) ещё выполняется, пропускаем запуск.`);
+            return;
+        }
+        this.runningTasks.add(task.id);
         try {
             console.log(`[TaskScheduler] Выполнение задачи: "${task.name}" (ID: ${task.id}) в ${new Date().toLocaleString('ru-RU')}`);
             let botIds = [];
@@ -81,7 +87,9 @@ class TaskScheduler {
                                 console.log(`[TaskScheduler] -> Запланирован запуск бота ${botConfig.username} через 10 секунд`);
                                 setTimeout(() => {
                                     console.log(`[TaskScheduler] -> Запускаем бота ${botConfig.username}...`);
-                                    botManager.startBot(botConfig);
+                                    Promise.resolve(botManager.startBot(botConfig)).catch((err) => {
+                                        console.error(`[TaskScheduler] Ошибка отложенного запуска бота ${botId}:`, err);
+                                    });
                                 }, 10000);
                             } else {
                                 console.log(`[TaskScheduler] -> Бот ${botConfig.username} не запущен, запускаем...`);
@@ -109,6 +117,8 @@ class TaskScheduler {
             console.log(`[TaskScheduler] Задача "${task.name}" выполнена успешно`);
         } catch (error) {
             console.error(`[TaskScheduler] Критическая ошибка при выполнении задачи "${task.name}":`, error);
+        } finally {
+            this.runningTasks.delete(task.id);
         }
     }
 

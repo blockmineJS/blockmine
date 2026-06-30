@@ -54,10 +54,14 @@ async function authenticateSocket(socket, next) {
 
         let permissions;
         try {
+            const rolePermissions = JSON.parse(matchedKey.user.role.permissions);
             if (matchedKey.customScopes) {
-                permissions = JSON.parse(matchedKey.customScopes);
+                const scopes = JSON.parse(matchedKey.customScopes);
+                permissions = rolePermissions.includes('*')
+                    ? scopes
+                    : scopes.filter((s) => rolePermissions.includes(s));
             } else {
-                permissions = JSON.parse(matchedKey.user.role.permissions);
+                permissions = rolePermissions;
             }
         } catch (parseError) {
             console.error('Ошибка парсинга прав доступа:', parseError);

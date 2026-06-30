@@ -288,7 +288,9 @@ class BotIPCMessageRouter {
 
         setTimeout(() => {
             const config = { ...child.botConfig };
-            this.restartBot(botId, config);
+            Promise.resolve(this.restartBot(botId, config)).catch((err) => {
+                this.appendLog(botId, `[API] Ошибка перезапуска: ${err.message}`);
+            });
         }, 3000);
     }
 
@@ -324,7 +326,11 @@ class BotIPCMessageRouter {
         this.appendLog(botId, `[API] Credentials изменены: ${username}, рестарт...`);
         child.send({ type: 'credentials_operation_response', requestId, payload: { success: true } });
 
-        setTimeout(() => this.restartBot(botId, config), 3000);
+        setTimeout(() => {
+            Promise.resolve(this.restartBot(botId, config)).catch((err) => {
+                this.appendLog(botId, `[API] Ошибка перезапуска после смены credentials: ${err.message}`);
+            });
+        }, 3000);
     }
 
     _handleExit(botId, botConfig, code, signal) {
@@ -341,7 +347,14 @@ class BotIPCMessageRouter {
         } catch (e) {}
 
         if (code === 1) {
-            this.crashRestartManager.handleCrash(botId, botConfig, (msg) => this.appendLog(botId, msg));
+            const { shouldRestart, delay } = this.crashRestartManager.handleCrash(botId, botConfig, (msg) => this.appendLog(botId, msg));
+            if (shouldRestart) {
+                setTimeout(() => {
+                    Promise.resolve(this.restartBot(botId, botConfig)).catch((err) => {
+                        this.appendLog(botId, `[CRASH] Не удалось перезапустить бота: ${err.message}`);
+                    });
+                }, delay);
+            }
         }
     }
 }

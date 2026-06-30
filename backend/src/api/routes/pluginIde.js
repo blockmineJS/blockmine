@@ -14,6 +14,38 @@ const router = express.Router({ mergeParams: true });
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
 
+function resolveWithin(baseDir, relativePath) {
+    if (typeof relativePath !== 'string' || relativePath.length === 0) return null;
+    const target = path.resolve(baseDir, relativePath);
+    const rel = path.relative(baseDir, target);
+    if (rel !== '' && (rel.startsWith('..') || path.isAbsolute(rel))) {
+        return null;
+    }
+    return target;
+}
+
+const { execFileSync } = require('child_process');
+
+function validateGitUrl(url) {
+    if (typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed || trimmed.startsWith('-')) return false;
+    let parsed;
+    try {
+        parsed = new URL(trimmed);
+    } catch {
+        return false;
+    }
+    return parsed.protocol === 'https:' && !!parsed.hostname;
+}
+
+function runGit(args, options = {}) {
+    if (!Array.isArray(args) || args.some((a) => typeof a !== 'string')) {
+        throw new Error('Invalid git arguments');
+    }
+    return execFileSync('git', args, { stdio: 'pipe', ...options });
+}
+
 router.use(authenticate);
 
 // Debug middleware для логирования всех запросов
@@ -50,7 +82,18 @@ const resolvePluginPath = async (req, res, next) => {
             return res.status(404).json({ error: 'Директория плагина не найдена в файловой системе.' });
         }
 
-        req.pluginPath = pluginPath;
+        const realPluginPath = await fse.realpath(pluginPath);
+        let realBase;
+        try {
+            realBase = await fse.realpath(PLUGINS_BASE_DIR);
+        } catch {
+            realBase = PLUGINS_BASE_DIR;
+        }
+        if (realPluginPath !== realBase && !realPluginPath.startsWith(realBase + path.sep)) {
+            return res.status(403).json({ error: 'Путь плагина находится вне разрешённой директории.' });
+        }
+
+        req.pluginPath = realPluginPath;
         req.pluginData = plugin;
         next();
     } catch (error) {
@@ -292,20 +335,15 @@ router.get('/:pluginName/structure', resolvePluginPath, async (req, res) => {
                 const repositoryUrl = packageJson.repository?.url || packageJson.repository;
 
                 if (repositoryUrl && typeof repositoryUrl === 'string') {
-                    const { execSync } = require('child_process');
-
-                    // Валидация URL репозитория
-                    const urlPattern = /^(https?|git):\/\/[a-zA-Z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+$/;
                     const cleanUrl = repositoryUrl.replace(/^git\+/, '');
 
-                    if (!urlPattern.test(cleanUrl)) {
+                    if (!validateGitUrl(cleanUrl)) {
                         console.warn(`[Plugin IDE] Invalid repository URL format: ${cleanUrl}`);
                         throw new Error('Invalid repository URL');
                     }
 
-                    execSync('git init', { cwd: req.pluginPath });
-                    // Используем массив аргументов для безопасности
-                    execSync('git remote add origin ' + JSON.stringify(cleanUrl), { cwd: req.pluginPath });
+                    runGit(['init'], { cwd: req.pluginPath });
+                    runGit(['remote', 'add', 'origin', cleanUrl], { cwd: req.pluginPath });
 
                     console.log(`[Plugin IDE] Initialized git repository for ${req.params.pluginName} with remote: ${cleanUrl}`);
                 }
@@ -359,8 +397,8 @@ coverage/
 
 router.get('/:pluginName/file', resolvePluginPath, async (req, res) => {
     try {
-        const filePath = path.join(req.pluginPath, req.query.path);
-        if (!filePath.startsWith(req.pluginPath)) {
+        const filePath = resolveWithin(req.pluginPath, req.query.path);
+        if (!filePath) {
             return res.status(403).json({ error: 'Доступ запрещен.' });
         }
         const content = await fse.readFile(filePath, 'utf-8');
@@ -377,9 +415,9 @@ router.post('/:pluginName/file', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'File path and content are required.' });
         }
 
-        const safePath = path.resolve(req.pluginPath, relativePath);
+        const safePath = resolveWithin(req.pluginPath, relativePath);
 
-        if (!safePath.startsWith(req.pluginPath)) {
+        if (!safePath) {
             return res.status(403).json({ error: 'Доступ запрещен.' });
         }
 
@@ -421,6 +459,9 @@ router.post('/:pluginName/file', resolvePluginPath, async (req, res) => {
                     } else {
                         // Если имя изменилось, переименовать папку плагина
                         if (oldName !== newName) {
+                            if (typeof newName !== 'string' || /[\\/]/.test(newName) || newName === '.' || newName === '..' || path.isAbsolute(newName)) {
+                                return res.status(400).json({ error: 'Недопустимое имя плагина в package.json.' });
+                            }
                             const oldPath = req.pluginPath;
                             const pluginsDir = path.dirname(oldPath);
                             const newPath = path.join(pluginsDir, newName);
@@ -500,8 +541,8 @@ router.post('/:pluginName/fs', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'Operation and path are required.' });
         }
 
-        const safePath = path.resolve(req.pluginPath, relativePath);
-        if (!safePath.startsWith(req.pluginPath)) {
+        const safePath = resolveWithin(req.pluginPath, relativePath);
+        if (!safePath) {
             return res.status(403).json({ error: 'Access denied: Path is outside of plugin directory.' });
         }
 
@@ -526,8 +567,8 @@ router.post('/:pluginName/fs', resolvePluginPath, async (req, res) => {
 
             case 'rename':
                 if (!newPath) return res.status(400).json({ error: 'New path is required for rename operation.' });
-                const safeNewPath = path.resolve(req.pluginPath, newPath);
-                if (!safeNewPath.startsWith(req.pluginPath)) return res.status(403).json({ error: 'Access denied: New path is outside of plugin directory.' });
+                const safeNewPath = resolveWithin(req.pluginPath, newPath);
+                if (!safeNewPath) return res.status(403).json({ error: 'Access denied: New path is outside of plugin directory.' });
                 if (!await fse.pathExists(safePath)) return res.status(404).json({ error: 'Source file or folder not found.' });
                 if (await fse.pathExists(safeNewPath)) return res.status(409).json({ error: 'Destination path already exists.' });
 
@@ -537,8 +578,8 @@ router.post('/:pluginName/fs', resolvePluginPath, async (req, res) => {
 
             case 'move':
                 if (!newPath) return res.status(400).json({ error: 'New path is required for move operation.' });
-                const safeMoveNewPath = path.resolve(req.pluginPath, newPath);
-                if (!safeMoveNewPath.startsWith(req.pluginPath)) return res.status(403).json({ error: 'Access denied: New path is outside of plugin directory.' });
+                const safeMoveNewPath = resolveWithin(req.pluginPath, newPath);
+                if (!safeMoveNewPath) return res.status(403).json({ error: 'Access denied: New path is outside of plugin directory.' });
                 if (!await fse.pathExists(safePath)) return res.status(404).json({ error: 'Source file or folder not found.' });
 
                 if (safeMoveNewPath.startsWith(safePath + path.sep)) {
@@ -768,31 +809,28 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
         const tempDir = path.join(cwd, '..', `temp-pr-${Date.now()}`);
 
         try {
-            // Клонируем свой форк
+            if (!validateGitUrl(cleanRepoUrl)) {
+                return res.status(400).json({ error: 'Недопустимый URL репозитория.' });
+            }
+
             const forkUrl = `https://${githubToken}@github.com/${myUsername}/${repoInfo.repo}.git`;
-            cp.execSync(`git clone "${forkUrl}" "${tempDir}"`, { stdio: 'pipe' });
+            runGit(['clone', '--', forkUrl, tempDir], { stdio: 'pipe' });
 
-            process.chdir(tempDir);
+            runGit(['remote', 'add', 'upstream', cleanRepoUrl], { stdio: 'pipe', cwd: tempDir });
+            runGit(['fetch', 'upstream'], { stdio: 'pipe', cwd: tempDir });
 
-            // Добавляем оригинальный репо как upstream
-            cp.execSync(`git remote add upstream ${cleanRepoUrl}`, { stdio: 'pipe' });
-            cp.execSync('git fetch upstream', { stdio: 'pipe' });
-
-            // Определяем основную ветку оригинала
             let defaultBranch = 'main';
             try {
-                cp.execSync('git show-ref --verify refs/remotes/upstream/main', { stdio: 'pipe' });
+                runGit(['show-ref', '--verify', 'refs/remotes/upstream/main'], { stdio: 'pipe', cwd: tempDir });
             } catch {
                 defaultBranch = 'master';
             }
 
-            // Создаём ветку от upstream/main
             try {
-                cp.execSync(`git checkout -b ${branch} upstream/${defaultBranch}`, { stdio: 'pipe' });
+                runGit(['checkout', '-b', branch, `upstream/${defaultBranch}`], { stdio: 'pipe', cwd: tempDir });
             } catch (e) {
-                // Ветка может уже существовать
-                cp.execSync(`git checkout ${branch}`, { stdio: 'pipe' });
-                cp.execSync(`git reset --hard upstream/${defaultBranch}`, { stdio: 'pipe' });
+                runGit(['checkout', branch], { stdio: 'pipe', cwd: tempDir });
+                runGit(['reset', '--hard', `upstream/${defaultBranch}`], { stdio: 'pipe', cwd: tempDir });
             }
 
             // Копируем файлы из плагина
@@ -806,9 +844,9 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
             }
 
             // Коммитим изменения
-            cp.execSync('git add .', { stdio: 'pipe' });
+            runGit(['add', '.'], { stdio: 'pipe', cwd: tempDir });
             try {
-                cp.execSync(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
+                runGit(['commit', '-m', commitMessage], { stdio: 'pipe', cwd: tempDir });
             } catch (e) {
                 if (e.message.includes('nothing to commit')) {
                     return res.status(400).json({ error: 'Нет изменений для коммита.' });
@@ -817,7 +855,7 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
             }
 
             // Пушим в свой форк
-            cp.execSync(`git push origin ${branch} --force`, { stdio: 'pipe' });
+            runGit(['push', 'origin', branch, '--force'], { stdio: 'pipe', cwd: tempDir });
             console.log(`[Plugin IDE] Изменения запушены в ${myUsername}/${repoInfo.repo}:${branch}`);
 
             // Создаём Pull Request через API
@@ -864,7 +902,6 @@ router.post('/:pluginName/create-pr', resolvePluginPath, async (req, res) => {
 
         } finally {
             try {
-                process.chdir(req.pluginPath);
                 await fse.remove(tempDir);
             } catch (cleanupError) {
                 console.error('Cleanup error:', cleanupError);
@@ -897,7 +934,7 @@ router.get('/:pluginName/search', resolvePluginPath, async (req, res) => {
                 let pattern;
                 if (useRegex === 'true') {
                     try {
-                        pattern = new RegExp(query, caseSensitive === 'true' ? 'g' : 'gi');
+                        pattern = new RegExp(query, caseSensitive === 'true' ? '' : 'i');
                     } catch (e) {
                         return; // Invalid regex, skip
                     }
@@ -906,7 +943,7 @@ router.get('/:pluginName/search', resolvePluginPath, async (req, res) => {
                     const wordBoundary = wholeWord === 'true' ? '\\b' : '';
                     pattern = new RegExp(
                         `${wordBoundary}${escapedQuery}${wordBoundary}`,
-                        caseSensitive === 'true' ? 'g' : 'gi'
+                        caseSensitive === 'true' ? '' : 'i'
                     );
                 }
 
@@ -1106,7 +1143,9 @@ router.post('/:pluginName/clone', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'Git URL is required.' });
         }
 
-        const { execSync } = require('child_process');
+        if (!validateGitUrl(gitUrl)) {
+            return res.status(400).json({ error: 'Недопустимый Git URL. Разрешены только https:// адреса.' });
+        }
 
         const files = await fse.readdir(req.pluginPath);
         const nonPackageFiles = files.filter(f => f !== 'package.json');
@@ -1123,8 +1162,8 @@ router.post('/:pluginName/clone', resolvePluginPath, async (req, res) => {
         try {
             console.log(`[Plugin IDE] Cloning ${gitUrl} into ${tempDir}...`);
 
-            execSync(`git clone "${gitUrl}" "${tempDir}"`, {
-                stdio: 'inherit',
+            runGit(['clone', '--depth', '1', '--', gitUrl, tempDir], {
+                stdio: 'pipe',
                 cwd: req.pluginPath
             });
 
@@ -1560,16 +1599,14 @@ router.get('/:pluginName/git/status', resolvePluginPath, async (req, res) => {
 router.post('/:pluginName/git/add', resolvePluginPath, async (req, res) => {
     try {
         const { files } = req.body;
-        const { execSync } = require('child_process');
 
         if (!files || !Array.isArray(files) || files.length === 0) {
             return res.status(400).json({ error: 'Files array is required.' });
         }
 
         for (const file of files) {
-            execSync(`git add "${file}"`, {
-                cwd: req.pluginPath
-            });
+            if (typeof file !== 'string') continue;
+            runGit(['add', '--', file], { cwd: req.pluginPath });
         }
 
         res.json({
@@ -1587,7 +1624,6 @@ router.post('/:pluginName/git/add', resolvePluginPath, async (req, res) => {
 router.post('/:pluginName/git/reset', resolvePluginPath, async (req, res) => {
     try {
         const { files } = req.body;
-        const { execSync } = require('child_process');
 
         if (!files || !Array.isArray(files) || files.length === 0) {
             return res.status(400).json({ error: 'Files array is required.' });
@@ -1596,7 +1632,7 @@ router.post('/:pluginName/git/reset', resolvePluginPath, async (req, res) => {
         // Check if HEAD exists (repo has commits)
         let hasCommits = true;
         try {
-            execSync('git rev-parse --verify HEAD', {
+            runGit(['rev-parse', '--verify', 'HEAD'], {
                 cwd: req.pluginPath,
                 stdio: 'ignore'
             });
@@ -1606,14 +1642,11 @@ router.post('/:pluginName/git/reset', resolvePluginPath, async (req, res) => {
 
         // Reset files
         for (const file of files) {
+            if (typeof file !== 'string') continue;
             if (hasCommits) {
-                execSync(`git reset HEAD "${file}"`, {
-                    cwd: req.pluginPath
-                });
+                runGit(['reset', 'HEAD', '--', file], { cwd: req.pluginPath });
             } else {
-                execSync(`git rm --cached -f "${file}"`, {
-                    cwd: req.pluginPath
-                });
+                runGit(['rm', '--cached', '-f', '--', file], { cwd: req.pluginPath });
             }
         }
 
@@ -1632,13 +1665,12 @@ router.post('/:pluginName/git/reset', resolvePluginPath, async (req, res) => {
 router.post('/:pluginName/git/commit', resolvePluginPath, async (req, res) => {
     try {
         const { message } = req.body;
-        const { execSync } = require('child_process');
 
-        if (!message || !message.trim()) {
+        if (!message || typeof message !== 'string' || !message.trim()) {
             return res.status(400).json({ error: 'Commit message is required.' });
         }
 
-        const output = execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+        const output = runGit(['commit', '-m', message], {
             cwd: req.pluginPath,
             encoding: 'utf8'
         });
@@ -1761,12 +1793,12 @@ router.post('/:pluginName/git/sync', resolvePluginPath, async (req, res) => {
 
 router.get('/:pluginName/git/log', resolvePluginPath, async (req, res) => {
     try {
-        const { execSync } = require('child_process');
-        const { limit = 20 } = req.query;
+        const limitRaw = parseInt(req.query.limit, 10);
+        const limit = Number.isInteger(limitRaw) && limitRaw > 0 && limitRaw <= 1000 ? limitRaw : 20;
 
         let output = '';
         try {
-            output = execSync(`git log --pretty=format:"%H|||%an|||%ae|||%at|||%s" -n ${limit}`, {
+            output = runGit(['log', '--pretty=format:%H|||%an|||%ae|||%at|||%s', '-n', String(limit)], {
                 cwd: req.pluginPath,
                 encoding: 'utf8'
             });
@@ -1808,12 +1840,16 @@ router.get('/:pluginName/git/diff', resolvePluginPath, async (req, res) => {
             return res.status(400).json({ error: 'File path is required' });
         }
 
+        const safeFullPath = resolveWithin(req.pluginPath, filePath);
+        if (!safeFullPath) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
         let diff = '';
 
         if (status === '?' || status === 'A') {
             try {
-                const fullPath = path.join(req.pluginPath, filePath);
-                const content = await fse.readFile(fullPath, 'utf8');
+                const content = await fse.readFile(safeFullPath, 'utf8');
                 const lines = content.split('\n');
                 diff = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
                 diff += lines.map(line => '+' + line).join('\n');
@@ -1822,12 +1858,12 @@ router.get('/:pluginName/git/diff', resolvePluginPath, async (req, res) => {
             }
         } else {
 
-            const command = staged === 'true'
-                ? `git diff --cached "${filePath}"`
-                : `git diff "${filePath}"`;
+            const diffArgs = staged === 'true'
+                ? ['diff', '--cached', '--', filePath]
+                : ['diff', '--', filePath];
 
             try {
-                diff = execSync(command, {
+                diff = runGit(diffArgs, {
                     cwd: req.pluginPath,
                     encoding: 'utf8'
                 });
@@ -1837,8 +1873,7 @@ router.get('/:pluginName/git/diff', resolvePluginPath, async (req, res) => {
                 }
             } catch (diffError) {
                 try {
-                    const fullPath = path.join(req.pluginPath, filePath);
-                    const content = await fse.readFile(fullPath, 'utf8');
+                    const content = await fse.readFile(safeFullPath, 'utf8');
                     const lines = content.split('\n');
                     diff = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
                     diff += lines.map(line => '+' + line).join('\n');

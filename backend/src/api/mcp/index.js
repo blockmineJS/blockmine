@@ -1,11 +1,22 @@
 const express = require('express');
 const { randomUUID } = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { isInitializeRequest } = require('@modelcontextprotocol/sdk/types.js');
 const { authenticateUniversal } = require('../middleware/auth');
 const { buildMcpServer } = require('./server');
 
 const router = express.Router();
+
+const mcpLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { jsonrpc: '2.0', error: { code: -32000, message: 'Too many requests' }, id: null },
+});
+
+router.use(mcpLimiter);
 
 const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const SESSION_GC_INTERVAL_MS = 5 * 60 * 1000;
@@ -56,8 +67,16 @@ router.post('/', authenticateUniversal, async (req, res) => {
     const sessionId = getSessionId(req);
 
     if (sessionId && sessions.has(sessionId)) {
+        const entry = sessions.get(sessionId);
+        if (entry.user?.userId !== req.user?.userId) {
+            return res.status(403).json({
+                jsonrpc: '2.0',
+                error: { code: -32003, message: 'Session does not belong to this credential.' },
+                id: null,
+            });
+        }
         touchSession(sessionId);
-        return handleViaTransport(req, res, sessions.get(sessionId).transport);
+        return handleViaTransport(req, res, entry.transport);
     }
 
     if (sessionId && !sessions.has(sessionId)) {

@@ -12,6 +12,8 @@ const BreakLoopSignal = require('./BreakLoopSignal');
 
 const MAX_REWINDS = 100;
 const PIN_TYPE_EXEC = 'Exec';
+const MAX_NODE_EXECUTIONS = 50000;
+const MAX_EXECUTION_MS = 30000;
 
 class GraphExecutionEngine {
     constructor(nodeRegistry, botManagerOrApi = null) {
@@ -61,6 +63,9 @@ class GraphExecutionEngine {
             }
 
             this.debugHandler = new GraphDebugHandler(this.context);
+
+            this._stepCount = 0;
+            this._deadline = Date.now() + MAX_EXECUTION_MS;
 
             let rewindAttempts = 0;
 
@@ -244,6 +249,14 @@ class GraphExecutionEngine {
         const execCacheKey = `${node.id}_executed`;
         if (this.memo.has(execCacheKey)) return;
         this.memo.set(execCacheKey, true);
+
+        this._stepCount = (this._stepCount || 0) + 1;
+        if (this._stepCount > MAX_NODE_EXECUTIONS) {
+            throw new Error(`Превышен лимит выполнения графа (${MAX_NODE_EXECUTIONS} нод).`);
+        }
+        if (this._deadline && Date.now() > this._deadline) {
+            throw new Error('Превышено максимальное время выполнения графа.');
+        }
 
         const startTime = Date.now();
 

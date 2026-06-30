@@ -4,21 +4,22 @@
  * @param {Object} savedSettings - Сохраненные настройки
  * @returns {Object} Объединенные настройки
  */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function deepMergeSettings(defaultSettings, savedSettings) {
     const result = { ...defaultSettings };
-    
+
     for (const key in savedSettings) {
-        if (savedSettings.hasOwnProperty(key)) {
-            if (typeof savedSettings[key] === 'object' && savedSettings[key] !== null && !Array.isArray(savedSettings[key])) {
-                // Если это объект, рекурсивно объединяем
-                result[key] = deepMergeSettings(result[key] || {}, savedSettings[key]);
-            } else {
-                // Если это примитив или массив, просто заменяем
-                result[key] = savedSettings[key];
-            }
+        if (!Object.prototype.hasOwnProperty.call(savedSettings, key)) continue;
+        if (FORBIDDEN_KEYS.has(key)) continue;
+
+        if (typeof savedSettings[key] === 'object' && savedSettings[key] !== null && !Array.isArray(savedSettings[key])) {
+            result[key] = deepMergeSettings(result[key] || {}, savedSettings[key]);
+        } else {
+            result[key] = savedSettings[key];
         }
     }
-    
+
     return result;
 }
 

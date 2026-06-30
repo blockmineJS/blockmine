@@ -1121,6 +1121,7 @@ process.on('message', async (message) => {
                 }
             };
 
+            const hydrateCommands = async () => {
             bot.commands = await loadCommands();
 
             const dbCommands = await prisma.command.findMany({ where: { botId: config.id } });
@@ -1225,6 +1226,10 @@ process.on('message', async (message) => {
                     });
                 }
             }
+            };
+
+            bot.hydrateCommands = hydrateCommands;
+            await hydrateCommands();
 
             await ensurePluginDependencies(config.plugins, sendLog);
             await initializePlugins(bot, config.plugins, prisma);
@@ -1885,9 +1890,10 @@ process.on('message', async (message) => {
             const newConfig = await fetchNewConfig(bot.config.id, prisma);
             if (newConfig) {
                 bot.config = { ...bot.config, ...newConfig };
-                const newCommands = await loadCommands();
                 const newPlugins = bot.config.plugins;
-                bot.commands = newCommands;
+                if (typeof bot.hydrateCommands === 'function') {
+                    await bot.hydrateCommands();
+                }
                 await initializePlugins(bot, newPlugins, prisma);
                 sendLog('[System] Bot configuration and plugins reloaded successfully.');
             } else {
@@ -2121,17 +2127,21 @@ process.on('message', async (message) => {
         }
     } else if (message.type === MessageTypes.PLUGINS.RELOAD) {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
-        const newConfig = await fetchNewConfig(bot.config.id, prisma);
-        if (newConfig) {
-            // Обновляем конфигурацию бота, сохраняя все поля включая прокси
-            bot.config = { ...bot.config, ...newConfig };
-            bot.config.plugins = newConfig.installedPlugins;
-            bot.commands.clear();
-            await loadCommands(bot, newConfig.commands);
-            await initializePlugins(bot, newConfig.installedPlugins, prisma);
-            sendLog('[System] Плагины успешно перезагружены.');
-        } else {
-            sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
+        try {
+            const newConfig = await fetchNewConfig(bot.config.id, prisma);
+            if (newConfig) {
+                bot.config = { ...bot.config, ...newConfig };
+                bot.config.plugins = newConfig.installedPlugins;
+                if (typeof bot.hydrateCommands === 'function') {
+                    await bot.hydrateCommands();
+                }
+                await initializePlugins(bot, newConfig.installedPlugins, prisma);
+                sendLog('[System] Плагины успешно перезагружены.');
+            } else {
+                sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
+            }
+        } catch (error) {
+            sendLog(`[System] Ошибка перезагрузки плагинов: ${error.message}`);
         }
     } else if (message.type === MessageTypes.SERVER.COMMAND) {
         if (bot && bot.messageQueue && message.payload && message.payload.command) {

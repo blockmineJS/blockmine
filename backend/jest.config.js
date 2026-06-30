@@ -42,7 +42,6 @@ module.exports = {
         '!src/**/*.test.js',
         '!src/**/__tests__/**',
         '!src/core/BotProcess.js',
-        '!src/test-refactor.js',
     ],
 
 

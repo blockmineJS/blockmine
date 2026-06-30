@@ -3,6 +3,9 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { authenticate, authorize } = require('../middleware/auth');
+
+router.use(authenticate);
 
 const debugOnly = (req, res, next) => {
     if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
@@ -178,9 +181,7 @@ router.get('/stream', debugOnly, (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control'
+        'Connection': 'keep-alive'
     });
     
     const sendLog = (log) => {

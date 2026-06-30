@@ -6,9 +6,8 @@ const PluginService = require('../../core/PluginService');
 
 const prisma = new PrismaClient();
 
-// Все роуты требуют аутентификации и прав администратора
 router.use(authenticate);
-router.use(authorize('system:settings'));
+router.use(authorize('panel:settings:edit'));
 
 router.get('/plugin-directories', async (req, res) => {
     try {

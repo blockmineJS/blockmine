@@ -16,7 +16,24 @@ class PluginStore {
     }
 
     async set(key, value) {
-        const jsonValue = JSON.stringify(value);
+        if (typeof key !== 'string' || key.length === 0) {
+            throw new Error('PluginStore: ключ должен быть непустой строкой.');
+        }
+        if (key.length > 512) {
+            throw new Error('PluginStore: ключ слишком длинный (максимум 512 символов).');
+        }
+        let jsonValue;
+        try {
+            jsonValue = JSON.stringify(value);
+        } catch (error) {
+            throw new Error(`PluginStore: значение нельзя сериализовать в JSON: ${error.message}`);
+        }
+        if (jsonValue === undefined) {
+            jsonValue = 'null';
+        }
+        if (jsonValue.length > 1024 * 1024) {
+            throw new Error('PluginStore: значение слишком большое (максимум 1 МБ).');
+        }
         await this.prisma.pluginDataStore.upsert({
             where: this._whereKey(key),
             update: { value: jsonValue },

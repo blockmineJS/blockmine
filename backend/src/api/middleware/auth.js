@@ -6,6 +6,7 @@ const JWT_SECRET = config.security.jwtSecret;
 
 const tokenCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 1000;
 
 /**
  * Универсальный middleware аутентификации
@@ -60,6 +61,10 @@ function authenticate(req, res, next) {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         req.user = decoded;
         
+        if (tokenCache.size >= MAX_CACHE_SIZE) {
+            const oldest = tokenCache.keys().next().value;
+            tokenCache.delete(oldest);
+        }
         tokenCache.set(token, {
             payload: decoded,
             expires: Date.now() + CACHE_TTL

@@ -23,6 +23,9 @@ async function evaluate(node, pinId, context, helpers) {
     if (pinId === 'result') {
         const str = String(await resolvePinValue(node, 'string', ''));
         const regexStr = String(await resolvePinValue(node, 'regex', ''));
+        if (str.length > 10000 || regexStr.length > 1000) {
+            return false;
+        }
         try {
             return new RegExp(regexStr).test(str);
         } catch (e) {

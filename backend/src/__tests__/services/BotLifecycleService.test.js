@@ -49,7 +49,8 @@ describe('BotLifecycleService', () => {
         };
 
         mockPluginRepository = {
-            findEnabledByBotId: jest.fn(() => Promise.resolve([]))
+            findEnabledByBotId: jest.fn(() => Promise.resolve([])),
+            findByBotId: jest.fn(() => Promise.resolve([]))
         };
 
         mockCommandRepository = {

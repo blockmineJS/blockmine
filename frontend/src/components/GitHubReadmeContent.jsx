@@ -9,10 +9,18 @@ export default function GitHubReadmeContent({ html, fallback, className = '', bo
             return '';
         }
 
-        return DOMPurify.sanitize(html, {
+        const hook = (node) => {
+            if (node.tagName === 'A' && node.hasAttribute('target')) {
+                node.setAttribute('rel', 'noopener noreferrer');
+            }
+        };
+        DOMPurify.addHook('afterSanitizeAttributes', hook);
+        const clean = DOMPurify.sanitize(html, {
             USE_PROFILES: { html: true },
             ADD_ATTR: ['target', 'rel', 'class', 'align']
         });
+        DOMPurify.removeHook('afterSanitizeAttributes');
+        return clean;
     }, [html]);
 
     if (!sanitizedHtml) {
