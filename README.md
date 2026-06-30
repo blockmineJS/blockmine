@@ -313,7 +313,7 @@ bot.registerCommand({
 
 ---
 
-## 🤖 MCP — управление через AI-ассистентов
+## MCP — управление через AI-ассистентов
 
 BlockMine выставляет **встроенный MCP-сервер** (Model Context Protocol) на `POST /api/mcp`. Это значит, что любой MCP-совместимый AI-клиент — Claude Desktop, Cursor, Cline, Claude Code — может управлять твоими ботами, создавать плагины, читать настройки и логи через обычный диалог с AI.
 
