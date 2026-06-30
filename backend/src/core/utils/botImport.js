@@ -35,7 +35,7 @@ function assertSafeUsername(username) {
 }
 
 function resolveSafePluginDir(botPluginsDir, pluginName) {
-    if (typeof pluginName !== 'string' || pluginName.length === 0 || pluginName.includes('\0')) {
+    if (typeof pluginName !== 'string' || pluginName.length === 0 || pluginName.includes('\0') || pluginName.includes('\\')) {
         throw httpError(`Недопустимое имя плагина: ${pluginName}`, 400);
     }
     const root = path.resolve(botPluginsDir);
