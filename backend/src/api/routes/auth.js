@@ -86,9 +86,26 @@ const VIEWER_PERMISSIONS = [
     'graph:read',
 ];
 
-function ownerOnly(req, res, next) {
-    if (req.user && req.user.userId === 1) return next();
-    return res.status(403).json({ error: 'Только владелец может изменять права пользователей и роли.' });
+function getOwnerPermissions() {
+    return ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
+}
+
+async function getOwnerUserId() {
+    const owner = await prisma.panelUser.findFirst({
+        orderBy: { id: 'asc' },
+        select: { id: true }
+    });
+    return owner ? owner.id : null;
+}
+
+async function ownerOnly(req, res, next) {
+    try {
+        if (req.user && req.user.userId === await getOwnerUserId()) return next();
+        return res.status(403).json({ error: 'Только владелец может изменять права пользователей и роли.' });
+    } catch (error) {
+        console.error('[OwnerOnly Error]', error);
+        return res.status(500).json({ error: 'Ошибка проверки прав владельца' });
+    }
 }
 
 /**
@@ -138,13 +155,13 @@ router.post('/setup', authLimiter, async (req, res) => {
         let newUser; 
 
         await prisma.$transaction(async (tx) => {
-            const adminPermissions = ALL_PERMISSIONS
-                .map(p => p.id)
-                .filter(id => id !== '*' && id !== 'plugin:develop');
-                
+            const adminPermissions = getOwnerPermissions();
+
             const adminRole = await tx.panelRole.upsert({
                 where: { name: 'Admin' },
-                update: {},
+                update: {
+                    permissions: JSON.stringify(adminPermissions)
+                },
                 create: {
                     name: 'Admin',
                     permissions: JSON.stringify(adminPermissions)
@@ -343,9 +360,8 @@ router.post('/login', authLimiter, async (req, res) => {
 
         let permissions = JSON.parse(user.role.permissions || '[]');
 
-        // Владелец (первый пользователь) всегда получает все актуальные права
-        if (user.id === 1) {
-            permissions = ALL_PERMISSIONS.map(p => p.id).filter(id => id !== '*');
+        if (user.id === await getOwnerUserId()) {
+            permissions = getOwnerPermissions();
         }
 
         const payload = {
@@ -410,10 +426,16 @@ router.get('/me', authenticate, async (req, res) => {
             return res.status(404).json({ error: "Пользователь не найден." });
         }
 
+        let permissions = JSON.parse(user.role.permissions || '[]');
+
+        if (user.id === await getOwnerUserId()) {
+            permissions = getOwnerPermissions();
+        }
+
         res.json({
             id: user.id,
             username: user.username,
-            permissions: JSON.parse(user.role.permissions || '[]')
+            permissions
         });
     } catch (error) {
         res.status(500).json({ error: "Ошибка сервера" });
