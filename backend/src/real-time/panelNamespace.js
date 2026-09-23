@@ -8,7 +8,7 @@ const { botManager } = require('../core/services');
 async function authenticateSocket(socket, next) {
     const token = socket.handshake.auth?.token;
 
-    if (!token) {
+    if (!token || typeof token !== 'string') {
         return next(new Error('API ключ не предоставлен'));
     }
 
@@ -16,6 +16,7 @@ async function authenticateSocket(socket, next) {
         const allKeys = await prisma.panelApiKey.findMany({
             where: {
                 isActive: true,
+                prefix: token.slice(0, 10),
                 OR: [
                     { expiresAt: null },
                     { expiresAt: { gt: new Date() } }
@@ -110,7 +111,7 @@ async function authenticateSocket(socket, next) {
  */
 function canAccessBot(socket, botId) {
     if (socket.user.allBots) return true;
-    return socket.user.availableBotIds.includes(botId);
+    return socket.user.availableBotIds.includes(Number(botId));
 }
 
 /**
@@ -162,7 +163,13 @@ function initializePanelNamespace(io) {
 
                 if (resource === 'bots') {
                     if (parts.length === 2 && parts[1] === 'status') {
-                        socket.join('bots:status');
+                        if (socket.user.allBots) {
+                            socket.join('bots:status');
+                        } else {
+                            for (const id of socket.user.availableBotIds) {
+                                socket.join(`bots:${id}:status`);
+                            }
+                        }
                         if (callback) callback({ success: true, channel });
                     } else if (parts.length >= 3) {
                         const botId = parseInt(parts[1]);
@@ -180,6 +187,10 @@ function initializePanelNamespace(io) {
                         if (callback) callback({ success: true, channel });
                     }
                 } else if (resource === 'system') {
+                    if (!socket.user.allBots) {
+                        if (callback) callback({ success: false, error: 'Нет доступа к системным каналам' });
+                        return;
+                    }
                     socket.join(channel);
                     if (callback) callback({ success: true, channel });
                 } else {
@@ -222,19 +233,11 @@ function initializePanelNamespace(io) {
                     return;
                 }
 
-                const bot = botManager.getBotInstance(botId);
-                if (!bot) {
-                    if (callback) callback({ success: false, error: 'Бот не найден или оффлайн' });
+                const result = botManager.sendMessageToBot(botId, message, chatType || 'chat', recipient || null);
+                if (!result.success) {
+                    if (callback) callback({ success: false, error: result.message });
                     return;
                 }
-
-                const payload = {
-                    chatType: chatType || 'chat',
-                    message,
-                    ...(recipient && { recipient })
-                };
-
-                await bot.sendMessage(payload);
 
                 if (callback) callback({ success: true });
             } catch (error) {
@@ -258,13 +261,17 @@ function initializePanelNamespace(io) {
                     return;
                 }
 
-                const bot = botManager.getBotInstance(botId);
-                if (!bot) {
-                    if (callback) callback({ success: false, error: 'Бот не найден или оффлайн' });
+                if (!username || !command) {
+                    if (callback) callback({ success: false, error: 'Нужны username и command' });
                     return;
                 }
 
-                const result = await bot.executeCommand(username, command, args || {});
+                const result = await botManager.validateAndExecuteCommandForApi(
+                    Number(botId),
+                    username,
+                    command,
+                    args || {}
+                );
 
                 if (callback) callback({ success: true, result });
             } catch (error) {
@@ -288,7 +295,20 @@ function initializePanelNamespace(io) {
                     return;
                 }
 
-                await botManager.startBot(botId);
+                const botConfig = await prisma.bot.findUnique({
+                    where: { id: Number(botId) },
+                    include: { server: true, proxy: true },
+                });
+                if (!botConfig) {
+                    if (callback) callback({ success: false, error: 'Бот не найден' });
+                    return;
+                }
+
+                const result = await botManager.startBot(botConfig);
+                if (result && result.success === false) {
+                    if (callback) callback({ success: false, error: result.message });
+                    return;
+                }
 
                 if (callback) callback({ success: true, message: 'Бот запущен' });
             } catch (error) {
@@ -355,11 +375,15 @@ function initializePanelNamespace(io) {
                     return;
                 }
 
-                const status = botManager.getBotStatus(botId);
+                const online = botManager.isBotRunning(Number(botId));
 
                 if (callback) callback({
                     success: true,
-                    status: status || { online: false, connected: false, status: 'offline' }
+                    status: {
+                        online,
+                        connected: online,
+                        status: online ? 'running' : 'offline',
+                    }
                 });
             } catch (error) {
                 console.error('[Panel WS] Ошибка получения статуса:', error);
@@ -380,9 +404,9 @@ function initializePanelNamespace(io) {
 /**
  * Broadcast события в Panel namespace
  */
-function broadcastToPanelNamespace(io, channel, data) {
+function broadcastToPanelNamespace(io, channel, data, eventName) {
     const panelNamespace = io.of('/panel');
-    panelNamespace.to(channel).emit(channel, data);
+    panelNamespace.to(channel).emit(eventName || channel, data);
 }
 
 module.exports = {

@@ -296,13 +296,15 @@ class BotLifecycleService {
         if (message) this.appendLog(botId, `[SYSTEM] ${message}`);
 
         try {
-            getIOSafe().emit('bot:status', { botId, status, message });
-            broadcastToPanelNamespace(getIOSafe(), 'bots:status', {
+            const statusPayload = {
                 botId,
                 status,
                 message,
                 timestamp: new Date().toISOString()
-            });
+            };
+            getIOSafe().emit('bot:status', { botId, status, message });
+            broadcastToPanelNamespace(getIOSafe(), 'bots:status', statusPayload);
+            broadcastToPanelNamespace(getIOSafe(), `bots:${botId}:status`, statusPayload, 'bots:status');
         } catch (e) {}
     }
 

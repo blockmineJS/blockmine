@@ -63,7 +63,7 @@ class TaskScheduler {
                     switch (task.action) {
                         case 'START_BOT':
                             console.log(`[TaskScheduler] -> Запуск бота ${botConfig.username} (ID: ${botId})`);
-                            if (!botManager.bots.has(botId)) {
+                            if (!botManager.isBotRunning(botId)) {
                                 await botManager.startBot(botConfig);
                                 console.log(`[TaskScheduler] -> Бот ${botConfig.username} успешно запущен`);
                             } else {
@@ -72,8 +72,8 @@ class TaskScheduler {
                             break;
                         case 'STOP_BOT':
                             console.log(`[TaskScheduler] -> Остановка бота ${botConfig.username} (ID: ${botId})`);
-                            if (botManager.bots.has(botId)) {
-                                botManager.stopBot(botId);
+                            if (botManager.isBotRunning(botId)) {
+                                await botManager.stopBot(botId);
                                 console.log(`[TaskScheduler] -> Бот ${botConfig.username} остановлен`);
                             } else {
                                 console.log(`[TaskScheduler] -> Бот ${botConfig.username} уже остановлен`);
@@ -81,24 +81,15 @@ class TaskScheduler {
                             break;
                         case 'RESTART_BOT':
                             console.log(`[TaskScheduler] -> Перезапуск бота ${botConfig.username} (ID: ${botId})`);
-                            if (botManager.bots.has(botId)) {
-                                console.log(`[TaskScheduler] -> Останавливаем бота ${botConfig.username}...`);
-                                botManager.stopBot(botId);
-                                console.log(`[TaskScheduler] -> Запланирован запуск бота ${botConfig.username} через 10 секунд`);
-                                setTimeout(() => {
-                                    console.log(`[TaskScheduler] -> Запускаем бота ${botConfig.username}...`);
-                                    Promise.resolve(botManager.startBot(botConfig)).catch((err) => {
-                                        console.error(`[TaskScheduler] Ошибка отложенного запуска бота ${botId}:`, err);
-                                    });
-                                }, 10000);
+                            if (botManager.isBotRunning(botId)) {
+                                await botManager.restartBot(botId);
                             } else {
-                                console.log(`[TaskScheduler] -> Бот ${botConfig.username} не запущен, запускаем...`);
                                 await botManager.startBot(botConfig);
-                                console.log(`[TaskScheduler] -> Бот ${botConfig.username} успешно запущен`);
                             }
+                            console.log(`[TaskScheduler] -> Бот ${botConfig.username} запущен`);
                             break;
                         case 'SEND_COMMAND':
-                            if (botManager.bots.has(botId)) {
+                            if (botManager.isBotRunning(botId)) {
                                 const payload = JSON.parse(task.payload || '{}');
                                 if (payload.command) {
                                     console.log(`[TaskScheduler] -> Отправка команды "${payload.command}" боту ${botConfig.username}`);
@@ -137,7 +128,6 @@ class TaskScheduler {
         try {
             const job = cron.schedule(task.cronPattern, () => this.executeTask(task), {
                 scheduled: true,
-                timezone: "Europe/Moscow"
             });
 
             this.scheduledJobs.set(task.id, job);

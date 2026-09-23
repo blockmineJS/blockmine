@@ -5,15 +5,23 @@ const TaskScheduler = require('../../core/TaskScheduler');
 const { authenticate, authorize } = require('../middleware/auth');
 
 const { CronExpressionParser } = require('cron-parser');
+const cron = require('node-cron');
 
 const prisma = new PrismaClient();
 
 router.use(authenticate);
 
 const normalizeCronPattern = (pattern) => {
-    if (typeof pattern !== 'string') return '* * * * *';
-    // Убираем лишние пробелы и нормализуем паттерн
+    if (typeof pattern !== 'string') return '';
     return pattern.replace(/\*\/1/g, '*').replace(/\s+/g, ' ').trim();
+};
+
+const parseCronOrError = (pattern) => {
+    const normalized = normalizeCronPattern(pattern);
+    if (!normalized || !cron.validate(normalized)) {
+        return { error: 'Невалидный cron-паттерн' };
+    }
+    return { pattern: normalized };
 };
 
 router.get('/', authorize('task:list'), async (req, res) => {
@@ -36,9 +44,13 @@ router.post('/', authorize('task:create'), async (req, res) => {
         const taskData = { ...restOfBody, runOnStartup: !!runOnStartup };
 
         if (runOnStartup) {
-            taskData.cronPattern = null; 
+            taskData.cronPattern = null;
         } else {
-            taskData.cronPattern = normalizeCronPattern(cronPattern);
+            const parsed = parseCronOrError(cronPattern);
+            if (parsed.error) {
+                return res.status(400).json({ error: parsed.error });
+            }
+            taskData.cronPattern = parsed.pattern;
         }
 
         const newTask = await prisma.scheduledTask.create({ data: taskData });
@@ -65,7 +77,11 @@ router.put('/:id', authorize('task:edit'), async (req, res) => {
         }
 
         if (dataToUpdate.cronPattern) {
-            dataToUpdate.cronPattern = normalizeCronPattern(dataToUpdate.cronPattern);
+            const parsed = parseCronOrError(dataToUpdate.cronPattern);
+            if (parsed.error) {
+                return res.status(400).json({ error: parsed.error });
+            }
+            dataToUpdate.cronPattern = parsed.pattern;
         }
 
         const updatedTask = await prisma.scheduledTask.update({
