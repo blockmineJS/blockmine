@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-const { SocksClient } = require('socks');
+const { createProxySocket } = require('./createProxySocket');
 const EventEmitter = require('events');
 const { v4: uuidv4 } = require('uuid');
 const { Vec3 } = require('vec3');
@@ -686,30 +686,26 @@ process.on('message', async (message) => {
             };
 
             if (config.proxyHost && config.proxyPort) {
-                sendLog(`[System] Используется прокси: ${config.proxyHost}:${config.proxyPort}`);
+                const proxyType = config.proxyType || config.proxy?.type || 'socks5';
+                sendLog(`[System] Используется прокси (${proxyType}): ${config.proxyHost}:${config.proxyPort}`);
 
                 const cleanProxyUsername = config.proxyUsername ? config.proxyUsername.trim() : null;
                 const cleanProxyPassword = config.proxyPassword || null;
 
                 botOptions.connect = (client) => {
-                    SocksClient.createConnection({
-                        proxy: {
-                            host: config.proxyHost,
-                            port: config.proxyPort,
-                            type: 5,
-                            userId: cleanProxyUsername,
-                            password: cleanProxyPassword
-                        },
-                        command: 'connect',
-                        destination: {
-                            host: config.server.host,
-                            port: config.server.port
-                        }
-                    }).then(info => {
-                        client.setSocket(info.socket);
+                    createProxySocket({
+                        type: proxyType,
+                        proxyHost: config.proxyHost,
+                        proxyPort: config.proxyPort,
+                        proxyUsername: cleanProxyUsername,
+                        proxyPassword: cleanProxyPassword,
+                        destinationHost: config.server.host,
+                        destinationPort: config.server.port,
+                    }).then((socket) => {
+                        client.setSocket(socket);
                         client.emit('connect');
-                    }).catch(err => {
-                        sendLog(`[Proxy Error] SOCKS connection failed: ${err.message}. Bot will attempt to restart.`);
+                    }).catch((err) => {
+                        sendLog(`[Proxy Error] ${err.message}. Bot will attempt to restart.`);
                         client.emit('error', err);
                         process.exit(1);
                     });
@@ -1350,8 +1346,8 @@ process.on('message', async (message) => {
                 } else {
                     reasonText = String(reason);
                 }
-                sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
-                process.exit(0);
+                sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}. Перезапуск.`);
+                process.exit(1);
             });
 
             bot.on('error', (err) => {

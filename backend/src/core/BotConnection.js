@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-const { SocksClient } = require('socks');
+const { createProxySocket } = require('./createProxySocket');
 const { Vec3 } = require('vec3');
 const EventEmitter = require('events');
 const MessageQueue = require('./MessageQueue');
@@ -23,24 +23,20 @@ function buildBotOptions(config) {
         const cleanProxyUsername = config.proxyUsername ? config.proxyUsername.trim() : null;
         const cleanProxyPassword = config.proxyPassword || null;
 
+        const proxyType = config.proxyType || config.proxy?.type || 'socks5';
         options.connect = (client) => {
-            SocksClient.createConnection({
-                proxy: {
-                    host: config.proxyHost,
-                    port: config.proxyPort,
-                    type: 5,
-                    userId: cleanProxyUsername,
-                    password: cleanProxyPassword
-                },
-                command: 'connect',
-                destination: {
-                    host: config.server.host,
-                    port: config.server.port
-                }
-            }).then(info => {
-                client.setSocket(info.socket);
+            createProxySocket({
+                type: proxyType,
+                proxyHost: config.proxyHost,
+                proxyPort: config.proxyPort,
+                proxyUsername: cleanProxyUsername,
+                proxyPassword: cleanProxyPassword,
+                destinationHost: config.server.host,
+                destinationPort: config.server.port,
+            }).then((socket) => {
+                client.setSocket(socket);
                 client.emit('connect');
-            }).catch(err => {
+            }).catch((err) => {
                 client.emit('error', err);
                 process.exit(1);
             });

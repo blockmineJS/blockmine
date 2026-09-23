@@ -123,8 +123,8 @@ function attachBotEvents(bot, handlers) {
         } else {
             reasonText = String(reason);
         }
-        sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}.`);
-        process.exit(0);
+        sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}. Перезапуск.`);
+        process.exit(1);
     });
 
     bot.on('error', (err) => {

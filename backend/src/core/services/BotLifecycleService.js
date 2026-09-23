@@ -104,6 +104,7 @@ class BotLifecycleService {
             decryptedConfig.proxyPort = decryptedConfig.proxy.port;
             decryptedConfig.proxyUsername = decryptedConfig.proxy.username;
             decryptedConfig.proxyPassword = decryptedConfig.proxy.password;
+            decryptedConfig.proxyType = decryptedConfig.proxy.type || 'socks5';
         }
 
         if (decryptedConfig.password) decryptedConfig.password = decrypt(decryptedConfig.password);
