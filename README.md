@@ -405,63 +405,57 @@ npm run dev
 - **Фронтенд** с горячей перезагрузкой будет доступен на `http://localhost:5173`
 
 
-## 📸 Скриншоты
+## Скриншоты
+
 
 <table align="center">
   <tr>
     <td align="center">
-      <p><strong>📊 Дашборд</strong></p>
-      <img src="./screen/dashboard.png" alt="Dashboard" width="100%">
-      <em>Мониторинг ресурсов и управление всеми ботами в реальном времени</em>
+      <p><strong>Дашборд</strong></p>
+      <img src="./screen/dashboard.png" alt="Дашборд" width="100%">
+      <em>Статус ботов, CPU и RAM</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🌍 3D Viewer</strong></p>
-      <img src="./screen/3dviewer.png" alt="3D Viewer" width="100%">
-      <em>Просмотр мира Minecraft глазами бота в реальном времени</em>
+      <p><strong>Каталог плагинов</strong></p>
+      <img src="./screen/plugins-store.png" alt="Каталог плагинов" width="100%">
+      <em>Установка из каталога, с GitHub или локально</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🔌 WebSocket API</strong></p>
-      <img src="./screen/websocket.png" alt="WebSocket" width="100%">
-      <em>Интерактивная панель для работы с WebSocket API</em>
+      <p><strong>Установленные плагины</strong></p>
+      <img src="./screen/plugins.png" alt="Установленные плагины" width="100%">
+      <em>Включение, настройки и команды плагина</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>👥 Совместная работа над графами</strong></p>
-      <img src="./screen/graph_collabe.png" alt="Collaboration" width="100%">
-      <em>Несколько разработчиков могут работать над одним графом одновременно</em>
+      <p><strong>Редактор плагина</strong></p>
+      <img src="./screen/ide.png" alt="Редактор плагина" width="100%">
+      <em>Файлы, Monaco и терминал на машине, где крутится панель</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>💻 Интерактивная консоль</strong></p>
-      <img src="./screen/console.png" alt="Console" width="100%">
-      <em>Полноценная консоль бота с цветной подсветкой и историей команд</em>
+      <p><strong>Команды</strong></p>
+      <img src="./screen/management.png" alt="Команды бота" width="100%">
+      <em>Алиасы, права и источник команды</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>⚙️ Управление командами</strong></p>
-      <img src="./screen/management_command.png" alt="Command Management" width="100%">
-      <em>Централизованное управление командами с алиасами и правами доступа</em>
+      <p><strong>3D-просмотр</strong></p>
+      <img src="./screen/3dviewer.png" alt="3D-просмотр" width="100%">
+      <em>Мир глазами бота</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🎛️ Настройки команд</strong></p>
-      <img src="./screen/настройки_отдельных_команд_кажду_команлду_можно_настраивать.png" alt="Command Settings" width="100%">
-      <em>Гибкая настройка каждой команды: алиасы, кулдауны, права и разрешенные чаты</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>⏰ Планировщик задач</strong></p>
-      <img src="./screen/планировщик_можно_задавать_действия_по_времени.png" alt="Scheduler" width="100%">
-      <em>Автоматизируйте действия ботов с помощью cron-расписаний</em>
+      <p><strong>Отладка графа</strong></p>
+      <img src="./screen/graph_live_debug.png" alt="Отладка графа" width="100%">
+      <em>Брейкпоинт и значения нод</em>
     </td>
   </tr>
 </table>

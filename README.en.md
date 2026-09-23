@@ -402,63 +402,58 @@ npm run dev
 - **Frontend** with hot reloading will be available at `http://localhost:5173`
 
 
-## 📸 Screenshots
+## Screenshots
+
+Captured from the v1.27.1 panel.
 
 <table align="center">
   <tr>
     <td align="center">
-      <p><strong>📊 Dashboard</strong></p>
+      <p><strong>Dashboard</strong></p>
       <img src="./screen/dashboard.png" alt="Dashboard" width="100%">
-      <em>Resource monitoring and managing all bots in real-time</em>
+      <em>Bot status, CPU and RAM</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🌍 3D Viewer</strong></p>
-      <img src="./screen/3dviewer.png" alt="3D Viewer" width="100%">
-      <em>Real-time Minecraft world view through bot's eyes</em>
+      <p><strong>Plugin catalog</strong></p>
+      <img src="./screen/plugins-store.png" alt="Plugin catalog" width="100%">
+      <em>Install from the catalog, GitHub, or a local folder</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🔌 WebSocket API</strong></p>
-      <img src="./screen/websocket.png" alt="WebSocket" width="100%">
-      <em>Interactive panel for working with WebSocket API</em>
+      <p><strong>Installed plugins</strong></p>
+      <img src="./screen/plugins.png" alt="Installed plugins" width="100%">
+      <em>Enable, configure, and see the commands a plugin adds</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>👥 Collaborative Graph Editing</strong></p>
-      <img src="./screen/graph_collabe.png" alt="Collaboration" width="100%">
-      <em>Multiple developers can work on the same graph simultaneously</em>
+      <p><strong>Plugin editor</strong></p>
+      <img src="./screen/ide.png" alt="Plugin editor" width="100%">
+      <em>Files, Monaco and a terminal on the machine that runs the panel</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>💻 Interactive Console</strong></p>
-      <img src="./screen/console.png" alt="Console" width="100%">
-      <em>Full-featured bot console with color highlighting and command history</em>
+      <p><strong>Commands</strong></p>
+      <img src="./screen/management.png" alt="Bot commands" width="100%">
+      <em>Aliases, permissions and where each command comes from</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>⚙️ Command Management</strong></p>
-      <img src="./screen/management_command.png" alt="Command Management" width="100%">
-      <em>Centralized command management with aliases and access rights</em>
+      <p><strong>3D view</strong></p>
+      <img src="./screen/3dviewer.png" alt="3D view" width="100%">
+      <em>The world through the bot, once it is online</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <p><strong>🎛️ Command Settings</strong></p>
-      <img src="./screen/настройки_отдельных_команд_кажду_команлду_можно_настраивать.png" alt="Command Settings" width="100%">
-      <em>Flexible configuration for each command: aliases, cooldowns, permissions, and allowed chats</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>⏰ Task Scheduler</strong></p>
-      <img src="./screen/планировщик_можно_задавать_действия_по_времени.png" alt="Scheduler" width="100%">
-      <em>Automate bot actions with cron schedules</em>
+      <p><strong>Graph debug</strong></p>
+      <img src="./screen/graph_live_debug.png" alt="Graph debug" width="100%">
+      <em>A breakpoint and the values on the nodes</em>
     </td>
   </tr>
 </table>
