@@ -63,6 +63,7 @@ const MessageTypes = {
     HANDLE_PERMISSION_ERROR: 'handle_permission_error',
     HANDLE_WRONG_CHAT: 'handle_wrong_chat',
     HANDLE_COOLDOWN: 'handle_cooldown',
+    RELEASE_COOLDOWN: 'release_cooldown',
     HANDLE_BLACKLIST: 'handle_blacklist',
   },
 

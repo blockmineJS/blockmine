@@ -1966,7 +1966,16 @@ process.on('message', async (message) => {
             sendLog(`[BotProcess] Ошибка удаления временной команды: ${error.message}`);
         }
     } else if (message.type === MessageTypes.GRAPH.EXECUTE_HANDLER) {
-        const { commandName, username, args, typeChat } = message;
+        const { commandName, username, args, typeChat, cooldownKey, cooldownStamp } = message;
+        const releaseCooldown = () => {
+            if (cooldownKey != null && process.send) {
+                process.send({
+                    type: MessageTypes.COMMAND.RELEASE_COOLDOWN,
+                    cooldownKey,
+                    cooldownStamp,
+                });
+            }
+        };
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
             (async () => {
@@ -1985,8 +1994,11 @@ process.on('message', async (message) => {
                 } catch (e) {
                     sendLog(`[Handler Error] Ошибка в handler-е команды ${commandName}: ${e.message}`);
                     sendLog(`[Handler Error] Stack trace: ${e.stack}`);
+                    releaseCooldown();
                 }
             })();
+        } else {
+            releaseCooldown();
         }
     } else if (message.type === MessageTypes.GRAPH.EXECUTE_COMMAND_REQUEST) {
         const { requestId, payload } = message;

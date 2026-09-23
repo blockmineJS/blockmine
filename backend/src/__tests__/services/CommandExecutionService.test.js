@@ -24,6 +24,7 @@ describe('CommandExecutionService', () => {
 
         mockCacheManager = {
             getBotConfig: jest.fn(),
+            getOrLoadBotConfig: jest.fn(),
             deleteBotConfig: jest.fn()
         };
 
@@ -455,6 +456,58 @@ describe('CommandExecutionService', () => {
 
             expect(mockGroupRepository.addPermissionToGroup).toHaveBeenCalledTimes(1);
             expect(mockLogger.warn).toHaveBeenCalled();
+        });
+    });
+
+    describe('cooldown reservation', () => {
+        const validationMessage = {
+            commandName: 'ping',
+            username: 'p',
+            args: {},
+            typeChat: 'chat',
+            commandArgs: [],
+        };
+
+        function mockPingCommand() {
+            const user = {
+                id: 42,
+                isOwner: false,
+                isBlacklisted: false,
+                username: 'p',
+                hasPermission: () => false,
+            };
+            UserService.getUser.mockResolvedValue(user);
+            mockCacheManager.getOrLoadBotConfig.mockResolvedValue({
+                commands: new Map([['ping', {
+                    name: 'ping',
+                    isEnabled: true,
+                    cooldown: 10,
+                    allowedChatTypes: '["chat"]',
+                    permissionId: null,
+                }]]),
+                commandAliases: new Map(),
+                permissionsById: new Map(),
+            });
+            mockProcessManager.getProcess.mockReturnValue({ send: jest.fn() });
+        }
+
+        test('повтор до снятия резерва получает кулдаун, после release команда снова уходит в бота', async () => {
+            mockPingCommand();
+            const botConfig = { id: 7, prefix: '@' };
+
+            await service.handleCommandValidation(botConfig, validationMessage);
+            const child = mockProcessManager.getProcess();
+            const started = child.send.mock.calls.map((call) => call[0]).find((message) => message.type === 'execute_handler');
+            expect(started.cooldownKey).toBe('7:ping:42');
+
+            child.send.mockClear();
+            await service.handleCommandValidation(botConfig, validationMessage);
+            expect(child.send.mock.calls.map((call) => call[0].type)).toContain('handle_cooldown');
+
+            service.releaseCooldown(started.cooldownKey, started.cooldownStamp);
+            child.send.mockClear();
+            await service.handleCommandValidation(botConfig, validationMessage);
+            expect(child.send.mock.calls.map((call) => call[0].type)).toContain('execute_handler');
         });
     });
 });

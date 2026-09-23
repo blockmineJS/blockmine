@@ -92,6 +92,9 @@ router.delete('/:botId/permissions/:permissionId', authenticateUniversal, author
         await prisma.groupPermission.deleteMany({ where: { permissionId } });
         await prisma.permission.delete({ where: { id: permissionId } });
 
+        const { botManager } = require('../../core/services');
+        botManager.invalidateAllUserCache(botId);
+
         res.json({ success: true });
     } catch (error) {
         console.error('[API Error] DELETE /bots/:botId/permissions/:permissionId:', error);

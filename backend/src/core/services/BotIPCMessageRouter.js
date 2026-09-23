@@ -44,6 +44,7 @@ class BotIPCMessageRouter {
             'status': () => this._handleStatus(botId, message),
             'bot_ready': () => this._handleBotReady(botId),
             'validate_and_run_command': () => this._handleCommandValidation(botId, child, message),
+            'release_cooldown': () => this.commandExecutionService?.releaseCooldown(message.cooldownKey, message.cooldownStamp),
             'request_user_action': () => this._handleUserAction(botId, child, message),
             'get_player_list_response': () => this._handlePlayerListResponse(message),
             'get_nearby_entities_response': () => this._handleNearbyEntitiesResponse(message),
@@ -211,6 +212,7 @@ class BotIPCMessageRouter {
     async _handleAddPermissions(botId, message) {
         const PermissionManager = require('../../core/PermissionManager');
         await PermissionManager.addPermissionsToGroup(botId, message.groupName, message.permissionNames);
+        this.commandExecutionService?.clearBotUserCache(botId);
     }
 
     async _handleTrace(botId, message) {

@@ -8,6 +8,25 @@ const cooldowns = new Map();
 const warningCache = new Map();
 const WARNING_COOLDOWN = 10 * 1000;
 
+function reserveCooldown(botId, dbCommand, user, permission) {
+    if (!(dbCommand.cooldown > 0) || user.isOwner) return null;
+    const domain = (permission?.name || '').split('.')[0] || 'user';
+    if (user.hasPermission(`${domain}.cooldown.bypass`)) return null;
+
+    const key = `${botId}:${dbCommand.name}:${user.id}`;
+    const now = Date.now();
+    const lastUsed = cooldowns.get(key);
+    if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
+        return {
+            blocked: true,
+            timeLeft: Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000),
+        };
+    }
+
+    cooldowns.set(key, now);
+    return { blocked: false, key, stamp: now };
+}
+
 class CommandExecutionService {
     constructor({
         botProcessManager,
@@ -119,26 +138,16 @@ class CommandExecutionService {
                 return;
             }
 
-            const domain = (permission?.name || '').split('.')[0] || 'user';
-            const bypassCooldownPermission = `${domain}.cooldown.bypass`;
-
-            if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
-                const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
-                const now = Date.now();
-                const lastUsed = cooldowns.get(cooldownKey);
-
-                if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
-                    const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                    child.send({
-                        type: 'handle_cooldown',
-                        commandName: dbCommand.name,
-                        username,
-                        typeChat,
-                        timeLeft
-                    });
-                    return;
-                }
-                cooldowns.set(cooldownKey, now);
+            const reservation = reserveCooldown(botId, dbCommand, user, permission);
+            if (reservation?.blocked) {
+                child.send({
+                    type: 'handle_cooldown',
+                    commandName: dbCommand.name,
+                    username,
+                    typeChat,
+                    timeLeft: reservation.timeLeft
+                });
+                return;
             }
 
             if (this.eventGraphManager) {
@@ -150,7 +159,15 @@ class CommandExecutionService {
                 });
             }
 
-            child.send({ type: 'execute_handler', commandName: dbCommand.name, username, args, typeChat });
+            child.send({
+                type: 'execute_handler',
+                commandName: dbCommand.name,
+                username,
+                args,
+                typeChat,
+                cooldownKey: reservation?.key,
+                cooldownStamp: reservation?.stamp,
+            });
 
         } catch (error) {
             this.logger.error({ botId, command: commandName, username, error }, 'Ошибка валидации команды');
@@ -215,22 +232,38 @@ class CommandExecutionService {
             throw new Error(`User '${username}' has insufficient permissions.`);
         }
 
-        const domain = (permission?.name || '').split('.')[0] || 'user';
-        const bypassCooldownPermission = `${domain}.cooldown.bypass`;
-
-        if (dbCommand.cooldown > 0 && !user.isOwner && !user.hasPermission(bypassCooldownPermission)) {
-            const cooldownKey = `${botId}:${dbCommand.name}:${user.id}`;
-            const now = Date.now();
-            const lastUsed = cooldowns.get(cooldownKey);
-
-            if (lastUsed && (now - lastUsed < dbCommand.cooldown * 1000)) {
-                const timeLeft = Math.ceil((dbCommand.cooldown * 1000 - (now - lastUsed)) / 1000);
-                throw new Error(`Command on cooldown for user '${username}'. Please wait ${timeLeft} seconds.`);
-            }
-            cooldowns.set(cooldownKey, now);
+        const reservation = reserveCooldown(botId, dbCommand, user, permission);
+        if (reservation?.blocked) {
+            throw new Error(`Command on cooldown for user '${username}'. Please wait ${reservation.timeLeft} seconds.`);
         }
 
-        return this._executeCommandInProcess(botId, dbCommand.name, args, user, typeChat);
+        try {
+            return await this._executeCommandInProcess(botId, dbCommand.name, args, user, typeChat);
+        } catch (error) {
+            this.releaseCooldown(reservation?.key, reservation?.stamp);
+            throw error;
+        }
+    }
+
+    releaseCooldown(cooldownKey, cooldownStamp) {
+        if (typeof cooldownKey !== 'string' || typeof cooldownStamp !== 'number') return;
+        if (cooldowns.get(cooldownKey) === cooldownStamp) {
+            cooldowns.delete(cooldownKey);
+        }
+    }
+
+    clearBotUserCache(botId) {
+        const prefix = `${botId}:`;
+        if (UserService.cache && typeof UserService.cache.keys === 'function') {
+            for (const key of UserService.cache.keys()) {
+                if (String(key).startsWith(prefix)) {
+                    UserService.cache.delete(key);
+                }
+            }
+        }
+        if (typeof this.processManager.sendMessage === 'function') {
+            this.processManager.sendMessage(botId, { type: 'invalidate_all_user_cache' });
+        }
     }
 
     async _executeCommandInProcess(botId, commandName, args, user, typeChat) {
@@ -421,6 +454,7 @@ class CommandExecutionService {
             }
 
             this.cache.deleteBotConfig(botId);
+            this.clearBotUserCache(botId);
         } catch (error) {
             this.logger.error({ botId, groupName: message.groupName, error }, 'Ошибка добавления прав в группу');
         }

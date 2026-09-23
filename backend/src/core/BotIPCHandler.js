@@ -349,7 +349,16 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
     };
 
     handlers[MessageTypes.COMMAND.EXECUTE_HANDLER] = (message) => {
-        const { commandName, username, args, typeChat } = message;
+        const { commandName, username, args, typeChat, cooldownKey, cooldownStamp } = message;
+        const releaseCooldown = () => {
+            if (cooldownKey != null && process.send) {
+                process.send({
+                    type: MessageTypes.COMMAND.RELEASE_COOLDOWN,
+                    cooldownKey,
+                    cooldownStamp,
+                });
+            }
+        };
         const commandInstance = bot.commands.get(commandName);
         if (commandInstance) {
             (async () => {
@@ -366,8 +375,11 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
                     }
                 } catch (e) {
                     sendLog(`[Handler Error] ${commandName}: ${e.message}`);
+                    releaseCooldown();
                 }
             })();
+        } else {
+            releaseCooldown();
         }
         return null;
     };

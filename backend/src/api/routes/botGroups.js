@@ -7,6 +7,16 @@ const UserService = require('../../core/UserService');
 
 const router = express.Router();
 
+async function invalidateGroupMembers(botId, groupId) {
+    const members = await prisma.user.findMany({
+        where: { botId, groups: { some: { groupId } } },
+        select: { username: true },
+    });
+    for (const member of members) {
+        botManager.invalidateUserCache(botId, member.username);
+    }
+}
+
 router.use('/:botId/groups', authenticateUniversal, checkBotAccess);
 
 router.get('/:botId/groups', authenticateUniversal, authorize('management:view'), async (req, res) => {
@@ -72,6 +82,8 @@ router.post('/:botId/groups/:groupId/permissions', authenticateUniversal, author
             update: {}
         });
 
+        await invalidateGroupMembers(botId, groupId);
+
         res.json({ success: true });
     } catch (error) {
         console.error('[API Error] POST /bots/:botId/groups/:groupId/permissions:', error);
@@ -93,6 +105,8 @@ router.delete('/:botId/groups/:groupId/permissions/:permissionId', authenticateU
         await prisma.groupPermission.deleteMany({
             where: { groupId, permissionId }
         });
+
+        await invalidateGroupMembers(botId, groupId);
 
         res.json({ success: true });
     } catch (error) {
