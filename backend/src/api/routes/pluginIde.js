@@ -6,7 +6,6 @@ const os = require('os');
 const { PrismaClient } = require('@prisma/client');
 const slugify = require('slugify');
 const { Octokit } = require('@octokit/rest');
-const aiAssistantRouter = require('./aiAssistant');
 
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
@@ -53,10 +52,6 @@ router.use((req, res, next) => {
     console.log('[Plugin IDE] Request:', req.method, req.path, 'Params:', req.params);
     next();
 });
-
-// Подключаем AI Assistant роуты ПЕРЕД другими роутами
-console.log('[Plugin IDE] Mounting AI Assistant router');
-router.use('/:pluginName/ai', aiAssistantRouter);
 
 const resolvePluginPath = async (req, res, next) => {
     try {

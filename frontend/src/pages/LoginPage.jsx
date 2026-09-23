@@ -19,7 +19,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import axios from 'axios';
+
+async function authRequest(url, body) {
+    const response = await fetch(url, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(data.error || data.message || response.statusText);
+    }
+    return data;
+}
 
 export default function LoginPage() {
     const { t } = useTranslation('login');
@@ -51,11 +63,11 @@ export default function LoginPage() {
     
     useEffect(() => {
         if (showRecovery) {
-            axios.get('/api/auth/config-path')
-                .then(response => {
-                    setConfigPath(response.data.configPath);
+            authRequest('/api/auth/config-path')
+                .then((data) => {
+                    setConfigPath(data.configPath);
                 })
-                .catch(error => {
+                .catch((error) => {
                     console.error('Не удалось загрузить путь к конфигу:', error);
                 });
         }
@@ -85,19 +97,19 @@ export default function LoginPage() {
         
         setRecoveryLoading(true);
         try {
-            const response = await axios.post('/api/auth/recovery/verify', {
+            const data = await authRequest('/api/auth/recovery/verify', {
                 recoveryCode
             });
-            
-            if (response.data.success) {
-                setResetToken(response.data.resetToken);
-                setAdminUsername(response.data.username);
+
+            if (data.success) {
+                setResetToken(data.resetToken);
+                setAdminUsername(data.username);
                 setRecoveryStep(2);
                 setRecoveryError('');
             }
             
         } catch (err) {
-            setRecoveryError(err.response?.data?.error || t('recovery.verifyError'));
+            setRecoveryError(err.message || t('recovery.verifyError'));
         } finally {
             setRecoveryLoading(false);
         }
@@ -120,17 +132,17 @@ export default function LoginPage() {
         
         setRecoveryLoading(true);
         try {
-            const response = await axios.post('/api/auth/recovery/reset', {
+            const data = await authRequest('/api/auth/recovery/reset', {
                 resetToken,
                 newPassword
             });
-            
+
             setRecoverySuccess({
-                message: response.data.message,
-                username: response.data.username
+                message: data.message,
+                username: data.username
             });
-            
-            setUsername(response.data.username);
+
+            setUsername(data.username);
             setPassword('');
             
             setTimeout(() => {
@@ -139,7 +151,7 @@ export default function LoginPage() {
             }, 3000);
             
         } catch (err) {
-            setRecoveryError(err.response?.data?.error || t('recovery.resetError'));
+            setRecoveryError(err.message || t('recovery.resetError'));
         } finally {
             setRecoveryLoading(false);
         }

@@ -42,7 +42,6 @@ More examples at - https://t.me/blockmineJs
 - **Live Debug mode** with breakpoints and step-by-step execution
 - **Execution tracing** with history and variable values
 - **Collaborative editing** of graphs by multiple users
-- **AI Assistant** for help with logic creation
 
 ### 🤖 Comprehensive Bot Management
 - **Start/stop/restart** with one click
@@ -202,7 +201,6 @@ The heart of No-Code automation in BlockMine. The editor allows you to create lo
 - **Live Debug** - real-time debugging with breakpoints
 - **Trace Viewer** - view execution history with variable values
 - **Collaborative work** - multiple developers can edit simultaneously
-- **AI assistant** - help with logic creation
 
 ### 🔍 Debugging System
 
