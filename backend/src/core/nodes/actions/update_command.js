@@ -1,4 +1,5 @@
 const prismaService = require('../../PrismaService');
+const { blockTestWrite } = require('../../services/testModeGuard');
 const prisma = prismaService.getClient();
 
 /**
@@ -106,6 +107,12 @@ async function execute(node, context, helpers) {
                     console.warn(`[update_command] Право "${permissionName}" не найдено, поле не будет обновлено`);
                 }
             }
+        }
+
+        if (blockTestWrite(context, 'update_command', String(commandName))) {
+            memo.set(`${node.id}:success`, false);
+            await traverse(node, 'exec');
+            return;
         }
 
         await prisma.command.update({

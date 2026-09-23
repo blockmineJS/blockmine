@@ -169,7 +169,9 @@ class GraphExecutionEngine {
                     this.context.variables = JSON.parse(JSON.stringify(debugState.replayState.variables));
                 }
                 if (debugState.replayState.commandArguments) {
-                    this.context.commandArguments = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
+                    const restoredArgs = JSON.parse(JSON.stringify(debugState.replayState.commandArguments));
+                    this.context.commandArguments = restoredArgs;
+                    this.context.args = restoredArgs;
                 }
             }
         } catch {}

@@ -1650,6 +1650,41 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
     }
 });
 
+router.post('/:botId/commands/:commandId/test-run', checkBotAccess, authorize('management:edit'), async (req, res) => {
+    try {
+        const { startOwnedTest } = require('../../core/services/GraphTestRunner');
+        const result = await startOwnedTest({
+            kind: 'command',
+            botId: parseInt(req.params.botId, 10),
+            graphId: parseInt(req.params.commandId, 10),
+            body: req.body,
+        });
+        res.json(result);
+    } catch (error) {
+        const status = error.status || 500;
+        if (status >= 500) console.error('[Test Run] command failed:', error);
+        res.status(status).json({ error: error.message || 'Test run failed' });
+    }
+});
+
+router.post('/:botId/commands/:commandId/run-node', checkBotAccess, authorize('management:edit'), async (req, res) => {
+    try {
+        const { runOwnedNode } = require('../../core/services/GraphTestRunner');
+        const result = await runOwnedNode({
+            kind: 'command',
+            botId: parseInt(req.params.botId, 10),
+            graphId: parseInt(req.params.commandId, 10),
+            nodeId: req.body?.node?.id,
+            body: req.body,
+        });
+        res.json(result);
+    } catch (error) {
+        const status = error.status || 500;
+        if (status >= 500) console.error('[Run Node] command failed:', error);
+        res.status(status).json({ error: error.message || 'Run node failed' });
+    }
+});
+
 router.get('/:botId/commands/:commandId/export', authorize('management:view'), async (req, res) => {
     try {
         const botId = parseInt(req.params.botId, 10);

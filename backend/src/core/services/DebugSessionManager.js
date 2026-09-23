@@ -27,6 +27,7 @@ class GraphDebugState {
     this.stepFromNodeId = null; // ID ноды, с которой начали step over (чтобы её пропустить)
 
     this.testMode = false;
+    this.runToEnd = false;
     this.history = [];
     this.historyLimit = 200;
     this.rewindTargetIndex = null;
@@ -95,7 +96,7 @@ class GraphDebugState {
    * @param {boolean} stepMode - Если true, остановится на следующей ноде
    */
   resume(overrides = null, stepMode = false) {
-    const effectiveStepMode = this.testMode ? true : stepMode;
+    const effectiveStepMode = this.runToEnd ? false : (this.testMode ? true : stepMode);
 
     if (this.resumeCallback) {
       const finalOverrides = {
@@ -143,6 +144,7 @@ class GraphDebugState {
 
     if (this.testMode) {
       this.testMode = false;
+      this.runToEnd = false;
       this.history = [];
       this.rewindTargetIndex = null;
       this.replayState = null;
@@ -263,6 +265,7 @@ class GraphDebugState {
 
   enableTestMode(initialPayload = {}) {
     this.testMode = true;
+    this.runToEnd = false;
     this.stepMode = true;
     this.stepFromNodeId = null;
     this.history = [];
@@ -276,6 +279,7 @@ class GraphDebugState {
 
   disableTestMode() {
     this.testMode = false;
+    this.runToEnd = false;
     this.history = [];
     this.rewindTargetIndex = null;
     this.replayState = null;

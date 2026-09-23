@@ -1,5 +1,6 @@
 const User = require('../../UserService');
 const prismaService = require('../../PrismaService');
+const { blockTestWrite } = require('../../services/testModeGuard');
 const prisma = prismaService.getClient();
 
 /**
@@ -17,6 +18,12 @@ async function execute(node, context, helpers) {
     const blacklistStatus = await resolvePinValue(node, 'blacklist_status', false);
     let updatedUser = null;
     
+    if (userObject && userObject.username && blockTestWrite(context, 'set_blacklist', `${userObject.username}=${Boolean(blacklistStatus)}`)) {
+        memo.set(`${node.id}:updated_user`, null);
+        await traverse(node, 'exec');
+        return;
+    }
+
     if (userObject && userObject.username) {
         const user = await User.getUser(userObject.username, context.botId);
         if (user) {

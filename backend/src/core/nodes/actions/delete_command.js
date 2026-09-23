@@ -1,4 +1,5 @@
 const prismaService = require('../../PrismaService');
+const { blockTestWrite } = require('../../services/testModeGuard');
 const prisma = prismaService.getClient();
 const { getRuntimeCommandRegistry } = require('../../system/RuntimeCommandRegistry');
 
@@ -17,6 +18,12 @@ async function execute(node, context, helpers) {
 
         if (!commandName) {
             console.error('[delete_command] Имя команды обязательно');
+            memo.set(`${node.id}:success`, false);
+            await traverse(node, 'exec');
+            return;
+        }
+
+        if (blockTestWrite(context, 'delete_command', String(commandName))) {
             memo.set(`${node.id}:success`, false);
             await traverse(node, 'exec');
             return;

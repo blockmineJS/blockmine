@@ -15,6 +15,40 @@ import { io } from 'socket.io-client';
 import { useAppStore } from './appStore';
 import NodeRegistry from '@/components/visual-editor/nodes';
 
+function buildGraphPayload(nodes, edges, variables) {
+  return {
+    nodes: (nodes || []).map(({ id, type, position, data }) => ({
+      id,
+      type,
+      position: position || { x: 0, y: 0 },
+      data: data || {},
+    })),
+    connections: (edges || []).map(({ id, source, target, sourceHandle, targetHandle }) => ({
+      id,
+      sourceNodeId: source,
+      targetNodeId: target,
+      sourcePinId: sourceHandle,
+      targetPinId: targetHandle,
+    })),
+    variables: variables || [],
+  };
+}
+
+function waitForDebugState(socket) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      socket.off('debug:state', onState);
+      resolve();
+    };
+    const onState = () => finish();
+    socket.on('debug:state', onState);
+    setTimeout(finish, 2000);
+  });
+}
+
 enableMapSet();
 
 export const useVisualEditorStore = create(
@@ -63,6 +97,7 @@ export const useVisualEditorStore = create(
     testModeHistoryLength: 0,
     testModeCanStepBack: false,
     testModeRunning: false,
+    testEffects: [],
     runNodeDialog: null,
     runNodeResult: null,
 
@@ -1278,6 +1313,16 @@ export const useVisualEditorStore = create(
       });
     },
 
+    runToEnd: () => {
+      const { socket, debugSession } = get();
+      if (!socket || !debugSession) return;
+      socket.emit('debug:continue', {
+        sessionId: debugSession.sessionId,
+        runToEnd: true,
+        stepMode: false
+      });
+    },
+
     stepExecution: (overrides = null) => {
       const { socket, debugSession } = get();
       if (!socket || !debugSession) {
@@ -1325,32 +1370,71 @@ export const useVisualEditorStore = create(
       const { socket, command } = get();
       if (!socket || !command) return;
       socket.emit('debug:disable-test-mode', { graphId: command.id });
-      set({ testMode: false, testModeRunning: false, testModeHistoryLength: 0, testModeCanStepBack: false });
+      set({ testMode: false, testModeRunning: false, testModeHistoryLength: 0, testModeCanStepBack: false, testEffects: [] });
     },
 
-    startTestRun: async ({ eventType, eventArgs }) => {
-      const { command } = get();
-      if (!command) return null;
-      try {
-        const response = await apiHelper(`/api/bots/${command.botId}/event-graphs/test-run/${command.id}`, {
-          method: 'POST',
-          body: { eventType, eventArgs }
+    startTestRun: async (payload) => {
+      const { command, editorType, socket } = get();
+      if (!command?.id) {
+        toast({ variant: 'destructive', title: 'Ошибка', description: 'Сначала сохраните граф' });
+        return { success: false, error: 'not_saved' };
+      }
+      if (!socket) {
+        toast({ variant: 'destructive', title: 'Ошибка', description: 'Нет соединения с панелью' });
+        return { success: false, error: 'no_socket' };
+      }
+
+      const joined = waitForDebugState(socket);
+      if (get().debugMode !== 'live') {
+        get().setDebugMode('live');
+      } else {
+        socket.emit('debug:join', {
+          botId: command.botId,
+          graphId: command.id
         });
-        set({ testModeRunning: true });
+      }
+      await joined;
+
+      const { nodes, edges, variables } = get();
+      const url = editorType === 'command'
+        ? `/api/bots/${command.botId}/commands/${command.id}/test-run`
+        : `/api/bots/${command.botId}/event-graphs/test-run/${command.id}`;
+
+      set({ testEffects: [], testMode: true });
+      try {
+        const response = await apiHelper(url, {
+          method: 'POST',
+          body: { ...(payload || {}), graph: buildGraphPayload(nodes, edges, variables) }
+        });
+        set({ testModeRunning: true, testMode: true });
         return response;
       } catch (e) {
         console.error('[TestMode] startTestRun failed:', e);
+        set({ testMode: false, testModeRunning: false });
         return { success: false, error: e.message };
       }
     },
 
     runSingleNode: async ({ nodeId, inputs, variables }) => {
-      const { command } = get();
-      if (!command) return null;
+      const { command, editorType, nodes, edges, variables: graphVariables } = get();
+      if (!command?.id) {
+        const errResult = { success: false, error: 'Сначала сохраните граф' };
+        set({ runNodeResult: errResult });
+        return errResult;
+      }
+      const node = nodes.find((item) => item.id === nodeId);
+      const url = editorType === 'command'
+        ? `/api/bots/${command.botId}/commands/${command.id}/run-node`
+        : `/api/bots/${command.botId}/event-graphs/run-node/${command.id}/${nodeId}`;
       try {
-        const response = await apiHelper(`/api/bots/${command.botId}/event-graphs/run-node/${command.id}/${nodeId}`, {
+        const response = await apiHelper(url, {
           method: 'POST',
-          body: { inputs: inputs || {}, variables: variables || {} }
+          body: {
+            inputs: inputs || {},
+            variables: variables && Object.keys(variables).length ? variables : graphVariables,
+            node: node ? { id: node.id, type: node.type, data: node.data || {} } : { id: nodeId },
+            graph: buildGraphPayload(nodes, edges, graphVariables),
+          }
         });
         set({ runNodeResult: response });
         return response;
@@ -1404,6 +1488,7 @@ export const useVisualEditorStore = create(
           testModeRunning: false,
           testModeHistoryLength: 0,
           testModeCanStepBack: false,
+          testEffects: [],
         });
       }
 
@@ -1760,8 +1845,20 @@ export const useVisualEditorStore = create(
         console.warn('[Debug] Rewind failed:', reason);
       });
 
-      newSocket.on('debug:test-mode-started', (data) => {
-        set({ testMode: true, testModeRunning: true, testModeHistoryLength: 0, testModeCanStepBack: false });
+      newSocket.on('debug:test-mode-started', () => {
+        set({ testMode: true, testModeRunning: true, testModeHistoryLength: 0, testModeCanStepBack: false, testEffects: [] });
+      });
+
+      newSocket.on('debug:test-effect', ({ effect }) => {
+        if (!effect) return;
+        set(state => {
+          if (!Array.isArray(state.testEffects)) state.testEffects = [];
+          state.testEffects.push(effect);
+        });
+      });
+
+      newSocket.on('debug:test-finished', () => {
+        set({ testModeRunning: false });
       });
 
       newSocket.on('debug:test-mode-stopped', () => {
@@ -1917,6 +2014,8 @@ export const useVisualEditorStore = create(
       socket.off('debug:rewind-failed');
       socket.off('debug:test-mode-started');
       socket.off('debug:test-mode-stopped');
+      socket.off('debug:test-effect');
+      socket.off('debug:test-finished');
       socket.off('debug:stopped');
 
       socket.disconnect();

@@ -206,13 +206,14 @@ function initializeSocket(httpServer) {
             debugState.toggleBreakpoint(nodeId, enabled);
         });
 
-        socket.on('debug:continue', ({ sessionId, overrides, stepMode }) => {
+        socket.on('debug:continue', ({ sessionId, overrides, stepMode, runToEnd }) => {
             const debugManager = getGlobalDebugManager();
             const debugState = debugManager.getBySessionId(sessionId);
             if (!debugState) {
                 return;
             }
 
+            if (runToEnd) debugState.runToEnd = true;
             debugState.resume(overrides, stepMode || false);
         });
 

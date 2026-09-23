@@ -11,6 +11,7 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import { cn } from '@/lib/utils';
 import { useNodeTranslation } from './hooks/useNodeTranslation';
+import TestEffectJournal from './TestEffectJournal';
 
 const DebugStepInfo = () => {
   const { t } = useTranslation('visual-editor');
@@ -22,6 +23,7 @@ const DebugStepInfo = () => {
   const testModeCanStepBack = useVisualEditorStore(state => state.testModeCanStepBack);
   const continueExecution = useVisualEditorStore(state => state.continueExecution);
   const stepExecution = useVisualEditorStore(state => state.stepExecution);
+  const runToEnd = useVisualEditorStore(state => state.runToEnd);
   const stepBack = useVisualEditorStore(state => state.stepBack);
   const stopExecution = useVisualEditorStore(state => state.stopExecution);
 
@@ -124,6 +126,17 @@ const DebugStepInfo = () => {
               <ArrowRight className="w-4 h-4 mr-1" />
               {t('debugControls.stepForward')}
             </Button>
+            {testMode && (
+              <Button
+                size="sm"
+                variant="default"
+                className="bg-green-600 hover:bg-green-700 flex-1"
+                onClick={() => runToEnd()}
+              >
+                <Play className="w-4 h-4 mr-1" />
+                {t('testMode.runToEnd')}
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!testMode && (
@@ -250,6 +263,8 @@ const DebugStepInfo = () => {
             </div>
           </div>
         )}
+
+        <TestEffectJournal />
       </CardContent>
     </Card>
   );

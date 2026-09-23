@@ -1,4 +1,5 @@
 const User = require('../../UserService');
+const { blockTestWrite } = require('../../services/testModeGuard');
 
 async function execute(node, context, helpers) {
     const { resolvePinValue, traverse } = helpers;
@@ -9,6 +10,11 @@ async function execute(node, context, helpers) {
     let username = null;
     if (typeof userIdentifier === 'string') username = userIdentifier;
     else if (userIdentifier?.username) username = userIdentifier.username;
+
+    if (username && groupName && blockTestWrite(context, 'remove_from_group', `${username} -> ${groupName}`)) {
+        await traverse(node, 'exec');
+        return;
+    }
 
     if (username && groupName) {
         const user = await User.getUser(username, context.botId);

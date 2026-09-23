@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TestModeStartDialog from './TestModeStartDialog';
+import TestEffectJournal from './TestEffectJournal';
 
 const DebugPanel = () => {
   const { t } = useTranslation('visual-editor');
@@ -131,6 +132,8 @@ const DebugPanel = () => {
             )}
           </div>
         </div>
+
+        <TestEffectJournal />
 
         {/* Брейкпоинты */}
         <div>

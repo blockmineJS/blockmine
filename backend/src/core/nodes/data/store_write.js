@@ -1,4 +1,5 @@
 const prismaService = require('../../PrismaService');
+const { blockTestWrite } = require('../../services/testModeGuard');
 const prisma = prismaService.getClient();
 
 async function execute(node, context, helpers) {
@@ -10,6 +11,10 @@ async function execute(node, context, helpers) {
 
     if (pluginName && key) {
         const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+        if (blockTestWrite(context, 'store_write', `${pluginName}.${key}`)) {
+            await traverse(node, 'exec');
+            return;
+        }
         await prisma.pluginDataStore.upsert({
             where: { pluginName_botId_key: { pluginName, botId: context.botId, key } },
             update: { value: stringValue },

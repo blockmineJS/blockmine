@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
+import NodeRegistry from '@/components/visual-editor/nodes';
 import { Play, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 const RunNodeDialog = () => {
@@ -23,9 +24,9 @@ const RunNodeDialog = () => {
 
   const inputDefs = useMemo(() => {
     if (!node) return [];
-    const data = node.data || {};
-    const pins = data.pins?.inputs || data.inputs || [];
-    return pins.filter(p => p && p.type !== 'exec' && p.name);
+    const definition = NodeRegistry.get(node.type);
+    const pins = definition?.getInputs?.(node.data || {}) || [];
+    return pins.filter(p => p && p.type !== 'Exec' && p.type !== 'exec' && p.id);
   }, [node]);
 
   const [inputs, setInputs] = useState({});
@@ -34,7 +35,7 @@ const RunNodeDialog = () => {
   useEffect(() => {
     if (node) {
       const initial = {};
-      inputDefs.forEach(p => { initial[p.name] = ''; });
+      inputDefs.forEach(p => { initial[p.id] = ''; });
       setInputs(initial);
     }
   }, [node, inputDefs]);
@@ -73,14 +74,14 @@ const RunNodeDialog = () => {
             <p className="text-sm text-slate-400">{t('testMode.noInputPins')}</p>
           ) : (
             inputDefs.map(pin => (
-              <div key={pin.name} className="space-y-1">
+              <div key={pin.id} className="space-y-1">
                 <Label className="flex items-center gap-2">
-                  <span>{pin.label || pin.name}</span>
+                  <span>{pin.name || pin.id}</span>
                   {pin.type && <Badge variant="outline" className="text-xs">{pin.type}</Badge>}
                 </Label>
                 <Input
-                  value={inputs[pin.name] ?? ''}
-                  onChange={(e) => update(pin.name, e.target.value)}
+                  value={inputs[pin.id] ?? ''}
+                  onChange={(e) => update(pin.id, e.target.value)}
                   placeholder={t('testMode.valueOrJson')}
                   className="bg-slate-700 border-slate-600 font-mono text-xs"
                 />

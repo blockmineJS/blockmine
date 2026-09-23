@@ -165,6 +165,11 @@ class User {
         });
 
         if (!userInstance) {
+            const { isGraphTestMode } = require('./services/testModeGuard');
+            if (isGraphTestMode()) {
+                return null;
+            }
+
             const defaultGroup = await prisma.group.findUnique({ where: { botId_name: { botId, name: 'User' } } });
             
             if (!defaultGroup) {

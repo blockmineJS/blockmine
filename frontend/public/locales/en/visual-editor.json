@@ -374,7 +374,10 @@
   },
   "testMode": {
     "title": "Test Mode",
-    "description": "Run the graph step by step with an emulated event. You can edit values and rewind.",
+    "description": "Run the graph step by step without a bot. Messages and blocked database writes show up in the journal.",
+    "commandHint": "The bot stays offline. Arguments are passed to the Get Argument node.",
+    "journalTitle": "Journal",
+    "journalEmpty": "No messages or writes yet",
     "startButton": "Start test",
     "exitButton": "Exit test",
     "running": "running",
@@ -385,6 +388,7 @@
     "close": "Close",
     "eventTypeLabel": "Event type",
     "noFields": "No additional data required",
+    "runToEnd": "Run to end",
     "stepBack": "Back",
     "stepBackTitle": "Rewind by one step",
     "step": "step {{n}}",
@@ -401,7 +405,19 @@
       "message": "Message",
       "health": "Health (0-20)",
       "food": "Food (0-20)",
-      "commandArgsJson": "Command arguments (JSON)"
+      "commandArgsJson": "Command arguments (JSON)",
+      "typeChat": "Chat type",
+      "noArguments": "This command has no arguments"
+    },
+    "chatTypes": {
+      "chat": "Public chat",
+      "private": "Private message"
+    },
+    "kinds": {
+      "message": "Message",
+      "log": "Log",
+      "chat": "Chat",
+      "db_write_blocked": "Database write skipped"
     },
     "events": {
       "chat": "Chat message",
