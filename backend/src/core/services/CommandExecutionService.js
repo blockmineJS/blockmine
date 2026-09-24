@@ -183,10 +183,7 @@ class CommandExecutionService {
 
         const typeChat = 'websocket';
 
-        let botConfigCache = this.cache.getBotConfig(botId);
-        if (!botConfigCache) {
-            throw new Error('Bot configuration cache not loaded.');
-        }
+        const botConfigCache = await this.cache.getOrLoadBotConfig(botId);
 
         const user = await UserService.getUser(username, botId, botConfig);
 

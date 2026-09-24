@@ -108,15 +108,26 @@ describe('CommandExecutionService', () => {
             ).rejects.toThrow('Bot configuration not found');
         });
 
-        test('должен выбросить ошибку если кеш не загружен', async () => {
+        test('должен загрузить кэш команд, если он был сброшен', async () => {
             mockProcessManager.getProcess.mockReturnValue({
                 botConfig: { id: 1 }
             });
-            mockCacheManager.getBotConfig.mockReturnValue(null);
+            mockCacheManager.getOrLoadBotConfig.mockResolvedValue({
+                commands: new Map(),
+                commandAliases: new Map(),
+                permissionsById: new Map(),
+            });
+            UserService.getUser.mockResolvedValue({
+                isBlacklisted: false,
+                isOwner: false,
+                username: 'Player1',
+                hasPermission: () => false,
+            });
 
             await expect(
                 service.validateAndExecuteCommandForApi(1, 'Player1', 'test', {})
-            ).rejects.toThrow('Bot configuration cache not loaded');
+            ).rejects.toThrow('not found or is disabled');
+            expect(mockCacheManager.getOrLoadBotConfig).toHaveBeenCalledWith(1);
         });
 
         test('должен выбросить ошибку если пользователь в черном списке', async () => {
@@ -128,7 +139,7 @@ describe('CommandExecutionService', () => {
             mockProcessManager.getProcess.mockReturnValue({
                 botConfig: { id: 1 }
             });
-            mockCacheManager.getBotConfig.mockReturnValue({
+            mockCacheManager.getOrLoadBotConfig.mockResolvedValue({
                 commands: new Map(),
                 commandAliases: new Map()
             });
@@ -149,7 +160,7 @@ describe('CommandExecutionService', () => {
             mockProcessManager.getProcess.mockReturnValue({
                 botConfig: { id: 1 }
             });
-            mockCacheManager.getBotConfig.mockReturnValue({
+            mockCacheManager.getOrLoadBotConfig.mockResolvedValue({
                 commands: new Map(),
                 commandAliases: new Map()
             });
@@ -178,7 +189,7 @@ describe('CommandExecutionService', () => {
             mockProcessManager.getProcess.mockReturnValue({
                 botConfig: { id: 1 }
             });
-            mockCacheManager.getBotConfig.mockReturnValue({
+            mockCacheManager.getOrLoadBotConfig.mockResolvedValue({
                 commands: new Map([['test', mockCommand]]),
                 commandAliases: new Map(),
                 permissionsById: new Map([[1, { id: 1, name: 'admin.test' }]])
