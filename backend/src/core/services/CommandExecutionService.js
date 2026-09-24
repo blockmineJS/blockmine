@@ -338,14 +338,19 @@ class CommandExecutionService {
                 let permission = await this.permissionRepository.findByName(botId, commandConfig.permissions);
 
                 if (!permission) {
-                    permission = await this.permissionRepository.create({
-                        botId,
-                        name: commandConfig.permissions,
-                        description: `Автоматически создано для команды ${commandConfig.name}`,
-                        owner: commandConfig.owner,
-                    });
+                    try {
+                        permission = await this.permissionRepository.create({
+                            botId,
+                            name: commandConfig.permissions,
+                            description: `Автоматически создано для команды ${commandConfig.name}`,
+                            owner: commandConfig.owner,
+                        });
+                    } catch (error) {
+                        if (error.code !== 'P2002') throw error;
+                        permission = await this.permissionRepository.findByName(botId, commandConfig.permissions);
+                    }
                 }
-                permissionId = permission.id;
+                permissionId = permission?.id || null;
             }
 
             const createData = {
@@ -369,13 +374,22 @@ class CommandExecutionService {
 
             const existingCommand = await this.commandRepository.findByName(botId, commandConfig.name);
             if (existingCommand) {
-                // Обновляем permissionId только если он null (не был установлен пользователем)
                 if (existingCommand.permissionId === null && permissionId !== null) {
                     updateData.permissionId = permissionId;
                 }
                 await this.commandRepository.update(existingCommand.id, updateData);
             } else {
-                await this.commandRepository.create(createData);
+                try {
+                    await this.commandRepository.create(createData);
+                } catch (error) {
+                    if (error.code !== 'P2002') throw error;
+                    const raced = await this.commandRepository.findByName(botId, commandConfig.name);
+                    if (!raced) throw error;
+                    if (raced.permissionId === null && permissionId !== null) {
+                        updateData.permissionId = permissionId;
+                    }
+                    await this.commandRepository.update(raced.id, updateData);
+                }
             }
 
             this.cache.deleteBotConfig(botId);

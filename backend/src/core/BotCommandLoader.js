@@ -46,7 +46,10 @@ async function loadBotCommands(bot, config, prisma) {
     }
 
     if (process.send) {
+        const seen = new Set();
         for (const cmd of bot.commands.values()) {
+            if (!cmd?.name || seen.has(cmd.name)) continue;
+            seen.add(cmd.name);
             process.send({
                 type: MessageTypes.COMMAND.REGISTER,
                 commandConfig: {

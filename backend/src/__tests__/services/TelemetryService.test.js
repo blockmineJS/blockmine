@@ -272,6 +272,23 @@ describe('TelemetryService', () => {
 
             expect(mockLogger.error).toHaveBeenCalled();
         });
+
+        test('не пишет в лог таймаут соединения со статистикой', async () => {
+            const mockBotProcess = {
+                botConfig: {
+                    username: 'TestBot',
+                    server: { host: 'mc.example.com', port: 25565 }
+                }
+            };
+            mockProcessManager.getAllProcesses.mockReturnValue(new Map([[1, mockBotProcess]]));
+            const timeoutError = new TypeError('fetch failed');
+            timeoutError.cause = Object.assign(new Error('Connect Timeout Error'), { code: 'UND_ERR_CONNECT_TIMEOUT', name: 'ConnectTimeoutError' });
+            global.fetch.mockRejectedValue(timeoutError);
+
+            await telemetryService.sendHeartbeat();
+
+            expect(mockLogger.error).not.toHaveBeenCalled();
+        });
     });
 
     describe('getInstanceId', () => {

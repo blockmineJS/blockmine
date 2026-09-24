@@ -53,6 +53,8 @@ function reportPluginDownload(pluginName) {
             }
         })
         .catch((error) => {
+            const { isConnectTimeout } = require('./utils/networkError');
+            if (isConnectTimeout(error)) return;
             console.error(`[Telemetry] Не удалось отправить статистику по плагину ${pluginName}: ${error.message}`);
         });
 }
