@@ -15,7 +15,7 @@ const {
     fetchLatestGithubVersionTag,
 } = require('./utils/github');
 const { installDependencies } = require('./utils/npmInstall');
-const { assertSafeZip } = require('./utils/zipSafe');
+const { assertSafeZip, assertArchiveLimits } = require('./utils/zipSafe');
 const TtlCache = require('./utils/ttlCache');
 const { deepMergeSettings } = require('./utils/settingsMerger');
 const { buildDefaultSettings } = require('./utils/pluginSettings');
@@ -31,6 +31,49 @@ function isPathInside(parent, child) {
 function sanitizePluginDirName(name) {
     const cleaned = String(name || '').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/^\.+/, '');
     return cleaned || 'plugin';
+}
+
+function httpError(message, statusCode) {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+}
+
+async function findPluginRoot(rootDir) {
+    if (await fse.pathExists(path.join(rootDir, 'package.json'))) {
+        return rootDir;
+    }
+
+    const entries = await fse.readdir(rootDir, { withFileTypes: true });
+    const matches = [];
+    for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name === '__MACOSX' || entry.name === 'node_modules' || entry.name === '.git') continue;
+        const candidate = path.join(rootDir, entry.name);
+        if (await fse.pathExists(path.join(candidate, 'package.json'))) {
+            matches.push(candidate);
+        }
+    }
+
+    if (matches.length === 1) return matches[0];
+    return null;
+}
+
+async function appendPluginFiles(archive, directory, relativeDir = '') {
+    const entries = await fse.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+        if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        const absolutePath = path.join(directory, entry.name);
+        const entryName = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+        if (entry.isSymbolicLink()) continue;
+        if (entry.isDirectory()) {
+            await appendPluginFiles(archive, absolutePath, entryName);
+            continue;
+        }
+        if (entry.isFile()) {
+            archive.file(absolutePath, { name: entryName });
+        }
+    }
 }
 
 const TELEMETRY_ENABLED = process.env.BLOCKMINE_TELEMETRY !== 'false';
@@ -213,6 +256,86 @@ class PluginManager {
         }
 
         return newPlugin;
+    }
+
+    async getInstalledPluginDirectory(botId, pluginId) {
+        const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: Number(pluginId) } });
+        if (!plugin || plugin.botId !== Number(botId)) {
+            throw httpError('Плагин не найден', 404);
+        }
+
+        let realPath;
+        try {
+            realPath = await fse.realpath(plugin.path);
+        } catch {
+            throw httpError('Файлы плагина не найдены', 404);
+        }
+
+        const stat = await fse.stat(realPath);
+        if (!stat.isDirectory()) {
+            throw httpError('Файлы плагина не найдены', 404);
+        }
+
+        const botDir = path.join(PLUGINS_BASE_DIR, `bot_${Number(botId)}`);
+        const realBotDir = await fse.realpath(botDir);
+        if (!isPathInside(realBotDir, realPath)) {
+            throw httpError('Файлы плагина недоступны', 400);
+        }
+
+        return {
+            plugin,
+            directory: realPath,
+            filename: `${sanitizePluginDirName(plugin.name)}.zip`,
+        };
+    }
+
+    async writePluginZip(directory, outputStream) {
+        const archiver = require('archiver');
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        const failed = new Promise((_, reject) => {
+            archive.on('error', reject);
+        });
+        archive.pipe(outputStream);
+        await appendPluginFiles(archive, directory);
+        await Promise.race([archive.finalize(), failed]);
+    }
+
+    async installFromZipBuffer(botId, buffer) {
+        if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+            throw httpError('Файл не похож на zip-архив.', 400);
+        }
+
+        let zip;
+        try {
+            zip = new AdmZip(buffer);
+        } catch {
+            throw httpError('Не удалось прочитать zip-архив.', 400);
+        }
+
+        try {
+            assertArchiveLimits(zip);
+        } catch (error) {
+            if (!error.statusCode) error.statusCode = 400;
+            throw error;
+        }
+
+        const tempDir = await fse.mkdtemp(path.join(os.tmpdir(), 'blockmine-plugin-zip-'));
+        try {
+            assertSafeZip(zip, tempDir);
+            zip.extractAllTo(tempDir, true);
+            const pluginDir = await findPluginRoot(tempDir);
+            if (!pluginDir) {
+                throw httpError('В архиве нет package.json плагина.', 400);
+            }
+            return await this.installFromLocalPath(botId, pluginDir);
+        } catch (error) {
+            if (!error.statusCode && /Небезопасный путь/.test(error.message || '')) {
+                error.statusCode = 400;
+            }
+            throw error;
+        } finally {
+            await safeRemove(tempDir);
+        }
     }
 
     async _downloadAndExtract(repoUrl, ref, destinationDir) {

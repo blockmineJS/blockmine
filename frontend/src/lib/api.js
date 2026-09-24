@@ -147,6 +147,17 @@ export const apiHelper = async (url, options = {}, successMessage) => {
   }
 };
 
+export function saveBlob(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export const api = {
   get: (url, successMessage) => apiHelper(url, { method: 'GET' }, successMessage),
   post: (url, body, successMessage) => apiHelper(url, { method: 'POST', body }, successMessage),

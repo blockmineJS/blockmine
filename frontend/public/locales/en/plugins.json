@@ -8,6 +8,8 @@
     "checkUpdates": "Check for updates",
     "installLocal": "Install locally",
     "installGithub": "Install from GitHub",
+    "installZip": "Install from zip",
+    "downloadZip": "Download zip",
     "createPlugin": "Create plugin",
     "install": "Install",
     "uninstall": "Uninstall",
@@ -72,6 +74,15 @@
     "installing": "Installing...",
     "updating": "Updating...",
     "deleting": "Deleting..."
+  },
+  "tooltips": {
+    "downloadZip": "Download zip"
+  },
+  "zipInstall": {
+    "title": "Install from zip",
+    "description": "The archive must contain package.json at the root or in a single folder. node_modules is not required.",
+    "fileLabel": "Plugin zip archive",
+    "install": "Install"
   },
   "localInstall": {
     "title": "Install plugin locally",

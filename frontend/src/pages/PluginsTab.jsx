@@ -5,11 +5,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap, Github } from 'lucide-react';
+import { RefreshCw, FolderPlus, Code2, Puzzle, Package, Sparkles, Zap, Github, FileArchive } from 'lucide-react';
 import InstalledPluginsView from '@/components/InstalledPluginsView';
 import PluginBrowserView from '@/components/PluginBrowserView';
 import GitHubInstallDialog from '@/components/GitHubInstallDialog';
 import LocalInstallDialog from '@/components/LocalInstallDialog';
+import ZipInstallDialog from '@/components/ZipInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
 import FadeTransition from '@/components/FadeTransition';
@@ -35,6 +36,7 @@ export default function PluginsTab() {
     const deletePlugin = useAppStore(state => state.deletePlugin);
     const updatePlugin = useAppStore(state => state.updatePlugin);
     const installPluginFromPath = useAppStore(state => state.installPluginFromPath);
+    const installPluginFromZip = useAppStore(state => state.installPluginFromZip);
     const installPluginFromRepo = useAppStore(state => state.installPluginFromRepo);
     const forkPlugin = useAppStore(state => state.forkPlugin);
     const createIdePlugin = useAppStore(state => state.createIdePlugin);
@@ -48,6 +50,8 @@ export default function PluginsTab() {
     const [isGithubInstalling, setIsGithubInstalling] = useState(false);
     const [isLocalInstallOpen, setIsLocalInstallOpen] = useState(false);
     const [isLocalInstalling, setIsLocalInstalling] = useState(false);
+    const [isZipInstallOpen, setIsZipInstallOpen] = useState(false);
+    const [isZipInstalling, setIsZipInstalling] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isForking, setIsForking] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
@@ -134,6 +138,18 @@ export default function PluginsTab() {
         setIsUpdating(null);
     };
 
+    const handleZipInstall = async (file) => {
+        setIsZipInstalling(true);
+        try {
+            await installPluginFromZip(intBotId, file);
+            setIsZipInstallOpen(false);
+        } catch (error) {
+            console.error('[PluginsTab] Zip install failed:', error);
+        } finally {
+            setIsZipInstalling(false);
+        }
+    };
+
     const handleLocalInstall = async (path) => {
         setIsLocalInstalling(true);
         try {
@@ -208,6 +224,15 @@ export default function PluginsTab() {
                         <TooltipContent>{t('actions.checkUpdates')}</TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
+                        <Dialog open={isZipInstallOpen} onOpenChange={setIsZipInstallOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={!canInstall}>
+                                    <FileArchive className="h-4 w-4" />
+                                    <span className="ml-2">{t('actions.installZip')}</span>
+                                </Button>
+                            </DialogTrigger>
+                            <ZipInstallDialog onInstall={handleZipInstall} onCancel={() => setIsZipInstallOpen(false)} isInstalling={isZipInstalling} />
+                        </Dialog>
                         <Dialog open={isLocalInstallOpen} onOpenChange={setIsLocalInstallOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" disabled={!canInstall}>

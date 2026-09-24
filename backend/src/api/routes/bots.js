@@ -402,6 +402,39 @@ router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAcce
     }
 });
 
+router.post('/:botId/plugins/install/zip', authenticateUniversal, checkBotAccess, authorize('plugin:install'), (req, res) => {
+    upload.single('file')(req, res, async (uploadError) => {
+        if (uploadError) {
+            const message = uploadError.code === 'LIMIT_FILE_SIZE'
+                ? 'Архив больше 50 МБ.'
+                : (uploadError.message || 'Не удалось прочитать файл.');
+            return res.status(400).json({ error: message });
+        }
+
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'Выберите zip-архив.' });
+            }
+            const newPlugin = await pluginManager.installFromZipBuffer(parseInt(req.params.botId, 10), req.file.buffer);
+            res.status(201).json(newPlugin);
+        } catch (error) {
+            res.status(error.statusCode || 500).json({ error: error.message || 'Не удалось установить плагин из архива' });
+        }
+    });
+});
+
+router.get('/:botId/plugins/:pluginId/download', authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
+    try {
+        const located = await pluginManager.getInstalledPluginDirectory(req.params.botId, req.params.pluginId);
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${located.filename}"`);
+        await pluginManager.writePluginZip(located.directory, res);
+    } catch (error) {
+        if (res.headersSent) return;
+        res.status(error.statusCode || 500).json({ error: error.message || 'Не удалось скачать плагин' });
+    }
+});
+
 router.use(authenticate);
 router.use('/:botId/event-graphs', checkBotAccess, eventGraphsRouter);
 router.use('/:botId/plugins/ide', checkBotAccess, authorize('plugin:develop'), pluginIdeRouter);

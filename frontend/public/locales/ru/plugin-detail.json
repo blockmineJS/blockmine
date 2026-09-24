@@ -10,7 +10,8 @@
     "installing": "Установка...",
     "installed": "Установлен",
     "install": "Установить",
-    "fork": "Форк"
+    "fork": "Форк",
+    "downloadZip": "Скачать zip"
   },
   "stats": {
     "totalDownloads": "Всего загрузок",

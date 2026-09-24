@@ -8,6 +8,8 @@
     "checkUpdates": "Проверить обновления",
     "installLocal": "Установить локально",
     "installGithub": "Установить с GitHub",
+    "installZip": "Установить из zip",
+    "downloadZip": "Скачать zip",
     "createPlugin": "Создать плагин",
     "install": "Установить",
     "uninstall": "Удалить",
@@ -70,6 +72,15 @@
     "installing": "Установка...",
     "updating": "Обновление...",
     "deleting": "Удаление..."
+  },
+  "tooltips": {
+    "downloadZip": "Скачать zip"
+  },
+  "zipInstall": {
+    "title": "Установить из zip",
+    "description": "Архив должен содержать package.json в корне или в одной папке. node_modules в архив класть не нужно.",
+    "fileLabel": "Zip-архив плагина",
+    "install": "Установить"
   },
   "localInstall": {
     "title": "Установить плагин локально",

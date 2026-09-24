@@ -318,6 +318,26 @@ export const createPluginSlice = (set, get) => {
       }
     },
 
+    installPluginFromZip: async (botId, file) => {
+      const body = new FormData();
+      body.append('file', file);
+      try {
+        const data = await apiHelper(`/api/bots/${botId}/plugins/install/zip`, {
+          method: 'POST',
+          body,
+        });
+        toast({
+          title: translatePlugins('ui.success', 'Успех!'),
+          description: translatePlugins('toasts.pluginInstalled', 'Плагин "{{name}}" успешно установлен.', {
+            name: data.name,
+          }),
+        });
+        return data;
+      } finally {
+        await get().fetchInstalledPlugins(botId, true);
+      }
+    },
+
     installPluginFromPath: async (botId, path) => {
       try {
         const data = await apiHelper(`/api/bots/${botId}/plugins/install/local`, {

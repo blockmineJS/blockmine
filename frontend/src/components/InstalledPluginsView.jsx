@@ -21,6 +21,7 @@ import {
   Clock,
   Code,
   Copy,
+  Download,
   GitBranch,
   LayoutGrid,
   List,
@@ -35,6 +36,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { translatePluginCategory, translatePluginSourceType } from '@/utils/pluginPresentation';
+import { apiHelper, saveBlob } from '@/lib/api';
 
 const IconComponent = ({ name, ...props }) => {
   if (!name) return <Package {...props} />;
@@ -117,6 +119,7 @@ function InstalledPluginCard({
   const { t } = useTranslation('plugins');
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [localEnabled, setLocalEnabled] = useState(plugin.isEnabled);
   const [isTogglePending, setIsTogglePending] = useState(false);
   const toggleLockRef = useRef(false);
@@ -190,8 +193,37 @@ function InstalledPluginCard({
         ? t('tooltips.updateTo', { version: updateVersion, defaultValue: 'Обновить до {{version}}' })
         : t('tooltips.updateAvailable', { defaultValue: 'Доступно обновление' });
 
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const blob = await apiHelper(`/api/bots/${botId}/plugins/${plugin.id}/download`);
+      if (blob instanceof Blob) {
+        saveBlob(blob, `${plugin.name}.zip`);
+      }
+    } catch {
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const renderActions = ({ compact = false } = {}) => (
     <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant={compact ? 'ghost' : 'outline'}
+            size={compact ? 'icon' : 'sm'}
+            className={cn(compact ? 'h-8 w-8' : hasUpdateAction ? 'h-9 w-9 shrink-0 px-0' : 'h-9 min-w-0 flex-1')}
+            onClick={handleDownload}
+            disabled={isDownloading}
+            aria-label={t('tooltips.downloadZip')}
+          >
+            {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('tooltips.downloadZip')}</TooltipContent>
+      </Tooltip>
       {isEditable && onFork && (
         <Tooltip>
           <TooltipTrigger asChild>

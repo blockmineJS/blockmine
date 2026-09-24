@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
+import { apiHelper, saveBlob } from '@/lib/api';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from '@/components/ui/dialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
@@ -99,6 +100,7 @@ export default function PluginDetailPage() {
   const [plugin, setPlugin] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isForking, setIsForking] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [changelog, setChangelog] = useState('');
@@ -222,6 +224,20 @@ export default function PluginDetailPage() {
   useEffect(() => {
     setLocalEnabled(Boolean(installedPlugin?.isEnabled));
   }, [installedPlugin?.id, installedPlugin?.isEnabled]);
+
+  const handleDownload = async () => {
+    if (!installedPlugin || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const blob = await apiHelper(`/api/bots/${intBotId}/plugins/${installedPlugin.id}/download`);
+      if (blob instanceof Blob) {
+        saveBlob(blob, `${installedPlugin.name}.zip`);
+      }
+    } catch {
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleInstall = async () => {
     if (!plugin || !safeRepoUrl) return;
@@ -355,6 +371,16 @@ export default function PluginDetailPage() {
                     <Switch checked={localEnabled} onCheckedChange={handleTogglePlugin} disabled={isTogglePending} />
                   </div>
                   <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                    >
+                      {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                      {t('buttons.downloadZip')}
+                    </Button>
                     {installedPlugin.manifest?.settings && Object.keys(installedPlugin.manifest.settings).length > 0 && (
                       <Button
                         variant="outline"
