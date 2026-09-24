@@ -89,11 +89,10 @@ More examples at - https://t.me/blockmineJs
 
 ### 🤖 MCP Server (for AI assistants)
 - **Built-in** [Model Context Protocol](https://modelcontextprotocol.io/) endpoint at `POST /api/mcp`
-- **25 tools**: bot management, plugins, users/groups/permissions, plugin file authoring straight on the host
+- **55 tools**: bots, servers, proxies, plugins, players and permissions, commands, chat, scheduler, plugin files on the host
 - **Auth** via Panel API Key (`pk_*`) — same keys used by the WebSocket API
-- **Connect from anywhere** — Claude Desktop, Cursor, Cline, Claude Code, and any MCP-compatible client
+- **HTTP connection** — Cursor, Claude, and any client with HTTP MCP
 - **`plugin-author` prompt** — full plugin-development guide served by the MCP itself, AI clients fetch it with a single `prompts/get`
-- **npm package [`blockmine-mcp`](https://www.npmjs.com/package/blockmine-mcp)** — thin stdio↔HTTP bridge for clients without native HTTP MCP support
 
 ---
 
@@ -314,11 +313,16 @@ BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api
 
 ### What the AI gets through MCP
 
-- **Bots:** `list_bots`, `get_bot_states`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_bot_logs`
-- **Plugins:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `install_local_plugin`
-- **Plugin authoring on the host:** `create_plugin`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
-- **Management:** `get_bot_users`, `get_user_info`, `get_bot_groups`, `get_bot_permissions`, `get_bot_commands`
+- **Bots:** `list_bots`, `get_bot`, `get_bot_states`, `get_bot_live_state`, `create_bot`, `update_bot`, `delete_bot`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_chat_history`, `get_bot_logs`
+- **Servers and proxies:** `list_servers`, `create_server`, `update_server`, `delete_server`, `list_proxies`, `create_proxy`, `update_proxy`, `delete_proxy`
+- **Plugins:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `list_plugin_catalog`, `get_catalog_plugin`, `install_plugin`, `install_local_plugin`, `uninstall_plugin`, `update_installed_plugin`, `check_plugin_updates`, `get_plugin_store`
+- **Plugin files on the host:** `create_plugin`, `list_plugin_files`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
+- **Players, groups, and permissions:** `get_bot_users`, `get_user_info`, `set_player_blacklist`, `add_player_to_group`, `remove_player_from_group`, `get_bot_groups`, `create_bot_group`, `grant_group_permission`, `revoke_group_permission`, `get_bot_permissions`
+- **Commands:** `get_bot_commands`, `update_bot_command`
+- **Scheduler:** `list_tasks`, `create_task`, `update_task`, `delete_task`
 - **`plugin-author` prompt** — the full BlockMine plugin-development guide, served by MCP and fetched by the AI with a single `prompts/get`
+
+`send_message_to_bot` takes a chat type (`chat`, `private`, `command`, or a type registered by a plugin) and can wait for the chat reply.
 
 ### Setup
 
@@ -326,23 +330,7 @@ BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api
 
 In the BlockMine panel: **Settings → API Keys → Create key**. The key starts with `pk_`.
 
-#### 2a. Through the npm wrapper (recommended — works in any MCP client)
-
-```bash
-npx blockmine-mcp setup
-```
-
-The wizard asks for your panel URL and token, verifies the connection and writes the right config into Claude Desktop / Claude Code / etc.
-
-Manually for Claude Code:
-```bash
-claude mcp add blockmine --scope user \
-  -e BLOCKMINE_URL=http://localhost:3001 \
-  -e BLOCKMINE_API_TOKEN=pk_your_key \
-  -- npx -y blockmine-mcp
-```
-
-#### 2b. Native HTTP (for clients with built-in HTTP MCP support)
+#### 2. Connect the client over HTTP
 
 ```bash
 claude mcp add blockmine --scope user --transport http \
@@ -350,7 +338,7 @@ claude mcp add blockmine --scope user --transport http \
   --header "Authorization: Bearer pk_your_key"
 ```
 
-Or in `mcp.json` / `claude_desktop_config.json`:
+Or in `mcp.json`:
 ```json
 {
   "mcpServers": {
@@ -367,13 +355,11 @@ Or in `mcp.json` / `claude_desktop_config.json`:
 
 The MCP endpoint comes up together with the panel. If BlockMine runs on a VPS, just use its public URL instead of `localhost:3001`. Auth is per-request via `Authorization: Bearer pk_*` — same keys as the WebSocket API.
 
-More about the npm package: [`blockmineJS/blockmine-mcp`](https://github.com/blockmineJS/blockmine-mcp).
-
 ---
 
 ## 🧑‍💻 For Developers and Contributors
 
-> **🤖 For AI Agents:** If you are an AI agent connected via MCP, you already have the `plugin-author` prompt (call `prompts/get` with that name). Without MCP, see [backend/src/ai/plugin-assistant-system-prompt.md](./backend/src/ai/plugin-assistant-system-prompt.md).
+> **🤖 For AI Agents:** If you are an AI agent connected via MCP, you already have the `plugin-author` prompt (call `prompts/get` with that name). Without MCP, see [docs/plugin-author.md](./docs/plugin-author.md).
 
 If you want to contribute to the project or run it in development mode.
 

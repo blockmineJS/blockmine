@@ -91,11 +91,10 @@
 
 ### 🤖 MCP Server (для AI-ассистентов)
 - **Встроенный** [Model Context Protocol](https://modelcontextprotocol.io/) endpoint на `POST /api/mcp`
-- **25 tools**: управление ботами, плагины, пользователи/группы/права, чтение/запись файлов плагина прямо на хосте
+- **55 tools**: боты, серверы, прокси, плагины, игроки и права, команды, чат, планировщик, файлы плагина на хосте
 - **Авторизация** через Panel API Key (`pk_*`) — те же ключи, что и для WebSocket API
-- **Подключение из любого хоста** — Claude Desktop, Cursor, Cline, Claude Code и т.д.
+- **Подключение по HTTP** — Cursor, Claude и любой клиент с HTTP MCP
 - **`plugin-author` prompt** — полное руководство по разработке плагинов прямо в MCP, AI получает его одним вызовом `prompts/get`
-- **npm-пакет [`blockmine-mcp`](https://www.npmjs.com/package/blockmine-mcp)** — тонкий stdio↔HTTP-мост для клиентов которые не умеют HTTP MCP
 
 ---
 
@@ -317,11 +316,16 @@ BlockMine выставляет **встроенный MCP-сервер** (Model 
 
 ### Что доступно AI через MCP
 
-- **Боты:** `list_bots`, `get_bot_states`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_bot_logs`
-- **Плагины:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `install_local_plugin`
-- **Разработка плагинов прямо на хосте:** `create_plugin`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
-- **Управление:** `get_bot_users`, `get_user_info`, `get_bot_groups`, `get_bot_permissions`, `get_bot_commands`
+- **Боты:** `list_bots`, `get_bot`, `get_bot_states`, `get_bot_live_state`, `create_bot`, `update_bot`, `delete_bot`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_chat_history`, `get_bot_logs`
+- **Серверы и прокси:** `list_servers`, `create_server`, `update_server`, `delete_server`, `list_proxies`, `create_proxy`, `update_proxy`, `delete_proxy`
+- **Плагины:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `list_plugin_catalog`, `get_catalog_plugin`, `install_plugin`, `install_local_plugin`, `uninstall_plugin`, `update_installed_plugin`, `check_plugin_updates`, `get_plugin_store`
+- **Файлы плагина на хосте:** `create_plugin`, `list_plugin_files`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
+- **Игроки, группы и права:** `get_bot_users`, `get_user_info`, `set_player_blacklist`, `add_player_to_group`, `remove_player_from_group`, `get_bot_groups`, `create_bot_group`, `grant_group_permission`, `revoke_group_permission`, `get_bot_permissions`
+- **Команды:** `get_bot_commands`, `update_bot_command`
+- **Планировщик:** `list_tasks`, `create_task`, `update_task`, `delete_task`
 - **Промпт `plugin-author`** — полное руководство по разработке плагинов BlockMine, которое AI получает одной командой `prompts/get`
+
+`send_message_to_bot` принимает тип чата (`chat`, `private`, `command` или тип, который зарегистрировал плагин) и может подождать ответ в чате.
 
 ### Подключение
 
@@ -329,23 +333,7 @@ BlockMine выставляет **встроенный MCP-сервер** (Model 
 
 В панели BlockMine: **Настройки → API ключи → Создать ключ**. Ключ начинается с `pk_`.
 
-#### 2a. Через npm-обёртку (рекомендуется — работает в любом MCP-клиенте)
-
-```bash
-npx blockmine-mcp setup
-```
-
-Визард сам спросит URL панели и токен, проверит соединение и пропишет нужный конфиг в Claude Desktop / Claude Code / etc.
-
-Вручную для Claude Code:
-```bash
-claude mcp add blockmine --scope user \
-  -e BLOCKMINE_URL=http://localhost:3001 \
-  -e BLOCKMINE_API_TOKEN=pk_ваш_ключ \
-  -- npx -y blockmine-mcp
-```
-
-#### 2b. Напрямую по HTTP (для клиентов с нативной поддержкой HTTP MCP)
+#### 2. Подключить клиент по HTTP
 
 ```bash
 claude mcp add blockmine --scope user --transport http \
@@ -353,7 +341,7 @@ claude mcp add blockmine --scope user --transport http \
   --header "Authorization: Bearer pk_ваш_ключ"
 ```
 
-Или в `mcp.json`/`claude_desktop_config.json`:
+Или в `mcp.json`:
 ```json
 {
   "mcpServers": {
@@ -370,13 +358,11 @@ claude mcp add blockmine --scope user --transport http \
 
 MCP endpoint поднимается вместе с самой панелью. Если BlockMine крутится на VPS — подставь публичный URL вместо `localhost:3001`. Авторизация per-request через `Authorization: Bearer pk_*` — те же ключи, что и для WebSocket API.
 
-Подробнее об npm-пакете: [`blockmineJS/blockmine-mcp`](https://github.com/blockmineJS/blockmine-mcp).
-
 ---
 
 ## 🧑‍💻 Для разработчиков и контрибьюторов
 
-> **🤖 Для AI агентов:** Если вы AI агент через MCP, у вас уже есть промпт `plugin-author` (вызовите `prompts/get` с этим именем). Если нет MCP — см. [backend/src/ai/plugin-assistant-system-prompt.md](./backend/src/ai/plugin-assistant-system-prompt.md).
+> **🤖 Для AI агентов:** Если вы AI агент через MCP, у вас уже есть промпт `plugin-author` (вызовите `prompts/get` с этим именем). Если нет MCP — см. [docs/plugin-author.md](./docs/plugin-author.md).
 
 Если вы хотите внести свой вклад в проект или запустить его в режиме разработки.
 
