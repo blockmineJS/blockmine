@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateUniversal } = require('../middleware/auth');
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateUniversal, async (req, res) => {
     const startTime = Date.now();
     const checks = {};
     let overallHealthy = true;
