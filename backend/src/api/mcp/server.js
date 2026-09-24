@@ -11,17 +11,14 @@ const registerTaskTools = require('./tools/tasks');
 
 const { version: PKG_VERSION } = require('../../../../package.json');
 
-const PLUGIN_AUTHOR_PROMPT_PATH = path.join(__dirname, '..', '..', 'ai', 'plugin-assistant-system-prompt.md');
-let _pluginAuthorPromptCache = null;
+const PLUGIN_AUTHOR_PROMPT_PATH = path.join(__dirname, '..', '..', '..', '..', 'docs', 'plugin-author.md');
 function loadPluginAuthorPrompt() {
-    if (_pluginAuthorPromptCache !== null) return _pluginAuthorPromptCache;
     try {
-        _pluginAuthorPromptCache = fs.readFileSync(PLUGIN_AUTHOR_PROMPT_PATH, 'utf-8');
+        return fs.readFileSync(PLUGIN_AUTHOR_PROMPT_PATH, 'utf-8');
     } catch (e) {
         console.error('[MCP] Failed to load plugin-author prompt:', e.message);
-        _pluginAuthorPromptCache = 'Plugin author guide is unavailable (file missing).';
+        return 'Plugin author guide is unavailable (file missing).';
     }
-    return _pluginAuthorPromptCache;
 }
 
 function buildMcpServer(ctx) {
@@ -59,7 +56,7 @@ Bot and proxy passwords are never returned. To change a password, pass a new one
 
 Authentication is per-request via Authorization: Bearer pk_... — the user is already authenticated when you call any tool. Permission errors will be returned in-line with success: false and the required permission name.
 
-When the user is asked to author a plugin, fetch the dedicated "plugin-author" prompt (prompts/get) — it carries the full plugin-development guide.
+When the user asks to create or edit a plugin, load the "plugin-author" prompt (prompts/get) and follow it. That prompt is the plugin API. Reading the panel source is fine when the prompt is not enough.
 
 When the user writes in Russian, answer in Russian.`,
             },
@@ -67,7 +64,7 @@ When the user writes in Russian, answer in Russian.`,
     }));
 
     server.registerPrompt('plugin-author', {
-        description: 'Full guide for authoring BlockMine plugins (structure, manifest, settings, commands, events, plugin registry, examples, best practices). Use this when the user asks to create or modify a plugin.',
+        description: 'The plugin API. Load this before writing or editing a plugin. Reading the panel source is fine when this prompt is not enough.',
     }, () => ({
         messages: [{
             role: 'user',

@@ -46,7 +46,7 @@ async function readTree(basePath, currentPath = '') {
 
 function register(server, { user }) {
     server.registerTool('create_plugin', {
-        description: 'Create a new empty plugin (or with hello-command template) for a bot. Plugin files live on the BlockMine server in ~/.blockmine/storage/plugins/bot_<id>/<slug>/.',
+        description: 'Create a new empty plugin (or with hello-command template) for a bot. Files live in ~/.blockmine/storage/plugins/bot_<id>/<slug>/. Before writing the plugin, load the MCP prompt plugin-author. That prompt is the plugin API. Reading the panel source is fine when the prompt is not enough.',
         inputSchema: {
             botId: z.number().int(),
             name: z.string().min(1).describe('Display name; will be slugified for the folder/package name'),
@@ -222,7 +222,7 @@ function register(server, { user }) {
     }));
 
     server.registerTool('write_plugin_file', {
-        description: 'Write (create or overwrite) a file in a plugin directory. Creates parent folders if needed. If you write package.json, plugin name/version/manifest in the DB is also updated.',
+        description: 'Write (create or overwrite) a file in a plugin directory. Creates parent folders if needed. Writing package.json also updates the plugin name, version, and botpanel manifest in the DB. Plugin code must follow the MCP prompt plugin-author.',
         inputSchema: {
             botId: z.number().int(),
             pluginName: z.string().min(1),
