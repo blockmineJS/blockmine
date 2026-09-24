@@ -7,6 +7,7 @@ class BotProcessManager {
         this.logger = logger;
         this.processes = new Map(); // botId -> child process
         this.pendingPlayerListRequests = new Map();
+        this.pendingLiveStateRequests = new Map();
         this.pendingCommandRequests = new Map();
         this.uiSubscriptions = new Map(); // botId -> Map<pluginName -> Set<socket>>
     }
@@ -122,6 +123,18 @@ class BotProcessManager {
             request.resolve(players);
             this.pendingPlayerListRequests.delete(requestId);
         }
+    }
+
+    addLiveStateRequest(requestId, handler) {
+        this.pendingLiveStateRequests.set(requestId, handler);
+    }
+
+    resolveLiveStateRequest(requestId, state) {
+        const request = this.pendingLiveStateRequests.get(requestId);
+        if (!request) return;
+        clearTimeout(request.timeout);
+        request.resolve(state);
+        this.pendingLiveStateRequests.delete(requestId);
     }
 
     addNearbyEntitiesRequest(requestId, handler) {

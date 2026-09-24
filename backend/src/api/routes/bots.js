@@ -15,6 +15,7 @@ const pluginIdeRouter = require('./pluginIde');
 const apiKeysRouter = require('./apiKeys');
 const { deepMergeSettings } = require('../../core/utils/settingsMerger');
 const { checkBotAccess } = require('../middleware/botAccess');
+const { setupDefaultPermissionsForBot } = require('../../core/setupDefaultBotPermissions');
 const { filterSecretSettings, prepareSettingsForSave, isGroupedSettings } = require('../../core/utils/secretsFilter');
 const PluginHooks = require('../../core/PluginHooks');
 const rateLimit = require('express-rate-limit');
@@ -405,44 +406,6 @@ router.use(authenticate);
 router.use('/:botId/event-graphs', checkBotAccess, eventGraphsRouter);
 router.use('/:botId/plugins/ide', checkBotAccess, authorize('plugin:develop'), pluginIdeRouter);
 router.use('/:botId/api-keys', apiKeysRouter);
-
-async function setupDefaultPermissionsForBot(botId, prismaClient = prisma) {
-    const initialData = {
-        groups: ["User", "Admin"],
-        permissions: [
-          { name: "admin.*", description: "Все права администратора" },
-          { name: "admin.cooldown.bypass", description: "Обход кулдауна для админ-команд" },
-          { name: "user.*", description: "Все права обычного пользователя" },
-          { name: "user.say", description: "Доступ к простым командам" },
-          { name: "user.cooldown.bypass", description: "Обход кулдауна для юзер-команд" },
-        ],
-        groupPermissions: {
-          "User": ["user.say"],
-          "Admin": ["admin.*", "admin.cooldown.bypass", "user.cooldown.bypass", "user.*"]
-        },
-    };
-    
-    for (const perm of initialData.permissions) {
-        await prismaClient.permission.upsert({ where: { botId_name: { botId, name: perm.name } }, update: { description: perm.description }, create: { ...perm, botId, owner: 'system' } });
-    }
-    for (const groupName of initialData.groups) {
-        await prismaClient.group.upsert({ where: { botId_name: { botId, name: groupName } }, update: {}, create: { name: groupName, botId, owner: 'system' } });
-    }
-    for (const [groupName, permNames] of Object.entries(initialData.groupPermissions)) {
-        const group = await prismaClient.group.findUnique({ where: { botId_name: { botId, name: groupName } } });
-        if (group) {
-            for (const permName of permNames) {
-                const permission = await prismaClient.permission.findUnique({ where: { botId_name: { botId, name: permName } } });
-                if (permission) {
-                    await prismaClient.groupPermission.upsert({ where: { groupId_permissionId: { groupId: group.id, permissionId: permission.id } }, update: {}, create: { groupId: group.id, permissionId: permission.id } });
-                }
-            }
-        }
-    }
-    console.log(`[Setup] Для бота ID ${botId} созданы группы и права по умолчанию.`);
-}
-
-
 
 router.post('/', authorize('bot:create'), async (req, res) => {
     try {

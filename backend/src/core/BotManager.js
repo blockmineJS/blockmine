@@ -151,6 +151,10 @@ class BotManager {
         return this.lifecycleService.getPlayerList(botId);
     }
 
+    async getLiveState(botId) {
+        return this.lifecycleService.getLiveState(botId);
+    }
+
     async getNearbyEntities(botId, position = null, radius = 32) {
         return this.lifecycleService.getNearbyEntities(botId, position, radius);
     }

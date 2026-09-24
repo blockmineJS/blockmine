@@ -217,6 +217,36 @@ process.on('message', async (message) => {
             }
             pendingRequests.delete(message.requestId);
         }
+    } else if (message.type === MessageTypes.SYSTEM.GET_LIVE_STATE) {
+        const entity = bot?.entity;
+        const pos = entity?.position;
+        const round = (value) => (typeof value === 'number' ? Math.round(value * 100) / 100 : null);
+        const players = bot
+            ? Object.values(bot.players || {}).filter((player) => player?.username).map((player) => ({
+                username: player.username,
+                ping: player.ping ?? null,
+                gamemode: player.gamemode ?? null,
+            }))
+            : [];
+        if (process.send) {
+            process.send({
+                type: MessageTypes.SYSTEM.GET_LIVE_STATE_RESPONSE,
+                requestId: message.requestId,
+                payload: {
+                    online: Boolean(entity),
+                    health: bot?.health ?? null,
+                    food: bot?.food ?? null,
+                    saturation: bot?.foodSaturation ?? null,
+                    position: pos ? { x: round(pos.x), y: round(pos.y), z: round(pos.z) } : null,
+                    yaw: round(entity?.yaw),
+                    pitch: round(entity?.pitch),
+                    onGround: entity?.onGround ?? null,
+                    dimension: bot?.game?.dimension ?? null,
+                    gameMode: bot?.game?.gameMode ?? null,
+                    players,
+                },
+            });
+        }
     } else if (message.type === MessageTypes.SYSTEM.GET_PLAYER_LIST) {
         const playerList = bot ? Object.keys(bot.players) : [];
         if (process.send) {
@@ -1207,7 +1237,10 @@ process.on('message', async (message) => {
             }
 
             if (process.send) {
+                const seen = new Set();
                 for (const cmd of bot.commands.values()) {
+                    if (!cmd?.name || seen.has(cmd.name)) continue;
+                    seen.add(cmd.name);
                     process.send({
                         type: MessageTypes.COMMAND.REGISTER,
                         commandConfig: {
@@ -1909,7 +1942,10 @@ process.on('message', async (message) => {
     } else if (message.type === MessageTypes.CHAT.CHAT) {
         if (bot && bot.entity) {
             const { message: msg, chatType, username } = message.payload;
-            bot.messageQueue.enqueue(chatType, msg, username);
+            const queued = bot.messageQueue.enqueue(chatType, msg, username);
+            if (queued === false) {
+                sendLog(`[System] Неизвестный тип чата "${chatType}". Сообщение не отправлено.`);
+            }
         }
     } else if (message.type === MessageTypes.COMMAND.REGISTER_TEMP) {
         // Регистрация временной команды из главного процесса

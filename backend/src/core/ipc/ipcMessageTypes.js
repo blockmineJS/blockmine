@@ -9,6 +9,8 @@ const MessageTypes = {
     GET_PLAYER_LIST_RESPONSE: 'get_player_list_response',
     GET_NEARBY_ENTITIES: 'system:get_nearby_entities',
     GET_NEARBY_ENTITIES_RESPONSE: 'get_nearby_entities_response',
+    GET_LIVE_STATE: 'system:get_live_state',
+    GET_LIVE_STATE_RESPONSE: 'get_live_state_response',
   },
 
   VIEWER: {

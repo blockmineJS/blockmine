@@ -45,7 +45,7 @@ class MessageQueue {
 
     enqueue(chatType, message, username = null) {
         const typeConfig = this.chatTypes[chatType];
-        if (!typeConfig) return;
+        if (!typeConfig) return false;
 
         let messagesToQueue = [];
 
@@ -63,6 +63,7 @@ class MessageQueue {
                 this._enqueue({ type: 'simple', chatType, ...typeConfig, message: trimmedMsg, username });
             }
         }
+        return true;
     }
 
 

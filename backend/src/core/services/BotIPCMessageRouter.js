@@ -47,6 +47,7 @@ class BotIPCMessageRouter {
             'release_cooldown': () => this.commandExecutionService?.releaseCooldown(message.cooldownKey, message.cooldownStamp),
             'request_user_action': () => this._handleUserAction(botId, child, message),
             'get_player_list_response': () => this._handlePlayerListResponse(message),
+            'get_live_state_response': () => this.processManager.resolveLiveStateRequest(message.requestId, message.payload),
             'get_nearby_entities_response': () => this._handleNearbyEntitiesResponse(message),
             'execute_command_response': () => this._handleCommandResponse(message),
             'register_command': () => this._handleRegisterCommand(botId, message),

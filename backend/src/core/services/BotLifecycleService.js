@@ -358,6 +358,30 @@ class BotLifecycleService {
         this.processManager.sendMessage(botId, { type: 'server_command', payload: { command } });
     }
 
+    async getLiveState(botId) {
+        if (!this.processManager.isRunning(botId)) {
+            return { online: false, players: [] };
+        }
+
+        return new Promise((resolve) => {
+            const { v4: uuidv4 } = require('uuid');
+            const requestId = uuidv4();
+            const timeout = setTimeout(() => resolve({ online: false, players: [], timedOut: true }), 5000);
+            this.processManager.addLiveStateRequest(requestId, {
+                resolve: (state) => {
+                    clearTimeout(timeout);
+                    resolve(state);
+                },
+                timeout,
+            });
+            const sent = this.processManager.sendMessage(botId, { type: 'system:get_live_state', requestId });
+            if (!sent) {
+                clearTimeout(timeout);
+                resolve({ online: false, players: [] });
+            }
+        });
+    }
+
     async getPlayerList(botId) {
         if (!this.processManager.isRunning(botId)) {
             return [];

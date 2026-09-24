@@ -66,6 +66,23 @@ async function requireBotAccess(user, botId) {
     return null;
 }
 
+function publicProxy(proxy) {
+    if (!proxy) return null;
+    const { password, ...rest } = proxy;
+    return { ...rest, hasPassword: Boolean(password) };
+}
+
+function publicBot(bot) {
+    if (!bot) return bot;
+    const { password, proxyPassword, proxy, ...rest } = bot;
+    return {
+        ...rest,
+        hasPassword: Boolean(password),
+        hasCustomProxyPassword: Boolean(proxyPassword),
+        proxy: publicProxy(proxy),
+    };
+}
+
 function jsonField(value, fallback = null) {
     if (value == null) return fallback;
     try {
@@ -97,4 +114,6 @@ module.exports = {
     requireBotAccess,
     jsonField,
     getAllowedBotIds,
+    publicBot,
+    publicProxy,
 };
