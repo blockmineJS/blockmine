@@ -919,6 +919,7 @@ async function stopRunningPanel(restartMethod) {
         } catch {
             emitProgress({ line: 'pm2 stop failed, killing ports' });
         }
+        return;
     }
     if (process.platform === 'win32') {
         try {

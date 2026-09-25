@@ -1,8 +1,24 @@
 process.env.BLOCKMINE_UPDATE_WORKER = '1';
 
+const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+if (process.env.BLOCKMINE_UPDATE_DETACHED !== '1') {
+    const child = spawn(process.execPath, process.argv.slice(1), {
+        cwd: process.cwd(),
+        detached: true,
+        stdio: 'ignore',
+        env: {
+            ...process.env,
+            BLOCKMINE_UPDATE_WORKER: '1',
+            BLOCKMINE_UPDATE_DETACHED: '1',
+        },
+    });
+    child.unref();
+    process.exit(0);
+}
 
 const logPath = path.join(os.homedir(), '.blockmine', 'update-worker.log');
 
