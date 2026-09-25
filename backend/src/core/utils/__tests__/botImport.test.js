@@ -1,10 +1,13 @@
 const path = require('path');
 const os = require('os');
+const fse = require('fs-extra');
+const AdmZip = require('adm-zip');
 const {
     assertSafeUsername,
     resolveSafePluginDir,
     resolveBotPluginsDir,
     parseImportZip,
+    importBotFromZip,
     PLUGINS_BASE_DIR,
 } = require('../botImport');
 const { assertArchiveLimits } = require('../zipSafe');
@@ -82,6 +85,54 @@ describe('botImport security guards', () => {
             }
             expect(thrown).toBeDefined();
             expect(thrown.statusCode).toBe(400);
+        });
+    });
+
+    describe('importBotFromZip', () => {
+        it('links imported commands to the new plugin id', async () => {
+            const username = `import_fix_${Date.now()}`;
+            const pluginDir = resolveBotPluginsDir(username);
+            const created = [];
+            const zip = new AdmZip();
+            zip.addFile('bot.json', Buffer.from(JSON.stringify({ username, prefix: '@' })));
+            zip.addFile('plugins.json', Buffer.from(JSON.stringify([
+                { id: 5, name: 'demo', version: '1.0.0', settings: '{}' },
+            ])));
+            zip.addFile('commands.json', Buffer.from(JSON.stringify([
+                { name: 'hi', pluginOwnerId: 5 },
+            ])));
+
+            const prisma = {
+                bot: {
+                    findFirst: async () => null,
+                    create: async () => ({ id: 1, username, server: {} }),
+                    delete: async () => {},
+                },
+                installedPlugin: {
+                    upsert: async () => ({ id: 9 }),
+                    update: async () => ({}),
+                },
+                command: {
+                    create: async ({ data }) => {
+                        created.push(data);
+                        return data;
+                    },
+                },
+            };
+
+            try {
+                await importBotFromZip(zip, {
+                    config: { username, serverId: 1, autoRename: false },
+                    prisma,
+                    pluginManager: {},
+                    setupDefaultPermissions: async () => {},
+                });
+            } finally {
+                await fse.remove(pluginDir);
+            }
+
+            expect(created).toHaveLength(1);
+            expect(created[0].pluginOwnerId).toBe(9);
         });
     });
 });

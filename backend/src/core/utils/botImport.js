@@ -210,7 +210,7 @@ async function importPlugins(zipEntries, newBot, prisma, pluginManager, botPlugi
         }
     }
 
-    return { pluginMap, botPluginsDir };
+    return pluginMap;
 }
 
 async function importPluginDataStore(zipEntries, newBotId, prisma) {
