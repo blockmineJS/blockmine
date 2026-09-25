@@ -1,7 +1,7 @@
 const validationService = require('./services/ValidationService');
 const { GRAPH_TYPES } = require('./constants/graphTypes');
 const { NodeDefinition } = require('./NodeDefinition');
-const { applyDynamicPins } = require('../../../shared/nodePins.mjs');
+const { applyDynamicPins } = require('../../../shared/nodePins.cjs');
 
 class NodeRegistry {
   constructor() {

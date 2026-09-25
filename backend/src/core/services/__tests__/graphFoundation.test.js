@@ -1,4 +1,4 @@
-const { computeDynamicOutputs } = require('../../../../../shared/nodePins.mjs');
+const { computeDynamicOutputs } = require('../../../../../shared/nodePins.cjs');
 const { buildGraphContext } = require('../../graphContext');
 const { evaluateEventPin } = require('../../nodes/event/evaluateEvent');
 const { createTestGraphServices } = require('../../graphServices');

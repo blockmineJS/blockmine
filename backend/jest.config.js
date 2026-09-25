@@ -51,7 +51,5 @@ module.exports = {
     resetMocks: true,
     restoreMocks: true,
 
-    verbose: true,
-
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.js'],
 };

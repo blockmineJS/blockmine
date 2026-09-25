@@ -298,7 +298,7 @@ function withVariablePins(pins, data) {
     return next;
 }
 
-export {
+module.exports = {
     isDynamicNodeType,
     computeDynamicInputs,
     computeDynamicOutputs,
