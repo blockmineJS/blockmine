@@ -58,7 +58,7 @@ const languages = [
   { code: 'en', name: 'English' },
 ];
 
-export default function LanguageSwitcher({ isCollapsed }) {
+export default function LanguageSwitcher({ isCollapsed, compact = false }) {
   const { i18n } = useTranslation();
 
   const normalizedLanguage = (i18n.resolvedLanguage || i18n.language || 'ru').split('-')[0];
@@ -72,13 +72,16 @@ export default function LanguageSwitcher({ isCollapsed }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {isCollapsed ? (
+        {isCollapsed || compact ? (
           <Button
             variant="ghost"
             size="icon"
             title={currentLang.name}
             aria-label={currentLang.name}
-            className="mx-auto flex text-muted-foreground transition-[background-color,color] duration-300 ease-out hover:text-foreground hover:bg-muted/50"
+            className={cn(
+              "flex text-muted-foreground transition-[background-color,color] duration-300 ease-out hover:text-foreground hover:bg-muted/50",
+              isCollapsed ? "mx-auto" : "h-8 w-8"
+            )}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center">
               <LanguageFlag

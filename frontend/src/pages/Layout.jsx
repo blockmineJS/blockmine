@@ -556,43 +556,62 @@ export default function Layout() {
             <div className="border-b p-4">
                 <div className={cn(
                     "relative overflow-hidden transition-[height] " + SIDEBAR_TRANSITION,
-                    isCollapsed ? "h-[76px]" : "h-[52px]"
+                    isCollapsed ? "h-[76px]" : "h-[92px]"
                 )}>
                     <div className={cn(
-                        "absolute inset-0 flex items-center justify-between transition-all " + SIDEBAR_TRANSITION,
+                        "absolute inset-0 flex flex-col justify-center gap-1 transition-all " + SIDEBAR_TRANSITION,
                         isCollapsed ? "pointer-events-none opacity-0 -translate-y-2 scale-95" : "opacity-100 translate-y-0 scale-100"
                     )}>
-                        <button
-                            type="button"
-                            onClick={() => setIsSidebarBrandHidden((previous) => !previous)}
-                            aria-label={t(isSidebarBrandHidden ? 'brandToggle.show' : 'brandToggle.hide')}
-                            title={t(isSidebarBrandHidden ? 'brandToggle.show' : 'brandToggle.hide')}
-                            className={cn(
-                                "flex min-w-0 flex-1 items-center rounded-md px-1 py-1 text-left transition-[gap,background-color] " + SIDEBAR_TRANSITION,
-                                isSidebarBrandHidden ? "gap-0" : "gap-3",
-                                "hover:bg-muted/50"
-                            )}
-                        >
-                            <div className={sidebarBrandLogoClasses(isSidebarBrandHidden)}>
-                                <img src="/logo.png" alt="BlockMineJS Logo" className="h-8 w-8 rounded" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h2 className="text-base font-bold leading-tight">
-                                    BlockMine
-                                </h2>
-                                <p className="truncate text-xs leading-tight text-muted-foreground">
-                                    {user?.username}
-                                </p>
-                            </div>
-                        </button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                            className="hidden md:flex hover:bg-muted/50"
-                        >
-                            <ChevronsLeft className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-between">
+                            <button
+                                type="button"
+                                onClick={() => setIsSidebarBrandHidden((previous) => !previous)}
+                                aria-label={t(isSidebarBrandHidden ? 'brandToggle.show' : 'brandToggle.hide')}
+                                title={t(isSidebarBrandHidden ? 'brandToggle.show' : 'brandToggle.hide')}
+                                className={cn(
+                                    "flex min-w-0 flex-1 items-center rounded-md px-1 py-1 text-left transition-[gap,background-color] " + SIDEBAR_TRANSITION,
+                                    isSidebarBrandHidden ? "gap-0" : "gap-3",
+                                    "hover:bg-muted/50"
+                                )}
+                            >
+                                <div className={sidebarBrandLogoClasses(isSidebarBrandHidden)}>
+                                    <img src="/logo.png" alt="BlockMineJS Logo" className="h-8 w-8 rounded" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h2 className="text-base font-bold leading-tight">
+                                        BlockMine
+                                    </h2>
+                                    <p className="truncate text-xs leading-tight text-muted-foreground">
+                                        {user?.username}
+                                    </p>
+                                </div>
+                            </button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                                className="hidden md:flex hover:bg-muted/50"
+                            >
+                                <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-0.5 px-1">
+                            <ThemeToggle compact />
+                            <LanguageSwitcher compact />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                onClick={() => {
+                                    setIsSheetOpen(false);
+                                    setIsLogoutDialogOpen(true);
+                                }}
+                                title={t('logout')}
+                                aria-label={t('logout')}
+                            >
+                                <LogOut className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
 
                     <div className={cn(
@@ -633,7 +652,7 @@ export default function Layout() {
                         to="/admin"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
+                            "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -649,7 +668,7 @@ export default function Layout() {
                         to="/api-keys"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
+                            "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -665,7 +684,7 @@ export default function Layout() {
                         to="/servers"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
+                            "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -682,7 +701,7 @@ export default function Layout() {
                         to="/proxies"
                         onClick={() => setIsSheetOpen(false)}
                         className={({ isActive }) => cn(
-                            "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
+                            "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
                             isActive
                                 ? "bg-primary/10 text-primary before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-primary before:rounded-r"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -694,7 +713,7 @@ export default function Layout() {
                     </NavLink>
                 )}
 
-                <div className={cn("flex flex-col gap-2", isCollapsed ? "px-1" : "px-2")}>
+                <div className="flex flex-col gap-2 px-1">
                     {hasPermission('bot:create') && (
                         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                             <DialogTrigger asChild>
@@ -744,37 +763,25 @@ export default function Layout() {
                     )}
                 </div>
 
-                <Separator className="my-2" />
-
-                <ThemeToggle isCollapsed={isCollapsed} />
-                <LanguageSwitcher isCollapsed={isCollapsed} />
-
-                <Button
-                    variant="ghost"
-                    size={isCollapsed ? "icon" : "default"}
-                    className={cn(
-                        "rounded-md text-sm font-medium transition-[background-color,color,gap,padding] " + SIDEBAR_TRANSITION,
-                        isCollapsed ? "mx-auto flex gap-0 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50" : "w-full h-9 justify-start px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                    onClick={() => {
-                        setIsSheetOpen(false);
-                        setIsLogoutDialogOpen(true);
-                    }}
-                    title={isCollapsed ? t('logout') : undefined}
-                    aria-label={t('logout')}
-                >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        <LogOut className="h-4 w-4 shrink-0" />
-                    </span>
-                    <span
-                        className={cn(
-                            "overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform,margin] " + SIDEBAR_TRANSITION,
-                            isCollapsed ? "ml-0 max-w-0 opacity-0 -translate-x-2" : "ml-2 max-w-[120px] opacity-100 translate-x-0"
-                        )}
-                    >
-                        {t('logout')}
-                    </span>
-                </Button>
+                {isCollapsed && (
+                    <div className="flex flex-col items-center gap-1">
+                        <ThemeToggle isCollapsed compact />
+                        <LanguageSwitcher isCollapsed compact />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="mx-auto text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            onClick={() => {
+                                setIsSheetOpen(false);
+                                setIsLogoutDialogOpen(true);
+                            }}
+                            title={t('logout')}
+                            aria-label={t('logout')}
+                        >
+                            <LogOut className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
 
                 <div className={cn(
                     "flex flex-col items-start overflow-hidden border-t text-xs text-muted-foreground transition-[max-height,opacity,transform,padding] " + SIDEBAR_TRANSITION,

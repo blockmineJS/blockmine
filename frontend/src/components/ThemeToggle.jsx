@@ -25,7 +25,7 @@ function ThemeIndicatorIcon({ theme, resolvedTheme }) {
   return resolvedTheme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />;
 }
 
-export default function ThemeToggle({ isCollapsed }) {
+export default function ThemeToggle({ isCollapsed, compact = false }) {
   const { t } = useTranslation('sidebar');
   const theme = useAppStore((state) => state.theme);
   const resolvedTheme = useAppStore((state) => state.resolvedTheme);
@@ -60,14 +60,17 @@ export default function ThemeToggle({ isCollapsed }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          {isCollapsed ? (
+          {isCollapsed || compact ? (
             <Button
               ref={triggerRef}
               variant="ghost"
               size="icon"
               title={t('theme.label')}
               aria-label={t('theme.label')}
-              className="mx-auto flex text-muted-foreground transition-[background-color,color] duration-300 ease-out hover:text-foreground hover:bg-muted/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+              className={cn(
+                "flex text-muted-foreground transition-[background-color,color] duration-300 ease-out hover:text-foreground hover:bg-muted/50 focus-visible:ring-0 focus-visible:ring-offset-0",
+                isCollapsed ? "mx-auto" : "h-8 w-8"
+              )}
             >
               <div className="flex h-4 w-4 shrink-0 items-center justify-center">
                 <ThemeIndicatorIcon theme={theme} resolvedTheme={resolvedTheme} />
