@@ -90,10 +90,36 @@ echo.
 start "BlockMine-open" /b cmd /c call "%~f0" __open_browser__
 call npm run dev
 set "EXITCODE=%ERRORLEVEL%"
+if exist "%USERPROFILE%\.blockmine\update-requested.txt" goto do_update
 echo.
 echo [BlockMine] Stopped. Exit code: %EXITCODE%
 pause
 exit /b %EXITCODE%
+
+:do_update
+echo.
+echo [BlockMine] Updating from GitHub...
+set "UPDATE_BRANCH=master"
+set /p UPDATE_BRANCH=<"%USERPROFILE%\.blockmine\update-requested.txt"
+del "%USERPROFILE%\.blockmine\update-requested.txt" >nul 2>&1
+if "%UPDATE_BRANCH%"=="" set "UPDATE_BRANCH=master"
+echo [BlockMine] git fetch %UPDATE_BRANCH%
+git fetch --quiet https://github.com/blockmineJS/blockmine.git %UPDATE_BRANCH%
+if errorlevel 1 goto update_failed
+echo [BlockMine] git merge --ff-only
+git merge --ff-only FETCH_HEAD
+if errorlevel 1 goto update_failed
+echo [BlockMine] npm install
+call npm install --no-fund --no-audit
+if errorlevel 1 goto update_failed
+echo [BlockMine] Update finished. Starting panel...
+goto start_panel
+
+:update_failed
+echo.
+echo [BlockMine] Update failed.
+pause
+exit /b 1
 
 :open_browser
 set /a _tries=0

@@ -4,6 +4,7 @@ const {
     isDefaultBranch,
     isSafeRef,
     mapGithubCommit,
+    parseGitLogLine,
     parseListeningPids,
     resolveUpdateDecision,
     resolveRestartMethod,
@@ -46,6 +47,13 @@ describe('PanelUpdateService helpers', () => {
         ].join('\n');
         expect(parseListeningPids(sample, 3001)).toEqual(['12345']);
         expect(parseListeningPids(sample, 5173)).toEqual(['67890']);
+    });
+
+    test('parseGitLogLine разбирает git log', () => {
+        const mapped = parseGitLogLine('abcdef1234567890\x1ffeat: panel\x1fmerka\x1f2026-09-25T15:32:00+03:00');
+        expect(mapped.shortSha).toBe('abcdef1');
+        expect(mapped.message).toBe('feat: panel');
+        expect(mapped.author).toBe('merka');
     });
 
     test('mapGithubCommit собирает короткое описание', () => {

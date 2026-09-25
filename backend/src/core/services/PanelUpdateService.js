@@ -4,7 +4,7 @@ const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const semver = require('semver');
-const { fetchGithubJson, fetchGithubJsonSafe } = require('../utils/github');
+const { fetchGithubJsonSafe } = require('../utils/github');
 
 const execFileAsync = promisify(execFile);
 
@@ -14,6 +14,7 @@ const OFFICIAL_REPO = 'blockmine';
 const OFFICIAL_GIT_URL = `https://github.com/${OFFICIAL_OWNER}/${OFFICIAL_REPO}.git`;
 const STAMP_PATH = path.join(REPO_ROOT, 'backend', 'src', '.panel-update-stamp.json');
 const PROGRESS_PATH = path.join(os.homedir(), '.blockmine', 'update-progress.json');
+const UPDATE_REQUEST_PATH = path.join(os.homedir(), '.blockmine', 'update-requested.txt');
 const CHECK_CACHE_MS = 2 * 60 * 1000;
 const STALE_PROGRESS_MS = 5 * 60 * 1000;
 const MAX_COMMITS = 25;
@@ -90,6 +91,20 @@ function getPm2Target(env = process.env) {
     if (env.pm_id != null && String(env.pm_id) !== '') return String(env.pm_id);
     if (env.name) return String(env.name);
     return 'blockmine';
+}
+
+function parseGitLogLine(line) {
+    if (!line || typeof line !== 'string') return null;
+    const [sha, message, author, date] = line.split('\x1f');
+    if (!sha) return null;
+    return {
+        sha,
+        shortSha: shortSha(sha),
+        message: firstLine(message || ''),
+        author: author || '',
+        date: date || '',
+        htmlUrl: `https://github.com/${OFFICIAL_OWNER}/${OFFICIAL_REPO}/commit/${sha}`,
+    };
 }
 
 function mapGithubCommit(commit) {
@@ -233,6 +248,97 @@ async function readLocalGitState() {
     }
 }
 
+async function resolveRemoteHead() {
+    const listing = await runGit(['ls-remote', '--symref', OFFICIAL_GIT_URL, 'HEAD']);
+    let branch = 'master';
+    let sha = '';
+    for (const line of listing.split(/\r?\n/)) {
+        const sym = line.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD$/);
+        if (sym) {
+            branch = sym[1];
+            continue;
+        }
+        const shaMatch = line.match(/^([a-f0-9]{40})\s+HEAD$/i);
+        if (shaMatch) sha = shaMatch[1];
+    }
+    if (!sha) {
+        const fallback = await runGit(['ls-remote', OFFICIAL_GIT_URL, 'refs/heads/master']);
+        sha = (fallback.split(/\s+/)[0] || '').trim();
+        branch = 'master';
+    }
+    if (!isSafeRef(branch)) branch = 'master';
+    return { sha, branch };
+}
+
+async function readRemoteSnapshotViaGit(localSha) {
+    const { sha: remoteSha, branch: defaultBranch } = await resolveRemoteHead();
+    if (!remoteSha) {
+        throw new Error('empty remote sha');
+    }
+
+    const htmlUrl = `https://github.com/${OFFICIAL_OWNER}/${OFFICIAL_REPO}/commit/${remoteSha}`;
+    if (localSha && remoteSha === localSha) {
+        return {
+            defaultBranch,
+            version: readLocalPackageVersion(),
+            sha: remoteSha,
+            shortSha: shortSha(remoteSha),
+            branch: defaultBranch,
+            message: firstLine(await runGit(['log', '-1', '--format=%s']).catch(() => '')),
+            date: await runGit(['log', '-1', '--format=%cI']).catch(() => ''),
+            htmlUrl,
+            compareStatus: 'identical',
+            behindBy: 0,
+            aheadBy: 0,
+            commits: [],
+        };
+    }
+
+    await runGit(['fetch', '--quiet', OFFICIAL_GIT_URL, defaultBranch], { timeout: 120000 });
+    const message = firstLine(await runGit(['log', '-1', '--format=%s', 'FETCH_HEAD']));
+    const date = await runGit(['log', '-1', '--format=%cI', 'FETCH_HEAD']);
+    let version = '';
+    try {
+        const pkgRaw = await runGit(['show', 'FETCH_HEAD:package.json']);
+        version = JSON.parse(pkgRaw).version || '';
+    } catch {
+        version = '';
+    }
+
+    const behindBy = Number(await runGit(['rev-list', '--count', 'HEAD..FETCH_HEAD'])) || 0;
+    const aheadBy = Number(await runGit(['rev-list', '--count', 'FETCH_HEAD..HEAD'])) || 0;
+    let compareStatus = 'unknown';
+    if (behindBy > 0 && aheadBy > 0) compareStatus = 'diverged';
+    else if (behindBy > 0) compareStatus = 'behind';
+    else if (aheadBy > 0) compareStatus = 'ahead';
+    else compareStatus = 'identical';
+
+    const log = await runGit([
+        'log',
+        `-n${MAX_COMMITS}`,
+        '--format=%H%x1f%s%x1f%an%x1f%cI',
+        'HEAD..FETCH_HEAD',
+    ]);
+    const commits = log
+        ? log.split(/\r?\n/).map(parseGitLogLine).filter(Boolean)
+        : [];
+
+    return {
+        defaultBranch,
+        version,
+        sha: remoteSha,
+        shortSha: shortSha(remoteSha),
+        branch: defaultBranch,
+        message,
+        date,
+        htmlUrl,
+        compareStatus,
+        behindBy,
+        aheadBy,
+        commits,
+    };
+}
+
 async function readRemotePackageVersion(ref) {
     if (!isSafeRef(ref)) return '';
     const payload = await fetchGithubJsonSafe(
@@ -247,12 +353,15 @@ async function readRemotePackageVersion(ref) {
     }
 }
 
-async function readRemoteSnapshot(localSha) {
+async function readRemoteSnapshotViaGithub(localSha) {
     const repo = await fetchGithubJsonSafe(`https://api.github.com/repos/${OFFICIAL_OWNER}/${OFFICIAL_REPO}`);
     const defaultBranch = (repo && repo.default_branch) || 'master';
-    const latestCommit = await fetchGithubJson(
+    const latestCommit = await fetchGithubJsonSafe(
         `https://api.github.com/repos/${OFFICIAL_OWNER}/${OFFICIAL_REPO}/commits/${encodeURIComponent(defaultBranch)}`
     );
+    if (!latestCommit || !latestCommit.sha) {
+        throw new Error('GitHub API snapshot unavailable');
+    }
     const remoteSha = latestCommit.sha;
     const latest = mapGithubCommit(latestCommit);
     const version = await readRemotePackageVersion(remoteSha || defaultBranch);
@@ -307,6 +416,18 @@ async function readRemoteSnapshot(localSha) {
         aheadBy,
         commits,
     };
+}
+
+async function readRemoteSnapshot(localSha) {
+    const canGit = hasGitDirectory() && await gitAvailable();
+    if (canGit) {
+        try {
+            return await readRemoteSnapshotViaGit(localSha);
+        } catch (error) {
+            console.error('[PanelUpdate] git remote snapshot failed:', error.message);
+        }
+    }
+    return readRemoteSnapshotViaGithub(localSha);
 }
 
 function isActiveStage(stage) {
@@ -675,6 +796,35 @@ function writeRestartStamp() {
     fs.writeFileSync(STAMP_PATH, JSON.stringify({ at: Date.now() }));
 }
 
+function usesStartBatSupervisor() {
+    return process.platform === 'win32' && fs.existsSync(path.join(REPO_ROOT, 'start.bat'));
+}
+
+function writeUpdateRequest(branch) {
+    fs.mkdirSync(path.dirname(UPDATE_REQUEST_PATH), { recursive: true });
+    fs.writeFileSync(UPDATE_REQUEST_PATH, `${branch}\n`, 'utf8');
+}
+
+function scheduleDevShutdown() {
+    const parentPid = process.ppid;
+    setTimeout(() => {
+        killPortListeners(5173).finally(() => {
+            try {
+                if (parentPid && String(parentPid) !== String(process.pid)) {
+                    if (process.platform === 'win32') {
+                        execFile('taskkill', ['/F', '/PID', String(parentPid)], { windowsHide: true });
+                    } else {
+                        process.kill(parentPid, 'SIGTERM');
+                    }
+                }
+            } catch {
+                return;
+            }
+            process.exit(0);
+        });
+    }, 1200);
+}
+
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -769,13 +919,7 @@ function relaunchPanel(restartMethod) {
 
     const startBat = path.join(REPO_ROOT, 'start.bat');
     if (process.platform === 'win32' && fs.existsSync(startBat)) {
-        const child = spawn('cmd.exe', ['/c', `start "BlockMine" ${winQuote(startBat)}`], {
-            cwd: REPO_ROOT,
-            detached: true,
-            stdio: 'ignore',
-            env: process.env,
-        });
-        child.unref();
+        spawnWindowsProcess(startBat, [], { hidden: false });
         return;
     }
 
@@ -807,45 +951,81 @@ function scheduleRelaunch() {
     relaunchPanel('spawn');
 }
 
-function winQuote(value) {
-    return `"${String(value).replace(/"/g, '')}"`;
+function psQuote(value) {
+    return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function spawnWindowsProcess(filePath, args, options = {}) {
+    const argList = (args || []).map(psQuote).join(',');
+    const windowStyle = options.hidden ? 'Hidden' : 'Normal';
+    const command = [
+        'Start-Process',
+        '-FilePath', psQuote(filePath),
+        '-WorkingDirectory', psQuote(REPO_ROOT),
+        '-WindowStyle', windowStyle,
+        argList ? `-ArgumentList @(${argList})` : '',
+    ].filter(Boolean).join(' ');
+    const child = spawn('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command',
+        command,
+    ], {
+        cwd: REPO_ROOT,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: options.env || process.env,
+    });
+    child.unref();
+}
+
+function writeUpdateLauncher(branch, method) {
+    const dir = path.join(os.homedir(), '.blockmine');
+    fs.mkdirSync(dir, { recursive: true });
+    const logPath = path.join(dir, 'update-worker.log');
+    const cmdPath = path.join(dir, 'run-update.cmd');
+    const launchPath = path.join(dir, 'launch-update.cmd');
+    const workerPath = path.join(__dirname, 'panelUpdateWorker.js');
+    const body = [
+        '@echo off',
+        `cd /d "${REPO_ROOT}"`,
+        'set BLOCKMINE_UPDATE_WORKER=1',
+        `set BLOCKMINE_RESTART_METHOD=${method}`,
+        `>>"${logPath}" echo launch %date% %time%`,
+        `"${process.execPath}" "${workerPath}" ${branch} ${method} >>"${logPath}" 2>&1`,
+        `>>"${logPath}" echo exit %ERRORLEVEL% %date% %time%`,
+    ].join('\r\n');
+    fs.writeFileSync(cmdPath, body, 'utf8');
+    fs.writeFileSync(launchPath, `@echo off\r\nstart "" /min "${cmdPath}"\r\n`, 'utf8');
+    return launchPath;
 }
 
 function spawnUpdateWorker(branch, restartMethod) {
     const workerPath = path.join(__dirname, 'panelUpdateWorker.js');
-    const args = [workerPath, branch, restartMethod];
+    const method = restartMethod || 'nodemon';
+    const env = {
+        ...process.env,
+        BLOCKMINE_UPDATE_WORKER: '1',
+        BLOCKMINE_RESTART_METHOD: method,
+    };
     if (process.platform === 'win32') {
-        const command = [
-            'start',
-            '"BlockMine-update"',
-            '/min',
-            winQuote(process.execPath),
-            winQuote(workerPath),
-            branch,
-            restartMethod || 'nodemon',
-        ].join(' ');
-        const child = spawn('cmd.exe', ['/c', command], {
+        const launchPath = writeUpdateLauncher(branch, method);
+        const child = spawn('cmd.exe', ['/c', launchPath], {
             cwd: REPO_ROOT,
             detached: true,
             stdio: 'ignore',
-            env: {
-                ...process.env,
-                BLOCKMINE_UPDATE_WORKER: '1',
-                BLOCKMINE_RESTART_METHOD: restartMethod,
-            },
+            env,
         });
         child.unref();
         return;
     }
-    const child = spawn(process.execPath, args, {
+    const child = spawn(process.execPath, [workerPath, branch, method], {
         cwd: REPO_ROOT,
         detached: true,
         stdio: 'ignore',
-        env: {
-            ...process.env,
-            BLOCKMINE_UPDATE_WORKER: '1',
-            BLOCKMINE_RESTART_METHOD: restartMethod,
-        },
+        env,
     });
     child.unref();
 }
@@ -926,11 +1106,12 @@ async function applyUpdate() {
     }
 
     applying = true;
-    try {
-        emitProgress({ stage: 'fetch', percent: 5, message: 'fetch', log: [] });
-    } catch (error) {
-        applying = false;
-        throw error;
+    emitProgress({ stage: 'stopping', percent: 5, message: 'stopping', log: [], line: 'starting updater' });
+
+    if (usesStartBatSupervisor()) {
+        writeUpdateRequest(branch);
+        scheduleDevShutdown();
+        return { ok: true, started: true, closing: true };
     }
 
     try {
@@ -953,6 +1134,7 @@ module.exports = {
     isSafeRef,
     parseListeningPids,
     mapGithubCommit,
+    parseGitLogLine,
     resolveUpdateDecision,
     resolveRestartMethod,
     getPm2Target,
