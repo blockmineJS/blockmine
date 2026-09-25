@@ -10,37 +10,7 @@ export const actionSendMessageDefinition = new NodeDefinition({
   label: 'Отправить сообщение',
   description: 'Отправляет сообщение в чат. Поддерживает переменные в формате {varName}',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'chat_type',
-      name: 'Тип чата',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'chat, whisper...'
-    },
-    {
-      id: 'message',
-      name: 'Сообщение',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Текст сообщения с {переменными}'
-    },
-    {
-      id: 'recipient',
-      name: 'Адресат',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Имя игрока'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {
     chat_type: '',

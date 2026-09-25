@@ -10,20 +10,7 @@ export const logicNotDefinition = new NodeDefinition({
   label: '! НЕ',
   description: 'Инвертирует boolean значение (NOT)',
 
-  computeInputs: (data) => [
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Boolean',
-      required: false,
-      inlineField: true,
-      placeholder: 'true/false'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean', description: 'Инвертированное значение' },
-  ],
 
   defaultData: {
     value: '',

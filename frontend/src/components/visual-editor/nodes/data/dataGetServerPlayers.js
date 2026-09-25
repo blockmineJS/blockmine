@@ -10,11 +10,7 @@ export const dataGetServerPlayersDefinition = new NodeDefinition({
   label: 'Игроки на сервере',
   description: 'Список всех игроков на сервере',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'players', name: 'Игроки', type: 'Array', description: 'Массив имен игроков' },
-  ],
 
   theme: {
     headerColor: '#10b981',

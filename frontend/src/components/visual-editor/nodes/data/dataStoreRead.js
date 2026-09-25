@@ -6,14 +6,7 @@ export const dataStoreReadDefinition = new NodeDefinition({
   label: 'Прочитать из Store',
   description: 'Читает значение из хранилища плагина по ключу',
 
-  computeInputs: (data) => [
-    { id: 'plugin_name', name: 'Плагин', type: 'String', required: true, inlineField: true, placeholder: 'my-plugin' },
-    { id: 'key', name: 'Ключ', type: 'String', required: true, inlineField: true, placeholder: 'myKey' },
-  ],
 
-  computeOutputs: () => [
-    { id: 'value', name: 'Значение', type: 'Wildcard' },
-  ],
 
   defaultData: { plugin_name: '', key: '' },
 

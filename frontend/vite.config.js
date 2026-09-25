@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@node-catalog": path.resolve(__dirname, "../shared/nodePins.mjs"),
     },
   },
   server: {

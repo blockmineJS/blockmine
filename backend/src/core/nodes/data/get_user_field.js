@@ -17,7 +17,8 @@ async function evaluate(node, pinId, context, helpers, defaultValue = null) {
     if (userIdentifier && typeof userIdentifier === 'object' && userIdentifier.username) {
         userObject = userIdentifier;
     } else if (typeof userIdentifier === 'string' && userIdentifier.length > 0) {
-        userObject = await User.getUser(userIdentifier, context.botId);
+        const { graphUser } = require('../../graphServices');
+        userObject = await graphUser(context, userIdentifier);
     }
 
     if (userObject) {

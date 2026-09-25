@@ -10,28 +10,7 @@ export const inventorySelectSlotDefinition = new NodeDefinition({
   label: 'Выбрать слот',
   description: 'Выбирает слот хотбара (0-8), переключая активный предмет в руке',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'slot',
-      name: 'Слот',
-      type: 'Number',
-      required: true,
-      inlineField: true,
-      placeholder: '0-8',
-      description: 'Номер слота хотбара (0-8)'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-    {
-      id: 'item',
-      name: 'Предмет',
-      type: 'Object',
-      description: 'Предмет в выбранном слоте (или null)'
-    },
-  ],
 
   defaultData: {
     slot: 0,

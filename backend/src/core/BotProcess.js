@@ -671,26 +671,14 @@ process.on('message', async (message) => {
         const { botId, graph, eventType, eventArgs } = message;
 
         try {
-            const playerList = bot ? Object.keys(bot.players) : [];
-            const botApi = createBotApi(bot, { enableLogging: true });
-
-            const context = {
-                bot: bot,  // Полный mineflayer bot
-                botApi: botApi,  // API для обратной совместимости
-                eventArgs: eventArgs || {},
-                players: playerList,
-                botState: bot ? {
-                    health: bot.health,
-                    food: bot.food,
-                    position: bot.entity?.position,
-                    gameMode: bot.game?.gameMode
-                } : {},
-                botEntity: bot && bot.entity ? serializeEntity(bot.entity) : null,
-                botId: botId,
+            const { buildGraphContext } = require('./graphContext');
+            const context = buildGraphContext({
+                bot,
+                botId,
                 graphId: graph.id,
-                eventType: eventType,
-                eventArgs: eventArgs
-            };
+                eventType,
+                eventArgs: eventArgs || {},
+            });
 
             const engine = new GraphExecutionEngine(NodeRegistry, bot);
             await engine.execute(graph, context, eventType);
@@ -1185,33 +1173,17 @@ process.on('message', async (message) => {
                     visualCommand.graphJson = dbCommand.graphJson;
                     visualCommand.owner = 'visual_editor';
                     visualCommand.handler = (botInstance, typeChat, user, args) => {
-                        const playerList = botInstance ? Object.keys(botInstance.players) : [];
-                        const botState = botInstance ? { yaw: botInstance.entity.yaw, pitch: botInstance.entity.pitch } : {};
-                        const botEntity = botInstance && botInstance.entity ? {
-                            position: botInstance.entity.position,
-                            yaw: botInstance.entity.yaw,
-                            pitch: botInstance.entity.pitch
-                        } : null;
-
-                        const context = {
-                            bot: botInstance,  // Полный mineflayer bot для доступа к blockAt, inventory и т.д.
-                            botApi: botInstance.api,  // API для обратной совместимости
-                            user,
-                            args,
-                            typeChat,
-                            players: playerList,
-                            botState,
-                            botEntity,
+                        const { buildGraphContext } = require('./graphContext');
+                        const context = buildGraphContext({
+                            bot: botInstance,
                             botId: botInstance.config.id,
                             graphId: dbCommand.id,
                             eventType: 'command',
-                            eventArgs: {
-                                commandName: dbCommand.name,
-                                user: { username: user?.username },
-                                args,
-                                typeChat
-                            }
-                        };
+                            user,
+                            args,
+                            typeChat,
+                            commandName: dbCommand.name,
+                        });
 
                         return botInstance.graphExecutionEngine.execute(visualCommand.graphJson, context);
                     };
@@ -2206,34 +2178,14 @@ process.on('message', async (message) => {
                 return;
             }
 
-            const botApi = createBotApi(bot);
-
-            const players = bot ? Object.keys(bot.players) : [];
-
-            const context = {
-                bot: bot,  // Полный mineflayer bot
-                botApi: botApi,  // API для обратной совместимости
-                players,
-                botState: {
-                    health: bot?.health,
-                    food: bot?.food,
-                    position: bot?.entity?.position
-                },
-                botEntity: bot && bot.entity ? {
-                    position: bot.entity.position,
-                    velocity: bot.entity.velocity,
-                    yaw: bot.entity.yaw,
-                    pitch: bot.entity.pitch,
-                    onGround: bot.entity.onGround,
-                    height: bot.entity.height,
-                    width: bot.entity.width
-                } : null,
-                eventArgs,
+            const { buildGraphContext } = require('./graphContext');
+            const context = buildGraphContext({
+                bot,
                 botId: config.id,
                 graphId: graph.id,
-                eventType: eventType,
-                eventArgs: eventArgs
-            };
+                eventType,
+                eventArgs: eventArgs || {},
+            });
 
             const engine = new GraphExecutionEngine(NodeRegistry, bot);
 

@@ -10,14 +10,7 @@ export const arrayGetRandomElementDefinition = new NodeDefinition({
   label: 'Случайный элемент',
   description: 'Возвращает случайный элемент из массива и его индекс',
 
-  computeInputs: (data) => [
-    { id: 'array', name: 'Массив', type: 'Array', description: 'Входной массив', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'element', name: 'Элемент', type: 'Wildcard', description: 'Случайный элемент' },
-    { id: 'index', name: 'Индекс', type: 'Number', description: 'Индекс элемента' },
-  ],
 
   theme: {
     headerColor: '#f59e0b',

@@ -10,48 +10,7 @@ export const inventoryGetHeldItemDefinition = new NodeDefinition({
   label: 'Предмет в руке',
   description: 'Получает предмет который бот держит в руке',
 
-  computeInputs: (data) => [
-    {
-      id: 'hand',
-      name: 'Рука',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      inlineFieldType: 'select',
-      inlineFieldOptions: [
-        { value: 'main', label: 'Основная' },
-        { value: 'off', label: 'Вторая (офхенд)' },
-      ],
-      description: 'Какую руку проверить'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    {
-      id: 'item',
-      name: 'Предмет',
-      type: 'Object',
-      description: 'Объект предмета или null'
-    },
-    {
-      id: 'name',
-      name: 'Имя',
-      type: 'String',
-      description: 'Имя предмета'
-    },
-    {
-      id: 'count',
-      name: 'Количество',
-      type: 'Number',
-      description: 'Количество в стаке'
-    },
-    {
-      id: 'hasItem',
-      name: 'Есть предмет?',
-      type: 'Boolean',
-      description: 'true если в руке есть предмет'
-    },
-  ],
 
   defaultData: {
     hand: 'main',

@@ -189,7 +189,7 @@ function BotVisualEditorPage() {
     const [showEventTypeDialog, setShowEventTypeDialog] = useState(false);
     const [availableEventTypes, setAvailableEventTypes] = useState([]);
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
-    const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
+    const cursorPositionRef = useRef({ x: 0, y: 0 });
     const [publishForm, setPublishForm] = useState({
         name: '',
         author: '',
@@ -259,7 +259,7 @@ function BotVisualEditorPage() {
             });
 
             // Сохраняем позицию курсора для Ctrl+V
-            setCursorPosition(position);
+            cursorPositionRef.current = position;
 
             // Collaborative cursor
             if (socket && command) {
@@ -341,7 +341,7 @@ function BotVisualEditorPage() {
             if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'м')) {
                 console.log('[Paste] Triggered!');
                 event.preventDefault();
-                pasteNodes(cursorPosition);
+                pasteNodes(cursorPositionRef.current);
             }
 
             // Delete или Backspace - удаляем выбранные элементы
@@ -372,7 +372,7 @@ function BotVisualEditorPage() {
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [copyNodes, pasteNodes, hoveredNodeId, nodes, cursorPosition, onNodesChange]);
+    }, [copyNodes, pasteNodes, hoveredNodeId, nodes, onNodesChange]);
 
     const loadCategories = async () => {
         try {

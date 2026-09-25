@@ -437,52 +437,17 @@ class GraphExecutionEngine {
     }
 
     _evaluateLegacyNode(node, pinId, defaultValue) {
+        const { evaluateEventPin } = require('./nodes/event/evaluateEvent');
+        if (node?.type?.startsWith('event:')) {
+            const eventValue = evaluateEventPin(node, pinId, this.context);
+            return eventValue !== undefined ? eventValue : defaultValue;
+        }
+
         let result;
 
         switch (node.type) {
             case 'user:set_blacklist':
                 result = this.memo.get(`${node.id}:updated_user`);
-                break;
-            case 'event:command':
-                if (pinId === 'args') result = this.context.eventArgs?.args || {};
-                else if (pinId === 'user') result = this.context.eventArgs?.user || {};
-                else if (pinId === 'chat_type') result = this.context.eventArgs?.typeChat || 'chat';
-                else if (pinId === 'command_name') result = this.context.eventArgs?.commandName;
-                else if (pinId === 'success') result = this.context.success !== undefined ? this.context.success : true;
-                else result = this.context.eventArgs?.[pinId];
-                break;
-            case 'event:chat':
-                if (pinId === 'username') result = this.context.eventArgs?.username || this.context.username;
-                else if (pinId === 'message') result = this.context.eventArgs?.message || this.context.message;
-                else if (pinId === 'chatType') result = this.context.eventArgs?.chatType || this.context.chat_type;
-                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-                break;
-            case 'event:raw_message':
-                if (pinId === 'rawText') result = this.context.eventArgs?.rawText || this.context.rawText;
-                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-                break;
-            case 'event:playerJoined':
-            case 'event:playerLeft':
-                if (pinId === 'user') result = this.context.eventArgs?.user || this.context.user;
-                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-                break;
-            case 'event:entitySpawn':
-            case 'event:entityMoved':
-            case 'event:entityGone':
-                if (pinId === 'entity') result = this.context.eventArgs?.entity || this.context.entity;
-                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
-                break;
-            case 'event:health':
-            case 'event:botDied':
-            case 'event:botStartup':
-                result = this.context.eventArgs?.[pinId] || this.context[pinId];
-                break;
-            case 'event:websocket_call':
-                if (pinId === 'graphName') result = this.context.eventArgs?.graphName || this.context.graphName;
-                else if (pinId === 'data') result = this.context.eventArgs?.data || this.context.data;
-                else if (pinId === 'socketId') result = this.context.eventArgs?.socketId || this.context.socketId;
-                else if (pinId === 'keyPrefix') result = this.context.eventArgs?.keyPrefix || this.context.keyPrefix;
-                else result = this.context.eventArgs?.[pinId] || this.context[pinId];
                 break;
             case 'flow:for_each':
                 if (pinId === 'element') result = this.memo.get(`${node.id}:element`);

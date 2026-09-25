@@ -10,22 +10,7 @@ export const timeFormatDefinition = new NodeDefinition({
   label: 'Форматировать дату',
   description: 'Форматирует дату в строку (yyyy-MM-dd HH:mm:ss)',
 
-  computeInputs: (data) => [
-    { id: 'date', name: 'Дата', type: 'DateTime', description: 'Дата для форматирования', required: true },
-    {
-      id: 'format',
-      name: 'Формат',
-      type: 'String',
-      description: 'Строка формата',
-      required: false,
-      inlineField: true,
-      placeholder: 'yyyy-MM-dd HH:mm:ss'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'formatted', name: 'Строка', type: 'String', description: 'Отформатированная дата' },
-  ],
 
   defaultData: {
     format: 'yyyy-MM-dd HH:mm:ss',

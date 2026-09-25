@@ -13,7 +13,8 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (!username || !permission) return false;
 
-    const user = await User.getUser(username, context.botId);
+    const { graphUser } = require('../../graphServices');
+    const user = await graphUser(context, username);
     if (!user) return false;
 
     if (user.permissionsSet) {

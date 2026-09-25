@@ -22,7 +22,8 @@ async function evaluate(node, pinId, context, helpers) {
     }
 
     if (usernameToFind) {
-        const user = await User.getUser(usernameToFind, context.botId);
+        const { graphUser } = require('../../graphServices');
+        const user = await graphUser(context, usernameToFind);
         if (user && user.groups) {
             groups = user.groups.map(g => g.group.name);
         }

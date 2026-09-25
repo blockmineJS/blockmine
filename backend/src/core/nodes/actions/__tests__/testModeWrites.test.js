@@ -50,7 +50,7 @@ describe('test mode database writes', () => {
         );
 
         expect(effects).toEqual([
-            expect.objectContaining({ kind: 'db_write_blocked', operation: 'store_write', summary: 'demo.coins' }),
+            expect.objectContaining({ kind: 'db_write', operation: 'store_write', summary: 'demo.coins' }),
         ]);
         expect(runtime.traverse).toHaveBeenCalledWith(expect.objectContaining({ id: 'store' }), 'exec');
     });
@@ -69,11 +69,11 @@ describe('test mode database writes', () => {
         );
 
         expect(effects[0]).toEqual(expect.objectContaining({
-            kind: 'db_write_blocked',
+            kind: 'db_write',
             operation: 'create_command',
             summary: 'from-test',
         }));
-        expect(runtime.memo.get('create:success')).toBe(false);
+        expect(runtime.memo.get('create:success')).toBe(true);
     });
 
     it('does not add a player to a group', async () => {
@@ -90,7 +90,7 @@ describe('test mode database writes', () => {
         );
 
         expect(effects[0]).toEqual(expect.objectContaining({
-            kind: 'db_write_blocked',
+            kind: 'db_write',
             operation: 'add_to_group',
             summary: 'Steve -> Admin',
         }));

@@ -10,20 +10,7 @@ export const stringToLowerDefinition = new NodeDefinition({
   label: 'В нижний регистр',
   description: 'Преобразует строку в нижний регистр (lowercase)',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'String' },
-  ],
 
   defaultData: {
     text: '',

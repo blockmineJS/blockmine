@@ -10,11 +10,7 @@ export const eventBotStartupDefinition = new NodeDefinition({
   label: 'При запуске бота',
   description: 'Срабатывает один раз при запуске бота',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
   theme: {
     headerColor: '#8b5cf6',

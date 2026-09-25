@@ -1,5 +1,5 @@
 const prismaService = require('../../PrismaService');
-const { blockTestWrite } = require('../../services/testModeGuard');
+const { tryGraphWrite } = require('../../graphServices');
 const prisma = prismaService.getClient();
 
 async function execute(node, context, helpers) {
@@ -11,7 +11,13 @@ async function execute(node, context, helpers) {
 
     if (pluginName && key) {
         const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-        if (blockTestWrite(context, 'store_write', `${pluginName}.${key}`)) {
+        const isolated = await tryGraphWrite(context, 'store_write', `${pluginName}.${key}`, {
+            botId: context.botId,
+            pluginName,
+            key,
+            value,
+        });
+        if (isolated?.handled) {
             await traverse(node, 'exec');
             return;
         }

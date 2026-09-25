@@ -10,12 +10,7 @@ export const eventPlayerJoinedDefinition = new NodeDefinition({
   label: 'Игрок зашел',
   description: 'Срабатывает, когда игрок заходит на сервер',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'user', name: 'Пользователь', type: 'User' },
-  ],
 
   theme: {
     headerColor: '#8b5cf6',

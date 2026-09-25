@@ -10,21 +10,7 @@ export const typeToStringDefinition = new NodeDefinition({
   label: 'В строку',
   description: 'Преобразует любое значение в строку (toString)',
 
-  computeInputs: (data) => [
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Wildcard',
-      description: 'Значение для преобразования',
-      required: false,
-      inlineField: true,
-      placeholder: 'Значение...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'String', description: 'Строковое представление' },
-  ],
 
   defaultData: {
     value: '',

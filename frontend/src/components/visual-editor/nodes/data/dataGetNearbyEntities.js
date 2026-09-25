@@ -10,21 +10,7 @@ export const dataGetNearbyEntitiesDefinition = new NodeDefinition({
   label: 'Сущности рядом',
   description: 'Существа в радиусе от бота',
 
-  computeInputs: (data) => [
-    {
-      id: 'radius',
-      name: 'Радиус',
-      type: 'Number',
-      description: 'Радиус поиска',
-      required: false,
-      inlineField: true,
-      placeholder: '10'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'entities', name: 'Существа', type: 'Array', description: 'Массив существ' },
-  ],
 
   defaultData: {
     radius: 10,

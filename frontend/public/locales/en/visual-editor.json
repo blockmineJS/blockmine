@@ -407,7 +407,24 @@
       "food": "Food (0-20)",
       "commandArgsJson": "Command arguments (JSON)",
       "typeChat": "Chat type",
-      "noArguments": "This command has no arguments"
+      "noArguments": "This command has no arguments",
+      "players": "Nearby players, comma-separated",
+      "inventory": "Inventory items, comma-separated",
+      "role": "Caller",
+      "player": "Player",
+      "owner": "Owner",
+      "permissions": "Player permissions, comma-separated",
+      "cooldownLeft": "Cooldown, seconds",
+      "expect": "Expected journal lines",
+      "expectHint": "One substring per line. Empty means the check only has to finish.",
+      "saveCheck": "Save check",
+      "runChecks": "Run checks",
+      "savedChecks": "Saved checks",
+      "noChecks": "No saved checks",
+      "checkName": "Check name",
+      "passed": "matched",
+      "failed": "did not match",
+      "deleteCheck": "Delete"
     },
     "chatTypes": {
       "chat": "Public chat",
@@ -417,7 +434,13 @@
       "message": "Message",
       "log": "Log",
       "chat": "Chat",
-      "db_write_blocked": "Database write skipped"
+      "db_write_blocked": "Database write skipped",
+      "db_write": "Write in the test database",
+      "move": "Movement",
+      "equip": "Equip",
+      "look": "Look",
+      "control": "Control",
+      "gate": "Command check"
     },
     "events": {
       "chat": "Chat message",

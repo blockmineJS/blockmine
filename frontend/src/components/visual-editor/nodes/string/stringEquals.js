@@ -10,28 +10,7 @@ export const stringEqualsDefinition = new NodeDefinition({
   label: 'Равно',
   description: 'Сравнивает две строки на равенство',
 
-  computeInputs: (data) => [
-    {
-      id: 'a',
-      name: 'A',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Строка A'
-    },
-    {
-      id: 'b',
-      name: 'B',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Строка B'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   defaultData: {
     a: '',

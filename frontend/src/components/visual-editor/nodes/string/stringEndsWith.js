@@ -10,28 +10,7 @@ export const stringEndsWithDefinition = new NodeDefinition({
   label: 'Заканчивается на',
   description: 'Проверяет заканчивается ли строка суффиксом',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-    {
-      id: 'suffix',
-      name: 'Суффикс',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Заканчивается на...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   defaultData: {
     text: '',

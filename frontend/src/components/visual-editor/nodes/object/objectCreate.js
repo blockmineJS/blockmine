@@ -11,30 +11,7 @@ export const objectCreateDefinition = new NodeDefinition({
   label: 'Создать объект',
   description: 'Создает объект из пар ключ-значение',
 
-  computeInputs: (data) => {
-    const inputs = [];
 
-    if (!data.advanced) {
-      for (let i = 0; i < (data.pinCount || 0); i++) {
-        inputs.push({
-          id: `key_${i}`,
-          name: `Ключ ${i}`,
-          type: 'String',
-        });
-        inputs.push({
-          id: `value_${i}`,
-          name: `Значение ${i}`,
-          type: 'Wildcard',
-        });
-      }
-    }
-
-    return inputs;
-  },
-
-  computeOutputs: (data) => [
-    { id: 'object', name: 'Object', type: 'Object', description: 'Созданный объект' },
-  ],
 
   SettingsComponent: ObjectCreateSettings,
 

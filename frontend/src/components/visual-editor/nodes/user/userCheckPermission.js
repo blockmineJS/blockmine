@@ -6,14 +6,7 @@ export const userCheckPermissionDefinition = new NodeDefinition({
   label: 'Проверить право',
   description: 'Проверяет, есть ли у пользователя указанное право',
 
-  computeInputs: (data) => [
-    { id: 'user', name: 'Пользователь', type: 'User', required: true },
-    { id: 'permission', name: 'Право', type: 'String', required: true, inlineField: true, placeholder: 'admin.*' },
-  ],
 
-  computeOutputs: () => [
-    { id: 'has_permission', name: 'Есть право', type: 'Boolean' },
-  ],
 
   defaultData: { permission: '' },
 

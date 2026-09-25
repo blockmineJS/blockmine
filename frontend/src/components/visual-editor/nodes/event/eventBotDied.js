@@ -10,11 +10,7 @@ export const eventBotDiedDefinition = new NodeDefinition({
   label: 'Бот умер',
   description: 'Срабатывает, когда бот умирает',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
   theme: {
     headerColor: '#8b5cf6',

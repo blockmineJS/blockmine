@@ -10,22 +10,7 @@ export const objectGetDefinition = new NodeDefinition({
   label: 'Получить значение',
   description: 'Получает значение по ключу из объекта',
 
-  computeInputs: (data) => [
-    { id: 'object', name: 'Объект', type: 'Object', description: 'Входной объект', required: true },
-    {
-      id: 'key',
-      name: 'Ключ',
-      type: 'String',
-      description: 'Ключ для получения',
-      required: false,
-      inlineField: true,
-      placeholder: 'key'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'value', name: 'Значение', type: 'Wildcard', description: 'Значение по ключу' },
-  ],
 
   defaultData: {
     key: '',

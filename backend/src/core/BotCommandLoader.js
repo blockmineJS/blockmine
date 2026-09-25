@@ -84,33 +84,17 @@ function createVisualCommand(bot, dbCommand) {
     visualCommand.owner = 'visual_editor';
 
     visualCommand.handler = (botInstance, typeChat, user, args) => {
-        const playerList = botInstance ? Object.keys(botInstance.players) : [];
-        const botState = botInstance ? { yaw: botInstance.entity.yaw, pitch: botInstance.entity.pitch } : {};
-        const botEntity = botInstance && botInstance.entity ? {
-            position: botInstance.entity.position,
-            yaw: botInstance.entity.yaw,
-            pitch: botInstance.entity.pitch
-        } : null;
-
-        const context = {
+        const { buildGraphContext } = require('./graphContext');
+        const context = buildGraphContext({
             bot: botInstance,
-            botApi: botInstance.api,
-            user,
-            args,
-            typeChat,
-            players: playerList,
-            botState,
-            botEntity,
             botId: botInstance.config.id,
             graphId: dbCommand.id,
             eventType: 'command',
-            eventArgs: {
-                commandName: dbCommand.name,
-                user: { username: user?.username },
-                args,
-                typeChat
-            }
-        };
+            user,
+            args,
+            typeChat,
+            commandName: dbCommand.name,
+        });
 
         const engine = new GraphExecutionEngine(NodeRegistry, botInstance);
         return engine.execute(visualCommand.graphJson, context);

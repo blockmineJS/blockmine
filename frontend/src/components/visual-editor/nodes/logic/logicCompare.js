@@ -11,28 +11,7 @@ export const logicCompareDefinition = new NodeDefinition({
   label: 'Сравнение',
   description: 'Сравнение двух значений',
 
-  computeInputs: (data) => [
-    {
-      id: 'a',
-      name: 'A',
-      type: 'Wildcard',
-      required: false,
-      inlineField: true,
-      placeholder: '...'
-    },
-    {
-      id: 'b',
-      name: 'B',
-      type: 'Wildcard',
-      required: false,
-      inlineField: true,
-      placeholder: '...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   SettingsComponent: LogicCompareSettings,
 

@@ -10,22 +10,7 @@ export const debugLogDefinition = new NodeDefinition({
   label: 'Отладка',
   description: 'Выводит значение в консоль сервера',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Wildcard',
-      description: 'Значение для вывода',
-      required: false,
-      inlineField: true,
-      placeholder: '...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {
     value: '',

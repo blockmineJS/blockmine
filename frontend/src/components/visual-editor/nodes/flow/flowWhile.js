@@ -10,16 +10,7 @@ export const flowWhileDefinition = new NodeDefinition({
   label: 'Цикл While',
   description: 'Выполняет "Тело цикла" пока условие истинно',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-    { id: 'condition', name: 'Условие', type: 'Boolean', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'loop_body', name: 'Тело цикла', type: 'Exec' },
-    { id: 'iteration', name: 'Итерация', type: 'Number' },
-    { id: 'completed', name: 'Завершено', type: 'Exec' },
-  ],
 
   theme: {
     headerColor: '#3b82f6',

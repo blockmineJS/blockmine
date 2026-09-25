@@ -11,21 +11,7 @@ export const arrayLiteralDefinition = new NodeDefinition({
   label: 'Массив',
   description: 'Создает массив из элементов',
 
-  computeInputs: (data) => {
-    const inputs = [];
-    for (let i = 0; i < (data.pinCount || 0); i++) {
-      inputs.push({
-        id: `item_${i}`,
-        name: `[${i}]`,
-        type: 'Wildcard',
-      });
-    }
-    return inputs;
-  },
 
-  computeOutputs: (data) => [
-    { id: 'array', name: 'Array', type: 'Array', description: 'Созданный массив' },
-  ],
 
   SettingsComponent: ArrayLiteralSettings,
 

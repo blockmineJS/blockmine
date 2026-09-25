@@ -10,23 +10,7 @@ export const actionBotLookAtDefinition = new NodeDefinition({
   label: 'Посмотреть на',
   description: 'Поворачивает голову бота на цель',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'target', name: 'Цель', type: 'Object', description: 'Позиция или сущность', required: true },
-    {
-      id: 'add_y',
-      name: 'Прибавить к Y',
-      type: 'Number',
-      description: 'Корректировка по Y',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {
     add_y: 0,

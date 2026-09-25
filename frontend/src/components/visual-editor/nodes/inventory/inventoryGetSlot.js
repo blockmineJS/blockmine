@@ -10,32 +10,7 @@ export const inventoryGetSlotDefinition = new NodeDefinition({
   label: 'Получить слот',
   description: 'Получает предмет в указанном слоте инвентаря',
 
-  computeInputs: (data) => [
-    {
-      id: 'slotNumber',
-      name: 'Номер слота',
-      type: 'Number',
-      required: true,
-      inlineField: true,
-      placeholder: '0-44',
-      description: 'Номер слота (0-8 хотбар, 9-35 инвентарь, 36-39 броня, 40 офхенд)'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    {
-      id: 'item',
-      name: 'Предмет',
-      type: 'Object',
-      description: 'Объект предмета или null если слот пуст'
-    },
-    {
-      id: 'isEmpty',
-      name: 'Пусто?',
-      type: 'Boolean',
-      description: 'true если слот пустой'
-    },
-  ],
 
   defaultData: {
     slotNumber: 0,

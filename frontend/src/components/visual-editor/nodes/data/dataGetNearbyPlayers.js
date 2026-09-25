@@ -10,21 +10,7 @@ export const dataGetNearbyPlayersDefinition = new NodeDefinition({
   label: 'Игроки рядом',
   description: 'Игроки рядом с ботом',
 
-  computeInputs: (data) => [
-    {
-      id: 'radius',
-      name: 'Радиус',
-      type: 'Number',
-      description: 'Радиус поиска',
-      required: false,
-      inlineField: true,
-      placeholder: '10'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'players', name: 'Игроки', type: 'Array', description: 'Массив игроков с расстоянием' },
-  ],
 
   defaultData: {
     radius: 10,

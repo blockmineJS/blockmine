@@ -10,21 +10,7 @@ export const actionSendLogDefinition = new NodeDefinition({
   label: 'Отправить лог',
   description: 'Записывает сообщение в веб-консоль',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'message',
-      name: 'Сообщение',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Текст для лога...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {
     message: '',

@@ -10,41 +10,7 @@ export const stringContainsDefinition = new NodeDefinition({
   label: 'Содержит',
   description: 'Проверяет содержится ли подстрока в строке',
 
-  computeInputs: (data) => [
-    {
-      id: 'haystack',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-    {
-      id: 'needle',
-      name: 'Подстрока',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Искать...'
-    },
-    {
-      id: 'case_sensitive',
-      name: 'Учет регистра',
-      type: 'Boolean',
-      required: false,
-      inlineField: true,
-      inlineFieldType: 'select',
-      inlineFieldOptions: [
-        { value: 'false', label: 'Нет' },
-        { value: 'true', label: 'Да' }
-      ],
-      defaultValue: false
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   defaultData: {
     haystack: '',

@@ -10,13 +10,7 @@ export const timeDateTimeLiteralDefinition = new NodeDefinition({
   label: 'Дата и время',
   description: 'Создает объект даты и времени. Пусто = текущее время',
 
-  computeInputs: (data) => [
-    { id: 'date', name: 'Дата (строка)', type: 'String', description: 'ISO строка даты', required: false },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'value', name: 'Дата', type: 'DateTime', description: 'Объект даты и времени' },
-  ],
 
   theme: {
     headerColor: '#ec4899',

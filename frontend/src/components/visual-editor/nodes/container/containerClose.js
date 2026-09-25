@@ -10,13 +10,7 @@ export const containerCloseDefinition = new NodeDefinition({
   label: 'Контейнер: закрыть',
   description: 'Закрывает текущий открытый контейнер',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Закрыт', type: 'Exec' },
-  ],
 
   defaultData: {},
 

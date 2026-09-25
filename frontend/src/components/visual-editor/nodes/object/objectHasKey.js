@@ -10,23 +10,7 @@ export const objectHasKeyDefinition = new NodeDefinition({
   label: 'Есть ключ',
   description: 'Проверяет наличие ключа в объекте',
 
-  computeInputs: (data) => [
-    { id: 'object', name: 'Объект', type: 'Object', description: 'Входной объект', required: true },
-    {
-      id: 'key',
-      name: 'Ключ',
-      type: 'String',
-      description: 'Ключ для проверки',
-      required: false,
-      inlineField: true,
-      placeholder: 'key'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Найден', type: 'Boolean', description: 'True если ключ существует' },
-    { id: 'value', name: 'Значение', type: 'Wildcard', description: 'Значение по ключу' },
-  ],
 
   defaultData: {
     key: '',

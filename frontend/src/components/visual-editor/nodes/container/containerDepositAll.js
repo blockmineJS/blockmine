@@ -10,37 +10,7 @@ export const containerDepositAllDefinition = new NodeDefinition({
   label: 'Контейнер: положить всё',
   description: 'Кладёт все предметы (или определённого типа) в контейнер',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'itemName',
-      name: 'Предмет',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Пусто = всё',
-      description: 'Имя предмета (пусто = все предметы)'
-    },
-    {
-      id: 'keepOne',
-      name: 'Оставить 1',
-      type: 'Boolean',
-      required: false,
-      inlineField: true,
-      inlineFieldType: 'checkbox',
-      description: 'Оставить хотя бы 1 предмет в инвентаре'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Готово', type: 'Exec' },
-    {
-      id: 'deposited',
-      name: 'Положено',
-      type: 'Number',
-      description: 'Сколько предметов положено'
-    },
-  ],
 
   defaultData: {
     itemName: '',

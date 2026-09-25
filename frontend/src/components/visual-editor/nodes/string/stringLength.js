@@ -10,20 +10,7 @@ export const stringLengthDefinition = new NodeDefinition({
   label: 'Длина',
   description: 'Возвращает длину строки',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'length', name: 'Длина', type: 'Number' },
-  ],
 
   defaultData: {
     text: '',

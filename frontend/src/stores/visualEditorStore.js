@@ -34,6 +34,22 @@ function buildGraphPayload(nodes, edges, variables) {
   };
 }
 
+function commandAccessPayload(state) {
+  const command = state.command || {};
+  const permission = (state.permissions || []).find((item) => item.id === command.permissionId);
+  let allowedChatTypes = command.allowedChatTypes;
+  if (typeof allowedChatTypes === 'string') {
+    try { allowedChatTypes = JSON.parse(allowedChatTypes); } catch { allowedChatTypes = ['chat', 'private']; }
+  }
+  return {
+    isEnabled: command.isEnabled !== false,
+    allowedChatTypes: Array.isArray(allowedChatTypes) ? allowedChatTypes : ['chat', 'private'],
+    cooldown: Number(command.cooldown) || 0,
+    permissionName: permission?.name || null,
+    argumentsDef: state.commandArguments || [],
+  };
+}
+
 function waitForDebugState(socket) {
   return new Promise((resolve) => {
     let settled = false;
@@ -1399,20 +1415,51 @@ export const useVisualEditorStore = create(
       const url = editorType === 'command'
         ? `/api/bots/${command.botId}/commands/${command.id}/test-run`
         : `/api/bots/${command.botId}/event-graphs/test-run/${command.id}`;
+      const access = editorType === 'command' ? commandAccessPayload(get()) : {};
 
-      set({ testEffects: [], testMode: true });
+      set({ testEffects: [], testMode: true, testModeRunning: true });
       try {
         const response = await apiHelper(url, {
           method: 'POST',
-          body: { ...(payload || {}), graph: buildGraphPayload(nodes, edges, variables) }
+          body: { ...access, ...(payload || {}), graph: buildGraphPayload(nodes, edges, variables) }
         });
-        set({ testModeRunning: true, testMode: true });
+        if (response?.blocked) {
+          set({ testEffects: response.effects || [], testMode: true, testModeRunning: false });
+          return response;
+        }
         return response;
       } catch (e) {
         console.error('[TestMode] startTestRun failed:', e);
         set({ testMode: false, testModeRunning: false });
         return { success: false, error: e.message };
       }
+    },
+
+    saveCommandTests: async (tests) => {
+      const { command } = get();
+      if (!command?.id) return null;
+      const testsJson = JSON.stringify(tests);
+      await apiHelper(`/api/bots/${command.botId}/commands/${command.id}`, {
+        method: 'PUT',
+        body: { testsJson },
+      });
+      set((state) => {
+        if (state.command) state.command.testsJson = testsJson;
+      });
+      return tests;
+    },
+
+    runCommandSuite: async (tests) => {
+      const { command, nodes, edges, variables } = get();
+      if (!command?.id) return null;
+      return apiHelper(`/api/bots/${command.botId}/commands/${command.id}/test-suite`, {
+        method: 'POST',
+        body: {
+          ...commandAccessPayload(get()),
+          graph: buildGraphPayload(nodes, edges, variables),
+          tests,
+        },
+      });
     },
 
     runSingleNode: async ({ nodeId, inputs, variables }) => {

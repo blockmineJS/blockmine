@@ -10,16 +10,7 @@ export const dataGetEntityFieldDefinition = new NodeDefinition({
   label: 'Поле сущности',
   description: 'Получает поля из объекта сущности',
 
-  computeInputs: (data) => [
-    { id: 'entity', name: 'Сущность', type: 'Object', description: 'Объект сущности', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'username', name: 'Никнейм', type: 'String' },
-    { id: 'type', name: 'Тип', type: 'String' },
-    { id: 'position', name: 'Позиция', type: 'Object' },
-    { id: 'isValid', name: 'Валидна', type: 'Boolean' },
-  ],
 
   theme: {
     headerColor: '#10b981',

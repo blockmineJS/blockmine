@@ -11,40 +11,7 @@ export const mathOperationDefinition = new NodeDefinition({
   label: 'Математическая операция',
   description: 'Математические операции и сравнения',
 
-  computeInputs: (data) => [
-    {
-      id: 'a',
-      name: 'A',
-      type: 'Number',
-      description: 'Первое число',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-    {
-      id: 'b',
-      name: 'B',
-      type: 'Number',
-      description: 'Второе число',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-  ],
 
-  computeOutputs: (data) => {
-    const operation = data.operation || '+';
-    const isComparison = ['>', '<', '==', '>=', '<=', '!='].includes(operation);
-
-    return [
-      {
-        id: 'result',
-        name: 'Result',
-        type: isComparison ? 'Boolean' : 'Number',
-        description: 'Результат операции',
-      },
-    ];
-  },
 
   SettingsComponent: MathOperationSettings,
 

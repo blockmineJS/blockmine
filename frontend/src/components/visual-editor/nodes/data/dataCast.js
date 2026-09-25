@@ -11,16 +11,7 @@ export const dataCastDefinition = new NodeDefinition({
   label: 'Преобразовать тип',
   description: 'Преобразует значение в выбранный тип',
 
-  computeInputs: (data) => [
-    { id: 'value', name: 'Значение', type: 'Wildcard' },
-  ],
 
-  computeOutputs: (data) => {
-    const targetType = data.targetType || 'String';
-    return [
-      { id: 'result', name: 'Результат', type: targetType },
-    ];
-  },
 
   SettingsComponent: DataCastSettings,
 

@@ -10,36 +10,7 @@ export const navigationGoToEntityDefinition = new NodeDefinition({
   label: 'Идти к сущности',
   description: 'Перемещает бота к указанной сущности (моб, животное)',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'entity',
-      name: 'Сущность',
-      type: 'Object',
-      required: true,
-      description: 'Объект сущности (из "Существа рядом")'
-    },
-    {
-      id: 'range',
-      name: 'Радиус',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '2',
-      description: 'На каком расстоянии остановиться'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Дошёл', type: 'Exec' },
-    { id: 'exec_failed', name: 'Не удалось', type: 'Exec' },
-    {
-      id: 'success',
-      name: 'Успех?',
-      type: 'Boolean',
-      description: 'true если бот дошёл до сущности'
-    },
-  ],
 
   defaultData: {
     range: 2,

@@ -10,29 +10,7 @@ export const stringMatchesDefinition = new NodeDefinition({
   label: 'Совпадает',
   description: 'Проверяет совпадение строки с regex паттерном',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-    {
-      id: 'pattern',
-      name: 'Паттерн',
-      type: 'String',
-      description: 'Регулярное выражение (regex). Примеры: "^[a-z]+$" - только строчные буквы, "\\d{3}" - три цифры',
-      required: false,
-      inlineField: true,
-      placeholder: '^[a-z]+$'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   defaultData: {
     text: '',

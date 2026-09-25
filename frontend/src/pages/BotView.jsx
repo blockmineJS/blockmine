@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, NavLink, useNavigate, useLocation, useOutlet } from 'react-router-dom';
+import { useParams, NavLink, useNavigate, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Play, Square, Settings, Puzzle, Terminal, Trash2, Users, Download, Loader2, Zap, Server, Sparkles, Wifi, Gamepad2 } from 'lucide-react';
@@ -9,7 +9,7 @@ import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
-import FadeTransition from '@/components/FadeTransition';
+
 import { AnimatePresence, motion } from 'framer-motion';
 
 const EMPTY_EXTENSIONS = [];
@@ -94,7 +94,6 @@ export default function BotView() {
     const { t, i18n } = useTranslation('bots');
     const { botId } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
     const outlet = useOutlet();
 
     if (!botId) {
@@ -155,7 +154,6 @@ export default function BotView() {
     const isRunning = rawBotStatus === 'running';
     const botStatusLabel = resolveBotStatusLabel(rawBotStatus, t);
     const botStatusStyle = BOT_STATUS_STYLES[rawBotStatus] || BOT_STATUS_STYLES.stopped;
-    const tabTransitionKey = location.pathname.split('/').slice(3).join('/') || 'default';
     const botTabLinkClasses = ({ isActive }) =>
         cn(
             "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium shrink-0 transition-[background-color,color,box-shadow,opacity] duration-200 ease-out",
@@ -344,9 +342,9 @@ export default function BotView() {
                 </header>
 
                 <main className="relative flex-grow min-h-0 overflow-hidden">
-                    <FadeTransition transitionKey={tabTransitionKey} className="absolute inset-0">
+                    <div className="h-full min-h-0">
                         {outlet}
-                    </FadeTransition>
+                    </div>
                 </main>
             </div>
 

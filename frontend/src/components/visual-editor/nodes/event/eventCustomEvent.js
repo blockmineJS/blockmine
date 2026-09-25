@@ -7,12 +7,7 @@ export const eventCustomEventDefinition = new NodeDefinition({
   label: '▶️ Событие',
   description: 'Стартовая нода пользовательского события с динамическими параметрами',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    ...(data.pins || []).map((pin) => ({ id: pin.id, name: pin.name, type: pin.type })),
-  ],
 
   SettingsComponent: EventCustomSettings,
 

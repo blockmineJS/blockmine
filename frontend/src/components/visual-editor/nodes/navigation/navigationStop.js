@@ -10,13 +10,7 @@ export const navigationStopDefinition = new NodeDefinition({
   label: 'Остановиться',
   description: 'Останавливает текущее движение/следование бота',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {},
 

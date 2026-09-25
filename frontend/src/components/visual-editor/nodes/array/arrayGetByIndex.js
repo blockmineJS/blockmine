@@ -10,22 +10,7 @@ export const arrayGetByIndexDefinition = new NodeDefinition({
   label: 'Получить по индексу',
   description: 'Получает элемент массива по его индексу',
 
-  computeInputs: (data) => [
-    { id: 'array', name: 'Массив', type: 'Array', description: 'Входной массив', required: true },
-    {
-      id: 'index',
-      name: 'Индекс',
-      type: 'Number',
-      description: 'Индекс элемента',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'element', name: 'Элемент', type: 'Wildcard', description: 'Элемент по индексу' },
-  ],
 
   defaultData: {
     index: 0,

@@ -1,6 +1,7 @@
 const validationService = require('./services/ValidationService');
 const { GRAPH_TYPES } = require('./constants/graphTypes');
 const { NodeDefinition } = require('./NodeDefinition');
+const { applyDynamicPins } = require('../../../shared/nodePins.mjs');
 
 class NodeRegistry {
   constructor() {
@@ -9,8 +10,11 @@ class NodeRegistry {
   }
 
   registerNodeType(config) {
-    if (!config.type) {
+    if (!config?.type) {
       throw new Error('Node type is required');
+    }
+    if (!(config instanceof NodeDefinition)) {
+      config = applyDynamicPins(config);
     }
 
     const validation = validationService.validateNode(config, 'NodeRegistry');
@@ -52,6 +56,7 @@ class NodeRegistry {
       pins: config.pins || { inputs: [], outputs: [] },
       executor: config.executor || null,
       evaluator: config.evaluator || null,
+      dynamicPins: Boolean(config.dynamicPins),
       defaultData: config.defaultData || {},
       theme: config.theme || {},
       icon: config.icon || null,

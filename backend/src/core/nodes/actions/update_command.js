@@ -1,5 +1,5 @@
 const prismaService = require('../../PrismaService');
-const { blockTestWrite } = require('../../services/testModeGuard');
+const { tryGraphWrite } = require('../../graphServices');
 const prisma = prismaService.getClient();
 
 /**
@@ -109,8 +109,9 @@ async function execute(node, context, helpers) {
             }
         }
 
-        if (blockTestWrite(context, 'update_command', String(commandName))) {
-            memo.set(`${node.id}:success`, false);
+        const isolated = await tryGraphWrite(context, 'update_command', String(commandName), { name: commandName });
+        if (isolated?.handled) {
+            memo.set(`${node.id}:success`, true);
             await traverse(node, 'exec');
             return;
         }

@@ -10,24 +10,7 @@ export const userSetBlacklistDefinition = new NodeDefinition({
   label: 'Установить ЧС',
   description: 'Управляет черным списком пользователя',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'user', name: 'Пользователь', type: 'User', description: 'Пользователь', required: true },
-    {
-      id: 'blacklist_status',
-      name: 'Статус ЧС',
-      type: 'Boolean',
-      description: 'True = добавить в ЧС',
-      required: false,
-      inlineField: true,
-      placeholder: 'true'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-    { id: 'updated_user', name: 'Обновленный пользователь', type: 'User' },
-  ],
 
   defaultData: {
     blacklist_status: true,

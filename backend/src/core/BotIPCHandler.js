@@ -309,18 +309,14 @@ function createBotIPCHandler(bot, prisma, pluginUiState, pendingRequests, sendLo
             return null;
         }
 
-        const players = bot ? Object.keys(bot.players) : [];
-
-        const context = {
+        const { buildGraphContext } = require('./graphContext');
+        const context = buildGraphContext({
             bot,
-            players,
-            botState: { health: bot?.health, food: bot?.food, position: bot?.entity?.position },
-            botEntity: bot && bot.entity ? serializeEntity(bot.entity) : null,
-            eventArgs,
             botId: config.id,
             graphId: graph.id,
-            eventType
-        };
+            eventType,
+            eventArgs: eventArgs || {},
+        });
 
         const engine = new GraphExecutionEngine(NodeRegistry, bot);
         await engine.execute(graph, context, eventType);

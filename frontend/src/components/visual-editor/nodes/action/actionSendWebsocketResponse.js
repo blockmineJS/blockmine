@@ -10,14 +10,7 @@ export const actionSendWebsocketResponseDefinition = new NodeDefinition({
   label: 'WebSocket Ответ',
   description: 'Отправляет ответ клиенту через WebSocket API',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'data', name: 'Данные', type: 'Wildcard', description: 'Данные для отправки', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   theme: {
     headerColor: '#0ea5e9',

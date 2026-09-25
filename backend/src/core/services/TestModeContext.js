@@ -61,8 +61,26 @@ function createMockHandler(label) {
     };
 }
 
-function createTestBot(recordEffect) {
+function createTestBot(recordEffect, world = {}) {
     const record = typeof recordEffect === 'function' ? recordEffect : () => {};
+    const position = {
+        x: Number(world.position?.x) || 0,
+        y: Number.isFinite(Number(world.position?.y)) ? Number(world.position.y) : 64,
+        z: Number(world.position?.z) || 0,
+    };
+    const slots = (Array.isArray(world.inventory) ? world.inventory : []).map((item, index) => {
+        if (!item) return null;
+        if (typeof item === 'string') {
+            return { name: item, displayName: item, count: 1, slot: index, type: item };
+        }
+        return {
+            name: item.name,
+            displayName: item.displayName || item.name,
+            count: item.count || 1,
+            slot: item.slot ?? index,
+            type: item.type || item.name,
+        };
+    }).filter(Boolean);
     const sendMessage = (type, message, username) => {
         record({
             kind: 'message',
@@ -79,16 +97,43 @@ function createTestBot(recordEffect) {
     };
 
     const base = function () {};
-    base.username = 'TestBot';
-    base.entity = { position: { x: 0, y: 64, z: 0 }, yaw: 0, pitch: 0 };
+    base.username = world.username || 'TestBot';
+    base.entity = { position, yaw: 0, pitch: 0, onGround: true };
     base.players = {};
+    for (const player of world.players || []) {
+        const name = String(player || '').trim();
+        if (!name) continue;
+        base.players[name] = { username: name, entity: { position: { x: 1, y: 64, z: 1 } } };
+    }
     base.entities = {};
-    base.health = 20;
-    base.food = 20;
+    base.health = Number.isFinite(Number(world.health)) ? Number(world.health) : 20;
+    base.food = Number.isFinite(Number(world.food)) ? Number(world.food) : 20;
+    base.inventory = {
+        slots,
+        items() { return slots.filter(Boolean); },
+    };
+    base.heldItem = null;
     base.sendMessage = sendMessage;
     base.sendLog = sendLog;
     base.chat = chat;
-    base.lookAt = () => {};
+    base.lookAt = async (x, y, z) => {
+        record({ kind: 'look', message: `${x} ${y} ${z}` });
+    };
+    base.setControlState = (control, value) => {
+        record({ kind: 'control', message: `${control}=${Boolean(value)}` });
+    };
+    base.equip = async (item, destination) => {
+        base.heldItem = item;
+        record({ kind: 'equip', message: `${item?.name || 'item'} -> ${destination || 'hand'}` });
+    };
+    base.pathfinder = {
+        async goto(goal) {
+            if (goal && Number.isFinite(Number(goal.x))) position.x = Number(goal.x);
+            if (goal && Number.isFinite(Number(goal.y))) position.y = Number(goal.y);
+            if (goal && Number.isFinite(Number(goal.z))) position.z = Number(goal.z);
+            record({ kind: 'move', message: `${position.x} ${position.y} ${position.z}` });
+        },
+    };
     base.api = { sendMessage, sendLog, chat };
 
     return new Proxy(base, createMockHandler('bot'));
@@ -104,44 +149,27 @@ function buildTestContext({
     typeChat,
     commandName,
     recordEffect,
+    world = {},
 }) {
-    const namedArgs = sanitizeArgs(args || eventArgs.args || eventArgs.commandArguments || {});
+    const { buildGraphContext } = require('../graphContext');
+    const { createTestGraphServices } = require('../graphServices');
     const userName = sanitizeUsername(username || eventArgs.username || eventArgs.user?.username);
     const chat = sanitizeTypeChat(typeChat || eventArgs.typeChat || eventArgs.chatType);
-    const user = { username: userName };
-    const mergedEventArgs = {
-        ...sanitizeEventArgs(eventArgs),
-        commandName: commandName || eventArgs.commandName || '',
-        user,
-        args: namedArgs,
-        typeChat: chat,
-        username: userName,
-    };
-    const bot = createTestBot(recordEffect);
-
-    return {
+    const services = createTestGraphServices(recordEffect, world);
+    const bot = createTestBot(recordEffect, world);
+    return buildGraphContext({
+        bot,
         botId,
         graphId,
         eventType,
-        eventArgs: mergedEventArgs,
-        user,
-        args: namedArgs,
-        commandArguments: namedArgs,
+        eventArgs: sanitizeEventArgs(eventArgs),
+        user: { username: userName },
+        args: sanitizeArgs(args || eventArgs.args || eventArgs.commandArguments || {}),
         typeChat: chat,
-        players: [],
-        botState: { yaw: 0, pitch: 0 },
-        botEntity: {
-            position: { x: 0, y: 64, z: 0 },
-            yaw: 0,
-            pitch: 0,
-        },
-        bot,
-        botApi: bot.api,
-        api: bot.api,
-        services: new Proxy({}, createMockHandler('services')),
-        __testMode: true,
+        commandName,
+        services,
         recordEffect: typeof recordEffect === 'function' ? recordEffect : () => {},
-    };
+    });
 }
 
 function createEffectRecorder(graphId, { broadcast = true } = {}) {

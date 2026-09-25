@@ -6,13 +6,7 @@ export const arrayShuffleDefinition = new NodeDefinition({
   label: 'Перемешать массив',
   description: 'Возвращает новый массив с элементами в случайном порядке',
 
-  computeInputs: () => [
-    { id: 'array', name: 'Массив', type: 'Array', required: true },
-  ],
 
-  computeOutputs: () => [
-    { id: 'shuffled', name: 'Перемешанный', type: 'Array' },
-  ],
 
   theme: {
     headerColor: '#f59e0b',

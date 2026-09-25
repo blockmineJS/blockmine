@@ -10,14 +10,7 @@ export const timeAddDefinition = new NodeDefinition({
   label: 'Добавить время',
   description: 'Добавляет к дате промежуток времени',
 
-  computeInputs: (data) => [
-    { id: 'date', name: 'Дата', type: 'DateTime', required: true },
-    { id: 'duration', name: 'Продолжительность', type: 'Object', description: '{ seconds: 5, minutes: 1 }', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Новая дата', type: 'DateTime', description: 'Дата с добавленным временем' },
-  ],
 
   theme: {
     headerColor: '#ec4899',

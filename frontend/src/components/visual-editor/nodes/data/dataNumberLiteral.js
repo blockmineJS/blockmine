@@ -10,20 +10,7 @@ export const dataNumberLiteralDefinition = new NodeDefinition({
   label: 'Число',
   description: 'Простое числовое значение.',
 
-  computeInputs: (data) => [
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'value', name: 'Значение', type: 'Number' },
-  ],
 
   defaultData: {
     value: 0,

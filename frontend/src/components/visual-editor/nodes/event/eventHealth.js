@@ -10,14 +10,7 @@ export const eventHealthDefinition = new NodeDefinition({
   label: 'Здоровье/Голод изменилось',
   description: 'Срабатывает при изменении здоровья, голода или насыщения бота',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'health', name: 'Здоровье', type: 'Number' },
-    { id: 'food', name: 'Голод', type: 'Number' },
-    { id: 'saturation', name: 'Насыщение', type: 'Number' },
-  ],
 
   theme: {
     headerColor: '#8b5cf6',

@@ -10,11 +10,7 @@ export const flowBreakDefinition = new NodeDefinition({
   label: 'Выйти из цикла',
   description: 'Немедленно прерывает выполнение цикла (For Each Loop) и передает управление на его выход Completed',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-  ],
 
-  computeOutputs: (data) => [],
 
   theme: {
     headerColor: '#3b82f6',

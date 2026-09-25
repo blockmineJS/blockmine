@@ -10,22 +10,7 @@ export const actionDeleteCommandDefinition = new NodeDefinition({
   label: 'Удалить команду',
   description: 'Удаляет существующую команду бота',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'commandName',
-      name: 'Имя команды',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'mycommand'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-    { id: 'success', name: 'Успешно', type: 'Boolean' },
-  ],
 
   defaultData: {
     commandName: '',

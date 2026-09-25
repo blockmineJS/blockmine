@@ -10,13 +10,7 @@ export const userGetPermissionsDefinition = new NodeDefinition({
   label: 'Получить разрешения',
   description: 'Возвращает права пользователя',
 
-  computeInputs: (data) => [
-    { id: 'user', name: 'Пользователь', type: 'User', description: 'Пользователь', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'permissions', name: 'Права', type: 'Array', description: 'Массив прав' },
-  ],
 
   theme: {
     headerColor: '#14b8a6',

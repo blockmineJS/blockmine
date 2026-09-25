@@ -1,8 +1,10 @@
+const { randomUUID } = require('crypto');
 const prisma = require('../../lib/prisma');
 const GraphValidation = require('../GraphValidation');
 const { parseVariables } = require('../utils/variableParser');
 const { buildTestContext, createEffectRecorder, sanitizeArgs, sanitizeEventArgs, sanitizeTypeChat, sanitizeUsername } = require('./TestModeContext');
 const { runInGraphTest } = require('./testModeGuard');
+const { checkCommandAccess, parseStringList } = require('../commandGate');
 
 const MAX_NODES = 2000;
 const MAX_CONNECTIONS = 4000;
@@ -83,7 +85,21 @@ async function loadOwnedGraph(kind, botId, graphId) {
         if (!command || !command.isVisual) {
             throw fail(404, 'Визуальная команда не найдена');
         }
-        return { name: command.name, graphJson: command.graphJson };
+        const permission = command.permissionId
+            ? await prisma.permission.findUnique({ where: { id: command.permissionId }, select: { name: true } })
+            : null;
+        const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { prefix: true } });
+        return {
+            name: command.name,
+            graphJson: command.graphJson,
+            isEnabled: command.isEnabled,
+            allowedChatTypes: command.allowedChatTypes,
+            argumentsJson: command.argumentsJson,
+            cooldown: command.cooldown,
+            permissionName: permission?.name || null,
+            prefix: bot?.prefix || '@',
+            testsJson: command.testsJson,
+        };
     }
 
     const eventGraph = await prisma.eventGraph.findFirst({
@@ -113,6 +129,7 @@ function buildRunContext({ botId, graphId, kind, body, commandName, recordEffect
         typeChat: sanitizeTypeChat(body?.typeChat),
         commandName,
         recordEffect,
+        world: body?.world && typeof body.world === 'object' ? body.world : {},
     });
 }
 
@@ -136,6 +153,27 @@ async function launchGraphTest({ kind, botId, graphId, graph, commandName, body 
     }
 
     const { getGlobalDebugManager } = require('./DebugSessionManager');
+    const nodeRegistry = require('../NodeRegistry');
+    const GraphExecutionEngine = require('../GraphExecutionEngine');
+    const engine = new GraphExecutionEngine(nodeRegistry, null);
+    const interactive = body?.interactive !== false;
+
+    if (!interactive) {
+        try {
+            const existing = getGlobalDebugManager().get(graphId);
+            if (existing) {
+                existing.testMode = false;
+                existing.stepMode = false;
+                existing.runToEnd = true;
+            }
+        } catch {
+        }
+        const { recordEffect, effects } = createEffectRecorder(graphId, { broadcast: false });
+        const context = buildRunContext({ botId, graphId, kind, body, commandName, recordEffect });
+        await runInGraphTest(() => engine.execute(validation.graph, context, eventType));
+        return { success: true, blocked: false, effects };
+    }
+
     const debugState = getGlobalDebugManager().getOrCreate(botId, graphId);
     debugState.enableTestMode({ botId, graphId, eventType });
 
@@ -148,10 +186,6 @@ async function launchGraphTest({ kind, botId, graphId, graph, commandName, body 
         commandName,
         recordEffect,
     });
-
-    const nodeRegistry = require('../NodeRegistry');
-    const GraphExecutionEngine = require('../GraphExecutionEngine');
-    const engine = new GraphExecutionEngine(nodeRegistry, null);
 
     setImmediate(() => {
         runInGraphTest(() => engine.execute(validation.graph, context, eventType))
@@ -169,11 +203,81 @@ async function launchGraphTest({ kind, botId, graphId, graph, commandName, body 
             });
     });
 
-    return { success: true, message: 'Test run started in step mode' };
+    return { success: true, blocked: false, message: 'Test run started in step mode' };
+}
+
+function gateEffects(gate) {
+    const effects = [];
+    if (gate.reason === 'disabled' || gate.reason === 'chat') {
+        const gateSummary = gate.reason === 'disabled'
+            ? 'Команда выключена'
+            : 'Этот тип чата для команды не разрешён';
+        effects.push({
+            id: randomUUID(),
+            at: Date.now(),
+            kind: 'gate',
+            reason: gate.reason,
+            summary: gateSummary,
+        });
+    }
+    for (const message of gate.messages || []) {
+        effects.push({
+            id: randomUUID(),
+            at: Date.now(),
+            kind: 'message',
+            chatType: message.typeChat,
+            message: message.message,
+            username: null,
+        });
+    }
+    return effects;
+}
+
+function accessFromBody(owned, body) {
+    const argumentsDef = Array.isArray(body?.argumentsDef)
+        ? body.argumentsDef
+        : parseStringList(owned.argumentsJson, []);
+    const allowedChatTypes = body?.allowedChatTypes !== undefined
+        ? body.allowedChatTypes
+        : parseStringList(owned.allowedChatTypes, ['chat', 'private']);
+    return checkCommandAccess({
+        commandName: owned.name,
+        prefix: owned.prefix || '@',
+        isEnabled: body?.isEnabled !== undefined ? Boolean(body.isEnabled) : owned.isEnabled !== false,
+        allowedChatTypes,
+        argumentsDef,
+        args: sanitizeArgs(body?.args),
+        typeChat: sanitizeTypeChat(body?.typeChat),
+        permissionName: body?.permissionName !== undefined ? (body.permissionName || null) : owned.permissionName,
+        cooldown: body?.cooldown !== undefined ? Number(body.cooldown) || 0 : Number(owned.cooldown) || 0,
+        asOwner: Boolean(body?.asOwner),
+        permissions: Array.isArray(body?.permissions) ? body.permissions : [],
+        cooldownLeft: Number(body?.cooldownLeft) || 0,
+    });
+}
+
+function effectText(effect) {
+    if (!effect) return '';
+    if (effect.kind === 'message') return String(effect.message || '');
+    if (effect.kind === 'log' || effect.kind === 'chat') return String(effect.message || '');
+    return String(effect.summary || effect.message || '');
 }
 
 async function startOwnedTest({ kind, botId, graphId, body }) {
     const owned = await loadOwnedGraph(kind, botId, graphId);
+    if (kind === 'command') {
+        const gate = accessFromBody(owned, body);
+        if (!gate.allowed) {
+            const effects = gateEffects(gate);
+            try {
+                const { getGlobalDebugManager } = require('./DebugSessionManager');
+                const debugState = getGlobalDebugManager().get(graphId);
+                effects.forEach((effect) => debugState?.broadcast('debug:test-effect', { effect }));
+            } catch {
+            }
+            return { success: true, blocked: true, reason: gate.reason, effects };
+        }
+    }
     const graph = resolveGraph(body, owned.graphJson);
     return launchGraphTest({
         kind,
@@ -183,6 +287,77 @@ async function startOwnedTest({ kind, botId, graphId, body }) {
         commandName: owned.name,
         body,
     });
+}
+
+function sanitizeStoredTests(value) {
+    const list = parseStringList(value, Array.isArray(value) ? value : []);
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 30).map((test) => ({
+        id: String(test?.id || randomUUID()).slice(0, 64),
+        name: String(test?.name || 'Проверка').slice(0, 80),
+        username: sanitizeUsername(test?.username),
+        typeChat: sanitizeTypeChat(test?.typeChat),
+        asOwner: Boolean(test?.asOwner),
+        permissions: Array.isArray(test?.permissions)
+            ? test.permissions.map((item) => String(item).slice(0, 80)).slice(0, 32)
+            : [],
+        args: sanitizeArgs(test?.args),
+        world: {
+            players: Array.isArray(test?.world?.players)
+                ? test.world.players.map((item) => String(item).slice(0, 32)).filter(Boolean).slice(0, 32)
+                : [],
+            inventory: Array.isArray(test?.world?.inventory)
+                ? test.world.inventory.map((item) => String(item).slice(0, 64)).filter(Boolean).slice(0, 64)
+                : [],
+        },
+        cooldownLeft: Math.max(0, Number(test?.cooldownLeft) || 0),
+        expect: Array.isArray(test?.expect)
+            ? test.expect.map((line) => String(line).slice(0, 200)).filter(Boolean).slice(0, 20)
+            : [],
+    }));
+}
+
+async function runCommandSuite({ botId, graphId, body }) {
+    const owned = await loadOwnedGraph('command', botId, graphId);
+    const tests = sanitizeStoredTests(Array.isArray(body?.tests) ? body.tests : owned.testsJson);
+    const results = [];
+    for (const test of tests) {
+        try {
+            const outcome = await startOwnedTest({
+                kind: 'command',
+                botId,
+                graphId,
+                body: {
+                    ...(body || {}),
+                    ...test,
+                    interactive: false,
+                    eventType: 'command',
+                },
+            });
+            const texts = (outcome.effects || []).map(effectText);
+            const missing = test.expect.filter((line) => !texts.some((text) => text.includes(line)));
+            results.push({
+                id: test.id,
+                name: test.name,
+                ok: missing.length === 0 && !outcome.error,
+                blocked: Boolean(outcome.blocked),
+                reason: outcome.reason || null,
+                missing,
+                effects: outcome.effects || [],
+            });
+        } catch (error) {
+            results.push({
+                id: test.id,
+                name: test.name,
+                ok: false,
+                blocked: false,
+                reason: 'error',
+                missing: [error.message],
+                effects: [],
+            });
+        }
+    }
+    return { results };
 }
 
 async function runOwnedNode({ kind, botId, graphId, nodeId, body }) {
@@ -285,4 +460,6 @@ module.exports = {
     launchGraphTest,
     startOwnedTest,
     runOwnedNode,
+    runCommandSuite,
+    sanitizeStoredTests,
 };

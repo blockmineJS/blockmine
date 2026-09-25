@@ -10,22 +10,7 @@ export const arrayRemoveByIndexDefinition = new NodeDefinition({
   label: 'Удалить по индексу',
   description: 'Удаляет элемент из массива по его индексу',
 
-  computeInputs: (data) => [
-    { id: 'array', name: 'Массив', type: 'Array', description: 'Входной массив', required: true },
-    {
-      id: 'index',
-      name: 'Индекс',
-      type: 'Number',
-      description: 'Индекс элемента для удаления',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Новый массив', type: 'Array', description: 'Массив без элемента' },
-  ],
 
   defaultData: {
     index: 0,

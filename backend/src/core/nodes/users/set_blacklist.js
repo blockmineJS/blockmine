@@ -1,6 +1,6 @@
 const User = require('../../UserService');
 const prismaService = require('../../PrismaService');
-const { blockTestWrite } = require('../../services/testModeGuard');
+const { tryGraphWrite, graphUser } = require('../../graphServices');
 const prisma = prismaService.getClient();
 
 /**
@@ -18,14 +18,17 @@ async function execute(node, context, helpers) {
     const blacklistStatus = await resolvePinValue(node, 'blacklist_status', false);
     let updatedUser = null;
     
-    if (userObject && userObject.username && blockTestWrite(context, 'set_blacklist', `${userObject.username}=${Boolean(blacklistStatus)}`)) {
-        memo.set(`${node.id}:updated_user`, null);
-        await traverse(node, 'exec');
-        return;
-    }
-
     if (userObject && userObject.username) {
-        const user = await User.getUser(userObject.username, context.botId);
+        const isolated = await tryGraphWrite(context, 'set_blacklist', `${userObject.username}=${Boolean(blacklistStatus)}`, {
+            username: userObject.username,
+            status: blacklistStatus,
+        });
+        if (isolated?.handled) {
+            memo.set(`${node.id}:updated_user`, await graphUser(context, userObject.username));
+            await traverse(node, 'exec');
+            return;
+        }
+        const user = await graphUser(context, userObject.username);
         if (user) {
             updatedUser = await prisma.user.update({
                 where: { id: user.id },

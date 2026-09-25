@@ -10,30 +10,7 @@ export const containerGetItemsDefinition = new NodeDefinition({
   label: 'Контейнер: содержимое',
   description: 'Получает список предметов из открытого контейнера',
 
-  computeInputs: (data) => [
-    {
-      id: 'container',
-      name: 'Контейнер',
-      type: 'Object',
-      required: false,
-      description: 'Объект контейнера (если не указан - текущий открытый)'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    {
-      id: 'items',
-      name: 'Предметы',
-      type: 'Array',
-      description: 'Массив предметов в контейнере'
-    },
-    {
-      id: 'count',
-      name: 'Кол-во слотов',
-      type: 'Number',
-      description: 'Количество занятых слотов'
-    },
-  ],
 
   defaultData: {},
 

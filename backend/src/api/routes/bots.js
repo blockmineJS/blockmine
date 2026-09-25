@@ -1184,6 +1184,10 @@ router.put('/:botId/commands/:commandId', authorize('management:edit'), async (r
         if (allowedChatTypes !== undefined) dataToUpdate.allowedChatTypes = Array.isArray(allowedChatTypes) ? JSON.stringify(allowedChatTypes) : allowedChatTypes;
         if (isEnabled !== undefined) dataToUpdate.isEnabled = isEnabled;
         if (argumentsJson !== undefined) dataToUpdate.argumentsJson = Array.isArray(argumentsJson) ? JSON.stringify(argumentsJson) : argumentsJson;
+        if (req.body.testsJson !== undefined) {
+            const { sanitizeStoredTests } = require('../../core/services/GraphTestRunner');
+            dataToUpdate.testsJson = JSON.stringify(sanitizeStoredTests(req.body.testsJson));
+        }
         if (graphJson !== undefined) dataToUpdate.graphJson = graphJson;
         if (pluginOwnerId !== undefined) dataToUpdate.pluginOwnerId = pluginOwnerId;
 
@@ -1646,6 +1650,22 @@ router.put('/:botId/commands/:commandId/visual', authorize('management:edit'), a
         }
         console.error('[API Error] /commands/:commandId/visual PUT:', error);
         res.status(500).json({ error: 'Failed to update visual command' });
+    }
+});
+
+router.post('/:botId/commands/:commandId/test-suite', checkBotAccess, authorize('management:edit'), async (req, res) => {
+    try {
+        const { runCommandSuite } = require('../../core/services/GraphTestRunner');
+        const result = await runCommandSuite({
+            botId: parseInt(req.params.botId, 10),
+            graphId: parseInt(req.params.commandId, 10),
+            body: req.body,
+        });
+        res.json(result);
+    } catch (error) {
+        const status = error.status || 500;
+        if (status >= 500) console.error('[Test Suite] command failed:', error);
+        res.status(status).json({ error: error.message || 'Test suite failed' });
     }
 });
 

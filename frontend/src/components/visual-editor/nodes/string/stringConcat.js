@@ -11,25 +11,7 @@ export const stringConcatDefinition = new NodeDefinition({
   label: 'Объединить строки',
   description: 'Объединяет несколько строк в одну',
 
-  computeInputs: (data) => {
-    const inputs = [];
-    const pinCount = data.pinCount || 2;
-    for (let i = 0; i < pinCount; i++) {
-      inputs.push({
-        id: `pin_${i}`,
-        name: `Строка ${i}`,
-        type: 'String',
-        required: false,
-        inlineField: true,
-        placeholder: '...'
-      });
-    }
-    return inputs;
-  },
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'String' },
-  ],
 
   SettingsComponent: StringConcatSettings,
 

@@ -10,32 +10,7 @@ export const furnaceTakeOutputDefinition = new NodeDefinition({
   label: 'Печка: забрать результат',
   description: 'Забирает готовый предмет из слота результата печки',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Забрано', type: 'Exec' },
-    { id: 'exec_failed', name: 'Пусто/Ошибка', type: 'Exec' },
-    {
-      id: 'item',
-      name: 'Предмет',
-      type: 'Object',
-      description: 'Забранный предмет'
-    },
-    {
-      id: 'count',
-      name: 'Кол-во',
-      type: 'Number',
-      description: 'Количество забранных предметов'
-    },
-    {
-      id: 'success',
-      name: 'Успех?',
-      type: 'Boolean',
-      description: 'true если предмет забран'
-    },
-  ],
 
   defaultData: {},
 

@@ -6,15 +6,7 @@ export const userRemoveFromGroupDefinition = new NodeDefinition({
   label: 'Убрать из группы',
   description: 'Убирает пользователя из указанной группы',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-    { id: 'user', name: 'Пользователь', type: 'User', required: true },
-    { id: 'group', name: 'Группа', type: 'String', required: true, inlineField: true, placeholder: 'Admin' },
-  ],
 
-  computeOutputs: () => [
-    { id: 'exec', name: 'Далее', type: 'Exec' },
-  ],
 
   defaultData: { group: '' },
 

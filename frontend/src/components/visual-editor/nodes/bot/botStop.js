@@ -6,11 +6,7 @@ export const botStopDefinition = new NodeDefinition({
   label: 'Выключить бота',
   description: 'Останавливает бота',
 
-  computeInputs: () => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: () => [],
 
   theme: {
     headerColor: '#dc2626',

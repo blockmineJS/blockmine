@@ -10,28 +10,7 @@ export const mathRandomNumberDefinition = new NodeDefinition({
   label: 'Случайное число',
   description: 'Генерирует случайное число в заданном диапазоне',
 
-  computeInputs: (data) => [
-    {
-      id: 'min',
-      name: 'Мин',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '0'
-    },
-    {
-      id: 'max',
-      name: 'Макс',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '100'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Результат', type: 'Number' },
-  ],
 
   defaultData: {
     min: 0,

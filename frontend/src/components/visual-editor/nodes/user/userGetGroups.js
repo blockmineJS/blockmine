@@ -10,13 +10,7 @@ export const userGetGroupsDefinition = new NodeDefinition({
   label: 'Получить группы',
   description: 'Возвращает группы пользователя',
 
-  computeInputs: (data) => [
-    { id: 'user', name: 'Пользователь', type: 'User', description: 'Пользователь', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'groups', name: 'Группы', type: 'Array', description: 'Массив групп' },
-  ],
 
   theme: {
     headerColor: '#14b8a6',

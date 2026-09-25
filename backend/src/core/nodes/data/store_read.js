@@ -10,6 +10,10 @@ async function evaluate(node, pinId, context, helpers) {
 
     if (!pluginName || !key) return null;
 
+    if (context.services?.readStore) {
+        return context.services.readStore(context.botId, pluginName, key);
+    }
+
     const row = await prisma.pluginDataStore.findUnique({
         where: { pluginName_botId_key: { pluginName, botId: context.botId, key } }
     });

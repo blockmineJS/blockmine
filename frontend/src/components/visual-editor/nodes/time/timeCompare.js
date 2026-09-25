@@ -11,14 +11,7 @@ export const timeCompareDefinition = new NodeDefinition({
   label: 'Сравнить даты',
   description: 'Сравнивает две даты',
 
-  computeInputs: (data) => [
-    { id: 'date_left', name: 'Дата А', type: 'DateTime', required: true },
-    { id: 'date_right', name: 'Дата Б', type: 'DateTime', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Результат', type: 'Boolean' },
-  ],
 
   SettingsComponent: TimeCompareSettings,
 

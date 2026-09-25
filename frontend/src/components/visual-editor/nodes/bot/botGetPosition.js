@@ -10,11 +10,7 @@ export const botGetPositionDefinition = new NodeDefinition({
   label: 'Получить позицию',
   description: 'Возвращает текущую позицию бота в мире',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'position', name: 'Позиция', type: 'Object', description: 'Объект с координатами {x, y, z}' },
-  ],
 
   theme: {
     headerColor: '#3b82f6',

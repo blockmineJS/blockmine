@@ -6,11 +6,7 @@ export const botGetNameDefinition = new NodeDefinition({
   label: 'Имя бота',
   description: 'Возвращает имя (username) бота',
 
-  computeInputs: () => [],
 
-  computeOutputs: () => [
-    { id: 'name', name: 'Имя', type: 'String' },
-  ],
 
   theme: {
     headerColor: '#3b82f6',

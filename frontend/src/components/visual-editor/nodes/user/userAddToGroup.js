@@ -6,15 +6,7 @@ export const userAddToGroupDefinition = new NodeDefinition({
   label: 'Добавить в группу',
   description: 'Добавляет пользователя в указанную группу',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-    { id: 'user', name: 'Пользователь', type: 'User', required: true },
-    { id: 'group', name: 'Группа', type: 'String', required: true, inlineField: true, placeholder: 'Admin' },
-  ],
 
-  computeOutputs: () => [
-    { id: 'exec', name: 'Далее', type: 'Exec' },
-  ],
 
   defaultData: { group: '' },
 

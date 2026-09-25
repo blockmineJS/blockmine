@@ -22,7 +22,8 @@ async function evaluate(node, pinId, context, helpers) {
     }
 
     if (usernameToFind) {
-        const user = await User.getUser(usernameToFind, context.botId);
+        const { graphUser } = require('../../graphServices');
+        const user = await graphUser(context, usernameToFind);
         if (user && user.permissionsSet) {
             permissions = Array.from(user.permissionsSet);
         }

@@ -10,20 +10,7 @@ export const stringLiteralDefinition = new NodeDefinition({
   label: 'Строка',
   description: 'Строка с поддержкой переменных {name}',
 
-  computeInputs: (data) => [
-    {
-      id: 'value',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст с {переменными}...'
-    }
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'value', name: 'Value', type: 'String', description: 'Итоговая строка' },
-  ],
 
   defaultData: {
     value: '',

@@ -10,12 +10,7 @@ export const eventRawMessageDefinition = new NodeDefinition({
   label: 'Сырое сообщение',
   description: 'Срабатывает при получении любого сообщения в сыром виде (до парсинга)',
 
-  computeInputs: (data) => [],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    { id: 'rawText', name: 'Сырой текст', type: 'String' },
-  ],
 
   theme: {
     headerColor: '#8b5cf6',

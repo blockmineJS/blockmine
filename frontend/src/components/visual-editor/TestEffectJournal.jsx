@@ -10,7 +10,11 @@ function formatEffect(effect) {
     return `[${effect.chatType || 'chat'}] ${who}${effect.message || ''}`;
   }
   if (effect.kind === 'log' || effect.kind === 'chat') return effect.message || '';
-  if (effect.kind === 'db_write_blocked') return effect.summary || effect.operation || '';
+  if (effect.kind === 'gate') return effect.summary || effect.reason || '';
+  if (effect.kind === 'db_write' || effect.kind === 'db_write_blocked') return effect.summary || effect.operation || '';
+  if (effect.kind === 'move' || effect.kind === 'equip' || effect.kind === 'look' || effect.kind === 'control') {
+    return effect.message || '';
+  }
   return effect.message || effect.summary || effect.kind || '';
 }
 
@@ -33,7 +37,7 @@ const TestEffectJournal = () => {
         ) : (
           testEffects.map((effect) => (
             <div key={effect.id} className="border-b border-slate-800 last:border-b-0 pb-2 last:pb-0">
-              <div className={`text-xs mb-1 ${effect.kind === 'db_write_blocked' ? 'text-amber-400' : 'text-slate-400'}`}>
+              <div className={`text-xs mb-1 ${effect.kind === 'db_write' || effect.kind === 'db_write_blocked' ? 'text-amber-400' : 'text-slate-400'}`}>
                 {t(`testMode.kinds.${effect.kind}`, { defaultValue: effect.kind })}
               </div>
               <div className="text-sm font-mono text-slate-100 break-all whitespace-pre-wrap">

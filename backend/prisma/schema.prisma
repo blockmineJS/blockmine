@@ -112,6 +112,7 @@ model Command {
   isVisual         Boolean @default(false)
   argumentsJson    String? @default("[]")
   graphJson        String? @default("null")
+  testsJson        String? @default("[]")
   
   pluginOwnerId    Int?
   pluginOwner      InstalledPlugin? @relation(fields: [pluginOwnerId], references: [id], onDelete: SetNull)

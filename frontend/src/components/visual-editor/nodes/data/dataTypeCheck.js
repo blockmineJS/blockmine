@@ -11,13 +11,7 @@ export const dataTypeCheckDefinition = new NodeDefinition({
   label: 'Проверить тип',
   description: 'Проверяет соответствие значения типу',
 
-  computeInputs: (data) => [
-    { id: 'value', name: 'Value', type: 'Wildcard', description: 'Значение для проверки' },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Is Type', type: 'Boolean', description: 'True если тип совпадает' },
-  ],
 
   SettingsComponent: DataTypeCheckSettings,
 

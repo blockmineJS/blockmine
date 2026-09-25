@@ -21,6 +21,7 @@ class NodeDefinition {
     // evaluator - для data пинов (вычисление значений)
     this.executor = config.executor || null;
     this.evaluator = config.evaluator || null;
+    this.dynamicPins = Boolean(config.dynamicPins);
 
     // Метаданные ноды
     this.defaultData = config.defaultData || {};
@@ -92,15 +93,23 @@ class NodeDefinition {
    * Используется для отправки в frontend
    */
   toJSON() {
+    const data = this.defaultData || {};
+    let inputs = [];
+    let outputs = [];
+    try {
+      inputs = this.getInputs(data) || [];
+      outputs = this.getOutputs(data) || [];
+    } catch {
+      inputs = this.pins.inputs || [];
+      outputs = this.pins.outputs || [];
+    }
     return {
       type: this.type,
       category: this.category,
       label: this.label,
       description: this.description,
-      pins: {
-        inputs: this.pins.inputs || [],
-        outputs: this.pins.outputs || []
-      },
+      dynamicPins: Boolean(this.dynamicPins),
+      pins: { inputs, outputs },
       defaultData: this.defaultData,
       theme: this.theme,
       icon: this.icon,

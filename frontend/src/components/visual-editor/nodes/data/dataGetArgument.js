@@ -10,31 +10,7 @@ export const dataGetArgumentDefinition = new NodeDefinition({
   label: 'Получить аргумент',
   description: 'Получить значение аргумента команды',
 
-  computeInputs: (data) => [
-    {
-      id: 'argumentName',
-      name: 'Имя аргумента',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'имя_аргумента'
-    }
-  ],
 
-  computeOutputs: (data, context) => {
-    const { argumentName } = data;
-    if (!argumentName) {
-      return [{ id: 'value', name: 'Value', type: 'Wildcard' }];
-    }
-
-    // Находим тип аргумента из контекста
-    const argument = context.commandArguments?.find(a => a.name === argumentName);
-    const type = argument?.type || 'Wildcard';
-
-    return [
-      { id: 'value', name: argumentName, type, description: `Значение аргумента ${argumentName}` },
-    ];
-  },
 
   defaultData: {
     argumentName: '',

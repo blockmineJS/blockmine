@@ -10,13 +10,7 @@ export const furnaceCloseDefinition = new NodeDefinition({
   label: 'Печка: закрыть',
   description: 'Закрывает открытую печку',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Далее', type: 'Exec' },
-  ],
 
   defaultData: {},
 

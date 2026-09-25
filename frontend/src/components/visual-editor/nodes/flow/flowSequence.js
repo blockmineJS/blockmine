@@ -11,22 +11,7 @@ export const flowSequenceDefinition = new NodeDefinition({
   label: 'Последовательность',
   description: 'Последовательно выполняет несколько веток',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-  ],
 
-  computeOutputs: (data) => {
-    const pinCount = data.pinCount || 2;
-    const outputs = [];
-    for (let i = 0; i < pinCount; i++) {
-      outputs.push({
-        id: `exec_${i}`,
-        name: `${i}`,
-        type: 'Exec',
-      });
-    }
-    return outputs;
-  },
 
   SettingsComponent: FlowSequenceSettings,
 

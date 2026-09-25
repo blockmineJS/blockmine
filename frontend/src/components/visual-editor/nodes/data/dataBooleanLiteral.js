@@ -10,20 +10,7 @@ export const dataBooleanLiteralDefinition = new NodeDefinition({
   label: 'Boolean',
   description: 'Булево значение (true/false)',
 
-  computeInputs: (data) => [
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Boolean',
-      required: false,
-      inlineField: true,
-      placeholder: 'false'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'value', name: 'Значение', type: 'Boolean', description: 'Булево значение' },
-  ],
 
   defaultData: {
     value: false,

@@ -10,13 +10,7 @@ export const userCheckBlacklistDefinition = new NodeDefinition({
   label: 'Проверить ЧС',
   description: 'Проверяет, находится ли пользователь в черном списке',
 
-  computeInputs: (data) => [
-    { id: 'user', name: 'Пользователь', type: 'User', description: 'Пользователь для проверки', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'is_blacklisted', name: 'В ЧС', type: 'Boolean', description: 'True если в черном списке' },
-  ],
 
   theme: {
     headerColor: '#14b8a6',

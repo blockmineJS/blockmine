@@ -1,5 +1,5 @@
 const User = require('../../UserService');
-const { blockTestWrite } = require('../../services/testModeGuard');
+const { tryGraphWrite, graphUser } = require('../../graphServices');
 
 async function execute(node, context, helpers) {
     const { resolvePinValue, traverse } = helpers;
@@ -11,13 +11,13 @@ async function execute(node, context, helpers) {
     if (typeof userIdentifier === 'string') username = userIdentifier;
     else if (userIdentifier?.username) username = userIdentifier.username;
 
-    if (username && groupName && blockTestWrite(context, 'add_to_group', `${username} -> ${groupName}`)) {
-        await traverse(node, 'exec');
-        return;
-    }
-
     if (username && groupName) {
-        const user = await User.getUser(username, context.botId);
+        const isolated = await tryGraphWrite(context, 'add_to_group', `${username} -> ${groupName}`, { username, groupName });
+        if (isolated?.handled) {
+            await traverse(node, 'exec');
+            return;
+        }
+        const user = await graphUser(context, username);
         if (user) {
             await user.addGroup(groupName);
             User.clearCache(username, context.botId);

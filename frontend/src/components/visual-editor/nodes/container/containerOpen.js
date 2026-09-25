@@ -11,53 +11,7 @@ export const containerOpenDefinition = new NodeDefinition({
   label: 'Контейнер: открыть',
   description: 'Открывает контейнер (сундук, бочку) по координатам',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'x',
-      name: 'X',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '0',
-      description: 'Координата X контейнера'
-    },
-    {
-      id: 'y',
-      name: 'Y',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '64',
-      description: 'Координата Y контейнера'
-    },
-    {
-      id: 'z',
-      name: 'Z',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '0',
-      description: 'Координата Z контейнера'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Открыт', type: 'Exec' },
-    { id: 'exec_failed', name: 'Ошибка', type: 'Exec' },
-    {
-      id: 'container',
-      name: 'Контейнер',
-      type: 'Object',
-      description: 'Объект открытого контейнера'
-    },
-    {
-      id: 'success',
-      name: 'Успех?',
-      type: 'Boolean',
-      description: 'true если контейнер открыт'
-    },
-  ],
 
   SettingsComponent: ContainerOpenSettings,
 

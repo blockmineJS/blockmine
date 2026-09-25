@@ -10,21 +10,7 @@ export const flowDelayDefinition = new NodeDefinition({
   label: '⏱️ Задержка',
   description: 'Ожидает указанное количество миллисекунд, затем продолжает выполнение',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec', required: true },
-    {
-      id: 'delay',
-      name: 'Задержка (мс)',
-      type: 'Number',
-      required: false,
-      inlineField: true,
-      placeholder: '1000'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Далее', type: 'Exec' },
-  ],
 
   defaultData: {
     delay: 1000,

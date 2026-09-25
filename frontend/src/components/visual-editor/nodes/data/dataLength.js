@@ -10,13 +10,7 @@ export const dataLengthDefinition = new NodeDefinition({
   label: 'Длина',
   description: 'Размер массива или длина строки',
 
-  computeInputs: (data) => [
-    { id: 'data', name: 'Массив или Строка', type: 'Wildcard', description: 'Данные для измерения', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'length', name: 'Длина', type: 'Number', description: 'Количество элементов/символов' },
-  ],
 
   theme: {
     headerColor: '#10b981',

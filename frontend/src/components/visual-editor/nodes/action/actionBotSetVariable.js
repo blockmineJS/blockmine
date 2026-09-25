@@ -10,51 +10,7 @@ export const actionBotSetVariableDefinition = new NodeDefinition({
   label: 'Установить переменную',
   description: 'Записывает значение в переменную',
 
-  computeInputs: (data) => [
-    { id: 'exec', name: 'Выполнить', type: 'Exec' },
-    {
-      id: 'name',
-      name: 'Имя',
-      type: 'String',
-      description: 'Имя переменной',
-      required: false,
-      inlineField: true,
-      inlineFieldType: 'select',
-      inlineFieldOptions: (context) => {
-        const variables = context.variables || [];
-        return variables
-          .filter(v => v.name)
-          .map(v => ({
-            value: v.name,
-            label: `${v.name} (${v.type})`
-          }));
-      },
-      placeholder: 'имя_переменной'
-    },
-    {
-      id: 'value',
-      name: 'Значение',
-      type: 'Wildcard',
-      required: false,
-      inlineField: true,
-      placeholder: '...'
-    },
-    {
-      id: 'persist',
-      name: 'Хранить в БД?',
-      type: 'Boolean',
-      required: false,
-      inlineField: true,
-      inlineFieldOptions: [
-        { value: false, label: 'Нет' },
-        { value: true, label: 'Да' }
-      ]
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'exec', name: 'Выполнено', type: 'Exec' },
-  ],
 
   defaultData: {
     value: '',

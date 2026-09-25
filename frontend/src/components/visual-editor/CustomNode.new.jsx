@@ -3,6 +3,7 @@ import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from './nodes';
 import BaseNode from './core/base/BaseNode';
 import { useNodeTranslation } from './hooks/useNodeTranslation';
+import { resolveNodePins } from './resolveNodePins';
 
 function CustomNode({ data, type, id: nodeId }) {
   const updateNodeData = useVisualEditorStore(state => state.updateNodeData);
@@ -66,14 +67,19 @@ function CustomNode({ data, type, id: nodeId }) {
     }));
   }, [type, getPinName, getPinDescription, getPlaceholder, getInlineOptionLabel]);
 
+  const resolvedPins = useMemo(
+    () => resolveNodePins(type, data, context, nodeConfig, definition),
+    [type, data, context, nodeConfig, definition]
+  );
+
   const inputs = useMemo(
-    () => definition ? translatePins(definition.getInputs(data, context)) : [],
-    [definition, data, context, translatePins]
+    () => translatePins(resolvedPins.inputs),
+    [resolvedPins.inputs, translatePins]
   );
 
   const outputs = useMemo(
-    () => definition ? translatePins(definition.getOutputs(data, context)) : [],
-    [definition, data, context, translatePins]
+    () => translatePins(resolvedPins.outputs),
+    [resolvedPins.outputs, translatePins]
   );
 
   // Получаем переведённые label и description

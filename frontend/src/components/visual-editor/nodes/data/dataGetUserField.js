@@ -10,16 +10,7 @@ export const dataGetUserFieldDefinition = new NodeDefinition({
   label: 'Поле пользователя',
   description: 'Данные пользователя',
 
-  computeInputs: (data) => [
-    { id: 'user', name: 'Пользователь', type: 'User', description: 'Объект пользователя', required: true },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'username', name: 'Никнейм', type: 'String' },
-    { id: 'groups', name: 'Группы', type: 'Array' },
-    { id: 'permissions', name: 'Права', type: 'Array' },
-    { id: 'isBlacklisted', name: 'В черном списке', type: 'Boolean' },
-  ],
 
   theme: {
     headerColor: '#10b981',

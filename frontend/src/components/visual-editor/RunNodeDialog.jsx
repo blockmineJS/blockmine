@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useVisualEditorStore } from '@/stores/visualEditorStore';
 import NodeRegistry from '@/components/visual-editor/nodes';
+import { resolveNodePins } from '@/components/visual-editor/resolveNodePins';
 import { Play, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 const RunNodeDialog = () => {
@@ -22,12 +23,14 @@ const RunNodeDialog = () => {
     return nodes.find(n => n.id === dialog.nodeId);
   }, [dialog?.nodeId, nodes]);
 
+  const availableNodes = useVisualEditorStore(s => s.availableNodes);
   const inputDefs = useMemo(() => {
     if (!node) return [];
     const definition = NodeRegistry.get(node.type);
-    const pins = definition?.getInputs?.(node.data || {}) || [];
+    const remoteNode = Object.values(availableNodes || {}).flat().find(item => item.type === node.type);
+    const pins = resolveNodePins(node.type, node.data || {}, {}, remoteNode, definition).inputs;
     return pins.filter(p => p && p.type !== 'Exec' && p.type !== 'exec' && p.id);
-  }, [node]);
+  }, [node, availableNodes]);
 
   const [inputs, setInputs] = useState({});
   const [busy, setBusy] = useState(false);

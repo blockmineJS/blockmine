@@ -6,8 +6,10 @@
  * @returns {Promise<any>} - Вычисленное значение для выходного пина.
  */
 async function evaluate(node, pinId, context, helpers, defaultValue = null) {
-    const args = context.args || {};
-    const argName = node.data?.argumentName || '';
+    const args = context.args || context.commandArguments || {};
+    const argName = (await helpers?.resolvePinValue?.(node, 'argumentName', node.data?.argumentName || ''))
+        || node.data?.argumentName
+        || '';
 
     if (pinId === 'value') {
         return args && argName && args[argName] !== undefined ? args[argName] : defaultValue;

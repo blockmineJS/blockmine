@@ -220,4 +220,11 @@ const eventsNodes = [
   }
 ];
 
+const { evaluateEventPin } = require('../nodes/event/evaluateEvent');
+for (const node of eventsNodes) {
+  if (node.type !== 'event:call_event' && !node.evaluator) {
+    node.evaluator = (nodeInstance, pinId, context) => evaluateEventPin(nodeInstance, pinId, context);
+  }
+}
+
 module.exports = eventsNodes;

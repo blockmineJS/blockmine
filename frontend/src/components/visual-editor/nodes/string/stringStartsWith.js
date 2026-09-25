@@ -10,28 +10,7 @@ export const stringStartsWithDefinition = new NodeDefinition({
   label: 'Начинается с',
   description: 'Проверяет начинается ли строка с префикса',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-    {
-      id: 'prefix',
-      name: 'Префикс',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Начинается с...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'Boolean' },
-  ],
 
   defaultData: {
     text: '',

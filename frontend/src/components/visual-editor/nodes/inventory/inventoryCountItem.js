@@ -10,26 +10,7 @@ export const inventoryCountItemDefinition = new NodeDefinition({
   label: 'Подсчитать предмет',
   description: 'Подсчитывает общее количество указанного предмета во всём инвентаре',
 
-  computeInputs: (data) => [
-    {
-      id: 'itemName',
-      name: 'Имя предмета',
-      type: 'String',
-      required: true,
-      inlineField: true,
-      placeholder: 'diamond, cobblestone...',
-      description: 'Имя предмета для подсчёта'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    {
-      id: 'count',
-      name: 'Количество',
-      type: 'Number',
-      description: 'Общее количество предмета в инвентаре'
-    },
-  ],
 
   defaultData: {
     itemName: '',

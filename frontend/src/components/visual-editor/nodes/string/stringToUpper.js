@@ -10,20 +10,7 @@ export const stringToUpperDefinition = new NodeDefinition({
   label: 'В верхний регистр',
   description: 'Преобразует строку в верхний регистр (UPPERCASE)',
 
-  computeInputs: (data) => [
-    {
-      id: 'text',
-      name: 'Текст',
-      type: 'String',
-      required: false,
-      inlineField: true,
-      placeholder: 'Введите текст...'
-    },
-  ],
 
-  computeOutputs: (data) => [
-    { id: 'result', name: 'Result', type: 'String' },
-  ],
 
   defaultData: {
     text: '',
