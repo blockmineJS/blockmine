@@ -805,22 +805,55 @@ function writeUpdateRequest(branch) {
     fs.writeFileSync(UPDATE_REQUEST_PATH, `${branch}\n`, 'utf8');
 }
 
+async function readWinProcess(pid) {
+    const { stdout } = await execFileAsync('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}" | Select-Object ParentProcessId,CommandLine | ConvertTo-Json -Compress`,
+    ], { timeout: 10000, windowsHide: true });
+    const text = String(stdout || '').trim();
+    if (!text) return null;
+    return JSON.parse(text);
+}
+
+async function findDevSupervisorPid() {
+    let pid = process.pid;
+    for (let step = 0; step < 12; step += 1) {
+        const info = await readWinProcess(pid);
+        if (!info) break;
+        const command = String(info.CommandLine || '');
+        if (/start\.bat/i.test(command)) break;
+        if (/concurrently/i.test(command)) return pid;
+        if (/npm(?:\.cmd)?\s+run\s+dev/i.test(command) && !/workspace/i.test(command)) return pid;
+        const parent = Number(info.ParentProcessId);
+        if (!parent || parent === pid) break;
+        pid = parent;
+    }
+    return process.ppid;
+}
+
 function scheduleDevShutdown() {
-    const parentPid = process.ppid;
     setTimeout(() => {
-        killPortListeners(5173).finally(() => {
-            try {
-                if (parentPid && String(parentPid) !== String(process.pid)) {
-                    if (process.platform === 'win32') {
-                        execFile('taskkill', ['/F', '/PID', String(parentPid)], { windowsHide: true });
-                    } else {
-                        process.kill(parentPid, 'SIGTERM');
-                    }
-                }
-            } catch {
-                return;
-            }
+        const finish = () => {
             process.exit(0);
+        };
+        if (process.platform !== 'win32') {
+            killPortListeners(5173).finally(() => {
+                try {
+                    process.kill(process.ppid, 'SIGTERM');
+                } catch {
+                    finish();
+                    return;
+                }
+                finish();
+            });
+            return;
+        }
+        findDevSupervisorPid().then((supervisorPid) => {
+            execFile('taskkill', ['/F', '/T', '/PID', String(supervisorPid)], { windowsHide: true }, finish);
+        }).catch(() => {
+            killPortListeners(5173).finally(finish);
         });
     }, 1200);
 }

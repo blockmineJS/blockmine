@@ -113,6 +113,7 @@ echo [BlockMine] npm install
 call npm install --no-fund --no-audit
 if errorlevel 1 goto update_failed
 echo [BlockMine] Update finished. Starting panel...
+call :free_ports
 goto start_panel
 
 :update_failed
@@ -120,6 +121,35 @@ echo.
 echo [BlockMine] Update failed.
 pause
 exit /b 1
+
+:free_ports
+echo [BlockMine] Waiting until ports 3001 and 5173 are free...
+set /a _port_try=0
+:free_ports_loop
+set /a _port_try+=1
+call :kill_port 3001
+call :kill_port 5173
+netstat -ano | findstr "LISTENING" | findstr ":3001 " >nul
+if not errorlevel 1 (
+    if %_port_try% LSS 20 (
+        timeout /t 1 /nobreak >nul
+        goto free_ports_loop
+    )
+)
+netstat -ano | findstr "LISTENING" | findstr ":5173 " >nul
+if not errorlevel 1 (
+    if %_port_try% LSS 20 (
+        timeout /t 1 /nobreak >nul
+        goto free_ports_loop
+    )
+)
+exit /b 0
+
+:kill_port
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%~1 " ^| findstr "LISTENING"') do (
+    if not "%%P"=="0" taskkill /F /T /PID %%P >nul 2>&1
+)
+exit /b 0
 
 :open_browser
 set /a _tries=0
