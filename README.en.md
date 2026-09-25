@@ -96,26 +96,53 @@ More examples at - https://t.me/blockmineJs
 
 ---
 
-## ✨ Quick Start with `npx`
+## Quick Start
 
-This is the easiest way to run the panel locally. Make sure you have **Node.js v22+** installed.
+You need **Node.js v22+**. On Windows, `start.bat` will try to install it via winget if it is missing.
 
-1. Open terminal (command prompt)
-2. Run a single command:
+### Windows — `start.bat`
+
+If you cloned the repository or downloaded a ZIP from GitHub, run `start.bat` in the project root (double-click or from Command Prompt):
+
+```bat
+start.bat
+```
+
+The script will:
+
+1. Check for Node.js 22+ and install the LTS build via winget if needed
+2. Install dependencies (`npm install`)
+3. Start development mode (`npm run dev`): backend and Vite
+4. Open http://localhost:5173/ when the panel is ready
+
+The first run can take several minutes. Later runs start the panel right away.
+
+- Panel (hot reload): http://localhost:5173/
+- API: http://localhost:3001
+
+To reinstall dependencies:
+
+```bat
+start.bat reinstall
+```
+
+### Any OS — `npx`
+
+The shortest path if Node.js is already installed and you do not need the repository:
 
 ```bash
 npx blockmine
 ```
 
-3. Done! The script will automatically download everything needed, set up the database, and start the server.
+This downloads the package, sets up the database, and starts the server.
 
-> ⚠️ **For Windows users**: If you get an error `Cannot load file ... npx.ps1 because running scripts is disabled`, open PowerShell as administrator and run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`. Press 'Y' to confirm.
+> **Windows and PowerShell**: if you get `Cannot load file ... npx.ps1 because running scripts is disabled`, open PowerShell as administrator and run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`. Press `Y` to confirm. Or start the panel with `start.bat` from the repository.
 
-After successful startup, you'll see in the console:
+After a successful start the console shows the panel URL:
+
 ```
 Control panel available at: http://localhost:3001
 ```
-Open this address in your browser to get started.
 
 ---
 
@@ -172,7 +199,9 @@ pm2 start ecosystem.config.js
 
 ### Updating
 
-To update to the latest version: ON HOST! For local you can skip build since it uses port 5173
+On a PM2 host the panel can update itself: the **Update** button in the UI runs `git pull`, `npm install`, `npm run build`, and `pm2 restart`. That needs a git clone on `master`/`main` with a clean working tree.
+
+The same steps by hand:
 
 ```bash
 cd blockmine
@@ -181,6 +210,8 @@ npm install
 npm run build
 pm2 restart blockmine
 ```
+
+Locally with `start.bat` / `npm run dev` you do not need a production build: Vite serves port 5173.
 
 ---
 
@@ -375,6 +406,8 @@ cd blockmine
 npm install
 npm run build
 ```
+
+On Windows, `start.bat` installs dependencies, starts the same development mode, and opens `http://localhost:5173/`.
 
 ### 2. Running in Development Mode
 

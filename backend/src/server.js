@@ -21,6 +21,7 @@ const searchRoutes = require('./api/routes/search');
 const eventGraphsRouter = require('./api/routes/eventGraphs');
 const TaskScheduler = require('./core/TaskScheduler');
 const panelRoutes = require('./api/routes/panel');
+const panelUpdateRoutes = require('./api/routes/panelUpdate');
 const changelogRoutes = require('./api/routes/changelog');
 const logsRoutes = require('./api/routes/logs');
 const systemRoutes = require('./api/routes/system');
@@ -91,6 +92,7 @@ app.use('/api/servers', serverRoutes);
 app.use('/api/proxies', proxiesRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/panel/update', panelUpdateRoutes);
 app.use('/api/panel', panelRoutes);
 app.use('/api/changelog', changelogRoutes);
 app.use('/api/logs', logsRoutes);
@@ -208,6 +210,11 @@ async function startServer() {
             }
             
             await TaskScheduler.initialize();
+            try {
+                require('./core/services/PanelUpdateService').getProgress();
+            } catch (error) {
+                console.error('[PanelUpdate] Failed to resume update watcher:', error.message);
+            }
             resolve(server);
         });
     });

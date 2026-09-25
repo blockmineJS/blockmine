@@ -27,6 +27,7 @@
     "settings": "Настройки",
     "suggest": "Предложить",
     "currentVersion": "Текущая версия",
+    "updateAvailable": "Доступно обновление",
     "changelog": "Changelog",
     "servers": "Серверы"
   },

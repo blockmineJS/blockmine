@@ -48,6 +48,9 @@ export default function DashboardPage() {
     const hasPermission = useAppStore(state => state.hasPermission);
     const appVersion = useAppStore(state => state.appVersion);
     const changelog = useAppStore(state => state.changelog);
+    const panelUpdate = useAppStore(state => state.panelUpdate);
+    const openPanelUpdateDialog = useAppStore(state => state.openPanelUpdateDialog);
+    const updateAvailable = Boolean(panelUpdate?.updateAvailable);
     const setShowChangelogDialog = useAppStore(state => state.setShowChangelogDialog);
     const fetchChangelog = useAppStore(state => state.fetchChangelog);
 
@@ -311,8 +314,13 @@ export default function DashboardPage() {
                                     <QuickActionButton
                                         icon={<Info className="h-5 w-5" />}
                                         label={`v${appVersion || '...'}`}
-                                        description={t('quickActions.currentVersion')}
+                                        description={updateAvailable ? t('quickActions.updateAvailable') : t('quickActions.currentVersion')}
+                                        count={updateAvailable ? 1 : undefined}
                                         onClick={async () => {
+                                            if (updateAvailable) {
+                                                await openPanelUpdateDialog();
+                                                return;
+                                            }
                                             if (!changelog) await fetchChangelog();
                                             setShowChangelogDialog(true);
                                         }}

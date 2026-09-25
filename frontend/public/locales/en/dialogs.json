@@ -4,6 +4,45 @@
     "selectVersion": "Select version",
     "noData": "No data to display"
   },
+  "panelUpdate": {
+    "title": "Update available",
+    "subtitle": "GitHub has a newer version of the panel.",
+    "subtitlePm2": "GitHub has a newer version. After install, PM2 will restart the panel.",
+    "subtitleIdle": "Comparing this install with the latest commit in the repository.",
+    "current": "Current",
+    "latest": "On GitHub",
+    "whatsNew": "What's new",
+    "noCommits": "Commit list is unavailable.",
+    "update": "Update",
+    "updating": "Updating…",
+    "later": "Later",
+    "close": "Close",
+    "restarting": "The panel is restarting. This page will reload on its own.",
+    "restartingPm2": "PM2 is restarting the panel. This page will reload on its own.",
+    "checking": "Checking GitHub…",
+    "upToDate": "You are on the latest version",
+    "applyError": "Failed to update the panel.",
+    "commitCount": "{{count}} commits",
+    "reason": {
+      "not_git": "In-app updates work from a git clone: start.bat on Windows or PM2 on Linux. For npx, install again with: npx blockmine",
+      "no_git_binary": "Git was not found. Install Git and start the panel again.",
+      "dirty": "This project has local changes. Commit or drop them first, otherwise pull is unsafe.",
+      "wrong_branch": "The panel is not on master/main. Switch to the default branch to update with the button.",
+      "diverged": "Local history has diverged from GitHub. A manual git pull is required.",
+      "offline": "Could not reach GitHub.",
+      "ahead": "This copy is newer than GitHub.",
+      "same": "No updates."
+    },
+    "stages": {
+      "fetch": "Fetching from GitHub",
+      "pull": "git pull",
+      "install": "npm install",
+      "build": "Building the panel",
+      "build_skipped": "Build skipped in development mode",
+      "restarting": "Restarting",
+      "error": "Update failed"
+    }
+  },
   "contribute": {
     "title": "Suggest an improvement or ask a question",
     "guide": "Here's a quick guide on how to submit your requests properly.",

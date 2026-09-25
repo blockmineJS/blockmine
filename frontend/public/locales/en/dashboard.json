@@ -27,6 +27,7 @@
     "settings": "Settings",
     "suggest": "Suggest",
     "currentVersion": "Current version",
+    "updateAvailable": "Update available",
     "changelog": "Changelog",
     "servers": "Servers"
   },

@@ -40,6 +40,12 @@ export const createCoreSlice = (set, get) => ({
     changelogFetchedAt: 0,
     showChangelogDialog: false,
     isChangelogLoading: false,
+    panelUpdate: null,
+    panelUpdateProgress: null,
+    showPanelUpdateDialog: false,
+    panelUpdateChecking: false,
+    panelUpdateApplying: false,
+    panelUpdateWaiting: false,
 
     connectSocket: () => {
         const existingSocket = get().socket;
@@ -82,6 +88,17 @@ export const createCoreSlice = (set, get) => ({
             set({ resourceUsage: usageMap });
         });
 
+        newSocket.on('panel:update', (payload) => {
+            const stage = payload?.stage || '';
+            const applying = stage !== '' && stage !== 'idle' && stage !== 'done' && stage !== 'error';
+            set({
+                panelUpdateProgress: payload,
+                panelUpdateApplying: applying,
+                panelUpdateWaiting: stage === 'restarting' ? true : get().panelUpdateWaiting,
+                showPanelUpdateDialog: stage === 'restarting' ? true : get().showPanelUpdateDialog,
+            });
+        });
+
         set({ socket: newSocket });
     },
     disconnectSocket: () => {
@@ -102,11 +119,17 @@ export const createCoreSlice = (set, get) => ({
 
             const currentVersion = versionData.version || '';
             const lastShownVersion = localStorage.getItem('lastShownVersion');
-            
-            
-                if (currentVersion && currentVersion !== lastShownVersion) {
-                    await get().openChangelogDialog();
-                }
+            await get().fetchPanelUpdate();
+            const updateInfo = get().panelUpdate;
+            const dismissedSha = localStorage.getItem('panelUpdateDismissedSha') || '';
+            const shouldShowUpdate = Boolean(
+                sessionStorage.getItem('blockmine-panel-updating')
+                || (
+                    updateInfo?.updateAvailable
+                    && updateInfo?.latest?.sha
+                    && updateInfo.latest.sha !== dismissedSha
+                )
+            );
 
             set(state => {
                 const serverLogs = stateData.logs || {};
@@ -130,9 +153,14 @@ export const createCoreSlice = (set, get) => ({
                     proxies: proxiesData?.items || [],
                     botStatuses: stateData.statuses || {},
                     appVersion: currentVersion,
-                    botLogs: newBotLogs
+                    botLogs: newBotLogs,
+                    showPanelUpdateDialog: shouldShowUpdate ? true : state.showPanelUpdateDialog,
                 };
             });
+
+            if (!shouldShowUpdate && currentVersion && currentVersion !== lastShownVersion) {
+                await get().openChangelogDialog();
+            }
         } catch (error) {
              console.error("Не удалось загрузить начальные данные:", error.message);
              set(state => ({
@@ -231,5 +259,68 @@ export const createCoreSlice = (set, get) => ({
         }
 
         set({ showChangelogDialog: true });
+    },
+
+    fetchPanelUpdate: async (force = false) => {
+        if (get().panelUpdateChecking) {
+            return get().panelUpdate;
+        }
+        try {
+            set({ panelUpdateChecking: true });
+            const data = await apiHelper(`/api/panel/update/check${force ? '?fresh=1' : ''}`);
+            if (!data?.applying && sessionStorage.getItem('blockmine-panel-updating') && !data?.updateAvailable) {
+                sessionStorage.removeItem('blockmine-panel-updating');
+            }
+            set({
+                panelUpdate: data,
+                panelUpdateChecking: false,
+                panelUpdateApplying: Boolean(data?.applying),
+            });
+            return data;
+        } catch (error) {
+            console.error('Не удалось проверить обновления панели:', error);
+            set({ panelUpdateChecking: false });
+            return get().panelUpdate;
+        }
+    },
+
+    openPanelUpdateDialog: async () => {
+        set({ showPanelUpdateDialog: true });
+        if (!get().panelUpdate) {
+            await get().fetchPanelUpdate();
+        }
+    },
+
+    closePanelUpdateDialog: () => {
+        const latestSha = get().panelUpdate?.latest?.sha;
+        if (latestSha) {
+            localStorage.setItem('panelUpdateDismissedSha', latestSha);
+        }
+        set({ showPanelUpdateDialog: false });
+    },
+
+    setShowPanelUpdateDialog: (show) => {
+        if (!show) {
+            if (get().panelUpdateApplying || get().panelUpdateWaiting) {
+                return;
+            }
+            get().closePanelUpdateDialog();
+            return;
+        }
+        set({ showPanelUpdateDialog: true });
+    },
+
+    applyPanelUpdate: async () => {
+        try {
+            set({ panelUpdateApplying: true, showPanelUpdateDialog: true });
+            await apiHelper('/api/panel/update/apply', { method: 'POST' });
+        } catch (error) {
+            set({ panelUpdateApplying: false });
+            throw error;
+        }
+    },
+
+    setPanelUpdateWaiting: (waiting) => {
+        set({ panelUpdateWaiting: Boolean(waiting) });
     },
 });

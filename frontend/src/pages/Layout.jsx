@@ -40,6 +40,7 @@ import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ChangelogDialog from '@/components/ChangelogDialog';
+import PanelUpdateDialog from '@/components/PanelUpdateDialog';
 import PresenceButton from '@/components/PresenceButton';
 import { apiHelper } from '@/lib/api';
 import FadeTransition from '@/components/FadeTransition';
@@ -481,6 +482,9 @@ export default function Layout() {
 
     const user = useAppStore(state => state.user);
     const appVersion = useAppStore(state => state.appVersion);
+    const panelUpdate = useAppStore(state => state.panelUpdate);
+    const openPanelUpdateDialog = useAppStore(state => state.openPanelUpdateDialog);
+    const updateAvailable = Boolean(panelUpdate?.updateAvailable);
     const servers = useAppStore(state => state.servers);
     const proxies = useAppStore(state => state.proxies);
     const logout = useAppStore(state => state.logout);
@@ -783,7 +787,7 @@ export default function Layout() {
 
                 <div className={cn(
                     "flex flex-col items-start overflow-hidden border-t text-xs text-muted-foreground transition-[max-height,opacity,transform,padding] " + SIDEBAR_TRANSITION,
-                    isCollapsed ? "max-h-0 opacity-0 -translate-y-2 pt-0" : "max-h-20 opacity-100 translate-y-0 pt-2"
+                    isCollapsed ? "max-h-0 opacity-0 -translate-y-2 pt-0" : "max-h-36 opacity-100 translate-y-0 pt-2"
                 )}>
                     <a
                         href="https://github.com/blockmineJS/blockmine"
@@ -794,6 +798,19 @@ export default function Layout() {
                         <Github className="h-4 w-4" />
                         <span>BlockMine v{appVersion}</span>
                     </a>
+                    {updateAvailable && (
+                        <button
+                            type="button"
+                            className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                            onClick={async () => {
+                                setIsSheetOpen(false);
+                                await openPanelUpdateDialog();
+                            }}
+                        >
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                            {t('updateAvailable')}
+                        </button>
+                    )}
                     <div className="mt-1">
                         <Button
                             variant="link"
@@ -864,6 +881,7 @@ export default function Layout() {
             </AlertDialog>
 
             <ChangelogDialog />
+            <PanelUpdateDialog />
         </div>
     );
 }
