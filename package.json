@@ -1,7 +1,7 @@
 {
   "name": "blockmine",
   "version": "1.27.1",
-  "description": "Мощная панель управления ботами для Майнкрафта.",
+  "description": "Minecraft-боты без программирования. Веб-панель и визуальный редактор. Запуск: npx blockmine",
   "author": "merka",
   "license": "MIT",
   "repository": {
@@ -13,10 +13,13 @@
   },
   "keywords": [
     "minecraft",
-    "bot",
+    "minecraft-bot",
     "mineflayer",
+    "bot-panel",
+    "visual-programming",
+    "no-code",
+    "npx",
     "dashboard",
-    "panel",
     "automation"
   ],
   "workspaces": [
@@ -24,7 +27,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "dev": "concurrently --kill-others-on-fail \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "postinstall": "node scripts/postinstall.js",
     "build": "npm run build --workspace=frontend",
     "prepublishOnly": "npm run build",

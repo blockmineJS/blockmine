@@ -8,10 +8,10 @@ const { execSync } = require('child_process');
 
 // Устанавливаем зеркало Prisma для РФ (если не установлено вручную)
 if (!process.env.PRISMA_ENGINES_MIRROR) {
-    process.env.PRISMA_ENGINES_MIRROR = 'https://registry.npmmirror.com/-/binary/prisma/';
+    process.env.PRISMA_ENGINES_MIRROR = 'https://cdn.npmmirror.com/binaries/prisma';
 }
 if (!process.env.PRISMA_BINARIES_MIRROR) {
-    process.env.PRISMA_BINARIES_MIRROR = 'https://registry.npmmirror.com/-/binary/prisma/';
+    process.env.PRISMA_BINARIES_MIRROR = 'https://cdn.npmmirror.com/binaries/prisma';
 }
 
 console.log('[BlockMine] Running postinstall...');

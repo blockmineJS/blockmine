@@ -767,8 +767,8 @@ function runLogged(command, args, timeout) {
                 HUSKY: '0',
                 GIT_TERMINAL_PROMPT: '0',
                 GIT_ASKPASS: 'echo',
-                PRISMA_ENGINES_MIRROR: process.env.PRISMA_ENGINES_MIRROR || 'https://registry.npmmirror.com/-/binary/prisma/',
-                PRISMA_BINARIES_MIRROR: process.env.PRISMA_BINARIES_MIRROR || 'https://registry.npmmirror.com/-/binary/prisma/',
+                PRISMA_ENGINES_MIRROR: process.env.PRISMA_ENGINES_MIRROR || 'https://cdn.npmmirror.com/binaries/prisma',
+                PRISMA_BINARIES_MIRROR: process.env.PRISMA_BINARIES_MIRROR || 'https://cdn.npmmirror.com/binaries/prisma',
             },
         }, (error, stdout, stderr) => {
             if (error) {
