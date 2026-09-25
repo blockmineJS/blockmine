@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { FilePenLine, Trash2, Share2, Upload, Sparkles, Search, AlertTriangle } from 'lucide-react';
 import {
@@ -28,6 +29,11 @@ const OWNER_TYPES = {
   SYSTEM: 'system'
 };
 
+function commandSourceKey(command) {
+    if (!command.owner || command.owner === OWNER_TYPES.SYSTEM) return OWNER_TYPES.SYSTEM;
+    return command.owner.startsWith('plugin:') ? command.owner.slice('plugin:'.length) : command.owner;
+}
+
 export default function CommandsManager({ commands = [], allPermissions = [], botId, isLoading, onDataChange }) {
     const { t } = useTranslation('management');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,20 +48,47 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [localCommands, setLocalCommands] = useState(commands);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sourceFilter, setSourceFilter] = useState('all');
+    const [sortMode, setSortMode] = useState('name');
 
     useEffect(() => {
         setLocalCommands(commands);
     }, [commands]);
 
-    // Filtered commands
-    const filteredCommands = useMemo(() => {
-        if (!searchQuery) return localCommands;
+    const sourceOptions = useMemo(() => {
+        const plugins = new Set();
+        localCommands.forEach((command) => {
+            const key = commandSourceKey(command);
+            if (key !== OWNER_TYPES.SYSTEM) plugins.add(key);
+        });
+        return [...plugins].sort((a, b) => a.localeCompare(b, 'ru'));
+    }, [localCommands]);
 
-        return localCommands.filter(cmd =>
-            cmd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (cmd.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [localCommands, searchQuery]);
+    const filteredCommands = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        const matched = localCommands.filter((command) => {
+            const source = commandSourceKey(command);
+            if (sourceFilter === OWNER_TYPES.SYSTEM && source !== OWNER_TYPES.SYSTEM) return false;
+            if (sourceFilter !== 'all' && sourceFilter !== OWNER_TYPES.SYSTEM && source !== sourceFilter) return false;
+            if (!query) return true;
+            return command.name.toLowerCase().includes(query)
+                || (command.description || '').toLowerCase().includes(query);
+        });
+
+        const byName = (a, b) => a.name.localeCompare(b.name, 'ru');
+        if (sortMode === 'plugin') {
+            return [...matched].sort((a, b) => {
+                const sourceA = commandSourceKey(a);
+                const sourceB = commandSourceKey(b);
+                if (sourceA === OWNER_TYPES.SYSTEM && sourceB !== OWNER_TYPES.SYSTEM) return -1;
+                if (sourceB === OWNER_TYPES.SYSTEM && sourceA !== OWNER_TYPES.SYSTEM) return 1;
+                const sourceOrder = sourceA.localeCompare(sourceB, 'ru');
+                if (sourceOrder !== 0) return sourceOrder;
+                return byName(a, b);
+            });
+        }
+        return [...matched].sort(byName);
+    }, [localCommands, searchQuery, sourceFilter, sortMode]);
 
     // Quick stats
     const stats = useMemo(() => {
@@ -194,14 +227,37 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 </div>
 
                 {/* Search */}
-                <div className="relative mt-4">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder={t('commands.searchPlaceholder')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                    />
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder={t('commands.searchPlaceholder')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
+                    <Select value={sortMode} onValueChange={setSortMode}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="name">{t('commands.sort.name')}</SelectItem>
+                            <SelectItem value="plugin">{t('commands.sort.plugin')}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">{t('commands.sourceFilter.all')}</SelectItem>
+                            <SelectItem value="system">{t('commands.sourceFilter.system')}</SelectItem>
+                            {sourceOptions.map((source) => (
+                                <SelectItem key={source} value={source}>{source}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </CardHeader>
 
@@ -224,7 +280,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                             <TableRow><TableCell colSpan={8} className="text-center">{t('commands.loading')}</TableCell></TableRow>
                         ) : filteredCommands.length === 0 ? (
                             <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">
-                                {searchQuery ? t('commands.notFound') : t('commands.empty')}
+                                {searchQuery || sourceFilter !== 'all' ? t('commands.notFound') : t('commands.empty')}
                             </TableCell></TableRow>
                         ) : (
                             filteredCommands.map(command => (

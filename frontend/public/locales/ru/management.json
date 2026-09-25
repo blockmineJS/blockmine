@@ -154,6 +154,14 @@
     "import": "Импорт",
     "create": "Создать",
     "searchPlaceholder": "Поиск по названию или описанию...",
+    "sort": {
+      "name": "По имени",
+      "plugin": "По плагину"
+    },
+    "sourceFilter": {
+      "all": "Все источники",
+      "system": "Системные"
+    },
     "table": {
       "enabled": "Вкл",
       "command": "Команда",

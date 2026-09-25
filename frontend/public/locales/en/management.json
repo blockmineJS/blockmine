@@ -154,6 +154,14 @@
     "import": "Import",
     "create": "Create",
     "searchPlaceholder": "Search by name or description...",
+    "sort": {
+      "name": "By name",
+      "plugin": "By plugin"
+    },
+    "sourceFilter": {
+      "all": "All sources",
+      "system": "System"
+    },
     "table": {
       "enabled": "On",
       "command": "Command",
