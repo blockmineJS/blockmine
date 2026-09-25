@@ -83,8 +83,32 @@ export default function PanelUpdateDialog() {
     const setShowPanelUpdateDialog = useAppStore((state) => state.setShowPanelUpdateDialog);
     const applyPanelUpdate = useAppStore((state) => state.applyPanelUpdate);
     const canEdit = hasPermission('panel:settings:edit');
+    const failed = progress?.stage === 'error';
     const busy = applying || waiting;
     const stage = progress?.stage || (waiting ? 'restarting' : '');
+
+    useEffect(() => {
+        if (!open) return undefined;
+        let cancelled = false;
+        const loadStatus = async () => {
+            try {
+                const token = useAppStore.getState().token;
+                const response = await fetch('/api/panel/update/status', {
+                    cache: 'no-store',
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!response.ok || cancelled) return;
+                const payload = await response.json();
+                useAppStore.setState({ panelUpdateProgress: payload });
+            } catch {
+                return;
+            }
+        };
+        loadStatus();
+        return () => {
+            cancelled = true;
+        };
+    }, [open]);
 
     useEffect(() => {
         if (!waiting) return undefined;
@@ -140,6 +164,7 @@ export default function PanelUpdateDialog() {
                 });
                 if (payload.stage === 'error') {
                     sessionStorage.removeItem('blockmine-panel-updating');
+                    useAppStore.getState().fetchPanelUpdate(true);
                 }
             } catch {
                 return;
@@ -169,16 +194,22 @@ export default function PanelUpdateDialog() {
 
     return (
         <Dialog open={open} onOpenChange={setShowPanelUpdateDialog}>
-            <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+            <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0" aria-describedby="panel-update-desc">
                 <div className="border-b bg-[radial-gradient(1200px_circle_at_0%_0%,hsl(var(--primary)/0.16),transparent_42%)] px-6 pb-5 pt-6">
                     <DialogHeader className="space-y-2 text-left">
                         <DialogTitle className="text-xl">
-                            {info?.updateAvailable ? t('panelUpdate.title') : t('panelUpdate.upToDate')}
+                            {failed
+                                ? t('panelUpdate.failedTitle')
+                                : info?.updateAvailable
+                                    ? t('panelUpdate.title')
+                                    : t('panelUpdate.upToDate')}
                         </DialogTitle>
-                        <DialogDescription>
-                            {info?.updateAvailable
-                                ? t(info.restartMethod === 'pm2' ? 'panelUpdate.subtitlePm2' : 'panelUpdate.subtitle')
-                                : t('panelUpdate.subtitleIdle')}
+                        <DialogDescription id="panel-update-desc">
+                            {failed
+                                ? t('panelUpdate.failedHint')
+                                : info?.updateAvailable
+                                    ? t(info.restartMethod === 'pm2' ? 'panelUpdate.subtitlePm2' : 'panelUpdate.subtitle')
+                                    : t('panelUpdate.subtitleIdle')}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -252,18 +283,23 @@ export default function PanelUpdateDialog() {
                                 </p>
                             ) : null}
 
-                            {busy ? (
-                                <div className="space-y-3 rounded-xl border bg-card p-4">
+                            {busy || failed ? (
+                                <div className={cn(
+                                    'space-y-3 rounded-xl border p-4',
+                                    failed ? 'border-destructive/40 bg-destructive/5' : 'bg-card'
+                                )}>
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-2 text-sm font-medium">
-                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                            {stageLabel || t('panelUpdate.updating')}
+                                            {failed ? null : <RefreshCw className="h-4 w-4 animate-spin" />}
+                                            {failed ? t('panelUpdate.failedTitle') : (stageLabel || t('panelUpdate.updating'))}
                                         </div>
-                                        <span className="font-mono text-xs text-muted-foreground">
-                                            {progress?.percent || 0}%
-                                        </span>
+                                        {busy ? (
+                                            <span className="font-mono text-xs text-muted-foreground">
+                                                {progress?.percent || 0}%
+                                            </span>
+                                        ) : null}
                                     </div>
-                                    <Progress value={progress?.percent || (waiting ? 100 : 8)} />
+                                    {busy ? <Progress value={progress?.percent || (waiting ? 100 : 8)} /> : null}
                                     {waiting ? (
                                         <p className="text-sm text-muted-foreground">
                                             {t(info?.restartMethod === 'pm2' ? 'panelUpdate.restartingPm2' : 'panelUpdate.restarting')}
@@ -291,7 +327,7 @@ export default function PanelUpdateDialog() {
                     {info?.updateAvailable ? (
                         <Button onClick={handleApply} disabled={!info?.canUpdate || !canEdit || busy}>
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                            {busy ? t('panelUpdate.updating') : t('panelUpdate.update')}
+                            {busy ? t('panelUpdate.updating') : failed ? t('panelUpdate.retry') : t('panelUpdate.update')}
                         </Button>
                     ) : null}
                 </DialogFooter>

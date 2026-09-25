@@ -15,7 +15,7 @@ const checkLimiter = rateLimit({
 
 const applyLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
-    max: 3,
+    max: 20,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many update attempts. Try again later.' },

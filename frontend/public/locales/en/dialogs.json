@@ -22,6 +22,9 @@
     "checking": "Checking GitHub…",
     "upToDate": "You are on the latest version",
     "applyError": "Failed to update the panel.",
+    "failedTitle": "Update did not finish",
+    "failedHint": "GitHub code may already be pulled. The error log is below. If the panel is on the latest commit, you can close this window.",
+    "retry": "Retry",
     "commitCount": "{{count}} commits",
     "reason": {
       "not_git": "In-app updates work from a git clone: start.bat on Windows or PM2 on Linux. For npx, install again with: npx blockmine",

@@ -624,11 +624,14 @@ function npmBin() {
 
 function runLogged(command, args, timeout) {
     return new Promise((resolve, reject) => {
+        const win = process.platform === 'win32';
+        const needsShell = win && (command === 'npm' || command === 'npm.cmd' || /\.(cmd|bat)$/i.test(command));
         const child = execFile(command, args, {
             cwd: REPO_ROOT,
             timeout,
             maxBuffer: 8 * 1024 * 1024,
             windowsHide: true,
+            shell: needsShell,
             env: {
                 ...process.env,
                 HUSKY: '0',
