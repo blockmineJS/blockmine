@@ -43,7 +43,7 @@ import ChangelogDialog from '@/components/ChangelogDialog';
 import PanelUpdateDialog from '@/components/PanelUpdateDialog';
 import PresenceButton from '@/components/PresenceButton';
 import { apiHelper } from '@/lib/api';
-import FadeTransition from '@/components/FadeTransition';
+
 import {
     DndContext,
     closestCenter,
@@ -204,19 +204,10 @@ const BotItem = ({ bot, isCollapsed, botStatuses, onLinkClick }) => {
     );
 };
 
-const getLayoutTransitionKey = (pathname) => {
-    const segments = pathname.split('/').filter(Boolean);
-    if (segments.length === 0) return 'dashboard';
-    if (segments[0] === 'bots') return `bots/${segments[1] || 'unknown'}`;
-    return segments[0];
-};
-
-const OutletViewport = React.memo(function OutletViewport({ transitionKey, children }) {
+const OutletViewport = React.memo(function OutletViewport({ children }) {
     return (
         <main className="min-w-0 overflow-y-auto" style={{ contain: 'layout paint' }}>
-            <FadeTransition transitionKey={transitionKey}>
-                {children}
-            </FadeTransition>
+            {children}
         </main>
     );
 });
@@ -558,7 +549,7 @@ export default function Layout() {
         logout();
     };
 
-    const layoutTransitionKey = getLayoutTransitionKey(location.pathname);
+
 
     const sidebarContent = (isCollapsed) => (
         <div className="flex flex-col h-full bg-background overflow-hidden">
@@ -863,7 +854,7 @@ export default function Layout() {
                 {sidebarContent(isSidebarCollapsed)}
             </aside>
 
-            <OutletViewport transitionKey={layoutTransitionKey}>
+            <OutletViewport>
                 {outlet}
             </OutletViewport>
 
