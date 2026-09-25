@@ -39,6 +39,23 @@ function httpError(message, statusCode) {
     return error;
 }
 
+async function readExportedSettings(pluginDir) {
+    const settingsPath = path.join(pluginDir, 'blockmine-settings.json');
+    if (!await fse.pathExists(settingsPath)) return null;
+    const raw = await fse.readFile(settingsPath, 'utf8');
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        throw httpError('Файл настроек в архиве повреждён.', 400);
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw httpError('Файл настроек в архиве должен быть объектом.', 400);
+    }
+    await fse.remove(settingsPath);
+    return JSON.stringify(parsed);
+}
+
 async function findPluginRoot(rootDir) {
     if (await fse.pathExists(path.join(rootDir, 'package.json'))) {
         return rootDir;
@@ -63,6 +80,7 @@ async function appendPluginFiles(archive, directory, relativeDir = '') {
     const entries = await fse.readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
         if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        if (!relativeDir && entry.name === 'blockmine-settings.json') continue;
         const absolutePath = path.join(directory, entry.name);
         const entryName = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
         if (entry.isSymbolicLink()) continue;
@@ -177,7 +195,7 @@ class PluginManager {
         depCheck.warnings.forEach((w) => console.warn(`[PluginManager] ${w}`));
     }
 
-    async installFromLocalPath(botId, directoryPath) {
+    async installFromLocalPath(botId, directoryPath, settingsJson = null) {
         if (typeof directoryPath !== 'string' || !directoryPath.trim()) {
             throw new Error('Не указан путь к директории плагина.');
         }
@@ -220,7 +238,7 @@ class PluginManager {
             await fse.copy(realSource, managedPath, {
                 filter: (src) => {
                     const base = path.basename(src);
-                    return base !== 'node_modules' && base !== '.git';
+                    return base !== 'node_modules' && base !== '.git' && base !== 'blockmine-settings.json';
                 },
             });
         }
@@ -231,6 +249,13 @@ class PluginManager {
         const wasNew = !preexisting;
 
         const newPlugin = await this.registerPlugin(botId, managedPath, 'LOCAL', `local:${packageJson.name}`);
+        if (settingsJson != null) {
+            await this.prisma.installedPlugin.update({
+                where: { id: newPlugin.id },
+                data: { settings: settingsJson },
+            });
+            newPlugin.settings = settingsJson;
+        }
 
         try {
             reportPluginDownload(packageJson.name);
@@ -289,7 +314,7 @@ class PluginManager {
         };
     }
 
-    async writePluginZip(directory, outputStream) {
+    async writePluginZip(directory, outputStream, settingsJson = null) {
         const archiver = require('archiver');
         const archive = archiver('zip', { zlib: { level: 9 } });
         const failed = new Promise((_, reject) => {
@@ -297,6 +322,9 @@ class PluginManager {
         });
         archive.pipe(outputStream);
         await appendPluginFiles(archive, directory);
+        if (settingsJson != null) {
+            archive.append(settingsJson, { name: 'blockmine-settings.json' });
+        }
         await Promise.race([archive.finalize(), failed]);
     }
 
@@ -327,7 +355,8 @@ class PluginManager {
             if (!pluginDir) {
                 throw httpError('В архиве нет package.json плагина.', 400);
             }
-            return await this.installFromLocalPath(botId, pluginDir);
+            const settingsJson = await readExportedSettings(pluginDir);
+            return await this.installFromLocalPath(botId, pluginDir, settingsJson);
         } catch (error) {
             if (!error.statusCode && /Небезопасный путь/.test(error.message || '')) {
                 error.statusCode = 400;

@@ -425,10 +425,13 @@ router.post('/:botId/plugins/install/zip', authenticateUniversal, checkBotAccess
 
 router.get('/:botId/plugins/:pluginId/download', authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
     try {
+        const withSettings = req.query.settings === '1' || req.query.settings === 'true';
         const located = await pluginManager.getInstalledPluginDirectory(req.params.botId, req.params.pluginId);
+        const filename = withSettings ? located.filename.replace(/\.zip$/, '-settings.zip') : located.filename;
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename="${located.filename}"`);
-        await pluginManager.writePluginZip(located.directory, res);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        const settingsJson = withSettings ? (located.plugin.settings || '{}') : null;
+        await pluginManager.writePluginZip(located.directory, res, settingsJson);
     } catch (error) {
         if (res.headersSent) return;
         res.status(error.statusCode || 500).json({ error: error.message || 'Не удалось скачать плагин' });

@@ -78,9 +78,13 @@
   "tooltips": {
     "downloadZip": "Download zip"
   },
+  "download": {
+    "default": "Download plugin",
+    "withSettings": "Download with this bot's settings"
+  },
   "zipInstall": {
     "title": "Install from zip",
-    "description": "The archive must contain package.json at the root or in a single folder. node_modules is not required.",
+    "description": "The archive must contain package.json at the root or in a single folder. Bot settings in the archive are applied. node_modules is not required.",
     "fileLabel": "Plugin zip archive",
     "install": "Install"
   },

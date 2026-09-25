@@ -76,9 +76,13 @@
   "tooltips": {
     "downloadZip": "Скачать zip"
   },
+  "download": {
+    "default": "Скачать плагин",
+    "withSettings": "Скачать с настройками этого бота"
+  },
   "zipInstall": {
     "title": "Установить из zip",
-    "description": "Архив должен содержать package.json в корне или в одной папке. node_modules в архив класть не нужно.",
+    "description": "Архив должен содержать package.json в корне или в одной папке. Если в нём есть настройки бота, они будут применены. node_modules в архив класть не нужно.",
     "fileLabel": "Zip-архив плагина",
     "install": "Установить"
   },
