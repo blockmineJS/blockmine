@@ -26,7 +26,7 @@
     "reason": {
       "not_git": "In-app updates work from a git clone: start.bat on Windows or PM2 on Linux. For npx, install again with: npx blockmine",
       "no_git_binary": "Git was not found. Install Git and start the panel again.",
-      "dirty": "This project has local changes. Commit or drop them first, otherwise pull is unsafe.",
+      "dirty": "Could not pull from GitHub: local files block the merge. Remove the conflicting edits and try again.",
       "wrong_branch": "The panel is not on master/main. Switch to the default branch to update with the button.",
       "diverged": "Local history has diverged from GitHub. A manual git pull is required.",
       "offline": "Could not reach GitHub.",

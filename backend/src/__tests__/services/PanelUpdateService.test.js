@@ -106,11 +106,11 @@ describe('resolveUpdateDecision', () => {
         });
     });
 
-    test('грязное дерево блокирует кнопку', () => {
+    test('локальные правки не блокируют кнопку', () => {
         expect(resolveUpdateDecision({ ...base, dirty: true })).toEqual({
             updateAvailable: true,
-            canUpdate: false,
-            reason: 'dirty',
+            canUpdate: true,
+            reason: null,
         });
     });
 

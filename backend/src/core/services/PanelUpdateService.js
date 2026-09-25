@@ -155,10 +155,6 @@ function resolveUpdateDecision({
         return { updateAvailable: true, canUpdate: false, reason: 'wrong_branch' };
     }
 
-    if (dirty) {
-        return { updateAvailable: true, canUpdate: false, reason: 'dirty' };
-    }
-
     if (diverged) {
         return { updateAvailable: true, canUpdate: false, reason: 'diverged' };
     }
