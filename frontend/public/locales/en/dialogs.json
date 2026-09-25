@@ -6,8 +6,8 @@
   },
   "panelUpdate": {
     "title": "Update available",
-    "subtitle": "GitHub has a newer version of the panel. Update will close this tab and start the panel again.",
-    "subtitlePm2": "GitHub has a newer version. After install, PM2 will restart the panel.",
+    "subtitle": "GitHub has a newer version. The panel will close and start again.",
+    "subtitlePm2": "GitHub has a newer version. The panel will close and start again.",
     "subtitleIdle": "Comparing this install with the latest commit in the repository.",
     "current": "Current",
     "latest": "On GitHub",
@@ -18,7 +18,7 @@
     "later": "Later",
     "close": "Close",
     "restarting": "The panel is restarting. This page will reload on its own.",
-    "restartingPm2": "PM2 is restarting the panel. This page will reload on its own.",
+    "restartingPm2": "The panel is restarting. This page will reload on its own.",
     "checking": "Checking GitHub…",
     "upToDate": "You are on the latest version",
     "applyError": "Failed to update the panel.",
@@ -26,7 +26,7 @@
     "failedHint": "GitHub code may already be pulled. The error log is below. If the panel is on the latest commit, you can close this window.",
     "retry": "Retry",
     "closingTitle": "Closing the panel",
-    "closingHint": "This tab will close. start.bat will open the panel when it is ready.",
+    "closingHint": "This tab will close, the panel will open on its own.",
     "commitCount": "{{count}} commits",
     "reason": {
       "not_git": "In-app updates work from a git clone: start.bat on Windows or PM2 on Linux. For npx, install again with: npx blockmine",

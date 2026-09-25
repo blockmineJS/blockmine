@@ -83,7 +83,8 @@ export default function PanelUpdateDialog() {
     const setShowPanelUpdateDialog = useAppStore((state) => state.setShowPanelUpdateDialog);
     const applyPanelUpdate = useAppStore((state) => state.applyPanelUpdate);
     const canEdit = hasPermission('panel:settings:edit');
-    const failed = progress?.stage === 'error';
+    const failed = progress?.stage === 'error'
+        && (Date.now() - (progress.at || 0) < 5 * 60 * 1000);
     const busy = applying || waiting;
     const stage = progress?.stage || (waiting ? 'restarting' : '');
 
@@ -217,7 +218,7 @@ export default function PanelUpdateDialog() {
                             {failed
                                 ? t('panelUpdate.failedHint')
                                 : info?.updateAvailable
-                                    ? t(info.restartMethod === 'pm2' ? 'panelUpdate.subtitlePm2' : 'panelUpdate.subtitle')
+                                    ? t('panelUpdate.subtitle')
                                     : t('panelUpdate.subtitleIdle')}
                         </DialogDescription>
                     </DialogHeader>
@@ -311,7 +312,7 @@ export default function PanelUpdateDialog() {
                                     {busy ? <Progress value={progress?.percent || (waiting ? 100 : 8)} /> : null}
                                     {waiting ? (
                                         <p className="text-sm text-muted-foreground">
-                                            {t(info?.restartMethod === 'pm2' ? 'panelUpdate.restartingPm2' : 'panelUpdate.restarting')}
+                                            {t('panelUpdate.restarting')}
                                         </p>
                                     ) : null}
                                     {progress?.log?.length ? (

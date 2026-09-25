@@ -15,6 +15,7 @@ const OFFICIAL_GIT_URL = `https://github.com/${OFFICIAL_OWNER}/${OFFICIAL_REPO}.
 const STAMP_PATH = path.join(REPO_ROOT, 'backend', 'src', '.panel-update-stamp.json');
 const PROGRESS_PATH = path.join(os.homedir(), '.blockmine', 'update-progress.json');
 const CHECK_CACHE_MS = 2 * 60 * 1000;
+const STALE_PROGRESS_MS = 5 * 60 * 1000;
 const MAX_COMMITS = 25;
 const ACTIVE_STAGES = new Set(['stopping', 'fetch', 'pull', 'install', 'build', 'starting']);
 
@@ -345,8 +346,31 @@ function emitSocketProgress() {
     }
 }
 
+function idleProgress() {
+    return {
+        stage: 'idle',
+        percent: 0,
+        message: '',
+        log: [],
+        at: Date.now(),
+    };
+}
+
+function discardInactiveProgress() {
+    const age = Date.now() - (progress.at || 0);
+    const active = isActiveStage(progress.stage);
+    if (active && age < STALE_PROGRESS_MS) return;
+    if (progress.stage === 'error' && age < STALE_PROGRESS_MS) return;
+    if (progress.stage === 'idle' && (!progress.log || progress.log.length === 0)) return;
+    applying = false;
+    stopProgressWatch();
+    progress = idleProgress();
+    persistProgress();
+}
+
 function getProgress() {
     resumeFromProgressFile();
+    discardInactiveProgress();
     return { ...progress, applying };
 }
 
@@ -479,29 +503,14 @@ function startProgressWatch() {
 function resumeFromProgressFile() {
     if (resumed) return;
     resumed = true;
-    const data = readProgressFile();
-    if (!data) return;
-    progress = {
-        stage: data.stage || 'idle',
-        percent: data.percent || 0,
-        message: data.message || '',
-        log: Array.isArray(data.log) ? data.log : [],
-        at: data.at || Date.now(),
-    };
-    if (progress.stage === 'restarting' || progress.stage === 'done') {
-        applying = false;
-        progress = { stage: 'idle', percent: 0, message: '', log: [], at: Date.now() };
-        persistProgress();
-        return;
-    }
-    if (isActiveStage(progress.stage)) {
-        applying = true;
-        startProgressWatch();
-    }
+    applying = false;
+    progress = idleProgress();
+    persistProgress();
 }
 
 async function checkForUpdate(options = {}) {
     resumeFromProgressFile();
+    discardInactiveProgress();
     const fresh = Boolean(options.fresh);
     if (!fresh && checkCache.value && (Date.now() - checkCache.at) < CHECK_CACHE_MS) {
         return { ...checkCache.value, cached: true, applying };
@@ -760,7 +769,7 @@ function relaunchPanel(restartMethod) {
 
     const startBat = path.join(REPO_ROOT, 'start.bat');
     if (process.platform === 'win32' && fs.existsSync(startBat)) {
-        const child = spawn('cmd.exe', ['/c', 'start', 'BlockMine', startBat], {
+        const child = spawn('cmd.exe', ['/c', `start "BlockMine" ${winQuote(startBat)}`], {
             cwd: REPO_ROOT,
             detached: true,
             stdio: 'ignore',
@@ -798,11 +807,24 @@ function scheduleRelaunch() {
     relaunchPanel('spawn');
 }
 
+function winQuote(value) {
+    return `"${String(value).replace(/"/g, '')}"`;
+}
+
 function spawnUpdateWorker(branch, restartMethod) {
     const workerPath = path.join(__dirname, 'panelUpdateWorker.js');
     const args = [workerPath, branch, restartMethod];
     if (process.platform === 'win32') {
-        const child = spawn('cmd.exe', ['/c', 'start', '/min', 'BlockMine-update', process.execPath, ...args], {
+        const command = [
+            'start',
+            '"BlockMine-update"',
+            '/min',
+            winQuote(process.execPath),
+            winQuote(workerPath),
+            branch,
+            restartMethod || 'nodemon',
+        ].join(' ');
+        const child = spawn('cmd.exe', ['/c', command], {
             cwd: REPO_ROOT,
             detached: true,
             stdio: 'ignore',

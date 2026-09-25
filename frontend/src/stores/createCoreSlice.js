@@ -123,12 +123,9 @@ export const createCoreSlice = (set, get) => ({
             const updateInfo = get().panelUpdate;
             const dismissedSha = localStorage.getItem('panelUpdateDismissedSha') || '';
             const shouldShowUpdate = Boolean(
-                sessionStorage.getItem('blockmine-panel-updating')
-                || (
-                    updateInfo?.updateAvailable
-                    && updateInfo?.latest?.sha
-                    && updateInfo.latest.sha !== dismissedSha
-                )
+                updateInfo?.updateAvailable
+                && updateInfo?.latest?.sha
+                && updateInfo.latest.sha !== dismissedSha
             );
 
             set(state => {
