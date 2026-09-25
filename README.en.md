@@ -6,7 +6,7 @@
   <img src="./image/logo.png" alt="BlockMine Logo" width="150">
   <h1>BlockMine</h1>
   <p>
-    <strong>Powerful Minecraft bot management platform with visual programming and advanced debugging</strong>
+    <strong>Minecraft bots without programming. A web panel and a visual editor. One command: npx blockmine</strong>
   </p>
   <p>
     <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="Stars"></a>
@@ -17,7 +17,7 @@
   </p>
 </div>
 
-**BlockMine** is an open-source solution for centralized management and automation of Minecraft bots. Launch bots, manage them in real-time, extend their capabilities with plugins, and create complex behavior scenarios in a visual editor.
+**BlockMine** is a panel for building Minecraft bots without writing code. Install Node.js, run `npx blockmine`, create a bot in the browser, and draw its behavior in the visual editor. Plugins, a live console, and graph debugging are included. A built-in MCP hands the panel to AI agents. Through it they run bots, servers, and proxies, write and install plugin code, and configure commands, permissions, player groups, and scheduled tasks.
 
 More examples at - https://t.me/blockmineJs
 
