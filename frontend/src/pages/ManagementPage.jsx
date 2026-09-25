@@ -7,8 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
-import FadeTransition from '@/components/FadeTransition';
-
 import CommandsManager from '@/components/management/CommandsManager';
 import UsersManager from '@/components/management/UsersManager';
 import GroupsManager from '@/components/management/GroupsManager';
@@ -147,18 +145,13 @@ export default function ManagementPage() {
             </CardHeader>
             
             <main className="flex-grow min-h-0">
-                <FadeTransition
-                    transitionKey={activeTab}
-                    duration={0.22}
-                    ready={isInitialContentReady}
-                    fallback={
+                <div className="h-full min-h-0">
+                    {isInitialContentReady ? tabContent[activeTab] : (
                         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                             {t('commands.loading')}
                         </div>
-                    }
-                >
-                    {tabContent[activeTab]}
-                </FadeTransition>
+                    )}
+                </div>
             </main>
 
             <CreateCommandDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreate={handleCreateCommand} />

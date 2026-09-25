@@ -13,7 +13,6 @@ import LocalInstallDialog from '@/components/LocalInstallDialog';
 import ZipInstallDialog from '@/components/ZipInstallDialog';
 import { useAppStore } from '@/stores/appStore';
 import CreatePluginDialog from '@/components/ide/CreatePluginDialog';
-import FadeTransition from '@/components/FadeTransition';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function PluginsTab() {
@@ -260,7 +259,7 @@ export default function PluginsTab() {
             </div>
             
             <main className="flex-grow min-h-0">
-                <FadeTransition transitionKey={activeTab} duration={0.2}>
+                <div className="h-full min-h-0">
                     {activeTab === 'installed' ? (
                         <div className="flex h-full flex-col min-h-0">
                             <div className="flex-1 overflow-y-auto">
@@ -289,7 +288,7 @@ export default function PluginsTab() {
                             />
                         </div>
                     )}
-                </FadeTransition>
+                </div>
             </main>
 
             <CreatePluginDialog 
