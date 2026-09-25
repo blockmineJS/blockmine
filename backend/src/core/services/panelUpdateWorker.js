@@ -4,10 +4,11 @@ const { runPanelUpdateJob, isSafeRef } = require('./PanelUpdateService');
 
 async function main() {
     const branch = process.argv[2] || 'master';
+    const restartMethod = process.argv[3] || process.env.BLOCKMINE_RESTART_METHOD || '';
     if (!isSafeRef(branch)) {
         process.exit(1);
     }
-    await runPanelUpdateJob(branch);
+    await runPanelUpdateJob(branch, restartMethod);
 }
 
 main().then(() => {

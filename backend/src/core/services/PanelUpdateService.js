@@ -16,7 +16,7 @@ const STAMP_PATH = path.join(REPO_ROOT, 'backend', 'src', '.panel-update-stamp.j
 const PROGRESS_PATH = path.join(os.homedir(), '.blockmine', 'update-progress.json');
 const CHECK_CACHE_MS = 2 * 60 * 1000;
 const MAX_COMMITS = 25;
-const ACTIVE_STAGES = new Set(['fetch', 'pull', 'install', 'build', 'starting']);
+const ACTIVE_STAGES = new Set(['stopping', 'fetch', 'pull', 'install', 'build', 'starting']);
 
 let checkCache = { at: 0, value: null };
 let applying = false;
@@ -666,35 +666,182 @@ function writeRestartStamp() {
     fs.writeFileSync(STAMP_PATH, JSON.stringify({ at: Date.now() }));
 }
 
-function scheduleRelaunch() {
-    const cli = path.join(REPO_ROOT, 'backend', 'cli.js');
-    const cwd = path.join(REPO_ROOT, 'backend');
-    const child = process.platform === 'win32'
-        ? spawn('cmd.exe', ['/c', `timeout /t 2 /nobreak >nul && "${process.execPath}" "${cli}"`], {
-            cwd,
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseListeningPids(netstatOutput, port) {
+    const pids = new Set();
+    const needle = `:${port}`;
+    for (const line of String(netstatOutput || '').split(/\r?\n/)) {
+        if (!/LISTENING/i.test(line)) continue;
+        const parts = line.trim().split(/\s+/);
+        const local = parts[1] || '';
+        if (!local.endsWith(needle) && !local.includes(`:${port}]`)) continue;
+        const pid = parts[parts.length - 1];
+        if (/^\d+$/.test(pid)) pids.add(pid);
+    }
+    return [...pids];
+}
+
+async function killPids(pids) {
+    const self = String(process.pid);
+    for (const pid of pids) {
+        if (!pid || pid === self) continue;
+        try {
+            if (process.platform === 'win32') {
+                await execFileAsync('taskkill', ['/F', '/PID', String(pid)], { windowsHide: true, timeout: 15000 });
+            } else {
+                process.kill(Number(pid), 'SIGTERM');
+            }
+        } catch {
+            continue;
+        }
+    }
+}
+
+async function killPortListeners(port) {
+    try {
+        if (process.platform === 'win32') {
+            const { stdout } = await execFileAsync('netstat', ['-ano'], { timeout: 15000, windowsHide: true });
+            await killPids(parseListeningPids(stdout, port));
+            return;
+        }
+        try {
+            await execFileAsync('fuser', ['-k', `${port}/tcp`], { timeout: 15000 });
+        } catch {
+            const { stdout } = await execFileAsync('lsof', ['-t', `-iTCP:${port}`, '-sTCP:LISTEN'], { timeout: 15000 });
+            await killPids(String(stdout).trim().split(/\s+/).filter(Boolean));
+        }
+    } catch {
+        return;
+    }
+}
+
+async function stopRunningPanel(restartMethod) {
+    emitProgress({ stage: 'stopping', percent: 8, message: 'stopping', line: 'stopping panel' });
+    if (restartMethod === 'pm2') {
+        const target = getPm2Target();
+        try {
+            await runLogged(process.platform === 'win32' ? 'pm2.cmd' : 'pm2', ['stop', target], 60000);
+        } catch {
+            emitProgress({ line: 'pm2 stop failed, killing ports' });
+        }
+    }
+    if (process.platform === 'win32') {
+        try {
+            await execFileAsync('taskkill', ['/F', '/FI', 'WINDOWTITLE eq BlockMine'], {
+                windowsHide: true,
+                timeout: 15000,
+            });
+        } catch {
+            emitProgress({ line: 'no BlockMine console window' });
+        }
+    }
+    await killPortListeners(3001);
+    await killPortListeners(5173);
+}
+
+function relaunchPanel(restartMethod) {
+    emitProgress({ stage: 'restarting', percent: 96, message: 'restarting', line: 'starting panel' });
+    if (restartMethod === 'pm2') {
+        const target = getPm2Target();
+        const child = spawn(process.platform === 'win32' ? 'pm2.cmd' : 'pm2', ['restart', target], {
+            cwd: REPO_ROOT,
             detached: true,
             stdio: 'ignore',
             windowsHide: true,
+            shell: process.platform === 'win32',
             env: process.env,
-        })
-        : spawn('sh', ['-c', `sleep 2; exec "${process.execPath}" "${cli}"`], {
-            cwd,
+        });
+        child.unref();
+        return;
+    }
+
+    const startBat = path.join(REPO_ROOT, 'start.bat');
+    if (process.platform === 'win32' && fs.existsSync(startBat)) {
+        const child = spawn('cmd.exe', ['/c', 'start', 'BlockMine', startBat], {
+            cwd: REPO_ROOT,
             detached: true,
             stdio: 'ignore',
             env: process.env,
         });
+        child.unref();
+        return;
+    }
+
+    if (restartMethod === 'nodemon' || isDevelopment()) {
+        const child = spawn(npmBin(), ['run', 'dev'], {
+            cwd: REPO_ROOT,
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false,
+            shell: process.platform === 'win32',
+            env: process.env,
+        });
+        child.unref();
+        return;
+    }
+
+    const cli = path.join(REPO_ROOT, 'backend', 'cli.js');
+    const child = spawn(process.execPath, [cli], {
+        cwd: path.join(REPO_ROOT, 'backend'),
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: process.env,
+    });
     child.unref();
 }
 
-async function runPanelUpdateJob(branch) {
+function scheduleRelaunch() {
+    relaunchPanel('spawn');
+}
+
+function spawnUpdateWorker(branch, restartMethod) {
+    const workerPath = path.join(__dirname, 'panelUpdateWorker.js');
+    const args = [workerPath, branch, restartMethod];
+    if (process.platform === 'win32') {
+        const child = spawn('cmd.exe', ['/c', 'start', '/min', 'BlockMine-update', process.execPath, ...args], {
+            cwd: REPO_ROOT,
+            detached: true,
+            stdio: 'ignore',
+            env: {
+                ...process.env,
+                BLOCKMINE_UPDATE_WORKER: '1',
+                BLOCKMINE_RESTART_METHOD: restartMethod,
+            },
+        });
+        child.unref();
+        return;
+    }
+    const child = spawn(process.execPath, args, {
+        cwd: REPO_ROOT,
+        detached: true,
+        stdio: 'ignore',
+        env: {
+            ...process.env,
+            BLOCKMINE_UPDATE_WORKER: '1',
+            BLOCKMINE_RESTART_METHOD: restartMethod,
+        },
+    });
+    child.unref();
+}
+
+async function runPanelUpdateJob(branch, restartMethod) {
     if (!isSafeRef(branch)) {
         const error = new Error('invalid_branch');
         error.code = 'invalid_branch';
         throw error;
     }
+    const method = restartMethod || process.env.BLOCKMINE_RESTART_METHOD || resolveRestartMethod();
 
     try {
-        emitProgress({ stage: 'fetch', percent: 10, message: 'fetch', log: [], line: `git fetch ${OFFICIAL_GIT_URL} ${branch}` });
+        await sleep(1500);
+        await stopRunningPanel(method);
+        await sleep(1500);
+
+        emitProgress({ stage: 'fetch', percent: 20, message: 'fetch', log: progress.log || [], line: `git fetch ${OFFICIAL_GIT_URL} ${branch}` });
         await runLogged('git', ['fetch', OFFICIAL_GIT_URL, branch], 120000);
 
         emitProgress({ stage: 'pull', percent: 35, message: 'pull', line: 'git merge --ff-only FETCH_HEAD' });
@@ -703,19 +850,14 @@ async function runPanelUpdateJob(branch) {
         emitProgress({ stage: 'install', percent: 50, message: 'install', line: 'npm install' });
         await runLogged(npmBin(), ['install', '--no-fund', '--no-audit'], 15 * 60 * 1000);
 
-        if (!isDevelopment()) {
+        if (method !== 'nodemon' && !isDevelopment()) {
             emitProgress({ stage: 'build', percent: 80, message: 'build', line: 'npm run build' });
             await runLogged(npmBin(), ['run', 'build'], 15 * 60 * 1000);
         } else {
             emitProgress({ stage: 'build', percent: 88, message: 'build_skipped', line: 'dev: skip production build' });
         }
 
-        try {
-            writeRestartStamp();
-        } catch (error) {
-            console.error('[PanelUpdate] Failed to write restart stamp:', error.message);
-        }
-
+        relaunchPanel(method);
         emitProgress({ stage: 'restarting', percent: 100, message: 'restarting' });
         return { ok: true, restarting: true };
     } catch (error) {
@@ -726,6 +868,11 @@ async function runPanelUpdateJob(branch) {
             message: 'error',
             line: detail,
         });
+        try {
+            relaunchPanel(method);
+        } catch (relaunchError) {
+            console.error('[PanelUpdate] Failed to relaunch after error:', relaunchError.message);
+        }
         const wrapped = new Error('update_failed');
         wrapped.code = 'update_failed';
         wrapped.detail = detail;
@@ -764,21 +911,9 @@ async function applyUpdate() {
         throw error;
     }
 
-    const workerPath = path.join(__dirname, 'panelUpdateWorker.js');
     try {
-        const child = spawn(process.execPath, [workerPath, branch], {
-            detached: true,
-            stdio: 'ignore',
-            cwd: REPO_ROOT,
-            windowsHide: true,
-            env: {
-                ...process.env,
-                BLOCKMINE_UPDATE_WORKER: '1',
-            },
-        });
-        child.unref();
-        startProgressWatch();
-        return { ok: true, started: true };
+        spawnUpdateWorker(branch, resolveRestartMethod());
+        return { ok: true, started: true, closing: true };
     } catch (error) {
         applying = false;
         emitProgress({ stage: 'error', percent: 0, message: 'error', line: error.message });
@@ -794,6 +929,7 @@ module.exports = {
     firstLine,
     isDefaultBranch,
     isSafeRef,
+    parseListeningPids,
     mapGithubCommit,
     resolveUpdateDecision,
     resolveRestartMethod,

@@ -4,6 +4,7 @@ const {
     isDefaultBranch,
     isSafeRef,
     mapGithubCommit,
+    parseListeningPids,
     resolveUpdateDecision,
     resolveRestartMethod,
     getPm2Target,
@@ -35,6 +36,16 @@ describe('PanelUpdateService helpers', () => {
         expect(isSafeRef('-c')).toBe(false);
         expect(isSafeRef('main; rm -rf /')).toBe(false);
         expect(isSafeRef('abc..def')).toBe(false);
+    });
+
+    test('parseListeningPids достаёт PID из netstat', () => {
+        const sample = [
+            'TCP    127.0.0.1:3001         0.0.0.0:0              LISTENING       12345',
+            'TCP    127.0.0.1:5173         0.0.0.0:0              LISTENING       67890',
+            'TCP    127.0.0.1:3001         127.0.0.1:54321        ESTABLISHED     11111',
+        ].join('\n');
+        expect(parseListeningPids(sample, 3001)).toEqual(['12345']);
+        expect(parseListeningPids(sample, 5173)).toEqual(['67890']);
     });
 
     test('mapGithubCommit собирает короткое описание', () => {

@@ -182,6 +182,15 @@ export default function PanelUpdateDialog() {
         try {
             sessionStorage.setItem('blockmine-panel-updating', '1');
             await applyPanelUpdate();
+            toast({
+                title: t('panelUpdate.closingTitle'),
+                description: t('panelUpdate.closingHint'),
+            });
+            window.open('', '_self');
+            window.close();
+            setTimeout(() => {
+                window.location.replace('about:blank');
+            }, 400);
         } catch (error) {
             sessionStorage.removeItem('blockmine-panel-updating');
             toast({
