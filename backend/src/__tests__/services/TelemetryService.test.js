@@ -256,7 +256,7 @@ describe('TelemetryService', () => {
             expect(global.fetch).not.toHaveBeenCalled();
         });
 
-        test('должен обработать ошибку при отправке', async () => {
+        test('не показывает пользователю ошибку мёртвого сервера телеметрии', async () => {
             const mockBotProcess = {
                 botConfig: {
                     username: 'TestBot',
@@ -266,11 +266,13 @@ describe('TelemetryService', () => {
 
             mockProcessManager.getAllProcesses.mockReturnValue(new Map([[1, mockBotProcess]]));
 
-            global.fetch.mockRejectedValue(new Error('Network error'));
+            const socketError = new TypeError('fetch failed');
+            socketError.cause = Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' });
+            global.fetch.mockRejectedValue(socketError);
 
             await telemetryService.sendHeartbeat();
 
-            expect(mockLogger.error).toHaveBeenCalled();
+            expect(mockLogger.error).not.toHaveBeenCalled();
         });
 
         test('не пишет в лог таймаут соединения со статистикой', async () => {

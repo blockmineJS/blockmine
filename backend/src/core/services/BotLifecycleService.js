@@ -37,6 +37,7 @@ class BotLifecycleService {
 
         this.logCache = new Map();
         this.startingBots = new Set();
+        this.stoppingBots = new Set();
         this.crashRestartManager = new CrashRestartManager(5, 60000);
 
         this.ipcRouter = new BotIPCMessageRouter({
@@ -50,6 +51,7 @@ class BotLifecycleService {
             emitStatusUpdate: this.emitStatusUpdate.bind(this),
             restartBot: this.restartBot.bind(this),
             stopBot: this.stopBot.bind(this),
+            isIntentionalStop: (botId) => this.stoppingBots.has(botId),
             getBotConfig: (botId) => this.processManager.getProcess(botId)?.botConfig,
         });
     }
@@ -144,31 +146,57 @@ class BotLifecycleService {
     async stopBot(botId) {
         const child = this.processManager.getProcess(botId);
         if (child) {
+            this.stoppingBots.add(botId);
             this.eventGraphManager.unloadGraphsForBot(botId);
 
             const { getTraceCollector } = require('./TraceCollectorService');
             const traceCollector = getTraceCollector();
             traceCollector.clearForBot(botId);
 
-            child.send({ type: 'stop' });
-
-            const killTimer = setTimeout(() => {
-                if (!child.killed) {
-                    this.logger.warn({ botId }, 'Принудительное завершение процесса');
-                    try {
-                        child.kill('SIGKILL');
-                    } catch (error) {
-                        this.logger.error({ botId, error }, 'Ошибка принудительного завершения');
-                    }
-                }
-            }, 5000);
-            if (typeof killTimer.unref === 'function') killTimer.unref();
-            if (typeof child.once === 'function') child.once('exit', () => clearTimeout(killTimer));
+            const stopped = this._whenChildStops(child, botId);
+            try {
+                child.send({ type: 'stop' });
+            } catch (error) {
+                this.logger.error({ botId, error }, 'Не удалось отправить stop');
+            }
 
             this.cache.clearBotCache(botId);
-            return { success: true };
+            return { success: true, stopped };
         }
         return { success: false, message: 'Бот не найден или уже остановлен' };
+    }
+
+    _whenChildStops(child, botId) {
+        if (!child || child.exitCode != null || child.signalCode != null) {
+            this.stoppingBots.delete(botId);
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(killTimer);
+                this.stoppingBots.delete(botId);
+                resolve();
+            };
+            const killTimer = setTimeout(() => {
+                if (settled || child.killed || child.exitCode != null || child.signalCode != null) {
+                    finish();
+                    return;
+                }
+                this.logger.warn({ botId }, 'Принудительное завершение процесса');
+                try {
+                    child.kill('SIGKILL');
+                } catch (error) {
+                    this.logger.error({ botId, error }, 'Ошибка принудительного завершения');
+                }
+                if (typeof child.once !== 'function') finish();
+            }, 5000);
+            if (typeof killTimer.unref === 'function') killTimer.unref();
+            if (typeof child.once === 'function') child.once('exit', finish);
+        });
     }
 
     getChildProcess(botId) {
@@ -181,8 +209,8 @@ class BotLifecycleService {
             throw new Error('Bot configuration not found');
         }
 
-        await this.stopBot(botId);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const stopResult = await this.stopBot(botId);
+        if (stopResult.stopped) await stopResult.stopped;
 
         return this.startBot(botConfig);
     }

@@ -10,6 +10,7 @@ class BotIPCMessageRouter {
         this.emitStatusUpdate = deps.emitStatusUpdate;
         this.restartBot = deps.restartBot;
         this.stopBot = deps.stopBot;
+        this.isIntentionalStop = deps.isIntentionalStop;
         this.getBotConfig = deps.getBotConfig;
     }
 
@@ -30,7 +31,7 @@ class BotIPCMessageRouter {
         child.stderr.on('data', (data) => this.appendLog(botId, `[STDERR] ${data.toString()}`));
 
         child.on('exit', (code, signal) => {
-            this._handleExit(botId, botConfig, code, signal);
+            this._handleExit(botId, botConfig, child, code, signal);
         });
     }
 
@@ -347,7 +348,8 @@ class BotIPCMessageRouter {
         }, 3000);
     }
 
-    _handleExit(botId, botConfig, code, signal) {
+    _handleExit(botId, botConfig, child, code, signal) {
+        if (this.processManager.getProcess(botId) !== child) return;
         this.processManager.remove(botId);
         if (this.resourceMonitor) {
             this.resourceMonitor.clearResourceUsage(botId);
@@ -360,7 +362,7 @@ class BotIPCMessageRouter {
             broadcastBotStatus(getIOSafe(), botId, false);
         } catch (e) {}
 
-        if (code === 1) {
+        if (code === 1 && !this.isIntentionalStop?.(botId)) {
             const { shouldRestart, delay } = this.crashRestartManager.handleCrash(botId, botConfig, (msg) => this.appendLog(botId, msg));
             if (shouldRestart) {
                 setTimeout(() => {

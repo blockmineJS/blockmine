@@ -3,8 +3,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { isConnectTimeout } = require('../utils/networkError');
-
 class TelemetryService {
     constructor({ config, botProcessManager, logger }) {
         this.config = config;
@@ -117,8 +115,7 @@ class TelemetryService {
 
             this.logger.debug('Heartbeat отправлен успешно');
         } catch (error) {
-            if (isConnectTimeout(error)) return;
-            this.logger.error({ error }, 'Не удалось отправить heartbeat');
+            this.logger.debug({ err: error.message }, 'Heartbeat пропущен');
         }
     }
 }

@@ -164,6 +164,61 @@ describe('BotLifecycleService', () => {
             expect(result.message).toContain('не найден');
         });
 
+        test('перезапуск стартует сразу после выхода процесса', async () => {
+            let onExit;
+            const botConfig = { id: 1, username: 'TestBot' };
+            const mockChild = {
+                send: jest.fn(),
+                kill: jest.fn(),
+                killed: false,
+                botConfig,
+                once: jest.fn((event, cb) => {
+                    if (event === 'exit') onExit = cb;
+                }),
+            };
+            mockProcessManager.getProcess.mockReturnValue(mockChild);
+            const startSpy = jest.spyOn(service, 'startBot').mockResolvedValue({});
+
+            const pending = service.restartBot(1);
+            await Promise.resolve();
+            jest.advanceTimersByTime(1000);
+
+            expect(startSpy).not.toHaveBeenCalled();
+            expect(mockChild.kill).not.toHaveBeenCalled();
+
+            onExit();
+            await pending;
+
+            expect(startSpy).toHaveBeenCalledWith(botConfig);
+        });
+
+        test('зависший процесс убивается через 5 секунд и стартует после выхода', async () => {
+            let onExit;
+            const botConfig = { id: 1, username: 'TestBot' };
+            const mockChild = {
+                send: jest.fn(),
+                kill: jest.fn(function () { this.killed = true; }),
+                killed: false,
+                botConfig,
+                once: jest.fn((event, cb) => {
+                    if (event === 'exit') onExit = cb;
+                }),
+            };
+            mockProcessManager.getProcess.mockReturnValue(mockChild);
+            const startSpy = jest.spyOn(service, 'startBot').mockResolvedValue({});
+
+            const pending = service.restartBot(1);
+            await jest.advanceTimersByTimeAsync(5000);
+
+            expect(mockChild.kill).toHaveBeenCalledWith('SIGKILL');
+            expect(startSpy).not.toHaveBeenCalled();
+
+            onExit();
+            await pending;
+
+            expect(startSpy).toHaveBeenCalledWith(botConfig);
+        });
+
         test('должен принудительно завершить процесс через 5 секунд', async () => {
             const mockChild = {
                 send: jest.fn(),
