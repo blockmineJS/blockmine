@@ -8,6 +8,7 @@ const { ok, err, wrap, requirePermission, requireBotAccess, getAllowedBotIds, pu
 
 const botInclude = { server: true, proxy: true };
 
+
 function register(server, { user }) {
     server.registerTool('list_bots', {
         description: 'List all bots accessible to the current API key, including their server and proxy.',
