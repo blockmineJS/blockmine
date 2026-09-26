@@ -293,16 +293,15 @@ export const useVisualEditorStore = create(
         get().connectGraphSocket(() => {
           // Callback вызывается после получения collab:state
           // Если graphState пустой - отправляем наше состояние
-          const { nodes, edges, command } = get();
-          if (nodes.length > 0 || edges.length > 0) {
-            console.log('[Collab] Sending init-graph-state after connection');
-            get().socket?.emit('collab:init-graph-state', {
-              botId: command.botId,
-              graphId: command.id,
-              nodes,
-              edges,
-            });
-          }
+          const { nodes, edges, variables, command } = get();
+          console.log('[Collab] Sending init-graph-state after connection');
+          get().socket?.emit('collab:init-graph-state', {
+            botId: command.botId,
+            graphId: command.id,
+            nodes,
+            edges,
+            variables: variables || [],
+          });
         });
       } catch (error) {
         console.error("Ошибка инициализации редактора:", error);
@@ -1624,6 +1623,7 @@ export const useVisualEditorStore = create(
           set({
             nodes: graphState.nodes,
             edges: graphState.edges,
+            variables: graphState.variables || get().variables,
           });
         } else {
           // Мы первые в комнате или graphState пустой - вызываем callback для инициализации
@@ -1725,9 +1725,10 @@ export const useVisualEditorStore = create(
             break;
           }
           case 'delete': {
-            // data = { nodeIds: [] }
             set(state => {
-              state.nodes = state.nodes.filter(n => !data.nodeIds.includes(n.id));
+              const nodeIds = data.nodeIds || [];
+              state.nodes = state.nodes.filter(n => !nodeIds.includes(n.id));
+              state.edges = state.edges.filter(edge => !nodeIds.includes(edge.source) && !nodeIds.includes(edge.target));
             });
             break;
           }
@@ -1745,6 +1746,24 @@ export const useVisualEditorStore = create(
       });
 
       // Изменения связей
+      newSocket.on('collab:variables-changed', ({ type, data }) => {
+        set(state => {
+          const current = state.variables || [];
+          let next = current;
+          if (type === 'set' && data?.variable?.name) {
+            const index = current.findIndex((item) => item.name === data.variable.name);
+            next = index === -1
+              ? [...current, data.variable]
+              : current.map((item, itemIndex) => itemIndex === index ? { ...item, ...data.variable } : item);
+          }
+          if (type === 'delete' && data?.name) {
+            next = current.filter((item) => item.name !== data.name);
+          }
+          state.variables = next;
+          if (state.command) state.command.variables = next;
+        });
+      });
+
       newSocket.on('collab:edge-changed', ({ type, data, username }) => {
         console.log('[Collab] Edge changed:', type, data, 'by', username);
 
@@ -2042,6 +2061,7 @@ export const useVisualEditorStore = create(
       socket.off('collab:selection-changed');
       socket.off('collab:mode-changed');
       socket.off('collab:node-changed');
+      socket.off('collab:variables-changed');
       socket.off('collab:edge-changed');
       socket.off('collab:graph-reloaded');
       socket.off('collab:connection-start');

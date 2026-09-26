@@ -8,6 +8,7 @@ const registerPluginIdeTools = require('./tools/pluginIde');
 const registerManagementTools = require('./tools/management');
 const registerServerTools = require('./tools/servers');
 const registerTaskTools = require('./tools/tasks');
+const registerGraphTools = require('./tools/graphs');
 
 const { version: PKG_VERSION } = require('../../../../package.json');
 
@@ -33,6 +34,7 @@ function buildMcpServer(ctx) {
     registerPluginTools(server, ctx);
     registerPluginIdeTools(server, ctx);
     registerManagementTools(server, ctx);
+    registerGraphTools(server, ctx);
 
     server.registerPrompt('blockmine-assistant', {
         description: 'Onboarding prompt explaining how to drive BlockMine through this MCP endpoint.',
@@ -49,6 +51,7 @@ Tools group into:
 - Tasks: list_tasks, create_task, update_task, delete_task
 - Plugins: get_bot_plugins, get_plugin_settings, update_plugin_settings, enable_disable_plugin, list_plugin_catalog, get_catalog_plugin, install_plugin, install_local_plugin, uninstall_plugin, update_installed_plugin, check_plugin_updates, get_plugin_store
 - Players and commands: get_bot_users, get_user_info, set_player_blacklist, add_player_to_group, remove_player_from_group, get_bot_groups, create_bot_group, grant_group_permission, revoke_group_permission, get_bot_permissions, get_bot_commands, update_bot_command
+- Open graph session: list_open_graphs, get_open_graph, add_graph_node, update_graph_node, move_graph_nodes, delete_graph_nodes, add_graph_connection, delete_graph_connections, set_graph_variable, delete_graph_variable. These work only while this same user has the graph open in the editor. Changes appear on that canvas and are not saved. The person saves.
 
 send_message_to_bot accepts chatType (chat, private, command, or a plugin type such as clan) and username for private. waitSeconds collects replies from get_chat_history that arrive after the send. get_bot_live_state returns health, position, and who is online.
 

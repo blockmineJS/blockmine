@@ -34,6 +34,8 @@ class GraphCollaborationManager {
                 graphState: {
                     nodes: [],
                     edges: [],
+                    variables: [],
+                    initialized: false,
                     lastUpdate: null,
                 },
             });
@@ -244,7 +246,7 @@ class GraphCollaborationManager {
     /**
      * Инициализировать состояние графа (вызывается первым пользователем после загрузки из БД)
      */
-    initializeGraphState(socket, { botId, graphId, nodes, edges }) {
+    initializeGraphState(socket, { botId, graphId, nodes, edges, variables }) {
         const roomKey = this.getRoomKey(botId, graphId);
         const room = this.rooms.get(roomKey);
 
@@ -253,6 +255,8 @@ class GraphCollaborationManager {
         room.graphState = {
             nodes: nodes || [],
             edges: edges || [],
+            variables: Array.isArray(variables) ? variables : [],
+            initialized: true,
             lastUpdate: Date.now(),
         };
 
@@ -267,49 +271,7 @@ class GraphCollaborationManager {
         const room = this.rooms.get(roomKey);
 
         if (room) {
-            // Обновляем состояние графа в комнате
-            switch (type) {
-                case 'create':
-                    // data = { node }
-                    if (data.node) {
-                        room.graphState.nodes.push(data.node);
-                    }
-                    break;
-                case 'delete':
-                    // data = { nodeIds: [] }
-                    if (data.nodeIds && Array.isArray(data.nodeIds)) {
-                        room.graphState.nodes = room.graphState.nodes.filter(n => !data.nodeIds.includes(n.id));
-                        // Удаляем связанные edges
-                        room.graphState.edges = room.graphState.edges.filter(
-                            c => !data.nodeIds.includes(c.source) && !data.nodeIds.includes(c.target)
-                        );
-                    }
-                    break;
-                case 'update':
-                    // data = { nodeId, nodeData }
-                    if (data.nodeId && data.nodeData) {
-                        const nodeIndex = room.graphState.nodes.findIndex(n => n.id === data.nodeId);
-                        if (nodeIndex !== -1) {
-                            room.graphState.nodes[nodeIndex].data = {
-                                ...room.graphState.nodes[nodeIndex].data,
-                                ...data.nodeData
-                            };
-                        }
-                    }
-                    break;
-                case 'move':
-                    // data = [{ id, position }]
-                    if (Array.isArray(data)) {
-                        data.forEach(change => {
-                            const nodeIndex = room.graphState.nodes.findIndex(n => n.id === change.id);
-                            if (nodeIndex !== -1) {
-                                room.graphState.nodes[nodeIndex].position = change.position;
-                            }
-                        });
-                    }
-                    break;
-            }
-            room.graphState.lastUpdate = Date.now();
+            this.applyNodeChange(room, type, data);
         }
 
         // Отправляем всем кроме отправителя
@@ -328,24 +290,7 @@ class GraphCollaborationManager {
         const room = this.rooms.get(roomKey);
 
         if (room) {
-            // Обновляем состояние графа в комнате
-            switch (type) {
-                case 'create':
-                    // data = { edge }
-                    if (data.edge) {
-                        room.graphState.edges.push(data.edge);
-                    }
-                    break;
-                case 'delete':
-                    // data = { edgeIds: [] }
-                    if (data.edgeIds && Array.isArray(data.edgeIds)) {
-                        room.graphState.edges = room.graphState.edges.filter(
-                            c => !data.edgeIds.includes(c.id)
-                        );
-                    }
-                    break;
-            }
-            room.graphState.lastUpdate = Date.now();
+            this.applyEdgeChange(room, type, data);
         }
 
         socket.to(roomKey).emit('collab:edge-changed', {
@@ -426,6 +371,88 @@ class GraphCollaborationManager {
     /**
      * Генерация ключа комнаты
      */
+    applyNodeChange(room, type, data) {
+        switch (type) {
+            case 'create':
+                if (data?.node && !room.graphState.nodes.some((node) => node.id === data.node.id)) {
+                    room.graphState.nodes.push(data.node);
+                }
+                break;
+            case 'delete':
+                if (Array.isArray(data?.nodeIds)) {
+                    room.graphState.nodes = room.graphState.nodes.filter((node) => !data.nodeIds.includes(node.id));
+                    room.graphState.edges = room.graphState.edges.filter(
+                        (edge) => !data.nodeIds.includes(edge.source) && !data.nodeIds.includes(edge.target)
+                    );
+                }
+                break;
+            case 'update':
+                if (data?.nodeId && data.nodeData) {
+                    const node = room.graphState.nodes.find((item) => item.id === data.nodeId);
+                    if (node) node.data = { ...node.data, ...data.nodeData };
+                }
+                break;
+            case 'move':
+                if (Array.isArray(data)) {
+                    data.forEach((change) => {
+                        const node = room.graphState.nodes.find((item) => item.id === change.id);
+                        if (node && change.position) node.position = change.position;
+                    });
+                }
+                break;
+            default:
+                break;
+        }
+        room.graphState.lastUpdate = Date.now();
+    }
+
+    applyEdgeChange(room, type, data) {
+        switch (type) {
+            case 'create':
+                if (data?.edge && !room.graphState.edges.some((edge) => edge.id === data.edge.id)) {
+                    room.graphState.edges.push(data.edge);
+                }
+                break;
+            case 'delete':
+                if (Array.isArray(data?.edgeIds)) {
+                    room.graphState.edges = room.graphState.edges.filter((edge) => !data.edgeIds.includes(edge.id));
+                }
+                break;
+            default:
+                break;
+        }
+        room.graphState.lastUpdate = Date.now();
+    }
+
+    applyVariableChange(room, type, data) {
+        if (!Array.isArray(room.graphState.variables)) room.graphState.variables = [];
+        if (type === 'set' && data?.variable?.name) {
+            const index = room.graphState.variables.findIndex((item) => item.name === data.variable.name);
+            if (index === -1) room.graphState.variables.push(data.variable);
+            else room.graphState.variables[index] = { ...room.graphState.variables[index], ...data.variable };
+        }
+        if (type === 'delete' && data?.name) {
+            room.graphState.variables = room.graphState.variables.filter((item) => item.name !== data.name);
+        }
+        room.graphState.lastUpdate = Date.now();
+    }
+
+    roomsForUser(userId) {
+        const rooms = [];
+        for (const room of this.rooms.values()) {
+            const present = Array.from(room.users.values()).some((user) => user.userId === userId);
+            if (present) rooms.push(room);
+        }
+        return rooms;
+    }
+
+    pushToRoom(room, event, payload) {
+        if (!this.io) {
+            throw new Error('Graph collaboration is not ready');
+        }
+        this.io.to(this.getRoomKey(room.botId, room.graphId)).emit(event, payload);
+    }
+
     getRoomKey(botId, graphId) {
         return `graph:${botId}:${graphId}`;
     }

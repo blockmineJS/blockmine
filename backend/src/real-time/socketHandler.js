@@ -352,10 +352,10 @@ function initializeSocket(httpServer) {
         });
 
         // Инициализация состояния графа (вызывается первым пользователем после загрузки)
-        socket.on('collab:init-graph-state', ({ botId, graphId, nodes, edges }) => {
+        socket.on('collab:init-graph-state', ({ botId, graphId, nodes, edges, variables }) => {
             try {
                 const collabManager = getGlobalCollaborationManager();
-                collabManager.initializeGraphState(socket, { botId, graphId, nodes, edges });
+                collabManager.initializeGraphState(socket, { botId, graphId, nodes, edges, variables });
             } catch (error) {
                 console.error('[Collab] Error initializing graph state:', error);
             }
