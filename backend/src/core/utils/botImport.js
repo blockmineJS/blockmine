@@ -128,17 +128,21 @@ function resolveBotPluginsDir(username) {
     return botPluginsDir;
 }
 
-async function importPlugins(zipEntries, newBot, prisma, pluginManager, botPluginsDir) {
+async function importPlugins(zipEntries, newBot, prisma, pluginManager, botPluginsDir, onProgress) {
     const pluginMap = new Map();
     const plugins = readJsonEntry(zipEntries, 'plugins.json');
     if (!plugins || !Array.isArray(plugins)) return pluginMap;
 
     await fs.mkdir(botPluginsDir, { recursive: true });
+    const total = plugins.length;
+    let index = 0;
 
     for (const pluginData of plugins) {
+        index += 1;
         const oldPluginId = pluginData.id;
         const pluginName = pluginData.name;
         const newPluginPath = resolveSafePluginDir(botPluginsDir, pluginName);
+        onProgress?.({ stage: 'plugin', step: 'files', name: pluginName, index, total });
 
         const prefix = `plugins/${pluginName}/`;
         for (const entry of zipEntries) {
@@ -159,7 +163,18 @@ async function importPlugins(zipEntries, newBot, prisma, pluginManager, botPlugi
 
         if (hasPackageJson) {
             try {
-                await pluginManager._installDependencies(newPluginPath);
+                if (typeof pluginManager._installDependencies === 'function') {
+                    await pluginManager._installDependencies(newPluginPath, {
+                        onWait: ({ elapsedMs }) => onProgress?.({
+                            stage: 'plugin',
+                            step: 'deps',
+                            name: pluginName,
+                            index,
+                            total,
+                            elapsedMs,
+                        }),
+                    });
+                }
             } catch (e) {
                 console.warn(`[Import] Не удалось установить зависимости для плагина ${pluginName}: ${e.message}`);
             }
@@ -296,7 +311,7 @@ async function importEventGraphs(zipEntries, newBotId, prisma, pluginMap) {
     }
 }
 
-async function importBotFromZip(zip, { config, prisma, pluginManager, setupDefaultPermissions }) {
+async function importBotFromZip(zip, { config, prisma, pluginManager, setupDefaultPermissions, onProgress }) {
     const zipEntries = zip.getEntries();
 
     const botData = readJsonEntry(zipEntries, 'bot.json');
@@ -334,12 +349,17 @@ async function importBotFromZip(zip, { config, prisma, pluginManager, setupDefau
 
     let newBot = null;
     try {
+        onProgress?.({ stage: 'bot' });
         newBot = await prisma.bot.create({ data: createData, include: { server: true } });
 
+        onProgress?.({ stage: 'permissions' });
         const pMap = await importPermissions(zipEntries, newBot.id, prisma, setupDefaultPermissions);
-        const pluginMap = await importPlugins(zipEntries, newBot, prisma, pluginManager, botPluginsDir);
+        const pluginMap = await importPlugins(zipEntries, newBot, prisma, pluginManager, botPluginsDir, onProgress);
+        onProgress?.({ stage: 'data' });
         await importPluginDataStore(zipEntries, newBot.id, prisma);
+        onProgress?.({ stage: 'commands' });
         await importCommands(zipEntries, newBot.id, prisma, pMap, pluginMap);
+        onProgress?.({ stage: 'graphs' });
         await importEventGraphs(zipEntries, newBot.id, prisma, pluginMap);
 
         return newBot;

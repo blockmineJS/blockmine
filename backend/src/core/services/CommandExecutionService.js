@@ -258,6 +258,18 @@ class CommandExecutionService {
     }
 
     clearBotUserCache(botId) {
+        if (!this._pendingUserCacheClears) this._pendingUserCacheClears = new Map();
+        const pending = this._pendingUserCacheClears.get(botId);
+        if (pending) clearTimeout(pending);
+        const timer = setTimeout(() => {
+            this._pendingUserCacheClears.delete(botId);
+            this._flushBotUserCache(botId);
+        }, 500);
+        if (typeof timer.unref === 'function') timer.unref();
+        this._pendingUserCacheClears.set(botId, timer);
+    }
+
+    _flushBotUserCache(botId) {
         const prefix = `${botId}:`;
         if (UserService.cache && typeof UserService.cache.keys === 'function') {
             for (const key of UserService.cache.keys()) {

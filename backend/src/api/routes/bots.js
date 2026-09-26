@@ -93,15 +93,14 @@ const conditionalListAuth = (req, res, next) => {
 router.post('/:id/restart', conditionalRestartAuth, authenticateUniversal, checkBotAccess, async (req, res) => {
     try {
         const botId = parseInt(req.params.id, 10);
-        botManager.stopBot(botId);
-        setTimeout(async () => {
-            const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true, proxy: true } });
-            if (!botConfig) {
-                return res.status(404).json({ success: false, message: 'Бот не найден' });
-            }
-            botManager.startBot(botConfig);
-            res.status(202).json({ success: true, message: 'Команда на перезапуск отправлена.' });
-        }, 1000);
+        const botConfig = await prisma.bot.findUnique({ where: { id: botId }, include: { server: true, proxy: true } });
+        if (!botConfig) {
+            return res.status(404).json({ success: false, message: 'Бот не найден' });
+        }
+        res.status(202).json({ success: true, message: 'Команда на перезапуск отправлена.' });
+        botManager.restartBot(botId, botConfig).catch((error) => {
+            console.error(`[API] Ошибка перезапуска бота ${botId}:`, error);
+        });
     } catch (error) {
         console.error(`[API] Ошибка перезапуска бота ${req.params.id}:`, error);
         res.status(500).json({ success: false, message: 'Ошибка при перезапуске бота: ' + error.message });
@@ -2443,28 +2442,53 @@ router.post('/import/create', authorize('bot:create'), upload.single('file'), as
         const zip = parseImportZip(req.file.buffer);
 
         const useProxyId = proxyId ? parseInt(proxyId, 10) : null;
-        const newBot = await importBotFromZip(zip, {
-            config: {
-                username,
-                prefix,
-                note,
-                owners: owners || '',
-                serverId: parseInt(serverId, 10),
-                password: password ? encrypt(password) : null,
-                proxyId: useProxyId,
-                proxyHost: useProxyId ? null : (proxyHost || null),
-                proxyPort: useProxyId ? null : sanitizeProxyPort(proxyPort),
-                proxyUsername: useProxyId ? null : (proxyUsername || null),
-                proxyPassword: useProxyId ? null : (proxyPassword ? encrypt(proxyPassword) : null),
-                autoRename: false,
-            },
-            prisma,
-            pluginManager,
-            setupDefaultPermissions: setupDefaultPermissionsForBot,
-        });
+        res.status(200);
+        res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('X-Accel-Buffering', 'no');
+        if (typeof res.flushHeaders === 'function') res.flushHeaders();
+        res.socket?.setNoDelay?.(true);
+        const send = (event) => {
+            if (event.type === 'progress' && !event.elapsedMs) {
+                const where = event.name ? ` ${event.index}/${event.total} ${event.name}` : '';
+                console.log(`[Import] ${event.stage}${where}${event.step ? ` ${event.step}` : ''}`);
+            }
+            res.write(`${JSON.stringify(event)}\n`);
+        };
 
-        res.status(201).json(newBot);
+        try {
+            const newBot = await importBotFromZip(zip, {
+                config: {
+                    username,
+                    prefix,
+                    note,
+                    owners: owners || '',
+                    serverId: parseInt(serverId, 10),
+                    password: password ? encrypt(password) : null,
+                    proxyId: useProxyId,
+                    proxyHost: useProxyId ? null : (proxyHost || null),
+                    proxyPort: useProxyId ? null : sanitizeProxyPort(proxyPort),
+                    proxyUsername: useProxyId ? null : (proxyUsername || null),
+                    proxyPassword: useProxyId ? null : (proxyPassword ? encrypt(proxyPassword) : null),
+                    autoRename: false,
+                },
+                prisma,
+                pluginManager,
+                setupDefaultPermissions: setupDefaultPermissionsForBot,
+                onProgress: (event) => send({ type: 'progress', ...event }),
+            });
+            send({ type: 'done', bot: newBot });
+            res.end();
+        } catch (error) {
+            const message = error.code === 'P2002'
+                ? 'Бот с таким именем уже существует'
+                : (error.statusCode ? error.message : 'Не удалось создать бота с импортированными данными');
+            console.error('[API Error] /bots/import/create:', error);
+            send({ type: 'error', error: message });
+            res.end();
+        }
     } catch (error) {
+        if (res.headersSent) return;
         if (error.code === 'P2002') {
             return res.status(409).json({ error: 'Бот с таким именем уже существует' });
         }

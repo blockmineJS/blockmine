@@ -416,6 +416,21 @@ describe('CommandExecutionService', () => {
         });
     });
 
+    describe('clearBotUserCache', () => {
+        test('несколько сбросов подряд уходят одним сообщением', () => {
+            mockProcessManager.sendMessage = jest.fn();
+
+            service.clearBotUserCache(1);
+            service.clearBotUserCache(1);
+            expect(mockProcessManager.sendMessage).not.toHaveBeenCalled();
+
+            jest.advanceTimersByTime(500);
+
+            expect(mockProcessManager.sendMessage).toHaveBeenCalledTimes(1);
+            expect(mockProcessManager.sendMessage).toHaveBeenCalledWith(1, { type: 'invalidate_all_user_cache' });
+        });
+    });
+
     describe('handleAddPermissionsToGroup', () => {
         test('должен добавить права в группу', async () => {
             mockGroupRepository.findByName.mockResolvedValue({ id: 1, name: 'Admin' });

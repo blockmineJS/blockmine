@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const fse = require('fs-extra');
 const path = require('path');
 
@@ -9,6 +9,40 @@ function isValidPackageName(name) {
     if (typeof name !== 'string' || name.length === 0 || name.length > 214) return false;
     if (name.startsWith('.') || name.startsWith('_')) return false;
     return NPM_PACKAGE_NAME_PATTERN.test(name);
+}
+
+function runCommandAsync(cmd, cwd, { timeoutMs = DEFAULT_TIMEOUT_MS, sendLog = console.log } = {}) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (result) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(result);
+        };
+        const child = spawn(cmd, { cwd, shell: true, windowsHide: true });
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => {
+            child.kill();
+            finish({ ok: false, detail: 'timeout' });
+        }, timeoutMs);
+        child.stdout?.on('data', (chunk) => { stdout += chunk.toString(); });
+        child.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
+        child.on('error', (error) => {
+            sendLog(`[npm] Команда '${cmd}' завершилась с ошибкой: ${error.message}`);
+            finish({ ok: false, error, detail: error.message });
+        });
+        child.on('close', (code) => {
+            if (code === 0) {
+                finish({ ok: true });
+                return;
+            }
+            const detail = (stderr || stdout || `code ${code}`).split('\n').slice(-3).join(' | ');
+            sendLog(`[npm] Команда '${cmd}' завершилась с ошибкой: ${detail}`);
+            finish({ ok: false, detail });
+        });
+    });
 }
 
 function runCommand(cmd, cwd, { timeoutMs = DEFAULT_TIMEOUT_MS, sendLog = console.log } = {}) {
@@ -25,7 +59,7 @@ function runCommand(cmd, cwd, { timeoutMs = DEFAULT_TIMEOUT_MS, sendLog = consol
 }
 
 async function installDependencies(pluginPath, options = {}) {
-    const { sendLog = console.log, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+    const { sendLog = console.log, timeoutMs = DEFAULT_TIMEOUT_MS, onWait } = options;
     const packageJsonPath = path.join(pluginPath, 'package.json');
     if (!await fse.pathExists(packageJsonPath)) return { installed: false, reason: 'no-package-json' };
 
@@ -39,6 +73,18 @@ async function installDependencies(pluginPath, options = {}) {
 
     const hasDeps = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
     if (!hasDeps) return { installed: false, reason: 'no-deps' };
+
+    const stampPath = path.join(pluginPath, '.bm-installed-deps.json');
+    const nextStamp = JSON.stringify(packageJson.dependencies || {});
+    const nodeModulesPath = path.join(pluginPath, 'node_modules');
+    let previousStamp = '';
+    if (await fse.pathExists(stampPath)) {
+        previousStamp = (await fse.readFile(stampPath, 'utf8')).trim();
+    }
+    if (await fse.pathExists(nodeModulesPath) && (previousStamp === '' || previousStamp === nextStamp)) {
+        if (previousStamp !== nextStamp) await fse.writeFile(stampPath, nextStamp);
+        return { installed: false, reason: 'up-to-date' };
+    }
 
     const packageManagerField = typeof packageJson.packageManager === 'string' ? packageJson.packageManager : '';
     const prefersPnpm = /pnpm/i.test(packageManagerField);
@@ -55,9 +101,21 @@ async function installDependencies(pluginPath, options = {}) {
     attempts.push('npm install --omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts');
 
     for (const cmd of attempts) {
-        const result = runCommand(cmd, pluginPath, { timeoutMs, sendLog });
+        const started = Date.now();
+        const pulse = () => {
+            if (typeof onWait === 'function') onWait({ command: cmd, elapsedMs: Date.now() - started });
+        };
+        pulse();
+        const timer = setInterval(pulse, 3000);
+        let result;
+        try {
+            result = await runCommandAsync(cmd, pluginPath, { timeoutMs, sendLog });
+        } finally {
+            clearInterval(timer);
+        }
         if (result.ok) {
             sendLog(`[npm] Зависимости установлены через '${cmd}'.`);
+            await fse.writeFile(stampPath, nextStamp);
             return { installed: true, command: cmd };
         }
     }

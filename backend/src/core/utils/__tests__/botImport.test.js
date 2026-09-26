@@ -102,6 +102,7 @@ describe('botImport security guards', () => {
                 { name: 'hi', pluginOwnerId: 5 },
             ])));
 
+            const events = [];
             const prisma = {
                 bot: {
                     findFirst: async () => null,
@@ -126,6 +127,7 @@ describe('botImport security guards', () => {
                     prisma,
                     pluginManager: {},
                     setupDefaultPermissions: async () => {},
+                    onProgress: (event) => events.push(event),
                 });
             } finally {
                 await fse.remove(pluginDir);
@@ -133,6 +135,10 @@ describe('botImport security guards', () => {
 
             expect(created).toHaveLength(1);
             expect(created[0].pluginOwnerId).toBe(9);
+            expect(events).toEqual(expect.arrayContaining([
+                { stage: 'bot' },
+                { stage: 'plugin', step: 'files', name: 'demo', index: 1, total: 1 },
+            ]));
         });
     });
 });

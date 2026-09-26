@@ -746,7 +746,8 @@ process.on('message', async (message) => {
             let isReady = false;
 
             bot.events = new EventEmitter();
-            bot.events.setMaxListeners(30);
+            bot.setMaxListeners(100);
+            bot.events.setMaxListeners(100);
             bot.config = config;
             bot.sendLog = sendLog;
             bot.messageQueue = new MessageQueue(bot);
@@ -1230,6 +1231,40 @@ process.on('message', async (message) => {
             };
 
             bot.hydrateCommands = hydrateCommands;
+
+            bot.on('kicked', (reason) => {
+                let reasonText;
+                if (typeof reason === 'string') {
+                    try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
+                } else if (reason && typeof reason === 'object') {
+                    reasonText = reason.text || reason.message || reason.reason || JSON.stringify(reason);
+                } else {
+                    reasonText = String(reason);
+                }
+                sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}. Перезапуск.`);
+                process.exit(1);
+            });
+
+            bot.on('error', (err) => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
+                sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`);
+            });
+
+            bot.on('end', (reason) => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
+                const restartableReasons = ['socketClosed', 'keepAliveError'];
+                const exitCode = restartableReasons.includes(reason) ? 1 : 0;
+
+                sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
+                process.exit(exitCode);
+            });
+
             await hydrateCommands();
 
             await ensurePluginDependencies(config.plugins, sendLog);
@@ -1340,39 +1375,6 @@ process.on('message', async (message) => {
                     food: bot.food,
                     saturation: bot.foodSaturation
                 });
-            });
-
-            bot.on('kicked', (reason) => {
-                let reasonText;
-                if (typeof reason === 'string') {
-                    try { reasonText = JSON.parse(reason).text || reason; } catch (e) { reasonText = reason; }
-                } else if (reason && typeof reason === 'object') {
-                    reasonText = reason.text || reason.message || reason.reason || JSON.stringify(reason);
-                } else {
-                    reasonText = String(reason);
-                }
-                sendLog(`[Event: kicked] Меня кикнули. Причина: ${reasonText}. Перезапуск.`);
-                process.exit(1);
-            });
-
-            bot.on('error', (err) => {
-                if (connectionTimeout) {
-                    clearTimeout(connectionTimeout);
-                    connectionTimeout = null;
-                }
-                sendLog(`[Event: error] Произошла ошибка: ${err.stack || err.message}`);
-            });
-
-            bot.on('end', (reason) => {
-                if (connectionTimeout) {
-                    clearTimeout(connectionTimeout);
-                    connectionTimeout = null;
-                }
-                const restartableReasons = ['socketClosed', 'keepAliveError'];
-                const exitCode = restartableReasons.includes(reason) ? 1 : 0;
-
-                sendLog(`[Event: end] Отключен от сервера. Причина: ${reason}`);
-                process.exit(exitCode);
             });
 
             bot.on('playerJoined', (player) => {
@@ -1909,8 +1911,10 @@ process.on('message', async (message) => {
             connectionTimeout = null;
         }
         botReadySent = false;
-        if (bot) bot.quit();
-        else process.exit(0);
+        if (bot) {
+            try { bot.quit(); } catch (error) { sendLog(`[System] Ошибка при отключении: ${error.message}`); }
+        }
+        setTimeout(() => process.exit(0), 1000);
     } else if (message.type === MessageTypes.CHAT.CHAT) {
         if (bot && bot.entity) {
             const { message: msg, chatType, username } = message.payload;

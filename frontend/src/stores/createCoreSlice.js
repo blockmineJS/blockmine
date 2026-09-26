@@ -74,11 +74,10 @@ export const createCoreSlice = (set, get) => ({
         newSocket.on('disconnect', (reason) => console.log('Socket.IO отключен:', reason));
         newSocket.on('connect_error', (err) => console.warn(`[Socket] Ошибка подключения: ${err.message}`));
 
-        newSocket.on('bot:status', ({ botId, status, message }) => {
+        newSocket.on('bot:status', ({ botId, status }) => {
             set(state => {
                 state.botStatuses[botId] = status;
             });
-            if (message) get().appendLog(botId, `[SYSTEM] ${message}`);
         });
 
         newSocket.on('bot:log', ({ botId, log }) => get().appendLog(botId, log));

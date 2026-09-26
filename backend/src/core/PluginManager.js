@@ -173,9 +173,12 @@ class PluginManager {
         return result;
     }
 
-    async _installDependencies(pluginPath) {
+    async _installDependencies(pluginPath, hooks = {}) {
         try {
-            await installDependencies(pluginPath, { sendLog: (msg) => console.log(`[PluginManager] ${msg}`) });
+            await installDependencies(pluginPath, {
+                sendLog: (msg) => console.log(`[PluginManager] ${msg}`),
+                onWait: hooks.onWait,
+            });
         } catch (error) {
             console.error(`[PluginManager] Ошибка при установке зависимостей в ${pluginPath}:`, error);
             throw new Error('Не удалось установить зависимости плагина.');

@@ -71,8 +71,8 @@ class BotManager {
         return this.lifecycleService.stopBot(botId);
     }
 
-    async restartBot(botId) {
-        return this.lifecycleService.restartBot(botId);
+    async restartBot(botId, botConfig = null) {
+        return this.lifecycleService.restartBot(botId, botConfig);
     }
 
     isBotRunning(botId) {
