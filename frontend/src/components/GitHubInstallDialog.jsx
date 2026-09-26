@@ -10,6 +10,35 @@ import { apiHelper } from '@/lib/api';
 import { ArrowLeft, ExternalLink, Github, Loader2, Star } from 'lucide-react';
 import GitHubReadmeContent from '@/components/GitHubReadmeContent';
 
+function ManifestReview({ review, t }) {
+    if (!review) return null;
+    const missing = review.dependencies?.missing || [];
+    const permissions = review.permissions || [];
+    const settings = review.settings || {};
+    const hasSettings = (settings.added?.length || 0) + (settings.removed?.length || 0) + (settings.renamed?.length || 0) > 0;
+    if (!missing.length && !permissions.length && !hasSettings) return null;
+    return (
+        <div className="mt-4 space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="font-medium">{t('githubInstall.manifestTitle')}</div>
+            {missing.length > 0 && (
+                <p>{t('githubInstall.missingPlugins')}: {missing.join(', ')}</p>
+            )}
+            {permissions.length > 0 && (
+                <p>{t('githubInstall.declaredPermissions')}: {permissions.map((item) => item.name).join(', ')}</p>
+            )}
+            {settings.added?.length > 0 && (
+                <p>{t('githubInstall.settingsAdded')}: {settings.added.map((item) => item.label).join(', ')}</p>
+            )}
+            {settings.removed?.length > 0 && (
+                <p>{t('githubInstall.settingsRemoved')}: {settings.removed.map((item) => item.label).join(', ')}</p>
+            )}
+            {settings.renamed?.length > 0 && (
+                <p>{t('githubInstall.settingsRenamed')}: {settings.renamed.map((item) => `${item.from} → ${item.to}`).join(', ')}</p>
+            )}
+        </div>
+    );
+}
+
 const isValidGithubRepoUrl = (value) => {
     try {
         const url = new URL(value);
@@ -174,6 +203,7 @@ export default function GitHubInstallDialog({ botId, onInstall, onCancel, isInst
                                     {t('githubInstall.versionHint')}
                                 </p>
                             </div>
+                            <ManifestReview review={preview.manifestReview} t={t} />
                         </div>
 
                         <div className="rounded-lg border overflow-hidden">

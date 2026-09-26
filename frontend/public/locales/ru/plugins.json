@@ -74,7 +74,8 @@
     "deleting": "Удаление..."
   },
   "tooltips": {
-    "downloadZip": "Скачать zip"
+    "downloadZip": "Скачать zip",
+    "reload": "Перезагрузить"
   },
   "download": {
     "default": "Скачать плагин",
@@ -98,6 +99,9 @@
     "description": "Управление настройками и информацией о плагине",
     "emptySettings": "У этого плагина нет настроек.",
     "clearData": "Очистить данные",
+    "resetSettings": "К значениям по умолчанию",
+    "confirmResetTitle": "Сбросить настройки «{{name}}»?",
+    "confirmResetDescription": "Текущие значения заменятся на те, что указаны в package.json плагина.",
     "selectPlaceholder": "Выберите значение",
     "unknownSettingType": "Неизвестный тип настройки: {{type}}",
     "confirmClearData": "Вы уверены, что хотите удалить все данные плагина \"{{name}}\"? Это действие необратимо.",
@@ -156,6 +160,7 @@
     },
     "toasts": {
       "savedSettings": "Настройки плагина сохранены.",
+      "resetSettings": "Настройки сброшены к значениям по умолчанию.",
       "clearedData": "Данные плагина успешно очищены.",
       "entryDeleted": "Запись удалена",
       "entrySaved": "Запись сохранена"
@@ -185,7 +190,13 @@
     "readmeTitle": "README",
     "noReadme": "GitHub API не вернул README для этого репозитория.",
     "previewHint": "Загрузите предпросмотр репозитория, чтобы выбрать релиз или тег перед установкой.",
-    "install": "Установить"
+    "install": "Установить",
+    "manifestTitle": "До установки",
+    "missingPlugins": "Не хватает плагинов",
+    "declaredPermissions": "Права из манифеста",
+    "settingsAdded": "Новые настройки",
+    "settingsRemoved": "Убранные настройки",
+    "settingsRenamed": "Переименованные настройки"
   },
   "createDialog": {
     "title": "Создать новый плагин",

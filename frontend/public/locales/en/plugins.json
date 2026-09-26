@@ -118,7 +118,13 @@
     "readmeTitle": "README",
     "noReadme": "This repository does not expose a README through the GitHub API.",
     "previewHint": "Load the repository preview to choose a release tag before installation.",
-    "install": "Install"
+    "install": "Install",
+    "manifestTitle": "Before install",
+    "missingPlugins": "Missing plugins",
+    "declaredPermissions": "Permissions from the manifest",
+    "settingsAdded": "New settings",
+    "settingsRemoved": "Removed settings",
+    "settingsRenamed": "Renamed settings"
   },
   "createDialog": {
     "title": "Create new plugin",
@@ -245,6 +251,9 @@
     "description": "Manage plugin settings and information",
     "emptySettings": "This plugin has no settings.",
     "clearData": "Clear data",
+    "resetSettings": "Reset to defaults",
+    "confirmResetTitle": "Reset settings for \"{{name}}\"?",
+    "confirmResetDescription": "Current values will be replaced with the defaults from the plugin package.json.",
     "selectPlaceholder": "Select a value",
     "unknownSettingType": "Unknown setting type: {{type}}",
     "confirmClearData": "Are you sure you want to delete all data for plugin \"{{name}}\"? This action cannot be undone.",
@@ -303,6 +312,7 @@
     },
     "toasts": {
       "savedSettings": "Plugin settings saved.",
+      "resetSettings": "Settings were reset to their defaults.",
       "clearedData": "Plugin data cleared successfully.",
       "entryDeleted": "Entry deleted.",
       "entrySaved": "Entry saved."
@@ -319,7 +329,7 @@
     "pluginUpdated": "Plugin updated. Restart the bot.",
     "pluginCreated": "Plugin \"{{name}}\" created successfully.",
     "pluginForked": "Plugin \"{{name}}\" was converted to a local plugin.",
-    "pluginReloaded": "Plugin reloaded, settings reset."
+    "pluginReloaded": "Plugin reloaded. Settings were not changed."
   },
   "details": {
     "title": "Plugin information",

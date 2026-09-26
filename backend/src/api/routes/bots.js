@@ -670,6 +670,31 @@ router.get('/:botId/plugins', authenticateUniversal, checkBotAccess, authorize('
     } catch (error) { res.status(500).json({ error: 'Не удалось получить плагины бота' }); }
 });
 
+async function loadManifestReview(botId, owner, repo, ref) {
+    try {
+        const payload = await fetchGithubJson(
+            `https://api.github.com/repos/${owner}/${repo}/contents/package.json?ref=${encodeURIComponent(ref || 'HEAD')}`
+        );
+        if (!payload?.content) return null;
+        const packageJson = JSON.parse(Buffer.from(payload.content, 'base64').toString('utf8'));
+        const existing = await prisma.installedPlugin.findFirst({
+            where: { botId, name: packageJson.name },
+        });
+        let previousManifest = null;
+        if (existing?.manifest) {
+            try {
+                previousManifest = JSON.parse(existing.manifest);
+            } catch {
+                previousManifest = null;
+            }
+        }
+        return pluginManager.reviewManifest(botId, packageJson, previousManifest);
+    } catch (error) {
+        console.warn(`[GitHub Preview] package.json review failed for ${owner}/${repo}:`, error.message);
+        return null;
+    }
+}
+
 router.post('/:botId/plugins/install/github/preview', githubPreviewLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { repoUrl } = req.body;
 
@@ -723,7 +748,8 @@ router.post('/:botId/plugins/install/github/preview', githubPreviewLimiter, auth
             latestReleaseTag: latestRelease?.tag_name || null,
             tags,
             readme,
-            readmeHtml
+            readmeHtml,
+            manifestReview: await loadManifestReview(parseInt(req.params.botId, 10), owner, repo, repoInfo.default_branch),
         });
     } catch (error) {
         if (error.name === 'AbortError') {
