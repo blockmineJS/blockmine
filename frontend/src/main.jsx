@@ -5,6 +5,7 @@ import './index.css';
 import './i18n';
 
 import { useAppStore } from '@/stores/appStore';
+import { DEFAULT_THEME, THEME_MODES, THEME_STORAGE_KEY } from '@/lib/themeUtils';
 import { Toaster } from "@/components/ui/toaster";
 import { Loader2 } from 'lucide-react';
 import LanguageSelectModal from '@/components/LanguageSelectModal';
@@ -40,8 +41,8 @@ function Root() {
   const setTheme = useAppStore(state => state.setTheme);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('blockmine-theme') || 'system';
-    setTheme(savedTheme);
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    setTheme(THEME_MODES.includes(storedTheme) ? storedTheme : DEFAULT_THEME);
   }, [setTheme]);
 
   useEffect(() => {

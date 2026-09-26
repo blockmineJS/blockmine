@@ -1,20 +1,17 @@
 import {
   applyThemeToDocument,
   CUSTOM_THEME_STORAGE_KEY,
+  DEFAULT_THEME,
   getDefaultCustomTheme,
   loadStoredCustomTheme,
+  readStoredThemeMode,
   resolveRenderedTheme,
   sanitizeCustomTheme,
+  THEME_MODES,
   THEME_STORAGE_KEY,
 } from '@/lib/themeUtils';
 
-const getInitialTheme = () => {
-  if (typeof window === 'undefined') {
-    return 'system';
-  }
-
-  return localStorage.getItem(THEME_STORAGE_KEY) || 'system';
-};
+const getInitialTheme = () => readStoredThemeMode();
 
 const persistCustomTheme = (customTheme) => {
   if (typeof window === 'undefined') {
@@ -35,14 +32,15 @@ const persistThemeMode = (theme) => {
 export const createThemeSlice = (set, get) => {
   const initialTheme = getInitialTheme();
   const initialCustomTheme = loadStoredCustomTheme();
+  const initialResolvedTheme = applyThemeToDocument(initialTheme, initialCustomTheme);
 
   return {
     theme: initialTheme,
-    resolvedTheme: resolveRenderedTheme(initialTheme, initialCustomTheme),
+    resolvedTheme: initialResolvedTheme,
     customTheme: initialCustomTheme,
 
     setTheme: (theme) => {
-      const normalizedTheme = ['light', 'dark', 'system', 'custom'].includes(theme) ? theme : 'system';
+      const normalizedTheme = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME;
       const customTheme = sanitizeCustomTheme(get().customTheme);
       const resolvedTheme = applyThemeToDocument(normalizedTheme, customTheme);
 

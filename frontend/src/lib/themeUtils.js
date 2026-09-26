@@ -1,5 +1,12 @@
 export const THEME_STORAGE_KEY = 'blockmine-theme';
 export const CUSTOM_THEME_STORAGE_KEY = 'blockmine-custom-theme';
+export const DEFAULT_THEME = 'dark';
+export const THEME_MODES = ['light', 'dark', 'system', 'custom'];
+
+const THEME_COLOR_META = {
+  dark: '#09090b',
+  light: '#ffffff',
+};
 
 export const CUSTOM_THEME_COLOR_FIELDS = {
   background: { cssVar: 'background', labelKey: 'theme.editor.colors.background.label', descriptionKey: 'theme.editor.colors.background.description' },
@@ -293,6 +300,28 @@ export function loadStoredCustomTheme() {
   }
 }
 
+export function readStoredThemeMode() {
+  if (typeof window === 'undefined') {
+    return DEFAULT_THEME;
+  }
+
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return THEME_MODES.includes(stored) ? stored : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+function syncThemeColorMeta(resolvedTheme) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    return;
+  }
+
+  meta.setAttribute('content', resolvedTheme === 'dark' ? THEME_COLOR_META.dark : THEME_COLOR_META.light);
+}
+
 export function resolveRenderedTheme(theme, customTheme) {
   if (theme === 'system') {
     if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -320,6 +349,7 @@ export function applyThemeToDocument(theme, customTheme) {
   clearCustomThemeVariables(root);
   root.classList.add(resolvedTheme);
   root.dataset.themeMode = theme;
+  syncThemeColorMeta(resolvedTheme);
 
   if (theme === 'custom') {
     applyCustomThemeVariables(root, sanitizeCustomTheme(customTheme));
@@ -339,6 +369,7 @@ export function applyCustomThemePreviewToDocument(customTheme) {
   root.classList.remove('light', 'dark');
   root.classList.add(sanitizedTheme.baseTheme);
   root.dataset.themeMode = 'custom';
+  syncThemeColorMeta(sanitizedTheme.baseTheme);
   clearCustomThemeVariables(root);
   applyCustomThemeVariables(root, sanitizedTheme);
 }

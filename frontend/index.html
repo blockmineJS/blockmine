@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,7 +10,37 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#09090b">
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var theme = 'dark';
+        try {
+          var stored = localStorage.getItem('blockmine-theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system' || stored === 'custom') {
+            theme = stored;
+          }
+        } catch (e) {}
+        var resolved = 'dark';
+        if (theme === 'light') {
+          resolved = 'light';
+        } else if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } else if (theme === 'custom') {
+          try {
+            var custom = JSON.parse(localStorage.getItem('blockmine-custom-theme') || '{}');
+            resolved = custom.baseTheme === 'light' ? 'light' : 'dark';
+          } catch (e) {}
+        }
+        root.classList.remove('light', 'dark');
+        root.classList.add(resolved);
+        root.dataset.themeMode = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute('content', resolved === 'dark' ? '#09090b' : '#ffffff');
+        }
+      })();
+    </script>
 
   </head>
   <body>
