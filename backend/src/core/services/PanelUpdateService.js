@@ -248,6 +248,17 @@ async function readLocalGitState() {
     }
 }
 
+async function restoreLockfiles() {
+    const files = ['package-lock.json', 'frontend/package-lock.json'];
+    for (const file of files) {
+        try {
+            await runGit(['checkout', '--', file]);
+        } catch {
+            continue;
+        }
+    }
+}
+
 async function resolveRemoteHead() {
     const listing = await runGit(['ls-remote', '--symref', OFFICIAL_GIT_URL, 'HEAD']);
     let branch = 'master';
@@ -1079,6 +1090,9 @@ async function runPanelUpdateJob(branch, restartMethod) {
 
         emitProgress({ stage: 'fetch', percent: 20, message: 'fetch', log: progress.log || [], line: `git fetch ${OFFICIAL_GIT_URL} ${branch}` });
         await runLogged('git', ['fetch', OFFICIAL_GIT_URL, branch], 120000);
+
+        emitProgress({ stage: 'pull', percent: 30, message: 'pull', line: 'restore package-lock.json' });
+        await restoreLockfiles();
 
         emitProgress({ stage: 'pull', percent: 35, message: 'pull', line: 'git merge --ff-only FETCH_HEAD' });
         await runLogged('git', ['merge', '--ff-only', 'FETCH_HEAD'], 120000);

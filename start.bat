@@ -106,6 +106,9 @@ if "%UPDATE_BRANCH%"=="" set "UPDATE_BRANCH=master"
 echo [BlockMine] git fetch %UPDATE_BRANCH%
 git fetch --quiet https://github.com/blockmineJS/blockmine.git %UPDATE_BRANCH%
 if errorlevel 1 goto update_failed
+echo [BlockMine] restore package-lock.json
+git checkout -- package-lock.json
+if exist frontend\package-lock.json git checkout -- frontend/package-lock.json
 echo [BlockMine] git merge --ff-only
 git merge --ff-only FETCH_HEAD
 if errorlevel 1 goto update_failed
