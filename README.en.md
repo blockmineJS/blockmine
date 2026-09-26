@@ -17,7 +17,7 @@
   </p>
 </div>
 
-**BlockMine** is a panel for building Minecraft bots without writing code. Install Node.js, run `npx blockmine`, create a bot in the browser, and draw its behavior in the visual editor. Plugins, a live console, and graph debugging are included. A built-in MCP hands the panel to AI agents. Through it they run bots, servers, and proxies, write and install plugin code, and configure commands, permissions, player groups, and scheduled tasks.
+**BlockMine** is a panel for building Minecraft bots without writing code. Install Node.js, run `npx blockmine`, create a bot in the browser, and draw its behavior in the visual editor. Plugins, a live console, and graph debugging are included. A built-in MCP hands the panel to an AI agent. You can give it several jobs at once: read what the server prints in chat and in the console, turn those lines into commands and functions, write a plugin, reload it on the live bot, and check the reply. The same conversation also covers servers, proxies, permissions, groups, and scheduled tasks.
 
 More examples at - https://t.me/blockmineJs
 
@@ -89,10 +89,10 @@ More examples at - https://t.me/blockmineJs
 
 ### 🤖 MCP Server (for AI assistants)
 - **Built-in** [Model Context Protocol](https://modelcontextprotocol.io/) endpoint at `POST /api/mcp`
-- **55 tools**: bots, servers, proxies, plugins, players and permissions, commands, chat, scheduler, plugin files on the host
-- **Auth** via Panel API Key (`pk_*`) — same keys used by the WebSocket API
-- **HTTP connection** — Cursor, Claude, and any client with HTTP MCP
-- **`plugin-author` prompt** — full plugin-development guide served by the MCP itself, AI clients fetch it with a single `prompts/get`
+- **One conversation, many jobs:** server output, plugin code, an in-game check, permissions, and the scheduler
+- **Writes the plugin itself:** files, commands, and functions from the `plugin-author` contract, reloaded without disconnecting the bot
+- **Checks it itself:** sends a message in the right chat, waits for the reply, and compares it with the console log
+- **65 tools**, panel key `pk_*`, HTTP from Cursor, Claude, and any MCP client
 
 ---
 
@@ -338,9 +338,17 @@ Automate bot actions on schedule:
 
 ---
 
-## 🤖 MCP — drive BlockMine with AI assistants
+## 🤖 MCP — the agent takes the work
 
-BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api/mcp`. Any MCP-compatible AI client — Claude Desktop, Cursor, Cline, Claude Code — can manage your bots, author plugins, read settings and logs through a normal chat with the AI.
+BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api/mcp`. Claude Desktop, Cursor, Cline, and Claude Code connect to the panel and drive it in a normal chat.
+
+You can hand the agent a batch of jobs at once:
+
+1. **Reads server output.** Chat, whispers, clan chat, and the bot console. The reply lines show how the server names a command and what is still missing.
+2. **Builds functions from that output.** Writes a new plugin or extends one already installed: commands, handlers, settings. The API contract is the `plugin-author` prompt.
+3. **Checks it on the live bot.** Reloads the plugin without disconnecting. Sends into the right chat, waits for the reply, and compares it with the log. A wrong reply goes back into the code and gets checked again.
+4. **Finishes the surrounding setup.** Permissions and groups, command settings, a scheduled task, a catalog or GitHub install, a server, and a proxy.
+5. **Edits the open graph.** If a canvas is already open in the editor, the agent adds nodes and links in that session. A person saves the graph to disk.
 
 ### What the AI gets through MCP
 
@@ -351,9 +359,10 @@ BlockMine ships a **built-in MCP server** (Model Context Protocol) on `POST /api
 - **Players, groups, and permissions:** `get_bot_users`, `get_user_info`, `set_player_blacklist`, `add_player_to_group`, `remove_player_from_group`, `get_bot_groups`, `create_bot_group`, `grant_group_permission`, `revoke_group_permission`, `get_bot_permissions`
 - **Commands:** `get_bot_commands`, `update_bot_command`
 - **Scheduler:** `list_tasks`, `create_task`, `update_task`, `delete_task`
+- **Open graph:** `list_open_graphs`, `get_open_graph`, `add_graph_node`, `update_graph_node`, `move_graph_nodes`, `delete_graph_nodes`, `add_graph_connection`, `delete_graph_connections`, `set_graph_variable`, `delete_graph_variable`. Edits show up in the editor and are not written to disk until a person saves the canvas
 - **`plugin-author` prompt** — the full BlockMine plugin-development guide, served by MCP and fetched by the AI with a single `prompts/get`
 
-`send_message_to_bot` takes a chat type (`chat`, `private`, `command`, or a type registered by a plugin) and can wait for the chat reply.
+`send_message_to_bot` takes a chat type (`chat`, `private`, `command`, or a type a plugin registered, such as clan) and can wait for the reply. Server and plugin replies are in `get_chat_history`. Process output is in `get_bot_logs`.
 
 ### Setup
 
