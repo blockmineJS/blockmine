@@ -125,7 +125,7 @@ router.post('/:id/reload', authenticateUniversal, authorize('plugin:settings:edi
     try {
         const pluginId = parseInt(req.params.id);
         const updatedPlugin = await pluginManager.reloadLocalPlugin(pluginId);
-        res.status(200).json({ message: 'Плагин перезагружен, настройки сброшены.', plugin: updatedPlugin });
+        res.status(200).json({ message: 'Плагин перезагружен. Настройки не изменены.', plugin: updatedPlugin });
     } catch (error) {
         console.error(`[API Error] /plugins/:id/reload:`, error);
         res.status(500).json({ error: error.message || 'Не удалось перезагрузить плагин.' });

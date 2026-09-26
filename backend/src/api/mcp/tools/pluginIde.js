@@ -312,10 +312,10 @@ function register(server, { user }) {
     }));
 
     server.registerTool('reload_plugin', {
-        description: 'After editing plugin files, reload the plugin by restarting the bot. Convenience wrapper around restart_bot for cases when the agent only knows pluginName.',
+        description: 'Reload one plugin in the running bot process. The bot stays on the server.',
         inputSchema: {
             botId: z.number().int(),
-            pluginName: z.string().min(1).describe('Used only to verify the plugin exists before restart'),
+            pluginName: z.string().min(1),
         },
     }, wrap('reload_plugin', async ({ botId, pluginName }) => {
         const permErr = requirePermission(user, 'bot:start_stop');
@@ -327,15 +327,9 @@ function register(server, { user }) {
         if (!plugin) return err('Plugin not found');
 
         const { botManager } = require('../../../core/services');
-        botManager.stopBot(botId);
-        setTimeout(async () => {
-            const botConfig = await prisma.bot.findUnique({
-                where: { id: botId },
-                include: { server: true, proxy: true },
-            });
-            if (botConfig) botManager.startBot(botConfig);
-        }, 1000);
-        return ok({ success: true, message: 'Bot restart dispatched to reload plugin', pluginName });
+        const result = await botManager.reloadPlugins(botId, plugin.name);
+        if (!result?.success) return err(result?.message || 'Bot is not running');
+        return ok({ success: true, message: 'Plugin reload dispatched', pluginName: plugin.name });
     }));
 }
 

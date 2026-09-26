@@ -139,8 +139,8 @@ class BotManager {
         return this.lifecycleService.lookAt(botId, position);
     }
 
-    async reloadPlugins(botId) {
-        return this.lifecycleService.reloadPlugins(botId);
+    async reloadPlugins(botId, pluginName = null) {
+        return this.lifecycleService.reloadPlugins(botId, pluginName);
     }
 
     sendServerCommandToBot(botId, command) {

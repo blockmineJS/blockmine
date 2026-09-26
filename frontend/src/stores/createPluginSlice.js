@@ -451,7 +451,7 @@ export const createPluginSlice = (set, get) => {
       await apiHelper(
         `/api/plugins/${pluginId}/reload`,
         { method: 'POST' },
-        translatePlugins('toasts.pluginReloaded', 'Плагин перезагружен, настройки сброшены.')
+        translatePlugins('toasts.pluginReloaded', 'Плагин перезагружен. Настройки не изменены.')
       );
       await get().fetchInstalledPlugins(botId, true);
     },

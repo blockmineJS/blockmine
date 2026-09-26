@@ -228,7 +228,7 @@ function InstalledPluginCard({
               <RefreshCw className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t('tooltips.reloadFromPackage', { defaultValue: 'Перезагрузить из package.json' })}</TooltipContent>
+          <TooltipContent>{t('tooltips.reload')}</TooltipContent>
         </Tooltip>
       )}
       {isForkable && onFork && (

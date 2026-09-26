@@ -9,6 +9,7 @@ class BotProcessManager {
         this.pendingPlayerListRequests = new Map();
         this.pendingLiveStateRequests = new Map();
         this.pendingCommandRequests = new Map();
+        this.pendingPluginUnloads = new Map();
         this.uiSubscriptions = new Map(); // botId -> Map<pluginName -> Set<socket>>
     }
 
@@ -39,6 +40,26 @@ class BotProcessManager {
         this.processes.set(botConfig.id, child);
 
         return child;
+    }
+
+    waitForPluginUnload(requestId, timeoutMs = 8000) {
+        return new Promise((resolve) => {
+            const timer = setTimeout(() => {
+                this.pendingPluginUnloads.delete(requestId);
+                resolve(false);
+            }, timeoutMs);
+            this.pendingPluginUnloads.set(requestId, () => {
+                clearTimeout(timer);
+                resolve(true);
+            });
+        });
+    }
+
+    resolvePluginUnload(requestId) {
+        const done = this.pendingPluginUnloads.get(requestId);
+        if (!done) return;
+        this.pendingPluginUnloads.delete(requestId);
+        done();
     }
 
     sendMessage(botId, message) {

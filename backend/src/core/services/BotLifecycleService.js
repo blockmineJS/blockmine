@@ -344,9 +344,11 @@ class BotLifecycleService {
         return { success: false };
     }
 
-    async reloadPlugins(botId) {
-        if (this.processManager.sendMessage(botId, { type: 'plugins:reload' })) {
-            this.logger.info({ botId }, 'Отправлен plugins:reload');
+    async reloadPlugins(botId, pluginName = null) {
+        const payload = { type: 'plugins:reload' };
+        if (pluginName) payload.pluginName = pluginName;
+        if (this.processManager.sendMessage(botId, payload)) {
+            this.logger.info({ botId, pluginName }, 'Отправлен plugins:reload');
             const { getIOSafe } = require('../../real-time/socketHandler');
             getIOSafe().emit('bot:plugins_reloaded', { botId });
             return { success: true, message: 'Команда на перезагрузку плагинов отправлена.' };

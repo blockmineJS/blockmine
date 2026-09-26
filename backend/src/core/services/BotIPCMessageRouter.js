@@ -50,6 +50,7 @@ class BotIPCMessageRouter {
             'get_live_state_response': () => this.processManager.resolveLiveStateRequest(message.requestId, message.payload),
             'get_nearby_entities_response': () => this._handleNearbyEntitiesResponse(message),
             'execute_command_response': () => this._handleCommandResponse(message),
+            'plugins:unloaded': () => this.processManager.resolvePluginUnload(message.requestId),
             'register_command': () => this._handleRegisterCommand(botId, message),
             'register_permissions': () => this._handlePermissions(botId, message),
             'register_group': () => this._handleGroup(botId, message),

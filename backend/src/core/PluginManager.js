@@ -17,8 +17,7 @@ const {
 const { installDependencies } = require('./utils/npmInstall');
 const { assertSafeZip, assertArchiveLimits } = require('./utils/zipSafe');
 const TtlCache = require('./utils/ttlCache');
-const { deepMergeSettings } = require('./utils/settingsMerger');
-const { buildDefaultSettings } = require('./utils/pluginSettings');
+const { pluginDependencySatisfied, diffSettings, listDeclaredPermissions } = require('./utils/pluginManifest');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
@@ -165,11 +164,9 @@ class PluginManager {
                 continue;
             }
             const installedVersion = installedMap.get(depName);
-            if ((depVersion.startsWith('^') || depVersion.startsWith('~'))) {
-                const requiredBase = depVersion.slice(1);
-                if (!installedVersion.startsWith(requiredBase.split('.')[0])) {
-                    result.warnings.push(`${depName}: установлена v${installedVersion}, требуется ${depVersion}`);
-                }
+            if (!pluginDependencySatisfied(installedVersion, depVersion)) {
+                result.missing.push(`${depName} (установлена ${installedVersion}, требуется ${depVersion})`);
+                result.isValid = false;
             }
         }
 
@@ -545,6 +542,38 @@ class PluginManager {
         }
     }
 
+    async reviewManifest(botId, packageJson, previousManifest = null) {
+        const manifest = packageJson?.botpanel || {};
+        const dependencies = await this.checkPluginDependencies(botId, packageJson);
+        const declared = listDeclaredPermissions(manifest);
+        const existing = await this.prisma.permission.findMany({
+            where: { botId: Number(botId) },
+            select: { name: true },
+        });
+        const existingNames = new Set(existing.map((item) => item.name));
+        const permissions = declared.map((item) => ({
+            ...item,
+            exists: existingNames.has(item.name),
+        }));
+        const settings = diffSettings(previousManifest?.settings || {}, manifest.settings || {});
+        return { dependencies, permissions, settings };
+    }
+
+    async _unloadInBotProcess(botId, pluginName) {
+        const processManager = this.botManager?.processManager;
+        if (!processManager?.isRunning?.(botId)) return;
+        const { v4: uuidv4 } = require('uuid');
+        const requestId = uuidv4();
+        const pending = processManager.waitForPluginUnload(requestId);
+        const sent = processManager.sendMessage(botId, {
+            type: 'plugins:unload',
+            pluginName,
+            requestId,
+        });
+        if (!sent) return;
+        await pending;
+    }
+
     async deletePlugin(pluginId) {
         const plugin = await this.prisma.installedPlugin.findUnique({ where: { id: pluginId } });
         if (!plugin) throw new Error('Плагин не найден');
@@ -553,20 +582,9 @@ class PluginManager {
         console.log(`[PluginManager] Удаление плагина ${plugin.name} (ID: ${plugin.id})`);
 
         try {
-            const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : {};
-            const mainFile = manifest.main || 'index.js';
-            const entryPointPath = path.join(plugin.path, mainFile);
-            if (await fse.pathExists(entryPointPath)) {
-                this._clearPluginRequireCache(plugin.path);
-                const pluginModule = require(entryPointPath);
-                if (pluginModule && typeof pluginModule.onUnload === 'function') {
-                    await pluginModule.onUnload({ botId: plugin.botId, prisma: this.prisma });
-                }
-            }
+            await this._unloadInBotProcess(plugin.botId, plugin.name);
         } catch (error) {
-            console.error(`[PluginManager] Ошибка при выполнении хука onUnload для плагина ${plugin.name}:`, error);
-        } finally {
-            this._clearPluginRequireCache(plugin.path);
+            console.error(`[PluginManager] Ошибка onUnload в процессе бота для ${plugin.name}:`, error);
         }
 
         try {
@@ -891,17 +909,17 @@ class PluginManager {
         }
 
         const manifest = packageJson.botpanel || {};
-
-        let savedSettings = {};
-        if (plugin.settings) {
-            try {
-                savedSettings = JSON.parse(plugin.settings) || {};
-            } catch {
-                savedSettings = {};
-            }
+        const stampPath = path.join(pluginPath, '.bm-installed-deps.json');
+        const nextStamp = JSON.stringify(packageJson.dependencies || {});
+        let previousStamp = '';
+        if (await fse.pathExists(stampPath)) {
+            previousStamp = await fse.readFile(stampPath, 'utf8');
         }
-        const defaultSettings = await buildDefaultSettings(pluginPath, manifest.settings || {});
-        const mergedSettings = deepMergeSettings(defaultSettings, savedSettings);
+        const nodeModulesPath = path.join(pluginPath, 'node_modules');
+        if (nextStamp !== previousStamp || (nextStamp !== '{}' && !await fse.pathExists(nodeModulesPath))) {
+            await this._installDependencies(pluginPath);
+            await fse.writeFile(stampPath, nextStamp);
+        }
 
         const updatedPlugin = await this.prisma.installedPlugin.update({
             where: { id: pluginId },
@@ -909,12 +927,11 @@ class PluginManager {
                 version: packageJson.version,
                 description: packageJson.description || '',
                 manifest: JSON.stringify(manifest),
-                settings: JSON.stringify(mergedSettings),
             },
         });
 
         if (this.botManager) {
-            await this.botManager.reloadPlugins(plugin.botId);
+            await this.botManager.reloadPlugins(plugin.botId, plugin.name);
         }
 
         return updatedPlugin;

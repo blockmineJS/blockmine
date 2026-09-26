@@ -2141,6 +2141,16 @@ process.on('message', async (message) => {
                 sendLog(`[BotProcess] Ошибка lookAt: получены невалидные координаты: ${JSON.stringify(message.payload.position)}`);
             }
         }
+    } else if (message.type === 'plugins:unload') {
+        try {
+            const { unloadPluginByName } = require('./PluginLoader');
+            await unloadPluginByName(bot, message.pluginName, prisma);
+        } catch (error) {
+            sendLog(`[System] Ошибка выгрузки плагина ${message.pluginName}: ${error.message}`);
+        }
+        if (process.send) {
+            process.send({ type: 'plugins:unloaded', requestId: message.requestId });
+        }
     } else if (message.type === MessageTypes.PLUGINS.RELOAD) {
         sendLog('[System] Получена команда на перезагрузку плагинов...');
         try {
@@ -2151,8 +2161,19 @@ process.on('message', async (message) => {
                 if (typeof bot.hydrateCommands === 'function') {
                     await bot.hydrateCommands();
                 }
-                await initializePlugins(bot, newConfig.installedPlugins, prisma);
-                sendLog('[System] Плагины успешно перезагружены.');
+                if (message.pluginName) {
+                    const plugin = (newConfig.installedPlugins || []).find((item) => item.name === message.pluginName);
+                    if (!plugin) {
+                        sendLog(`[System] Плагин ${message.pluginName} не найден или выключен.`);
+                    } else {
+                        const { reloadInstalledPlugin } = require('./PluginLoader');
+                        await reloadInstalledPlugin(bot, plugin, prisma);
+                        sendLog(`[System] Плагин ${plugin.name} перезагружен.`);
+                    }
+                } else {
+                    await initializePlugins(bot, newConfig.installedPlugins, prisma);
+                    sendLog('[System] Плагины успешно перезагружены.');
+                }
             } else {
                 sendLog('[System] Не удалось получить новую конфигурацию для перезагрузки плагинов.');
             }
