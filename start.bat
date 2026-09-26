@@ -104,13 +104,13 @@ set /p UPDATE_BRANCH=<"%USERPROFILE%\.blockmine\update-requested.txt"
 del "%USERPROFILE%\.blockmine\update-requested.txt" >nul 2>&1
 if "%UPDATE_BRANCH%"=="" set "UPDATE_BRANCH=master"
 echo [BlockMine] git fetch %UPDATE_BRANCH%
-git fetch --quiet https://github.com/blockmineJS/blockmine.git %UPDATE_BRANCH%
+git fetch --quiet https://github.com/blockmineJS/blockmine.git +refs/heads/%UPDATE_BRANCH%:refs/panel-update/%UPDATE_BRANCH%
 if errorlevel 1 goto update_failed
 echo [BlockMine] restore package-lock.json
 git checkout -- package-lock.json
 if exist frontend\package-lock.json git checkout -- frontend/package-lock.json
 echo [BlockMine] git merge --ff-only
-git merge --ff-only FETCH_HEAD
+git merge --ff-only refs/panel-update/%UPDATE_BRANCH%
 if errorlevel 1 goto update_failed
 echo [BlockMine] npm install
 call npm install --no-fund --no-audit

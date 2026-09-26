@@ -3,6 +3,8 @@ const {
     firstLine,
     isDefaultBranch,
     isSafeRef,
+    officialUpdateRef,
+    officialFetchRefspec,
     mapGithubCommit,
     parseGitLogLine,
     parseListeningPids,
@@ -37,6 +39,12 @@ describe('PanelUpdateService helpers', () => {
         expect(isSafeRef('-c')).toBe(false);
         expect(isSafeRef('main; rm -rf /')).toBe(false);
         expect(isSafeRef('abc..def')).toBe(false);
+    });
+
+    test('обновление кладёт официальную ветку в свою ссылку, без FETCH_HEAD', () => {
+        expect(officialUpdateRef('master')).toBe('refs/panel-update/master');
+        expect(officialFetchRefspec('master')).toBe('+refs/heads/master:refs/panel-update/master');
+        expect(officialFetchRefspec('-c')).toBe('+refs/heads/master:refs/panel-update/master');
     });
 
     test('parseListeningPids достаёт PID из netstat', () => {

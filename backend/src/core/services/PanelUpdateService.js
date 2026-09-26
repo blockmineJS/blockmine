@@ -57,6 +57,16 @@ function isSafeRef(value) {
         && !value.includes('..');
 }
 
+function officialUpdateRef(branch) {
+    const safe = isSafeRef(branch) ? branch : 'master';
+    return `refs/panel-update/${safe}`;
+}
+
+function officialFetchRefspec(branch) {
+    const safe = isSafeRef(branch) ? branch : 'master';
+    return `+refs/heads/${safe}:${officialUpdateRef(safe)}`;
+}
+
 function readLocalPackageVersion() {
     try {
         const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'));
@@ -305,19 +315,23 @@ async function readRemoteSnapshotViaGit(localSha) {
         };
     }
 
-    await runGit(['fetch', '--quiet', OFFICIAL_GIT_URL, defaultBranch], { timeout: 120000 });
-    const message = firstLine(await runGit(['log', '-1', '--format=%s', 'FETCH_HEAD']));
-    const date = await runGit(['log', '-1', '--format=%cI', 'FETCH_HEAD']);
+    const remoteRef = officialUpdateRef(defaultBranch);
+    await runGit(
+        ['fetch', '--quiet', OFFICIAL_GIT_URL, officialFetchRefspec(defaultBranch)],
+        { timeout: 120000 }
+    );
+    const message = firstLine(await runGit(['log', '-n1', '--format=%s', remoteRef]));
+    const date = await runGit(['log', '-n1', '--format=%cI', remoteRef]);
     let version = '';
     try {
-        const pkgRaw = await runGit(['show', 'FETCH_HEAD:package.json']);
+        const pkgRaw = await runGit(['show', `${remoteRef}:package.json`]);
         version = JSON.parse(pkgRaw).version || '';
     } catch {
         version = '';
     }
 
-    const behindBy = Number(await runGit(['rev-list', '--count', 'HEAD..FETCH_HEAD'])) || 0;
-    const aheadBy = Number(await runGit(['rev-list', '--count', 'FETCH_HEAD..HEAD'])) || 0;
+    const behindBy = Number(await runGit(['rev-list', '--count', `HEAD..${remoteRef}`])) || 0;
+    const aheadBy = Number(await runGit(['rev-list', '--count', `${remoteRef}..HEAD`])) || 0;
     let compareStatus = 'unknown';
     if (behindBy > 0 && aheadBy > 0) compareStatus = 'diverged';
     else if (behindBy > 0) compareStatus = 'behind';
@@ -328,7 +342,7 @@ async function readRemoteSnapshotViaGit(localSha) {
         'log',
         `-n${MAX_COMMITS}`,
         '--format=%H%x1f%s%x1f%an%x1f%cI',
-        'HEAD..FETCH_HEAD',
+        `HEAD..${remoteRef}`,
     ]);
     const commits = log
         ? log.split(/\r?\n/).map(parseGitLogLine).filter(Boolean)
@@ -1088,14 +1102,16 @@ async function runPanelUpdateJob(branch, restartMethod) {
         await stopRunningPanel(method);
         await sleep(1500);
 
-        emitProgress({ stage: 'fetch', percent: 20, message: 'fetch', log: progress.log || [], line: `git fetch ${OFFICIAL_GIT_URL} ${branch}` });
-        await runLogged('git', ['fetch', OFFICIAL_GIT_URL, branch], 120000);
+        const fetchSpec = officialFetchRefspec(branch);
+        const updateRef = officialUpdateRef(branch);
+        emitProgress({ stage: 'fetch', percent: 20, message: 'fetch', log: progress.log || [], line: `git fetch ${OFFICIAL_GIT_URL} ${fetchSpec}` });
+        await runLogged('git', ['fetch', OFFICIAL_GIT_URL, fetchSpec], 120000);
 
         emitProgress({ stage: 'pull', percent: 30, message: 'pull', line: 'restore package-lock.json' });
         await restoreLockfiles();
 
-        emitProgress({ stage: 'pull', percent: 35, message: 'pull', line: 'git merge --ff-only FETCH_HEAD' });
-        await runLogged('git', ['merge', '--ff-only', 'FETCH_HEAD'], 120000);
+        emitProgress({ stage: 'pull', percent: 35, message: 'pull', line: `git merge --ff-only ${updateRef}` });
+        await runLogged('git', ['merge', '--ff-only', updateRef], 120000);
 
         emitProgress({ stage: 'install', percent: 50, message: 'install', line: 'npm install' });
         await runLogged(npmBin(), ['install', '--no-fund', '--no-audit'], 15 * 60 * 1000);
@@ -1176,6 +1192,8 @@ module.exports = {
     firstLine,
     isDefaultBranch,
     isSafeRef,
+    officialUpdateRef,
+    officialFetchRefspec,
     parseListeningPids,
     mapGithubCommit,
     parseGitLogLine,
