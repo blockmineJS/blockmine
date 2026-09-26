@@ -104,20 +104,26 @@ class BotHistoryStore {
             logs.shift();
         }
 
-        prisma.commandInvocation.create({
-            data: {
-                botId: Number(botId),
-                commandName: entry.command || '',
-                username: entry.username || '',
-                typeChat: entry.typeChat,
-                argsJson: JSON.stringify(entry.args || {}),
-                success: entry.success !== false,
-                error: entry.error,
-                createdAt: new Date(entry.timestamp),
-            },
-        }).catch((error) => {
+        try {
+            const writer = prisma.commandInvocation;
+            if (!writer || typeof writer.create !== 'function') return;
+            writer.create({
+                data: {
+                    botId: Number(botId),
+                    commandName: entry.command || '',
+                    username: entry.username || '',
+                    typeChat: entry.typeChat,
+                    argsJson: JSON.stringify(entry.args || {}),
+                    success: entry.success !== false,
+                    error: entry.error,
+                    createdAt: new Date(entry.timestamp),
+                },
+            }).catch((error) => {
+                console.error('[CommandHistory] Не удалось записать вызов:', error.message);
+            });
+        } catch (error) {
             console.error('[CommandHistory] Не удалось записать вызов:', error.message);
-        });
+        }
     }
 
     async getPersistentCommandLogs(botId, filters = {}) {
