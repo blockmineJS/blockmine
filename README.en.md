@@ -6,7 +6,7 @@
   <img src="./image/logo.png" alt="BlockMine Logo" width="150">
   <h1>BlockMine</h1>
   <p>
-    <strong>Minecraft bots without programming. A web panel and a visual editor. One command: npx blockmine</strong>
+    <strong>Minecraft bots without programming. A web panel and a visual editor. Install from git</strong>
   </p>
   <p>
     <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="Stars"></a>
@@ -17,7 +17,7 @@
   </p>
 </div>
 
-**BlockMine** is a panel for building Minecraft bots without writing code. Install Node.js, run `npx blockmine`, create a bot in the browser, and draw its behavior in the visual editor. Plugins, a live console, and graph debugging are included. A built-in MCP hands the panel to an AI agent. You can give it several jobs at once: read what the server prints in chat and in the console, turn those lines into commands and functions, write a plugin, reload it on the live bot, and check the reply. The same conversation also covers servers, proxies, permissions, groups, and scheduled tasks.
+**BlockMine** is a panel for building Minecraft bots without writing code. Install Node.js, clone the repository, and start the panel. Create a bot in the browser and draw its behavior in the visual editor. Plugins, a live console, and graph debugging are included. A built-in MCP hands the panel to an AI agent. You can give it several jobs at once: read what the server prints in chat and in the console, turn those lines into commands and functions, write a plugin, reload it on the live bot, and check the reply. The same conversation also covers servers, proxies, permissions, groups, and scheduled tasks.
 
 More examples at - https://t.me/blockmineJs
 
@@ -98,11 +98,20 @@ More examples at - https://t.me/blockmineJs
 
 ## Quick Start
 
-You need **Node.js v22+**. On Windows, `start.bat` will try to install it via winget if it is missing.
+Install the panel from git. The **Update** button then fetches only new commits, installs dependencies, and rebuilds the panel. That is faster than installing the package again: `npx blockmine` downloads the whole package every time, and that install has no update button.
+
+You need **Git** and **Node.js v22+**. On Windows, `start.bat` will try to install Node.js via winget if it is missing.
+
+### Clone the repository
+
+```bash
+git clone https://github.com/blockmineJS/blockmine.git
+cd blockmine
+```
 
 ### Windows — `start.bat`
 
-If you cloned the repository or downloaded a ZIP from GitHub, run `start.bat` in the project root (double-click or from Command Prompt):
+In the project root, double-click or run from Command Prompt:
 
 ```bat
 start.bat
@@ -126,23 +135,25 @@ To reinstall dependencies:
 start.bat reinstall
 ```
 
-### Any OS — `npx`
+### Linux and macOS
 
-The shortest path if Node.js is already installed and you do not need the repository:
+```bash
+npm install
+npm run dev
+```
+
+- Panel (hot reload): http://localhost:5173/
+- API: http://localhost:3001
+
+### If git is not available
 
 ```bash
 npx blockmine
 ```
 
-This downloads the package, sets up the database, and starts the server.
+This downloads the npm package, sets up the database, and starts the server. The console prints `http://localhost:3001`. In-app update is unavailable: a newer version means running the same command again, and the package downloads in full.
 
-> **Windows and PowerShell**: if you get `Cannot load file ... npx.ps1 because running scripts is disabled`, open PowerShell as administrator and run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`. Press `Y` to confirm. Or start the panel with `start.bat` from the repository.
-
-After a successful start the console shows the panel URL:
-
-```
-Control panel available at: http://localhost:3001
-```
+> **Windows and PowerShell**: if you get `Cannot load file ... npx.ps1 because running scripts is disabled`, open PowerShell as administrator and run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`. Press `Y` to confirm. Or install from git and run `start.bat`.
 
 ---
 
@@ -199,7 +210,7 @@ pm2 start ecosystem.config.js
 
 ### Updating
 
-On a PM2 host the panel can update itself: the **Update** button in the UI runs `git pull`, `npm install`, `npm run build`, and `pm2 restart`. That needs a git clone on `master`/`main` with a clean working tree.
+On a PM2 host the panel can update itself: the **Update** button in the UI runs `git pull`, `npm install`, `npm run build`, and `pm2 restart`. Git fetches only new commits, so this is faster than installing the package again. That needs a git clone on `master`/`main` with a clean working tree.
 
 The same steps by hand:
 
