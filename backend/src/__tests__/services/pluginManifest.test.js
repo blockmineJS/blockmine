@@ -1,4 +1,4 @@
-const { pluginDependencySatisfied, diffSettings } = require('../../core/utils/pluginManifest');
+const { pluginDependencySatisfied, diffSettings, listDeclaredPermissions } = require('../../core/utils/pluginManifest');
 
 describe('pluginManifest', () => {
     test('semver диапазон плагина', () => {
@@ -15,5 +15,15 @@ describe('pluginManifest', () => {
         expect(diff.renamed).toEqual([{ from: 'muteReason', to: 'reason', label: 'Причина' }]);
         expect(diff.added).toEqual([]);
         expect(diff.removed).toEqual([]);
+    });
+
+    test('permissions из манифеста без пустых имён', () => {
+        expect(listDeclaredPermissions({
+            permissions: [
+                { name: ' clan.mute ', description: 'Мут' },
+                { name: '' },
+                null,
+            ],
+        })).toEqual([{ name: 'clan.mute', description: 'Мут' }]);
     });
 });

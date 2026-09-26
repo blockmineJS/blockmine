@@ -51,6 +51,7 @@ class BotIPCMessageRouter {
             'get_nearby_entities_response': () => this._handleNearbyEntitiesResponse(message),
             'execute_command_response': () => this._handleCommandResponse(message),
             'plugins:unloaded': () => this.processManager.resolvePluginUnload(message.requestId),
+            'plugin:load_state': () => this._handlePluginLoadState(botId, message),
             'register_command': () => this._handleRegisterCommand(botId, message),
             'register_permissions': () => this._handlePermissions(botId, message),
             'register_group': () => this._handleGroup(botId, message),
@@ -96,6 +97,15 @@ class BotIPCMessageRouter {
         if (this.eventGraphManager) {
             this.eventGraphManager.handleEvent(botId, message.eventType, message.args);
         }
+    }
+
+    async _handlePluginLoadState(botId, message) {
+        if (!message?.pluginName) return;
+        const prisma = require('../../lib/prisma');
+        await prisma.installedPlugin.updateMany({
+            where: { botId, name: message.pluginName },
+            data: { loadError: message.error || null },
+        });
     }
 
     _handlePluginData(botId, message) {

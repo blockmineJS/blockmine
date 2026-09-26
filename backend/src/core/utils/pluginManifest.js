@@ -66,9 +66,32 @@ function listDeclaredPermissions(manifest) {
         }));
 }
 
+async function ensureDeclaredPermissions(prisma, botId, pluginName, manifest) {
+    const declared = listDeclaredPermissions(manifest);
+    if (!declared.length || !prisma?.permission) return;
+    const owner = `plugin:${pluginName}`;
+    for (const permission of declared) {
+        try {
+            await prisma.permission.upsert({
+                where: { botId_name: { botId: Number(botId), name: permission.name } },
+                update: {},
+                create: {
+                    botId: Number(botId),
+                    name: permission.name,
+                    description: permission.description || null,
+                    owner,
+                },
+            });
+        } catch (error) {
+            console.error(`[Plugin] Не удалось создать право ${permission.name} для ${pluginName}:`, error.message);
+        }
+    }
+}
+
 module.exports = {
     pluginDependencySatisfied,
     flattenSettingKeys,
     diffSettings,
     listDeclaredPermissions,
+    ensureDeclaredPermissions,
 };

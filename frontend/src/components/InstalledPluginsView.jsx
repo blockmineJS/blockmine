@@ -349,6 +349,11 @@ function InstalledPluginCard({
             {t('labels.by', { defaultValue: 'от' })} <span className="font-medium text-primary/90">{authorLabel}</span>
           </p>
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description}</p>
+          {plugin.loadError && (
+            <p className="mt-2 line-clamp-3 text-xs text-destructive" title={plugin.loadError}>
+              {t('labels.loadError', { defaultValue: 'Не загрузился' })}: {plugin.loadError.split('\n')[0]}
+            </p>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="h-5 px-2 text-xs">v{plugin.version}</Badge>
@@ -498,6 +503,11 @@ function InstalledPluginCard({
 
       <CardContent className="space-y-3 pb-2">
         <p className="line-clamp-2 text-sm text-muted-foreground">{description}</p>
+        {plugin.loadError && (
+          <p className="line-clamp-3 text-xs text-destructive" title={plugin.loadError}>
+            {t('labels.loadError', { defaultValue: 'Не загрузился' })}: {plugin.loadError.split('\n')[0]}
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-1">
           {visibleMetaBadges.map(({ key, label, variant, icon: Icon }) => (

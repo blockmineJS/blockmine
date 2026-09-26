@@ -28,6 +28,7 @@ function presentPlugin(plugin) {
         version: plugin.version,
         description: plugin.description,
         isEnabled: plugin.isEnabled,
+        loadError: plugin.loadError || null,
         sourceType: plugin.sourceType,
         sourceUri: plugin.sourceUri,
         sourceRefType: plugin.sourceRefType,

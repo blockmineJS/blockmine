@@ -5,6 +5,7 @@ const { createRequire } = require('module');
 const { pathToFileURL } = require('url');
 const PluginStore = require('../plugins/PluginStore');
 const { deepMergeSettings } = require('./utils/settingsMerger');
+const { ensureDeclaredPermissions } = require('./utils/pluginManifest');
 const { installDependencies, installSinglePackage, getPeerDependencies, isValidPackageName } = require('./utils/npmInstall');
 
 const SYSTEM_LOG_PATTERNS = [
@@ -130,15 +131,16 @@ async function loadPluginModule(entryPointPath, pluginRequire) {
     }
 }
 
-function invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog) {
+async function invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog) {
+    let result = null;
     if (typeof pluginModule === 'function') {
-        pluginModule(bot, pluginOptions);
+        result = pluginModule(bot, pluginOptions);
     } else if (pluginModule && typeof pluginModule.onLoad === 'function') {
-        pluginModule.onLoad(bot, pluginOptions);
+        result = pluginModule.onLoad(bot, pluginOptions);
     } else if (pluginModule?.default && typeof pluginModule.default === 'function') {
-        pluginModule.default(bot, pluginOptions);
+        result = pluginModule.default(bot, pluginOptions);
     } else if (pluginModule?.default && typeof pluginModule.default.onLoad === 'function') {
-        pluginModule.default.onLoad(bot, pluginOptions);
+        result = pluginModule.default.onLoad(bot, pluginOptions);
     } else {
         sendLog(`[PluginLoader] [ERROR] ${plugin.name} не экспортирует функцию или объект с методом onLoad.`);
     }
@@ -148,6 +150,7 @@ function invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog) {
     } else if (pluginModule?.default?.exports && bot.pluginRegistry) {
         bot.pluginRegistry.set(plugin.name, pluginModule.default.exports);
     }
+    return result;
 }
 
 function clearRequireCacheForPath(targetPath) {
@@ -322,10 +325,11 @@ async function loadInstalledPlugin(bot, plugin, prisma) {
             const pluginConsole = createPluginConsole(bot.config.id, plugin.name, global.console);
             bot.console = pluginConsole;
             const pluginOptions = { settings: finalSettings, store, console: pluginConsole };
-            invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog);
+            await invokePluginEntry(pluginModule, bot, pluginOptions, plugin, sendLog);
         };
 
         sendLog(`[PluginLoader] Загрузка: ${plugin.name} (v${plugin.version})`);
+        await ensureDeclaredPermissions(prisma, bot.config.id, plugin.name, manifest);
 
         if (!Array.isArray(bot.__pluginCleanups)) bot.__pluginCleanups = [];
         bot.__pluginCleanups.push(cleanup);
@@ -364,8 +368,22 @@ async function loadInstalledPlugin(bot, plugin, prisma) {
         }
     } catch (error) {
         bot.__activePluginCleanup = null;
-        sendLog(`[PluginLoader] [FATAL] Не удалось загрузить плагин ${plugin.name}: ${error.stack}`);
+        const message = error?.stack || error?.message || String(error);
+        sendLog(`[PluginLoader] [FATAL] Не удалось загрузить плагин ${plugin.name}: ${message}`);
+        reportPluginLoadState(bot, plugin.name, message);
+        return;
     }
+    reportPluginLoadState(bot, plugin.name, null);
+}
+
+function reportPluginLoadState(bot, pluginName, error) {
+    if (!process.send) return;
+    process.send({
+        type: 'plugin:load_state',
+        botId: bot.config.id,
+        pluginName,
+        error: error ? String(error).slice(0, 4000) : null,
+    });
 }
 
 async function reloadInstalledPlugin(bot, plugin, prisma) {

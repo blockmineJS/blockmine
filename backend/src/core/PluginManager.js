@@ -17,7 +17,7 @@ const {
 const { installDependencies } = require('./utils/npmInstall');
 const { assertSafeZip, assertArchiveLimits } = require('./utils/zipSafe');
 const TtlCache = require('./utils/ttlCache');
-const { pluginDependencySatisfied, diffSettings, listDeclaredPermissions } = require('./utils/pluginManifest');
+const { pluginDependencySatisfied, diffSettings, listDeclaredPermissions, ensureDeclaredPermissions } = require('./utils/pluginManifest');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
@@ -524,11 +524,13 @@ class PluginManager {
             ...extraData,
         };
 
-        return prisma.installedPlugin.upsert({
+        const saved = await prisma.installedPlugin.upsert({
             where: { botId_name: { botId, name: packageJson.name } },
             update: pluginData,
             create: pluginData,
         });
+        await ensureDeclaredPermissions(prisma, botId, packageJson.name, packageJson.botpanel || {});
+        return saved;
     }
 
     _clearPluginRequireCache(pluginPath) {

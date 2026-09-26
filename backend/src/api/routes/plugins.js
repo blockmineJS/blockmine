@@ -198,6 +198,7 @@ router.get('/bot/:botId', authenticateUniversal, checkBotAccess, authorize('plug
                 sourceRefType: true,
                 sourceRef: true,
                 isEnabled: true,
+                loadError: true,
                 manifest: true,
                 settings: true,
                 createdAt: true,

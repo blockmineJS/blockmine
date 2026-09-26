@@ -84,6 +84,7 @@ model InstalledPlugin {
   sourceRef   String?
   path        String
   isEnabled   Boolean @default(true)
+  loadError   String?
 
   manifest String?
   settings String? @default("{}")
