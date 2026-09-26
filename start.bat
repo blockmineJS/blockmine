@@ -112,6 +112,9 @@ if errorlevel 1 goto update_failed
 echo [BlockMine] npm install
 call npm install --no-fund --no-audit
 if errorlevel 1 goto update_failed
+echo [BlockMine] npm run build
+call npm run build
+if errorlevel 1 goto update_failed
 echo [BlockMine] Update finished. Starting panel...
 call :free_ports
 goto start_panel

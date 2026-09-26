@@ -1086,12 +1086,8 @@ async function runPanelUpdateJob(branch, restartMethod) {
         emitProgress({ stage: 'install', percent: 50, message: 'install', line: 'npm install' });
         await runLogged(npmBin(), ['install', '--no-fund', '--no-audit'], 15 * 60 * 1000);
 
-        if (method !== 'nodemon' && !isDevelopment()) {
-            emitProgress({ stage: 'build', percent: 80, message: 'build', line: 'npm run build' });
-            await runLogged(npmBin(), ['run', 'build'], 15 * 60 * 1000);
-        } else {
-            emitProgress({ stage: 'build', percent: 88, message: 'build_skipped', line: 'dev: skip production build' });
-        }
+        emitProgress({ stage: 'build', percent: 80, message: 'build', line: 'npm run build' });
+        await runLogged(npmBin(), ['run', 'build'], 15 * 60 * 1000);
 
         relaunchPanel(method);
         emitProgress({ stage: 'restarting', percent: 100, message: 'restarting' });
