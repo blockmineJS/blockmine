@@ -43,7 +43,7 @@ router.get('/:botId/commands', authenticateUniversal, authorize('bot:list'), asy
         const botId = parseInt(req.params.botId);
         const { username, command, success, from, to, limit, offset } = req.query;
 
-        const result = botHistoryStore.getCommandLogs(botId, {
+        const query = {
             username,
             command,
             success,
@@ -51,7 +51,10 @@ router.get('/:botId/commands', authenticateUniversal, authorize('bot:list'), asy
             to,
             limit: limit || 100,
             offset: offset || 0
-        });
+        };
+        const result = req.query.scope === 'all'
+            ? await botHistoryStore.getPersistentCommandLogs(botId, query)
+            : botHistoryStore.getCommandLogs(botId, query);
 
         res.json({
             logs: result.logs,

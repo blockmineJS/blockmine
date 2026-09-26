@@ -159,6 +159,14 @@ class CommandExecutionService {
                 });
             }
 
+            botHistoryStore.addCommandLog(botId, {
+                username,
+                command: dbCommand.name,
+                args: args || {},
+                typeChat,
+                success: true,
+            });
+
             child.send({
                 type: 'execute_handler',
                 commandName: dbCommand.name,

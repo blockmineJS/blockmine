@@ -366,6 +366,7 @@ export default function CommandsManager({ commands = [], allPermissions = [], bo
                 <CommandDetailDialog
                     onCancel={handleCloseModal}
                     command={editingCommand}
+                    botId={botId}
                     allPermissions={allPermissions}
                     onSubmit={handleSubmit}
                     isSaving={isSaving}

@@ -5,7 +5,8 @@
     "users": "Пользователи",
     "groups": "Группы",
     "permissions": "Права",
-    "commands": "Команды"
+    "commands": "Команды",
+    "history": "История"
   },
   "messages": {
     "success": "Успех",
@@ -116,10 +117,32 @@
     "commandDescription": "Описание",
     "create": "Создать"
   },
+  "commandHistory": {
+    "title": "История команд",
+    "description": "Кто и какую команду вызывал у этого бота.",
+    "command": "Команда",
+    "empty": "Вызовов ещё не было.",
+    "sinceStart": "С момента запуска",
+    "allTime": "Всё время",
+    "allTimeHint": "Хранится в базе и остаётся после перезапуска панели."
+  },
   "commandDetail": {
     "title": "Команда: {{name}}",
     "tabOverview": "Обзор",
     "tabSettings": "Настройки",
+    "tabHistory": "История",
+    "historyLoading": "Загрузка истории...",
+    "historyError": "Не удалось загрузить историю вызовов.",
+    "historyEmpty": "Эту команду ещё никто не вызывал.",
+    "historyHint": "Показываются вызовы с момента запуска панели. После перезапуска список начинается заново.",
+    "historyCount": "Всего: {{count}}",
+    "historyUser": "Кто",
+    "historyChat": "Чат",
+    "historyWhen": "Когда",
+    "historyArgs": "Аргументы",
+    "historyResult": "Результат",
+    "historyOk": "Ок",
+    "historyFail": "Ошибка",
     "usage": "Использование",
     "arguments": "Аргументы",
     "argument": "Аргумент",

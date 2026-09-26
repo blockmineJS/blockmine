@@ -1,3 +1,5 @@
+const prisma = require('../lib/prisma');
+
 /**
  * In-memory хранилище истории чатов и команд ботов
  * Хранит последние N сообщений/команд для каждого бота
@@ -90,6 +92,7 @@ class BotHistoryStore {
             username: data.username,
             command: data.command,
             args: data.args || [],
+            typeChat: data.typeChat || null,
             success: data.success !== undefined ? data.success : true,
             error: data.error || null,
             timestamp: data.timestamp || new Date().toISOString()
@@ -100,6 +103,55 @@ class BotHistoryStore {
         if (logs.length > this.MAX_COMMAND_LOGS) {
             logs.shift();
         }
+
+        prisma.commandInvocation.create({
+            data: {
+                botId: Number(botId),
+                commandName: entry.command || '',
+                username: entry.username || '',
+                typeChat: entry.typeChat,
+                argsJson: JSON.stringify(entry.args || {}),
+                success: entry.success !== false,
+                error: entry.error,
+                createdAt: new Date(entry.timestamp),
+            },
+        }).catch((error) => {
+            console.error('[CommandHistory] Не удалось записать вызов:', error.message);
+        });
+    }
+
+    async getPersistentCommandLogs(botId, filters = {}) {
+        const where = { botId: Number(botId) };
+        if (filters.command) where.commandName = filters.command;
+        if (filters.username) where.username = filters.username;
+        if (filters.success !== undefined) {
+            where.success = filters.success === 'true' || filters.success === true;
+        }
+
+        const limit = parseInt(filters.limit, 10) || 100;
+        const offset = parseInt(filters.offset, 10) || 0;
+        const [rows, total] = await Promise.all([
+            prisma.commandInvocation.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                take: limit,
+                skip: offset,
+            }),
+            prisma.commandInvocation.count({ where }),
+        ]);
+
+        return {
+            logs: rows.map((row) => ({
+                username: row.username,
+                command: row.commandName,
+                args: safeParseArgs(row.argsJson),
+                typeChat: row.typeChat,
+                success: row.success,
+                error: row.error,
+                timestamp: row.createdAt.toISOString(),
+            })),
+            total,
+        };
     }
 
     /**
@@ -174,6 +226,14 @@ class BotHistoryStore {
                 failed: commandLogs.filter(l => !l.success).length
             }
         };
+    }
+}
+
+function safeParseArgs(value) {
+    try {
+        return JSON.parse(value || '{}');
+    } catch {
+        return {};
     }
 }
 

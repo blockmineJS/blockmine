@@ -5,7 +5,8 @@
     "users": "Users",
     "groups": "Groups",
     "permissions": "Permissions",
-    "commands": "Commands"
+    "commands": "Commands",
+    "history": "History"
   },
   "messages": {
     "success": "Success",
@@ -116,10 +117,32 @@
     "commandDescription": "Description",
     "create": "Create"
   },
+  "commandHistory": {
+    "title": "Command history",
+    "description": "Who called which command on this bot.",
+    "command": "Command",
+    "empty": "No calls yet.",
+    "sinceStart": "Since start",
+    "allTime": "All time",
+    "allTimeHint": "Stored in the database and kept after a panel restart."
+  },
   "commandDetail": {
     "title": "Command: {{name}}",
     "tabOverview": "Overview",
     "tabSettings": "Settings",
+    "tabHistory": "History",
+    "historyLoading": "Loading history...",
+    "historyError": "Failed to load call history.",
+    "historyEmpty": "Nobody has called this command yet.",
+    "historyHint": "Shows calls since the panel started. The list starts over after a restart.",
+    "historyCount": "Total: {{count}}",
+    "historyUser": "Who",
+    "historyChat": "Chat",
+    "historyWhen": "When",
+    "historyArgs": "Arguments",
+    "historyResult": "Result",
+    "historyOk": "Ok",
+    "historyFail": "Error",
     "usage": "Usage",
     "arguments": "Arguments",
     "argument": "Argument",

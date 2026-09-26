@@ -64,6 +64,7 @@ model Bot {
   apiKeys          BotApiKey[]
   apiConnectionLogs ApiConnectionLog[]
   executionTraces  ExecutionTrace[]
+  commandInvocations CommandInvocation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,6 +94,22 @@ model InstalledPlugin {
   eventGraphs EventGraph[]
 
   @@unique([botId, name])
+}
+
+model CommandInvocation {
+  id          Int      @id @default(autoincrement())
+  botId       Int
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  commandName String
+  username    String
+  typeChat    String?
+  argsJson    String   @default("{}")
+  success     Boolean  @default(true)
+  error       String?
+  createdAt   DateTime @default(now())
+
+  @@index([botId, createdAt])
+  @@index([botId, commandName, createdAt])
 }
 
 model Command {

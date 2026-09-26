@@ -8,6 +8,7 @@ import { useAppStore } from '@/stores/appStore';
 import { apiHelper } from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
 import CommandsManager from '@/components/management/CommandsManager';
+import CommandHistoryList from '@/components/management/CommandHistoryList';
 import UsersManager from '@/components/management/UsersManager';
 import GroupsManager from '@/components/management/GroupsManager';
 import PermissionsManager from '@/components/management/PermissionsManager';
@@ -124,6 +125,9 @@ export default function ManagementPage() {
                         isLoading={isLoading}
                         onDataChange={fetchData}
                     />
+        ),
+        history: (
+                    <CommandHistoryList botId={bot?.id} />
         )
     };
 
@@ -140,6 +144,7 @@ export default function ManagementPage() {
                         <TabsTrigger value="groups">{t('tabs.groups')}</TabsTrigger>
                         <TabsTrigger value="permissions">{t('tabs.permissions')}</TabsTrigger>
                         <TabsTrigger value="commands">{t('tabs.commands')}</TabsTrigger>
+                        <TabsTrigger value="history">{t('tabs.history')}</TabsTrigger>
                     </TabsList>
             </Tabs>
             </CardHeader>

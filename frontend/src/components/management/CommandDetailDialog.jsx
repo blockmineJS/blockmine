@@ -17,9 +17,10 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import DynamicInputList from './DynamicInputList';
-import { Save, Loader2, Terminal, Settings as SettingsIcon, Copy } from 'lucide-react';
+import { Save, Loader2, Terminal, Settings as SettingsIcon, Copy, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import CommandHistoryList from './CommandHistoryList';
 
 const OWNER_TYPES = {
   SYSTEM: 'system'
@@ -127,7 +128,7 @@ function CommandSettingsTab({ formData, onValueChange, allPermissions, t }) {
     );
 }
 
-export default function CommandDetailDialog({ command, allPermissions = [], onSubmit, isSaving, onCancel }) {
+export default function CommandDetailDialog({ command, allPermissions = [], botId, onSubmit, isSaving, onCancel }) {
     const { t } = useTranslation('management');
     const [formData, setFormData] = useState(null);
 
@@ -185,6 +186,10 @@ export default function CommandDetailDialog({ command, allPermissions = [], onSu
                         <SettingsIcon className="h-4 w-4" />
                         {t('commandDetail.tabSettings')}
                     </TabsTrigger>
+                    <TabsTrigger value="history" className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        {t('commandDetail.tabHistory')}
+                    </TabsTrigger>
                 </TabsList>
                 <ScrollArea className="flex-grow pr-6 -mr-6">
                     <TabsContent value="overview">
@@ -192,6 +197,9 @@ export default function CommandDetailDialog({ command, allPermissions = [], onSu
                     </TabsContent>
                     <TabsContent value="settings">
                         <CommandSettingsTab formData={formData} onValueChange={handleValueChange} allPermissions={allPermissions} t={t} />
+                    </TabsContent>
+                    <TabsContent value="history">
+                        <CommandHistoryList botId={botId} commandName={command.name} embedded />
                     </TabsContent>
                 </ScrollArea>
             </Tabs>
