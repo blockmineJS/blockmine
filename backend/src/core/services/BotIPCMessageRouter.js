@@ -63,6 +63,7 @@ class BotIPCMessageRouter {
             'update_credentials': () => this._handleUpdateCredentials(botId, child, message),
             'restart_bot': () => this._handleRestartBot(botId, child, message),
             'stop': () => this._handleStopBot(botId),
+            'restart': () => this._handleGraphRestart(botId),
             'change_credentials': () => this._handleChangeCredentials(botId, child, message),
             'resource_usage': () => this._handleResourceUsage(botId, message),
         };
@@ -295,6 +296,13 @@ class BotIPCMessageRouter {
         if (this.stopBot) {
             await this.stopBot(botId);
         }
+    }
+
+    _handleGraphRestart(botId) {
+        if (!this.restartBot) return;
+        Promise.resolve(this.restartBot(botId)).catch((err) => {
+            this.appendLog(botId, `[API] Ошибка перезапуска: ${err.message}`);
+        });
     }
 
     async _handleRestartBot(botId, child, message) {

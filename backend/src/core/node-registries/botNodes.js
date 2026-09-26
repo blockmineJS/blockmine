@@ -16,6 +16,20 @@ const botNodes = [
     theme: { headerColor: '#dc2626', accentColor: '#ef4444' }
   },
   {
+    type: 'bot:restart',
+    label: '🔄 Перезапустить бота',
+    category: 'Бот',
+    description: 'Останавливает бота и запускает его снова.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../../core/nodes/bot/restart_bot').execute,
+    computeInputs: () => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec' }
+    ],
+    computeOutputs: () => [],
+    defaultData: {},
+    theme: { headerColor: '#d97706', accentColor: '#f59e0b' }
+  },
+  {
     type: 'bot:get_position',
     label: '🤖 Позиция бота',
     category: 'Бот',
