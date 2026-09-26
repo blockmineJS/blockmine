@@ -11,7 +11,7 @@
 1. Новый плагин: `create_plugin(botId, name, template)`. `template` — `empty` или `command`. Имя становится slug папки. Свежий `package.json` содержит `botpanel.dependencies` массивом `[]`. Когда пишешь свой `package.json`, замени его на объект. Нет зависимостей — пустой объект `{}`.
 2. Код: `write_plugin_file`. Запись `package.json` обновляет в базе имя, версию и `botpanel`.
 3. Правка: `read_plugin_file`, `list_plugin_files`.
-4. Применить: `reload_plugin`. Это перезапуск бота, горячей подмены файлов нет. Бот заново логинится.
+4. Применить: `reload_plugin`. Перечитывается только этот плагин, в том же процессе. Бот с сервера не выходит. `npm install` запускается, только если изменились зависимости в `package.json`. Настройки бота эта команда не трогает.
 5. Загрузка: `get_bot_logs`. Строка загрузки плагина и `error.stack` видны там. `get_bot_plugins` показывает, что плагин включён. Игровую проверку сам не запускай, см. раздел «Проверка».
 
 `install_plugin` ставит чужой репозиторий. Свой код пишется через `create_plugin` и `write_plugin_file`.
@@ -43,7 +43,7 @@ my-plugin/
 
 ```javascript
 async function onLoad(bot, options) {}
-async function onUnload({ botId, prisma }) {}
+async function onUnload({ botId, bot, prisma }) {}
 module.exports = { onLoad, onUnload };
 ```
 
@@ -53,16 +53,24 @@ module.exports = (bot, options) => {};
 
 `options.settings` — настройки из манифеста, уже слитые с сохранёнными. `options.store` — своё key-value хранилище. `options.console` — логгер с именем плагина.
 
-`onUnload` вызывается при удалении плагина, не при каждом рестарте. В нём удали команды и права, которые плагин создал. `prisma` есть только здесь.
+## Выгрузка и удаление
+
+`onUnload({ botId, bot, prisma })` вызывается только в процессе бота. Туда он попадает в двух случаях: перечитывание этого плагина и удаление, пока бот запущен. В процессе панели хук не вызывается.
+
+Панель сама снимает слушатели, которые плагин повесил через `bot.on` и `bot.events.on`. Команды, права и группы с `owner: plugin:<имя>` панель удаляет из базы сама. Графы с тем же владельцем тоже. В `onUnload` остаётся только своя очистка: таймер, сокет, файл.
+
+Если бот выключен, `onUnload` не вызывается: процесса нет, слушатели не висят. Записи в базе и папка плагина всё равно удаляются. При следующем запуске плагина уже нет.
+
+Кнопка «Перезагрузить» на карточке и `reload_plugin` перечитывают только этот плагин. Остальные плагины бота не трогаются. Сохранённые настройки не сбрасываются. Сброс к `default` из `package.json` делается в окне настроек плагина, кнопкой «К значениям по умолчанию».
 
 ```javascript
-async function onUnload({ botId, prisma }) {
-    await prisma.command.deleteMany({ where: { botId, owner: PLUGIN_OWNER_ID } });
-    await prisma.permission.deleteMany({ where: { botId, owner: PLUGIN_OWNER_ID } });
+async function onUnload({ bot }) {
+    if (bot.clanMuteTimer) {
+        clearInterval(bot.clanMuteTimer);
+        bot.clanMuteTimer = null;
+    }
 }
 ```
-
-Слушатели, повешенные в `onLoad`, сними в `bot.once('end', ...)`. Иначе после рестарта внутри одного процесса они копятся. `require` кэша при рестарте бота нет: процесс новый.
 
 Комментарии в коде плагина не пиши. Русский текст пиши как русский текст, не как `\uXXXX`.
 
@@ -80,7 +88,10 @@ async function onUnload({ botId, prisma }) {
     "icon": "VolumeX",
     "categories": ["Clan"],
     "supportedHosts": ["mc.masedworld.net"],
-    "dependencies": { "parser-keksik": "*" },
+    "dependencies": { "parser-keksik": "^1.0.0" },
+    "permissions": [
+      { "name": "clan.mute", "description": "Мут кланового чата" }
+    ],
     "settings": {
       "doneMessage": {
         "type": "string",
@@ -97,17 +108,62 @@ async function onUnload({ botId, prisma }) {
 
 `botpanel.dependencies` — другие плагины, объект имя → версия (`*` или `^1.0.0`), не массив. Пустой `supportedHosts` значит «любой сервер». `icon` — имя из Lucide в PascalCase.
 
-Настройки, которые рисует панель:
+## Типы настроек
 
-| type | что это |
-|---|---|
-| `string` | строка. `secret: true` прячет значение и маскирует его как `********` |
-| `number` | число |
-| `boolean` | переключатель |
-| `string[]` | список, в UI каждая строка — элемент. `secret: true` тоже работает |
-| `select` | варианты: строки или `{ "value", "label" }`. Сохраняется `value` |
-| `json` / `json_file` | объект. У `json_file` есть `defaultPath` внутри папки плагина |
-| `proxy` | `{ enabled, proxyId, host, port, type, username, password }`. `type`: `socks5`, `socks4`, `http` |
+Поле в `botpanel.settings` — объект с `type`, `label`, `description` и `default`. В `onLoad` значение лежит в `options.settings.<ключ>`.
+
+| type | в настройках бота | в `options.settings` |
+|---|---|---|
+| `string` | одна строка. `secret: true` прячет её и маскирует сохранённое значение как `********` | строка |
+| `number` | число | число. Пустое поле сохраняется как `null` |
+| `boolean` | переключатель | `true` или `false` |
+| `string[]` | многострочное поле, каждая строка — элемент | массив строк. Пустое поле — `[]` |
+| `select` | выпадающий список | строка `value` выбранного пункта |
+| `json_file` | кнопка «Редактировать», открывает JSON. Стартовое значение можно прочитать из файла | объект или массив. После сохранения из панели это значение в базе |
+| `proxy` | выбор прокси бота или ручной адрес | объект, поля ниже |
+
+`select.options` — массив строк или объектов `{ "value", "label" }`. В базу пишется `value`.
+
+```json
+"lang": {
+  "type": "select",
+  "label": "Язык",
+  "default": "ru",
+  "options": [
+    { "value": "ru", "label": "Русский" },
+    { "value": "en", "label": "English" }
+  ]
+}
+```
+
+`json_file` — единственный JSON-тип в окне настроек плагина. Типа `json` там нет: такое поле покажется как неизвестный тип. Объект можно положить и без файла, через `default`.
+
+`defaultPath` нужен, когда стартовый JSON большой и лежит файлом в папке плагина. Путь относительно этой папки, не абсолютный и не с `..`. При первой загрузке панель читает файл и кладёт разобранный JSON в настройку. Если файла нет или он вне папки плагина, значение будет `{}`. Сохранение из окна настроек записывает объект в базу и файл на диске не меняет. Правка файла после этого на уже сохранённую настройку не влияет, пока её не сбросят к значениям по умолчанию.
+
+```json
+"shop": {
+  "type": "json_file",
+  "label": "Магазин",
+  "description": "Цены и товары",
+  "defaultPath": "data/shop.json"
+}
+```
+
+`proxy`:
+
+```json
+"proxy": {
+  "enabled": false,
+  "proxyId": null,
+  "host": "",
+  "port": "",
+  "type": "socks5",
+  "username": "",
+  "password": ""
+}
+```
+
+`type` у прокси: `socks5`, `socks4`, `http`. `proxyId` — id прокси из панели. Если игрок выбрал прокси из списка, ручные `host` и `port` не используются.
 
 `default` загрузчик прогоняет через `JSON.parse`. Строка `"true"` станет boolean, `"10"` станет числом. Невалидный JSON остаётся как есть, поэтому `"default": "привет"` остаётся строкой. Сохранённые настройки перекрывают default.
 
@@ -119,7 +175,7 @@ async function onUnload({ botId, prisma }) {
 
 ## Команда
 
-`PLUGIN_OWNER_ID` вида `plugin:clan-mute` пишется в `owner` команды и права. По нему `onUnload` находит свои строки.
+`PLUGIN_OWNER_ID` вида `plugin:clan-mute` пишется в `owner` команды и права. По нему панель находит строки этого плагина при удалении.
 
 ```javascript
 const { PLUGIN_OWNER_ID, PERMISSION } = require('../constants');
