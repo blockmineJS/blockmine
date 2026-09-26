@@ -5,6 +5,50 @@
  * @param {Object} allSettings - Все текущие значения настроек
  * @returns {boolean} - true, если поле должно быть показано
  */
+function parseSettingDefault(rawDefault) {
+  if (rawDefault === undefined) return undefined;
+  if (typeof rawDefault !== 'string') return rawDefault;
+  try {
+    return JSON.parse(rawDefault);
+  } catch {
+    return rawDefault;
+  }
+}
+
+function defaultForSetting(config) {
+  if (!config || typeof config !== 'object' || !config.type) return undefined;
+  const parsed = parseSettingDefault(config.default);
+  if (parsed !== undefined) return parsed;
+  if (config.type === 'boolean') return false;
+  if (config.type === 'string' || config.type === 'password') return '';
+  if (config.type === 'number') return 0;
+  if (config.type === 'string[]') return [];
+  if (config.type === 'json_file') return {};
+  return undefined;
+}
+
+export function collectManifestDefaults(manifestSettings) {
+  const defaults = {};
+  if (!manifestSettings || typeof manifestSettings !== 'object') return defaults;
+  const entries = Object.entries(manifestSettings);
+  const grouped = entries.some(([, value]) => value && typeof value === 'object' && value.label && !value.type);
+  const visit = (configMap) => {
+    Object.entries(configMap).forEach(([key, config]) => {
+      if (key === 'label') return;
+      const value = defaultForSetting(config);
+      if (value !== undefined) defaults[key] = value;
+    });
+  };
+  if (grouped) {
+    entries.forEach(([, category]) => {
+      if (category && typeof category === 'object') visit(category);
+    });
+    return defaults;
+  }
+  visit(manifestSettings);
+  return defaults;
+}
+
 export function shouldShowField(key, config, allSettings) {
   // Старая логика для обратной совместимости с actionsPreset
   if (allSettings?.actionsPreset !== undefined && key.startsWith('enable')) {

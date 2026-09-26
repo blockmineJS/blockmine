@@ -5,7 +5,7 @@ import { Code, Edit, Info, Loader2, Plus, RefreshCw, Save, Search, Settings, Tra
 import { apiHelper } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
-import { shouldShowField } from '@/lib/pluginSettingsUtils';
+import { collectManifestDefaults, shouldShowField } from '@/lib/pluginSettingsUtils';
 import PluginDetailInfo from './PluginDetailInfo';
 import ConfirmationDialog from './ConfirmationDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -281,6 +281,7 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
     const [dataFormValue, setDataFormValue] = useState('');
     const [isEditMode, setIsEditMode] = useState(false);
     const [confirmClearData, setConfirmClearData] = useState(false);
+    const [confirmResetSettings, setConfirmResetSettings] = useState(false);
     const [keyPendingDelete, setKeyPendingDelete] = useState(null);
 
     const isGrouped = useMemo(() => {
@@ -331,6 +332,21 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
             );
             onSaveSuccess();
             onOpenChange(false);
+        } catch {
+        }
+    };
+
+    const performResetSettings = async () => {
+        if (readOnly) return;
+        const defaults = collectManifestDefaults(manifestSettings);
+        setSettings(defaults);
+        try {
+            await apiHelper(
+                `/api/bots/${bot.id}/plugins/${plugin.id}`,
+                { method: 'PUT', body: JSON.stringify({ settings: defaults }) },
+                t('settingsDialog.toasts.resetSettings'),
+            );
+            onSaveSuccess();
         } catch {
         }
     };
@@ -592,6 +608,10 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                             </Tooltip>
                         </TooltipProvider>
                         <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setConfirmResetSettings(true)} disabled={settings === null || readOnly}>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                {t('settingsDialog.resetSettings')}
+                            </Button>
                             <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('actions.cancel')}</Button>
                             <TooltipProvider>
                                 <Tooltip>
@@ -615,6 +635,16 @@ export default function PluginSettingsDialog({ bot, plugin, onOpenChange, onSave
                     <PluginDetailInfo plugin={plugin} botId={bot.id} />
                 </TabsContent>
             </Tabs>
+
+            <ConfirmationDialog
+                open={confirmResetSettings}
+                onOpenChange={setConfirmResetSettings}
+                title={t('settingsDialog.confirmResetTitle', { name: plugin.name })}
+                description={t('settingsDialog.confirmResetDescription')}
+                onConfirm={performResetSettings}
+                confirmText={t('settingsDialog.resetSettings')}
+                cancelText={t('actions.cancel', { defaultValue: 'Отмена' })}
+            />
 
             <ConfirmationDialog
                 open={confirmClearData}
