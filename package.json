@@ -1,6 +1,6 @@
 {
   "name": "blockmine",
-  "version": "1.27.1",
+  "version": "1.28.0",
   "description": "Minecraft-боты без программирования. Веб-панель и визуальный редактор. Запуск: npx blockmine",
   "author": "merka",
   "license": "MIT",

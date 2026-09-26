@@ -1,6 +1,51 @@
 # История версий
 
 
+## [1.28.0](https://github.com/blockmineJS/blockmine/compare/v1.27.1...v1.28.0) (2026-09-26)
+
+
+### 🛠 Рефакторинг
+
+* лайаут чуть изменили ([5e86e70](https://github.com/blockmineJS/blockmine/commit/5e86e704d5c2887c45b4ff3ecfecf152ca2ff2b2))
+* рефактор системы плагинов ([81991f0](https://github.com/blockmineJS/blockmine/commit/81991f00c50f0c742a2206d0e09afbf0c3177e04))
+* система графов/нод отрефакторена ([4d0c6fd](https://github.com/blockmineJS/blockmine/commit/4d0c6fde878fc31d84a0039d0620eca9fe02dbe8))
+
+
+### 🐛 Исправления
+
+* 0 ([3535695](https://github.com/blockmineJS/blockmine/commit/353569570dec3f1afd0d7d6c9795a46294096ca3))
+* авто обнова теперь сама делает билд ([4ccb16a](https://github.com/blockmineJS/blockmine/commit/4ccb16a05e24a8e6aeafaeb50963d2db2838c5c9))
+* владелец панели теперь получает все права везде ([051587a](https://github.com/blockmineJS/blockmine/commit/051587ae2f6a20353d3672798e6bc43fd68e9143))
+* импорт бота теперь работает ([62a22d0](https://github.com/blockmineJS/blockmine/commit/62a22d0df0aa8b694958070958941a59bf44d5bd))
+* история команд не роняет выполнение ([a1aeb52](https://github.com/blockmineJS/blockmine/commit/a1aeb525d722cb3db1b916794b7db1a87e956535))
+* кик поднимает бота, HTTP-прокси идёт через CONNECT ([fd4cac1](https://github.com/blockmineJS/blockmine/commit/fd4cac1c1d231d6a7f52d92259b3880a7e682f76))
+* кэш прав группы и откат кулдауна если команда упала ([ad751bd](https://github.com/blockmineJS/blockmine/commit/ad751bda8efab87cccd8f925c3d9d8c2d1366c1e))
+* мониторинг CPU/RAM через IPC вместо pidusage ([489951a](https://github.com/blockmineJS/blockmine/commit/489951a336f09fe17a0148e80797c6a8540a9f9e))
+* регистрация команд без дубля, таймаут телеметрии без лога ([6f3668a](https://github.com/blockmineJS/blockmine/commit/6f3668a6c6af712721cf27c11f82a33af59c7092))
+* сокет панели и cron планировщика ([57cdf55](https://github.com/blockmineJS/blockmine/commit/57cdf5504c19a5d046724593c3844b64914994c4))
+* api команды читает кэш после сброса ([42b7a31](https://github.com/blockmineJS/blockmine/commit/42b7a312ac952cc0a836e5bc609ffbc2852d84fc))
+
+
+### ✨ Новые возможности
+
+* большая обнова всего. мне лень каждую вспоминать ([1d0c2f0](https://github.com/blockmineJS/blockmine/commit/1d0c2f0c6b0027cdef41c1ca8f49a32dac8b36e5))
+* выгрузка и перезагрузка одного плагина в процессе бота ([aa4e6c0](https://github.com/blockmineJS/blockmine/commit/aa4e6c0f5a705c34f947a9544abed9c926e40fcf))
+* вырезал старье ([ca5f399](https://github.com/blockmineJS/blockmine/commit/ca5f3999dbb3dfced34e796d1d364c05da54dda2))
+* история вызовов команд ([9a914cf](https://github.com/blockmineJS/blockmine/commit/9a914cfc2a72bda1e74e3a4854d3823186ff1ad0))
+* плагины. установленные. сортировка. системные/от плагина ([af31364](https://github.com/blockmineJS/blockmine/commit/af31364468cdebfd9eda945546f001ffb975b923))
+* полностью новый 3д вьюер ([7fe49ce](https://github.com/blockmineJS/blockmine/commit/7fe49ce23ba5ed10565f886c193154cdf54e91a4))
+* предпросмотр манифеста плагина до установки ([45f0e6f](https://github.com/blockmineJS/blockmine/commit/45f0e6fd0f5520e32cb059d43ea6bb5f0f4aede5))
+* сброс настроек плагина к значениям по умолчанию ([77fa733](https://github.com/blockmineJS/blockmine/commit/77fa733726b0adc00616e83b1cd4c9949d0e7b54))
+* скачивание плагина с настройками бота ([52de000](https://github.com/blockmineJS/blockmine/commit/52de00055cf6f3c9e38c120351da4fcc3ac27048))
+* тестовый(дебаг) прогон событий/команд ([3c20ee2](https://github.com/blockmineJS/blockmine/commit/3c20ee235a1fdd05031fd6f3b2bb730a50250bd7))
+* установка и скачивание плагина из zip ([40219e7](https://github.com/blockmineJS/blockmine/commit/40219e72840000e848255957e9ad6449c71999e1))
+* mcp для ботов, серверов, плагинов, задач и чата ([9b99a9e](https://github.com/blockmineJS/blockmine/commit/9b99a9e11f7b45fa3d2a1f4f42dcd04a7ecf96a4))
+* mcp уже тут ([d0bb8bf](https://github.com/blockmineJS/blockmine/commit/d0bb8bff1dae258da90343f6a61f54a5724e5571))
+* start.bat и обновление панели с github ([ac35af2](https://github.com/blockmineJS/blockmine/commit/ac35af222737693135c3e4d4ccbe33c0dfce1aa5))
+* **viewer:** новый интерфейс 3D-вьюера в стиле Minecraft ([cbe68be](https://github.com/blockmineJS/blockmine/commit/cbe68beac392bf95b1becd6782aeaae318205f0d))
+* **viewer:** полный pack текстур Minecraft 1.21.x для GUI и блоков ([2b9816c](https://github.com/blockmineJS/blockmine/commit/2b9816c2437cb7fbf77301098029ceae575ea26a))
+* **viewer:** расширенная поддержка GUI, контейнеров, скорборда и TAB ([5543765](https://github.com/blockmineJS/blockmine/commit/5543765f822a3cb7b8e776fc63484cc80fed03a0))
+
 ### [1.27.1](https://github.com/blockmineJS/blockmine/compare/v1.27.0...v1.27.1) (2026-05-15)
 
 ## [1.27.0](https://github.com/blockmineJS/blockmine/compare/v1.25.0...v1.27.0) (2026-05-12)
