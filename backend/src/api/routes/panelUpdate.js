@@ -32,7 +32,7 @@ router.get('/check', authenticateUniversal, checkLimiter, async (req, res) => {
     }
 });
 
-router.get('/status', authenticateUniversal, (req, res) => {
+router.get('/status', authenticateUniversal, checkLimiter, (req, res) => {
     res.json(PanelUpdateService.getProgress());
 });
 
