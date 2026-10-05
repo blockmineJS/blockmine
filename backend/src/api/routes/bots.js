@@ -3,6 +3,7 @@ const prisma = require('../../lib/prisma');
 const path = require('path');
 const fs = require('fs/promises');
 const fse = require('fs-extra');
+const rateLimit = require('express-rate-limit');
 const { botManager, pluginManager } = require('../../core/services');
 const UserService = require('../../core/UserService');
 const commandManager = require('../../core/system/CommandManager');
@@ -390,7 +391,15 @@ router.get('/:id/logs', conditionalListAuth, authenticateUniversal, checkBotAcce
     }
 });
 
-router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+const pluginInstallRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit plugin installation attempts per IP per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Слишком много запросов на установку плагинов. Попробуйте позже.' }
+});
+
+router.post('/:botId/plugins/install/local', pluginInstallRateLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { path } = req.body;
     try {
@@ -401,7 +410,7 @@ router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAcce
     }
 });
 
-router.post('/:botId/plugins/install/zip', authenticateUniversal, checkBotAccess, authorize('plugin:install'), (req, res) => {
+router.post('/:botId/plugins/install/zip', pluginInstallRateLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), (req, res) => {
     upload.single('file')(req, res, async (uploadError) => {
         if (uploadError) {
             const message = uploadError.code === 'LIMIT_FILE_SIZE'
