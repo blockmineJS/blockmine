@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const prisma = require('../../lib/prisma');
 const path = require('path');
 const fs = require('fs/promises');
@@ -390,7 +391,14 @@ router.get('/:id/logs', conditionalListAuth, authenticateUniversal, checkBotAcce
     }
 });
 
-router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
+const pluginPackageRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+router.post('/:botId/plugins/install/local', pluginPackageRateLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), async (req, res) => {
     const { botId } = req.params;
     const { path } = req.body;
     try {
@@ -401,7 +409,7 @@ router.post('/:botId/plugins/install/local', authenticateUniversal, checkBotAcce
     }
 });
 
-router.post('/:botId/plugins/install/zip', authenticateUniversal, checkBotAccess, authorize('plugin:install'), (req, res) => {
+router.post('/:botId/plugins/install/zip', pluginPackageRateLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:install'), (req, res) => {
     upload.single('file')(req, res, async (uploadError) => {
         if (uploadError) {
             const message = uploadError.code === 'LIMIT_FILE_SIZE'
@@ -422,7 +430,7 @@ router.post('/:botId/plugins/install/zip', authenticateUniversal, checkBotAccess
     });
 });
 
-router.get('/:botId/plugins/:pluginId/download', authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
+router.get('/:botId/plugins/:pluginId/download', pluginPackageRateLimiter, authenticateUniversal, checkBotAccess, authorize('plugin:list'), async (req, res) => {
     try {
         const withSettings = req.query.settings === '1' || req.query.settings === 'true';
         const located = await pluginManager.getInstalledPluginDirectory(req.params.botId, req.params.pluginId);
