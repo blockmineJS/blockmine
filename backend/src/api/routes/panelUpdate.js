@@ -36,7 +36,7 @@ router.get('/status', authenticateUniversal, (req, res) => {
     res.json(PanelUpdateService.getProgress());
 });
 
-router.post('/apply', authenticateUniversal, authorize('panel:settings:edit'), applyLimiter, async (req, res) => {
+router.post('/apply', applyLimiter, authenticateUniversal, authorize('panel:settings:edit'), async (req, res) => {
     try {
         const result = await PanelUpdateService.applyUpdate();
         res.json(result);
