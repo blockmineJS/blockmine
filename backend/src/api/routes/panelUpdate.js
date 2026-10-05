@@ -21,7 +21,7 @@ const applyLimiter = rateLimit({
     message: { error: 'Too many update attempts. Try again later.' },
 });
 
-router.get('/check', authenticateUniversal, checkLimiter, async (req, res) => {
+router.get('/check', checkLimiter, authenticateUniversal, async (req, res) => {
     try {
         const fresh = req.query.fresh === '1' || req.query.fresh === 'true';
         const result = await PanelUpdateService.checkForUpdate({ fresh });
@@ -32,11 +32,11 @@ router.get('/check', authenticateUniversal, checkLimiter, async (req, res) => {
     }
 });
 
-router.get('/status', authenticateUniversal, checkLimiter, (req, res) => {
+router.get('/status', checkLimiter, authenticateUniversal, (req, res) => {
     res.json(PanelUpdateService.getProgress());
 });
 
-router.post('/apply', authenticateUniversal, authorize('panel:settings:edit'), applyLimiter, async (req, res) => {
+router.post('/apply', applyLimiter, authenticateUniversal, authorize('panel:settings:edit'), async (req, res) => {
     try {
         const result = await PanelUpdateService.applyUpdate();
         res.json(result);
