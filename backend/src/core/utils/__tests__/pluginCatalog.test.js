@@ -1,5 +1,5 @@
 const { inspect } = require('../../../../../services/official-list-bot/accept-unofficial');
-const { diffCatalog } = require('../../../../../services/official-list-bot/discord-changes');
+const { diffCatalog, buildPayloads } = require('../../../../../services/official-list-bot/discord-changes');
 const {
     normalizeCatalog,
     isFloatingLatest,
@@ -152,6 +152,14 @@ describe('plugin catalog sections', () => {
         );
         expect(updated[0].type).toBe('updated');
         expect(updated[0].previous.latestTag).toBe('v0.1.0');
+        const described = diffCatalog(before, {
+            official: [pinned],
+            unofficial: [{ ...added, description: 'Коротко о плагине', author: 'ada', categories: ['Чат'] }],
+        });
+        const embed = buildPayloads(described, { commitUrl: 'https://github.com/blockmineJS/official-plugins-list/commit/abc', pusher: 'ada' })[0].embeds[0];
+        expect(embed.description).toBe('Коротко о плагине');
+        expect(embed.fields.find((field) => field.name === 'Автор').value).toBe('ada');
+        expect(embed.fields.find((field) => field.name === 'Категории').value).toBe('Чат');
     });
 
     test('version bump stays on the patch', () => {

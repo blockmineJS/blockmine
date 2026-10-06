@@ -59,32 +59,66 @@ function pluginTitle(entry) {
     return entry.displayName || entry.name || entry.id;
 }
 
-function describe(change) {
-    const title = pluginTitle(change.entry);
-    const label = sectionLabel(change.section);
-    if (change.type === 'added') {
-        return `**${label} добавлен:** ${title} \`${change.entry.latestTag || ''}\`\n${change.entry.repoUrl || ''}`;
-    }
-    if (change.type === 'removed') {
-        return `**${label} убран:** ${title}\n${change.entry.repoUrl || ''}`;
-    }
-    const from = change.previous?.latestTag || '';
-    const to = change.entry.latestTag || '';
-    const version = from !== to ? ` \`${from}\` → \`${to}\`` : '';
-    return `**${label} обновлён:** ${title}${version}\n${change.entry.repoUrl || ''}`;
+function clip(value, max) {
+    const text = String(value || '').trim();
+    if (!text) return 'нет';
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-function buildPayload(changes, { commitUrl, pusher }) {
-    const description = changes.map(describe).join('\n\n').slice(0, 3900);
+function listText(value) {
+    if (!Array.isArray(value) || value.length === 0) return 'нет';
+    return value.join(', ');
+}
+
+function showValue(value) {
+    if (Array.isArray(value)) return listText(value);
+    if (value === undefined || value === null || value === '') return 'нет';
+    return String(value);
+}
+
+function changedLines(previous, entry) {
+    const keys = ['name', 'displayName', 'author', 'description', 'repoUrl', 'icon', 'latestTag', 'categories', 'supportedHosts', 'dependencies'];
+    const lines = [];
+    for (const key of keys) {
+        if (JSON.stringify(previous?.[key] ?? null) === JSON.stringify(entry?.[key] ?? null)) continue;
+        lines.push(`**${key}:** ${showValue(previous?.[key])} → ${showValue(entry?.[key])}`);
+    }
+    return lines.join('\n') || 'запись изменена';
+}
+
+function embedFor(change, { commitUrl, pusher }) {
+    const entry = change.entry;
+    const label = sectionLabel(change.section);
+    const action = change.type === 'added' ? 'добавлен' : change.type === 'removed' ? 'убран' : 'обновлён';
+    const color = change.type === 'removed' ? 0xed4245 : change.type === 'updated' ? 0xfaa61a : (change.section === 'official' ? 0x5865f2 : 0x3ba55d);
+    const fields = [
+        { name: 'Автор', value: clip(entry.author, 1024), inline: true },
+        { name: 'Версия', value: clip(entry.latestTag, 256), inline: true },
+        { name: 'Иконка', value: clip(entry.icon, 256), inline: true },
+        { name: 'Категории', value: clip(listText(entry.categories), 1024) },
+        { name: 'Серверы', value: clip(listText(entry.supportedHosts), 1024) },
+        { name: 'Зависимости', value: clip(listText(entry.dependencies), 1024) },
+    ];
+    if (change.type === 'updated') {
+        fields.push({ name: 'Что изменилось', value: clip(changedLines(change.previous, entry), 1024) });
+    }
     return {
-        embeds: [{
-            title: 'Список плагинов',
-            url: commitUrl,
-            description,
-            color: 0x3ba55d,
-            footer: pusher ? { text: pusher } : undefined,
-        }],
+        title: `${label} плагин ${action}: ${pluginTitle(entry)}`.slice(0, 256),
+        url: entry.repoUrl || commitUrl,
+        description: entry.description ? clip(entry.description, 4096) : 'Описания нет.',
+        color,
+        fields,
+        footer: { text: [pusher, commitUrl].filter(Boolean).join(' · ').slice(0, 2048) },
     };
+}
+
+function buildPayloads(changes, meta) {
+    const embeds = changes.map((change) => embedFor(change, meta));
+    const payloads = [];
+    for (let index = 0; index < embeds.length; index += 10) {
+        payloads.push({ embeds: embeds.slice(index, index + 10) });
+    }
+    return payloads;
 }
 
 function decodeContent(data) {
@@ -116,18 +150,20 @@ async function notify({ github, context, core }) {
     if (!changes.length) return { sent: false, reason: 'no-changes' };
 
     const commitUrl = `https://github.com/${owner}/${repo}/commit/${context.sha}`;
-    const response = await fetch(webhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(changes, {
-            commitUrl,
-            pusher: context.payload.pusher?.name || '',
-        })),
+    const payloads = buildPayloads(changes, {
+        commitUrl,
+        pusher: context.payload.pusher?.name || '',
     });
-    if (!response.ok) {
-        const text = await response.text();
-        core.setFailed(`Discord ответил ${response.status}`);
-        return { sent: false, reason: text.slice(0, 200) };
+    for (const payload of payloads) {
+        const response = await fetch(webhook, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            core.setFailed(`Discord ответил ${response.status}`);
+            return { sent: false, reason: String(response.status) };
+        }
     }
     core.notice(`В Discord отправлено изменений: ${changes.length}`);
     return { sent: true, count: changes.length };
@@ -135,6 +171,6 @@ async function notify({ github, context, core }) {
 
 module.exports = {
     diffCatalog,
-    buildPayload,
+    buildPayloads,
     notify,
 };
