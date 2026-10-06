@@ -36,13 +36,13 @@ import { cn } from "@/lib/utils";
 import BotForm from "@/components/BotForm";
 import GlobalSearch from '@/components/GlobalSearch';
 import { useToast } from "@/hooks/use-toast";
+import { apiHelper } from '@/lib/api';
 import { useAppStore } from '@/stores/appStore';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ChangelogDialog from '@/components/ChangelogDialog';
 import PanelUpdateDialog from '@/components/PanelUpdateDialog';
 import PresenceButton from '@/components/PresenceButton';
-import { apiHelper } from '@/lib/api';
 
 import {
     DndContext,
@@ -498,6 +498,39 @@ export default function Layout() {
     });
 
 
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const sessionId = params.get('github_session');
+        if (!sessionId) return undefined;
+        let stopped = false;
+        apiHelper(`/api/github/connect/${sessionId}`)
+            .then((status) => {
+                if (stopped) return;
+                if (status?.status === 'ready' && status.token) {
+                    localStorage.setItem('blockmine_github_token', status.token);
+                    toast({ title: t('github.connected', { ns: 'plugins', defaultValue: 'GitHub подключён' }) });
+                } else {
+                    toast({
+                        variant: 'destructive',
+                        title: t('github.failed', { ns: 'plugins', defaultValue: 'GitHub не подключился' }),
+                    });
+                }
+            })
+            .catch((error) => {
+                if (stopped) return;
+                toast({ variant: 'destructive', title: error.message || 'GitHub не подключился' });
+            })
+            .finally(() => {
+                if (stopped) return;
+                params.delete('github_session');
+                const next = `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash || ''}`;
+                navigate(next, { replace: true });
+            });
+        return () => {
+            stopped = true;
+        };
+    }, [location.hash, location.pathname, location.search, navigate, t, toast]);
 
     useEffect(() => {
         if (location.state?.openCreateBotModal) {

@@ -103,6 +103,44 @@ const navigationNodes = [
     ],
     defaultData: {},
     theme: { headerColor: '#3b82f6', accentColor: '#60a5fa' }
+  },
+  {
+    type: 'navigation:step',
+    label: '👟 Шаг',
+    category: 'Навигация',
+    description: 'Идёт на несколько блоков туда, куда смотрит бот: вперёд, назад, влево или вправо.',
+    graphType: GRAPH_TYPES.ALL,
+    executor: require('../../core/nodes/navigation/step').execute,
+    evaluator: require('../../core/nodes/navigation/step').evaluate,
+    computeInputs: () => [
+      { id: 'exec', name: 'Выполнить', type: 'Exec' },
+      {
+        id: 'direction',
+        name: 'Направление',
+        type: 'String',
+        required: false,
+        inlineField: true,
+        inlineFieldType: 'select',
+        defaultValue: 'forward',
+        inlineFieldOptions: [
+          { value: 'forward', label: 'Вперёд' },
+          { value: 'back', label: 'Назад' },
+          { value: 'left', label: 'Влево' },
+          { value: 'right', label: 'Вправо' },
+        ],
+      },
+      { id: 'distance', name: 'Блоки', type: 'Number', required: false, inlineField: true, placeholder: '1' },
+    ],
+    computeOutputs: () => [
+      { id: 'exec', name: 'Дошёл', type: 'Exec' },
+      { id: 'exec_failed', name: 'Не удалось', type: 'Exec' },
+      { id: 'x', name: 'X', type: 'Number' },
+      { id: 'y', name: 'Y', type: 'Number' },
+      { id: 'z', name: 'Z', type: 'Number' },
+      { id: 'success', name: 'Успех?', type: 'Boolean' },
+    ],
+    defaultData: { direction: 'forward', distance: 1 },
+    theme: { headerColor: '#3b82f6', accentColor: '#60a5fa' },
   }
 ];
 

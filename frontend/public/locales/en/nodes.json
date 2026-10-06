@@ -1128,5 +1128,101 @@
       "isBurning": "Burning?",
       "isBurning_desc": "true if furnace is working"
     }
+  },
+
+  "world:find_block": {
+    "label": "Find Block",
+    "description": "Finds blocks by name in loaded chunks. Age 7 is ripe wheat, carrots and potatoes. Age 3 is beetroot and nether wart.",
+    "pins": {
+      "name": "Block name",
+      "name_desc": "Block name, for example wheat, carrots, nether_wart",
+      "radius": "Radius",
+      "radius_desc": "How many blocks around the bot to scan, from 1 to 64",
+      "count": "Count",
+      "count_desc": "How many nearest blocks to return, from 1 to 32",
+      "minAge": "Min age",
+      "minAge_desc": "Empty matches any block with this name. 7 is ripe wheat",
+      "block": "Block",
+      "block_desc": "Nearest block: x, y, z, name, age",
+      "blocks": "Blocks",
+      "blocks_desc": "List of found blocks",
+      "age": "Age",
+      "age_desc": "Crop age, or empty when the block has none",
+      "exec_failed": "Not found"
+    }
+  },
+
+  "world:dig": {
+    "label": "Break Block",
+    "description": "Breaks a block. If it is out of reach, the bot walks up to it first.",
+    "pins": {
+      "block": "Block",
+      "block_desc": "Block from Find Block, or an object with x, y, z",
+      "x": "X",
+      "y": "Y",
+      "z": "Z",
+      "exec_failed": "Failed",
+      "success_desc": "true if the block was broken"
+    }
+  },
+
+  "world:place": {
+    "label": "Place Block",
+    "description": "Places an item against a block face. Wheat seeds are wheat_seeds on the top of farmland.",
+    "pins": {
+      "block": "Block",
+      "block_desc": "Block whose face is clicked",
+      "x": "X",
+      "y": "Y",
+      "z": "Z",
+      "face": "Face",
+      "face_desc": "Which face to click",
+      "itemName": "Item",
+      "itemName_desc": "Inventory item name. Empty uses the item already in hand",
+      "exec_failed": "Failed",
+      "success_desc": "true if the block was placed"
+    },
+    "options": {
+      "face": {
+        "up": "Top",
+        "down": "Bottom",
+        "north": "North",
+        "south": "South",
+        "east": "East",
+        "west": "West"
+      }
+    }
+  },
+
+  "world:attack": {
+    "label": "Attack",
+    "description": "One hit on an entity. If it is farther than 3 blocks, the bot walks closer first.",
+    "pins": {
+      "entity": "Entity",
+      "entity_desc": "Entity from the nearby entities list",
+      "exec_failed": "Failed",
+      "success_desc": "true if the hit was sent"
+    }
+  },
+
+  "navigation:step": {
+    "label": "Step",
+    "description": "Walks several blocks relative to where the bot is looking: forward, back, left or right.",
+    "pins": {
+      "direction": "Direction",
+      "direction_desc": "Relative to the bot's look, not compass directions",
+      "distance": "Blocks",
+      "distance_desc": "How many blocks to walk, from 1 to 64",
+      "exec_failed": "Failed",
+      "success_desc": "true if the bot arrived"
+    },
+    "options": {
+      "direction": {
+        "forward": "Forward",
+        "back": "Back",
+        "left": "Left",
+        "right": "Right"
+      }
+    }
   }
 }

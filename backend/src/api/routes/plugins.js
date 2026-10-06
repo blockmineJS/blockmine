@@ -11,6 +11,8 @@ const {
 } = require('../../core/utils/github');
 const TtlCache = require('../../core/utils/ttlCache');
 const { filterSecretSettings, parseManifest, isGroupedSettings } = require('../../core/utils/pluginSettings');
+const { normalizeCatalog } = require('../../core/utils/pluginCatalog');
+const { removeOwnUnofficialEntry } = require('../../core/utils/pluginPublish');
 
 const router = express.Router();
 const OFFICIAL_CATALOG_URL = 'https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json';
@@ -41,7 +43,7 @@ async function fetchOfficialCatalog(force = false) {
                 console.error(`[API Error] Failed to fetch catalog from GitHub. Status: ${response.status}, Response: ${errorText}`);
                 throw new Error(`GitHub returned status ${response.status}`);
             }
-            const data = await response.json();
+            const data = normalizeCatalog(await response.json());
             catalogCache.data = data;
             catalogCache.expiresAt = Date.now() + CATALOG_TTL_MS;
             return data;
@@ -229,6 +231,24 @@ router.get('/bot/:botId', authenticateUniversal, checkBotAccess, authorize('plug
     } catch (error) {
         console.error(`[API Error] /plugins/bot/:botId:`, error);
         res.status(500).json({ error: 'Не удалось получить список плагинов.' });
+    }
+});
+
+router.post('/catalog/:name/unlist', authenticateUniversal, async (req, res) => {
+    try {
+        const result = await removeOwnUnofficialEntry({
+            token: req.body?.token,
+            pluginId: req.params.name,
+        });
+        catalogCache.data = null;
+        catalogCache.expiresAt = 0;
+        pluginDetailCache.delete(req.params.name);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        const status = error.statusCode || error.status || 500;
+        res.status(status >= 400 && status < 600 ? status : 500).json({
+            error: error.message || 'Не удалось убрать плагин из списка.',
+        });
     }
 });
 

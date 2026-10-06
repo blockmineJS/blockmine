@@ -42,7 +42,9 @@ const {
     fetchGithubJson,
     fetchGithubReadme,
     renderGithubMarkdown,
+    fetchLatestGithubVersionTag,
 } = require('../../core/utils/github');
+const { isFloatingLatest } = require('../../core/utils/pluginCatalog');
 
 const router = express.Router();
 
@@ -772,7 +774,14 @@ router.post('/:botId/plugins/install/github', githubInstallLimiter, authenticate
     const normalizedTag = typeof tag === 'string' && tag.trim() ? tag.trim() : null;
     try {
         normalizedRepoUrl = normalizeGithubRepoUrl(repoUrl);
-        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), normalizedRepoUrl, prisma, false, normalizedTag);
+        let installTag = normalizedTag;
+        if (isFloatingLatest(installTag)) {
+            installTag = await fetchLatestGithubVersionTag(normalizedRepoUrl);
+            if (!installTag) {
+                return res.status(404).json({ message: `У ${normalizedRepoUrl} нет релиза, хотя в списке стоит latest.` });
+            }
+        }
+        const newPlugin = await pluginManager.installFromGithub(parseInt(botId), normalizedRepoUrl, prisma, false, installTag);
         res.status(201).json(newPlugin);
     } catch (error) {
         let status = /required|invalid|only github|must include|unsupported/i.test(error.message) ? 400 : 500;

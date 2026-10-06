@@ -139,12 +139,12 @@ export default function SubmitToOfficialListDialog({ isOpen, onClose, pluginInfo
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Icons.Package className="h-5 w-5" />
-                        {isUpdate ? 'Обновить версию в списке' : 'Подать в официальный список'}
+                        {isUpdate ? 'Обновить версию в списке' : 'Подать в неофициальный список'}
                     </DialogTitle>
                     <DialogDescription>
                         {prUrl ? 'Pull Request успешно создан!' : isUpdate
                             ? `Обновить версию с ${currentVersion} на ${latestTag}`
-                            : 'Автоматически создаст PR в blockmineJS/official-plugins-list'
+                            : 'Создаст PR в неофициальный раздел. Его примет бот списка.'
                         }
                     </DialogDescription>
                 </DialogHeader>

@@ -12,7 +12,7 @@ class TelemetryService {
         this.heartbeatDebounceTimer = null;
         this.heartbeatInterval = null;
 
-        this.STATS_SERVER_URL = 'http://185.65.200.184:3000';
+        this.STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://212.22.78.42:3000';
         this.DATA_DIR = path.join(os.homedir(), '.blockmine');
         this.INSTANCE_ID_PATH = path.join(this.DATA_DIR, '.instance_id');
 

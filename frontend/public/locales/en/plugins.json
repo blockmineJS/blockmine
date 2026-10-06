@@ -22,6 +22,7 @@
     "reload": "Reload",
     "cancel": "Cancel",
     "delete": "Delete",
+    "publish": "Publish",
     "open": "Open",
     "unavailable": "Unavailable"
   },
@@ -147,6 +148,9 @@
     "categories": "Categories",
     "all": "All",
     "noResults": "No plugins found",
+    "showUnofficial": "Unofficial",
+    "unofficialRiskTitle": "At your own risk.",
+    "unofficialRisk": "Nobody on the list has checked these plugins.",
     "viewGrid": "Grid view",
     "viewList": "List view",
     "total": "Total: {{count}}",
@@ -181,7 +185,37 @@
   "badges": {
     "popular": "Popular",
     "new": "New",
-    "update": "Update"
+    "update": "Update",
+    "unofficial": "Unofficial",
+    "official": "Official"
+  },
+  "publish": {
+    "title": "Publish plugin",
+    "summary": "A repo, a release, and straight into the unofficial list.",
+    "listed": "The plugin is already in the unofficial list.",
+    "updateLead": "Already on GitHub, currently {{version}}. This ships the next version into the unofficial list.",
+    "release": "Ship version",
+    "github": "GitHub",
+    "connect": "Connect GitHub",
+    "waiting": "If GitHub did not open by itself, press the button below and allow access.",
+    "openGithub": "Open GitHub",
+    "githubSaved": "You can publish.",
+    "githubMissing": "GitHub opens with one green button. There is no code to type.",
+    "name": "Name",
+    "icon": "Icon",
+    "iconSite": "Pick an icon",
+    "author": "Author",
+    "description": "Description",
+    "submit": "Publish",
+    "needGithub": "Press Connect GitHub first",
+    "githubReady": "GitHub connected",
+    "githubFailed": "GitHub did not confirm the login",
+    "failed": "Could not publish",
+    "updated": "New release {{version}}.",
+    "created": "Repository created, release {{version}}.",
+    "officialSkip": "The official list version did not move. That pin is manual. If it says latest, this release is picked up.",
+    "openRepo": "Repository",
+    "openPr": "List request"
   },
   "labels": {
     "by": "by",
@@ -200,6 +234,7 @@
     "updateAvailable": "Update available"
   },
   "tooltips": {
+    "downloadZip": "Download zip",
     "openRepository": "Open repository",
     "editCode": "Edit code",
     "reload": "Reload",
@@ -208,7 +243,16 @@
     "settings": "Settings",
     "delete": "Delete",
     "updateTo": "Update to {{version}}",
-    "updateAvailable": "Update available"
+    "updateAvailable": "Update available",
+    "publish": "Publish",
+    "unlist": "Remove from the list"
+  },
+  "unlist": {
+    "title": "Remove \"{{name}}\" from the list?",
+    "confirm": "Remove",
+    "working": "Removing...",
+    "done": "Plugin removed from the unofficial list",
+    "failed": "Could not remove the plugin"
   },
   "dependencyDialog": {
     "title": "Dependency check",

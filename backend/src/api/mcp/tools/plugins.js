@@ -4,6 +4,7 @@ const { botManager, pluginManager } = require('../../../core/services');
 const PluginHooks = require('../../../core/PluginHooks');
 const { filterSecretSettings, prepareSettingsForSave, isGroupedSettings } = require('../../../core/utils/secretsFilter');
 const { ok, err, wrap, requirePermission, requireBotAccess, jsonField, hasPermission } = require('../helpers');
+const { normalizeCatalog } = require('../../../core/utils/pluginCatalog');
 
 const CATALOG_URL = 'https://raw.githubusercontent.com/blockmineJS/official-plugins-list/main/index.json';
 
@@ -48,8 +49,7 @@ function requireCatalogAccess(user) {
 async function fetchCatalog() {
     const response = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw new Error(`Catalog request failed (${response.status})`);
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    return normalizeCatalog(await response.json());
 }
 
 function register(server, { user }) {

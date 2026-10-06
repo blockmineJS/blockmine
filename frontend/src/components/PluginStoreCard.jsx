@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { translatePluginCategory } from '@/utils/pluginPresentation';
+import UnlistCatalogButton from '@/components/UnlistCatalogButton';
 
 const getLatestVersion = (tag) => (tag || '0.0.0').replace(/^v/i, '');
 
@@ -60,6 +61,17 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
             isHovered && 'opacity-100'
           )}
         />
+
+        <Badge className={cn(
+          'absolute right-0 top-0 z-10 rounded-none border px-2 py-0.5 text-[10px]',
+          plugin.listing === 'unofficial'
+            ? 'border-amber-700/60 bg-background text-amber-200'
+            : 'border-sky-700/50 bg-background text-sky-200'
+        )}>
+          {plugin.listing === 'unofficial'
+            ? t('badges.unofficial', { defaultValue: 'Неофициальный' })
+            : t('badges.official', { defaultValue: 'Официальный' })}
+        </Badge>
 
         {plugin.isTop3 && (
           <div className="absolute left-0 top-0 z-10 flex flex-col items-start gap-1">
@@ -181,7 +193,10 @@ export default function PluginStoreCard({ plugin, isInstalled, isInstalling, onI
         </CardContent>
 
         <CardFooter className="relative z-10 mt-auto flex min-h-[84px] flex-col items-start justify-end gap-2 border-t px-5 pb-4 pt-3">
-          <div className="min-h-[22px] w-full">
+          <div className="flex min-h-[22px] w-full items-center">
+            {plugin.listing === 'unofficial' && (
+              <UnlistCatalogButton plugin={plugin} className="h-6 rounded-none px-2 text-xs" />
+            )}
             {hasDependencies && (
               <Tooltip>
                 <TooltipTrigger asChild>

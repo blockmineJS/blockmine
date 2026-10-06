@@ -11,7 +11,7 @@
   <p>
     <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="Stars"></a>
     <a href="https://github.com/blockmineJS/blockmine/commits/main"><img src="https://img.shields.io/github/last-commit/blockmineJS/blockmine?style=for-the-badge&logo=git" alt="Last Commit"></a>
-    <a href="http://185.65.200.184:3000/api/stats" target="_blank">
+    <a href="http://212.22.78.42:3000/api/stats" target="_blank">
     </a>
   </p>
 </div>
@@ -136,6 +136,14 @@ start.bat
 start.bat reinstall
 ```
 
+Ручное обновление, без кнопки в панели:
+
+```bat
+update.bat
+```
+
+Скрипт останавливает панель, забирает новые коммиты с GitHub, ставит зависимости, собирает проект и снова запускает её. Кнопка **Обновить** вызывает те же шаги.
+
 ### Linux и macOS
 
 ```bash
@@ -158,57 +166,41 @@ npx blockmine
 
 ---
 
-## 🚀 Установка на хостинг (VPS/Dedicated Server)
+## Установка на хост
 
-Для продакшн-развертывания на сервере рекомендуется использовать PM2 для управления процессом.
+Если вы впервые зашли на хост и ничерта не знаете, вводите это. Ubuntu или Debian: команды обновят систему и поставят Node.js 22, npm и PM2.
 
-### Требования
-- **Node.js v22+**
-- **npm**
-- **Git** (для клонирования репозитория)
-- **PM2** (менеджер процессов)
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install -g npm@latest
+sudo npm install -g pm2@latest
+```
 
-### Шаг 1: Клонирование репозитория
+Потом клонируйте репозиторий:
 
 ```bash
 git clone https://github.com/blockmineJS/blockmine.git
+```
+
+Если написало `-bash: git: command not found`, гита на хосте нет. Поставьте его и снова введите `git clone`:
+
+```bash
+sudo apt install -y git
+```
+
+Дальше зайдите в папку, соберите панель и запустите:
+
+```bash
 cd blockmine
-```
-
-### Шаг 2: Установка зависимостей
-
-```bash
-npm install
-```
-
-> **Примечание**: Команда `npm install` автоматически запустит `postinstall` скрипт, который установит зависимости frontend и сгенерирует Prisma клиент.
-
-### Шаг 3: Сборка frontend
-
-```bash
+npm i
 npm run build
-```
-
-Эта команда создаст оптимизированную production-сборку React приложения.
-
-### Шаг 4: Установка PM2
-
-Если PM2 еще не установлен глобально:
-
-```bash
-npm install -g pm2
-```
-
-### Шаг 5: Запуск с PM2
-
-Запустите приложение с помощью готового конфигурационного файла:
-
-```bash
 pm2 start ecosystem.config.js
 ```
 
-> **Примечание**: В проекте уже есть файл `ecosystem.config.js` с оптимальными настройками для production.
-
+Можно зайти по адресу `http://IP-хоста:3001`.
 
 ### Обновление
 

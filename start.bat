@@ -99,24 +99,7 @@ exit /b %EXITCODE%
 :do_update
 echo.
 echo [BlockMine] Updating from GitHub...
-set "UPDATE_BRANCH=master"
-set /p UPDATE_BRANCH=<"%USERPROFILE%\.blockmine\update-requested.txt"
-del "%USERPROFILE%\.blockmine\update-requested.txt" >nul 2>&1
-if "%UPDATE_BRANCH%"=="" set "UPDATE_BRANCH=master"
-echo [BlockMine] git fetch %UPDATE_BRANCH%
-git fetch --quiet https://github.com/blockmineJS/blockmine.git +refs/heads/%UPDATE_BRANCH%:refs/panel-update/%UPDATE_BRANCH%
-if errorlevel 1 goto update_failed
-echo [BlockMine] restore package-lock.json
-git checkout -- package-lock.json
-if exist frontend\package-lock.json git checkout -- frontend/package-lock.json
-echo [BlockMine] git merge --ff-only
-git merge --ff-only refs/panel-update/%UPDATE_BRANCH%
-if errorlevel 1 goto update_failed
-echo [BlockMine] npm install
-call npm install --no-fund --no-audit
-if errorlevel 1 goto update_failed
-echo [BlockMine] npm run build
-call npm run build
+call "%~dp0update.bat" --from-start
 if errorlevel 1 goto update_failed
 echo [BlockMine] Update finished. Starting panel...
 call :free_ports

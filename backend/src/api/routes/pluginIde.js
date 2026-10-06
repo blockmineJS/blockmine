@@ -6,6 +6,7 @@ const os = require('os');
 const { PrismaClient } = require('@prisma/client');
 const slugify = require('slugify');
 const { Octokit } = require('@octokit/rest');
+const { inspectLocalPublish, publishLocalPlugin, submitListedRelease, removeOwnUnofficialEntry } = require('../../core/utils/pluginPublish');
 
 const prisma = new PrismaClient();
 const router = express.Router({ mergeParams: true });
@@ -1999,328 +2000,94 @@ async function uploadFilesToGitHub(octokit, owner, repo, pluginPath) {
     }
 }
 
-/**
- * POST /:pluginName/submit-to-official-list
- * Создает PR в blockmineJS/official-plugins-list для добавления плагина
- */
-router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (req, res) => {
+router.post('/:pluginName/unlist', resolvePluginPath, async (req, res) => {
     try {
-        const { token, pluginDisplayName, icon } = req.body;
-
-        if (!token) {
-            return res.status(400).json({ error: 'GitHub token is required.' });
-        }
-
-        if (!pluginDisplayName || !icon) {
-            return res.status(400).json({ error: 'Plugin name and icon are required.' });
-        }
-
-        // Читаем package.json плагина
-        const packageJsonPath = path.join(req.pluginPath, 'package.json');
-        if (!await fse.pathExists(packageJsonPath)) {
-            return res.status(404).json({ error: 'package.json not found.' });
-        }
-
-        const packageJson = await fse.readJson(packageJsonPath);
-        const repoUrl = typeof packageJson.repository === 'string'
-            ? packageJson.repository
-            : packageJson.repository?.url;
-
-        if (!repoUrl) {
-            return res.status(400).json({ error: 'No repository URL in package.json.' });
-        }
-
-        // Извлекаем owner/repo из URL
-        const match = repoUrl.match(/github\.com[\/:](.+?)\/(.+?)(\.git)?$/);
-        if (!match) {
-            return res.status(400).json({ error: 'Invalid GitHub repository URL.' });
-        }
-
-        const [, owner, repoName] = match;
-        const cleanRepoName = repoName.replace('.git', '');
-
-        const octokit = new Octokit({ auth: token });
-
-        // Получаем latest tag
-        let latestTag = null;
-        try {
-            const { data: tags } = await octokit.repos.listTags({
-                owner,
-                repo: cleanRepoName,
-                per_page: 1
-            });
-            if (tags.length > 0) {
-                latestTag = tags[0].name;
-            }
-        } catch (error) {
-            console.warn('[Plugin IDE] Could not fetch tags:', error.message);
-        }
-
-        if (!latestTag) {
-            return res.status(400).json({ error: 'Plugin must have at least one release tag.' });
-        }
-
-        // Сохраняем иконку в package.json если её там нет
-        if (!packageJson.botpanel) {
-            packageJson.botpanel = {};
-        }
-
-        if (!packageJson.botpanel.icon) {
-            packageJson.botpanel.icon = icon;
-            await fse.writeJson(packageJsonPath, packageJson, { spaces: 2 });
-            console.log(`[Plugin IDE] Saved icon "${icon}" to package.json`);
-        }
-
-        // Берём категории, зависимости и supportedHosts из package.json
-        const categories = packageJson.botpanel?.categories || [];
-        const supportedHosts = packageJson.botpanel?.supportedHosts || [];
-        const dependencies = packageJson.botpanel?.dependencies || [];
-
-        // Формируем entry для официального списка
-        const pluginEntry = {
-            id: cleanRepoName,
-            name: pluginDisplayName,
-            author: packageJson.author || owner,
-            description: packageJson.description || '',
-            repoUrl: repoUrl.replace('.git', ''),
-            icon: icon,
-            latestTag: latestTag,
-            categories: categories,
-            supportedHosts: supportedHosts,
-            dependencies: dependencies
-        };
-
-        // Работаем с official-plugins-list репозиторием
-        const listOwner = 'blockmineJS';
-        const listRepo = 'official-plugins-list';
-
-        console.log(`[Plugin IDE] Creating PR for plugin ${cleanRepoName} in official list`);
-
-        // Получаем default branch (main или master)
-        const { data: repoInfo } = await octokit.repos.get({
-            owner: listOwner,
-            repo: listRepo
+        const result = await removeOwnUnofficialEntry({
+            token: req.body?.token,
+            pluginId: req.pluginData.name,
         });
-        const defaultBranch = repoInfo.default_branch;
-
-        // Получаем SHA основной ветки
-        const { data: refData } = await octokit.git.getRef({
-            owner: listOwner,
-            repo: listRepo,
-            ref: `heads/${defaultBranch}`
-        });
-        const baseSha = refData.object.sha;
-
-        // Получаем текущий index.json для проверки, существует ли плагин
-        const { data: fileData } = await octokit.repos.getContent({
-            owner: listOwner,
-            repo: listRepo,
-            path: 'index.json',
-            ref: defaultBranch
-        });
-
-        const currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
-        const pluginsList = JSON.parse(currentContent);
-
-        // Проверяем, не добавлен ли уже плагин
-        const existingPlugin = pluginsList.find(p => p.id === cleanRepoName);
-        const isUpdate = !!existingPlugin;
-        const oldVersion = existingPlugin?.latestTag;
-
-        // Название ветки зависит от типа операции
-        const branchName = isUpdate ? `update-plugin-${cleanRepoName}` : `add-plugin-${cleanRepoName}`;
-
-        // Проверяем, существует ли уже ветка с таким именем
-        let branchExists = false;
-        try {
-            await octokit.git.getRef({
-                owner: listOwner,
-                repo: listRepo,
-                ref: `heads/${branchName}`
-            });
-            branchExists = true;
-        } catch (error) {
-            // Ветка не существует, это нормально
-        }
-
-        // Если ветка существует, удаляем её
-        if (branchExists) {
-            try {
-                await octokit.git.deleteRef({
-                    owner: listOwner,
-                    repo: listRepo,
-                    ref: `heads/${branchName}`
-                });
-                console.log(`[Plugin IDE] Deleted existing branch ${branchName}`);
-            } catch (error) {
-                console.warn('[Plugin IDE] Could not delete existing branch:', error.message);
-            }
-        }
-
-        // Создаем новую ветку
-        await octokit.git.createRef({
-            owner: listOwner,
-            repo: listRepo,
-            ref: `refs/heads/${branchName}`,
-            sha: baseSha
-        });
-
-        // Обновляем или добавляем плагин в список
-        const existingIndex = pluginsList.findIndex(p => p.id === cleanRepoName);
-        if (existingIndex !== -1) {
-            // Обновляем существующий
-            pluginsList[existingIndex] = pluginEntry;
-        } else {
-            // Добавляем новый
-            pluginsList.push(pluginEntry);
-        }
-
-        // Сортируем по id для консистентности
-        pluginsList.sort((a, b) => a.id.localeCompare(b.id));
-
-        const newContent = JSON.stringify(pluginsList, null, 2) + '\n';
-
-        // Создаем коммит с обновленным index.json
-        const { data: blob } = await octokit.git.createBlob({
-            owner: listOwner,
-            repo: listRepo,
-            content: Buffer.from(newContent).toString('base64'),
-            encoding: 'base64'
-        });
-
-        const { data: baseCommit } = await octokit.git.getCommit({
-            owner: listOwner,
-            repo: listRepo,
-            commit_sha: baseSha
-        });
-
-        const { data: tree } = await octokit.git.createTree({
-            owner: listOwner,
-            repo: listRepo,
-            tree: [
-                {
-                    path: 'index.json',
-                    mode: '100644',
-                    type: 'blob',
-                    sha: blob.sha
-                }
-            ],
-            base_tree: baseCommit.tree.sha
-        });
-
-        // Commit message и PR body зависят от типа операции
-        const commitMessage = isUpdate
-            ? `Update ${pluginDisplayName} to ${latestTag}`
-            : `Add ${pluginDisplayName} plugin`;
-
-        const { data: commit } = await octokit.git.createCommit({
-            owner: listOwner,
-            repo: listRepo,
-            message: commitMessage,
-            tree: tree.sha,
-            parents: [baseSha]
-        });
-
-        await octokit.git.updateRef({
-            owner: listOwner,
-            repo: listRepo,
-            ref: `heads/${branchName}`,
-            sha: commit.sha
-        });
-
-        // Создаем Pull Request
-        const prTitle = isUpdate
-            ? `🔄 Update ${pluginDisplayName} to ${latestTag}`
-            : `✨ Add ${pluginDisplayName} plugin`;
-
-        const prBody = isUpdate
-            ? `## Обновление плагина: ${pluginDisplayName}
-
-**ID**: \`${cleanRepoName}\`
-**Автор**: ${packageJson.author || owner}
-**Описание**: ${packageJson.description || 'Нет описания'}
-**Репозиторий**: ${repoUrl.replace('.git', '')}
-**Старая версия**: ${oldVersion}
-**Новая версия**: ${latestTag}
-
----
-
-Этот PR был автоматически создан из BlockMine IDE.
-
-### Что нужно проверить:
-- [ ] Новая версия работает корректно
-- [ ] Обновленные данные плагина корректны
-- [ ] Заполнены \`categories\`, \`supportedHosts\`, \`dependencies\` (если нужно)
-- [ ] Иконка отображается корректно
-`
-            : `## Новый плагин: ${pluginDisplayName}
-
-**ID**: \`${cleanRepoName}\`
-**Автор**: ${packageJson.author || owner}
-**Описание**: ${packageJson.description || 'Нет описания'}
-**Репозиторий**: ${repoUrl.replace('.git', '')}
-**Версия**: ${latestTag}
-
----
-
-Этот PR был автоматически создан из BlockMine IDE.
-
-### Что нужно проверить:
-- [ ] Плагин работает
-- [ ] Описание корректно
-- [ ] Заполнены \`categories\`, \`supportedHosts\`, \`dependencies\` (если нужно)
-- [ ] Иконка отображается корректно
-`;
-
-        let prUrl;
-        let prNumber;
-
-        try {
-            const { data: pr } = await octokit.pulls.create({
-                owner: listOwner,
-                repo: listRepo,
-                title: prTitle,
-                head: branchName,
-                base: defaultBranch,
-                body: prBody
-            });
-            prUrl = pr.html_url;
-            prNumber = pr.number;
-        } catch (error) {
-            // Возможно PR уже существует
-            if (error.status === 422) {
-                // Ищем существующий PR
-                const { data: pulls } = await octokit.pulls.list({
-                    owner: listOwner,
-                    repo: listRepo,
-                    head: `${listOwner}:${branchName}`,
-                    state: 'open'
-                });
-
-                if (pulls.length > 0) {
-                    prUrl = pulls[0].html_url;
-                    prNumber = pulls[0].number;
-                } else {
-                    throw error;
-                }
-            } else {
-                throw error;
-            }
-        }
-
-        res.json({
-            success: true,
-            prUrl,
-            prNumber,
-            message: 'Pull Request created successfully'
-        });
-
+        res.json({ success: true, ...result });
     } catch (error) {
-        console.error(`[Plugin IDE Error] /submit-to-official-list:`, error);
-        res.status(500).json({
-            error: error.message || 'Failed to create Pull Request.'
+        const status = error.statusCode || error.status || 500;
+        res.status(status >= 400 && status < 600 ? status : 500).json({
+            error: error.message || 'Не удалось убрать плагин из списка.',
         });
     }
 });
+
+router.get('/:pluginName/publish-info', resolvePluginPath, async (req, res) => {
+    try {
+        if (req.pluginData.sourceType !== 'LOCAL' && req.pluginData.sourceType !== 'LOCAL_IDE') {
+            return res.status(400).json({ error: 'Одной кнопкой публикуется только локальный плагин.' });
+        }
+        res.json(await inspectLocalPublish(req.pluginPath));
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Не удалось прочитать плагин.' });
+    }
+});
+
+router.post('/:pluginName/publish', resolvePluginPath, async (req, res) => {
+    try {
+        const { token, author, description, displayName, icon } = req.body || {};
+        const result = await publishLocalPlugin({
+            token,
+            pluginPath: req.pluginPath,
+            pluginRecord: req.pluginData,
+            fields: { author, description, displayName, icon },
+        });
+
+        let manifest = {};
+        try {
+            manifest = req.pluginData.manifest ? JSON.parse(req.pluginData.manifest) : {};
+        } catch {
+            manifest = {};
+        }
+        await prisma.installedPlugin.update({
+            where: { id: req.pluginData.id },
+            data: {
+                version: result.version,
+                description: result.description || req.pluginData.description,
+                manifest: JSON.stringify({ ...manifest, ...(result.manifest || {}) }),
+            },
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        const status = error.statusCode || error.status || 500;
+        console.error('[Plugin IDE Error] /publish:', error.message);
+        res.status(status >= 400 && status < 600 ? status : 500).json({
+            error: error.message || 'Не удалось опубликовать плагин.',
+        });
+    }
+});
+
+router.post('/:pluginName/submit-to-official-list', resolvePluginPath, async (req, res) => {
+    try {
+        const { token, pluginDisplayName, icon } = req.body || {};
+        if (!pluginDisplayName || !icon) {
+            return res.status(400).json({ error: 'Нужны название и иконка.' });
+        }
+        const result = await submitListedRelease({
+            token,
+            pluginPath: req.pluginPath,
+            displayName: pluginDisplayName,
+            icon,
+        });
+        res.json({
+            success: true,
+            ...result,
+            message: result.prSkipped
+                ? 'Плагин уже в официальном разделе. Версию списка меняют вручную.'
+                : 'Pull Request в неофициальный раздел создан.',
+        });
+    } catch (error) {
+        const status = error.statusCode || error.status || 500;
+        console.error('[Plugin IDE Error] /submit-to-official-list:', error.message);
+        res.status(status >= 400 && status < 600 ? status : 500).json({
+            error: error.message || 'Не удалось отправить плагин в список.',
+        });
+    }
+});
+
 
 module.exports = router; 

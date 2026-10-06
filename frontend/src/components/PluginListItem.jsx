@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import UnlistCatalogButton from '@/components/UnlistCatalogButton';
 import {
   Tooltip,
   TooltipContent,
@@ -108,6 +109,14 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
               <Link to={pluginDetailPath} className="group">
                 <h3 className="inline-flex items-center gap-2 text-lg font-semibold transition-colors group-hover:text-primary">
                   {plugin.displayName || plugin.name}
+                  <Badge className={cn(
+                    'rounded-none border bg-transparent text-[10px]',
+                    plugin.listing === 'unofficial' ? 'border-amber-700/60 text-amber-200' : 'border-sky-700/50 text-sky-200'
+                  )}>
+                    {plugin.listing === 'unofficial'
+                      ? t('badges.unofficial', { defaultValue: 'Неофициальный' })
+                      : t('badges.official', { defaultValue: 'Официальный' })}
+                  </Badge>
                   {plugin.verified && <SparklesIcon className="h-4 w-4 text-blue-500" />}
                 </h3>
               </Link>
@@ -259,6 +268,7 @@ export default function PluginListItem({ plugin, isInstalled, isInstalling, onIn
               )}
             </Button>
           </div>
+          <UnlistCatalogButton plugin={plugin} className="h-7 rounded-none px-2 text-xs" />
           <span className="text-xs text-muted-foreground">v{getLatestVersion(plugin.latestTag)}</span>
         </div>
       </div>

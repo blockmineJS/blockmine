@@ -37,6 +37,8 @@ const CATEGORY_ALIASES = {
   'инвентарь': 'inventory',
   navigation: 'navigation',
   'навигация': 'navigation',
+  world: 'world',
+  'мир': 'world',
   container: 'container',
   containers: 'container',
   'контейнеры': 'container',

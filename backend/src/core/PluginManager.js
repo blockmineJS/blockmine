@@ -18,6 +18,7 @@ const { installDependencies } = require('./utils/npmInstall');
 const { assertSafeZip, assertArchiveLimits } = require('./utils/zipSafe');
 const TtlCache = require('./utils/ttlCache');
 const { pluginDependencySatisfied, diffSettings, listDeclaredPermissions, ensureDeclaredPermissions } = require('./utils/pluginManifest');
+const { isFloatingLatest } = require('./utils/pluginCatalog');
 
 const DATA_DIR = path.join(os.homedir(), '.blockmine');
 const PLUGINS_BASE_DIR = path.join(DATA_DIR, 'storage', 'plugins');
@@ -94,7 +95,7 @@ async function appendPluginFiles(archive, directory, relativeDir = '') {
 }
 
 const TELEMETRY_ENABLED = process.env.BLOCKMINE_TELEMETRY !== 'false';
-const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
+const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://212.22.78.42:3000';
 
 const LATEST_TAG_TTL_MS = 30 * 60 * 1000;
 const LATEST_VERSION_TTL_MS = 30 * 60 * 1000;
@@ -669,7 +670,7 @@ class PluginManager {
                     catalogInfo?.latestVersion ||
                     catalogInfo?.tag;
 
-                if (!latestTagRaw) {
+                if (!latestTagRaw || isFloatingLatest(latestTagRaw)) {
                     latestTagRaw = await this._resolveLatestTagWithCache(targetRepoUrl);
                 }
 

@@ -184,6 +184,7 @@
       "debug": "Debug",
       "inventory": "Inventory",
       "navigation": "Navigation",
+      "world": "World",
       "container": "Containers",
       "furnace": "Furnace",
       "event": "Events",

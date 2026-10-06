@@ -3,7 +3,7 @@ const TtlCache = require('../../core/utils/ttlCache');
 
 const router = express.Router();
 
-const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://185.65.200.184:3000';
+const STATS_SERVER_URL = process.env.STATS_SERVER_URL || 'http://212.22.78.42:3000';
 const STATS_CACHE_TTL_MS = 60 * 1000;
 const STATS_REQUEST_TIMEOUT_MS = 5000;
 const STATS_CACHE_KEY = 'stats';

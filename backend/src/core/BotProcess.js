@@ -13,6 +13,7 @@ const { parseArguments } = require('./system/parseArguments');
 const GraphExecutionEngine = require('./GraphExecutionEngine');
 const NodeRegistry = require('./NodeRegistry');
 const { createBotApi } = require('./ipc/botApiFactory');
+const { attachPathfinder } = require('./attachPathfinder');
 const { MessageTypes, EventTypes } = require('./ipc/ipcMessageTypes');
 
 const UserService = require('./UserService');
@@ -733,6 +734,7 @@ process.on('message', async (message) => {
             }
 
             bot = mineflayer.createBot(botOptions);
+            attachPathfinder(bot, sendLog);
 
             connectionTimeout = setTimeout(() => {
                 if (bot && !bot.player) {

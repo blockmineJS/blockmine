@@ -160,7 +160,15 @@ import {
   navigationGoToEntityDefinition,
   navigationFollowDefinition,
   navigationStopDefinition,
+  navigationStepDefinition,
 } from './navigation';
+
+import {
+  worldFindBlockDefinition,
+  worldDigDefinition,
+  worldPlaceDefinition,
+  worldAttackDefinition,
+} from './world';
 
 // Container nodes
 import {
@@ -331,6 +339,13 @@ export function registerAllNodes() {
   NodeRegistry.register(navigationGoToEntityDefinition);
   NodeRegistry.register(navigationFollowDefinition);
   NodeRegistry.register(navigationStopDefinition);
+  NodeRegistry.register(navigationStepDefinition);
+
+  // World category
+  NodeRegistry.register(worldFindBlockDefinition);
+  NodeRegistry.register(worldDigDefinition);
+  NodeRegistry.register(worldPlaceDefinition);
+  NodeRegistry.register(worldAttackDefinition);
 
   // Container category
   NodeRegistry.register(containerOpenDefinition);

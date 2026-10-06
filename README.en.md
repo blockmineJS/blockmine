@@ -11,7 +11,7 @@
   <p>
     <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="Stars"></a>
     <a href="https://github.com/blockmineJS/blockmine/commits/main"><img src="https://img.shields.io/github/last-commit/blockmineJS/blockmine?style=for-the-badge&logo=git" alt="Last Commit"></a>
-    <a href="http://185.65.200.184:3000/api/stats" target="_blank">
+    <a href="http://212.22.78.42:3000/api/stats" target="_blank">
       <img src="https://img.shields.io/endpoint?url=https://blockmine-proxy.vercel.app/api/shield&style=for-the-badge&logo=minecraft&logoColor=white" alt="Bots Online">
     </a>
   </p>
@@ -135,6 +135,14 @@ To reinstall dependencies:
 start.bat reinstall
 ```
 
+To update manually, without the button in the panel:
+
+```bat
+update.bat
+```
+
+The script stops the panel, fetches new commits from GitHub, installs dependencies, builds the project, and starts it again. The **Update** button runs the same steps.
+
 ### Linux and macOS
 
 ```bash
@@ -157,56 +165,41 @@ This downloads the npm package, sets up the database, and starts the server. The
 
 ---
 
-## 🚀 Hosting Installation (VPS/Dedicated Server)
+## Install on a host
 
-For production deployment on a server, it's recommended to use PM2 for process management.
+If this is your first time on the host and you have no idea what to type, paste this. Ubuntu or Debian: it updates the system and installs Node.js 22, npm, and PM2.
 
-### Requirements
-- **Node.js v22+**
-- **npm**
-- **Git** (for cloning the repository)
-- **PM2** (process manager)
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install -g npm@latest
+sudo npm install -g pm2@latest
+```
 
-### Step 1: Clone the Repository
+Then clone the repository:
 
 ```bash
 git clone https://github.com/blockmineJS/blockmine.git
+```
+
+If it prints `-bash: git: command not found`, git is not on the host. Install it and run `git clone` again:
+
+```bash
+sudo apt install -y git
+```
+
+Then go into the folder, build the panel, and start it:
+
+```bash
 cd blockmine
-```
-
-### Step 2: Install Dependencies
-
-```bash
-npm install
-```
-
-> **Note**: The `npm install` command will automatically run the `postinstall` script, which installs frontend dependencies and generates the Prisma client.
-
-### Step 3: Build Frontend
-
-```bash
+npm i
 npm run build
-```
-
-This command will create an optimized production build of the React application.
-
-### Step 4: Install PM2
-
-If PM2 is not yet installed globally:
-
-```bash
-npm install -g pm2
-```
-
-### Step 5: Start with PM2
-
-Launch the application using the ready-made configuration file:
-
-```bash
 pm2 start ecosystem.config.js
 ```
 
-> **Note**: The project already includes an `ecosystem.config.js` file with optimal production settings.
+You can open it at `http://<host-ip>:3001`.
 
 ### Updating
 

@@ -33,9 +33,11 @@ import {
   Sparkles,
   Terminal,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { translatePluginCategory, translatePluginSourceType } from '@/utils/pluginPresentation';
 import PluginDownloadMenu from '@/components/PluginDownloadMenu';
+import PublishPluginDialog from '@/components/ide/PublishPluginDialog';
 
 const IconComponent = ({ name, ...props }) => {
   if (!name) return <Package {...props} />;
@@ -113,6 +115,7 @@ function InstalledPluginCard({
   onOpenSettings,
   onFork,
   onReload,
+  onPublish,
   viewMode = 'grid',
 }) {
   const { t } = useTranslation('plugins');
@@ -214,6 +217,21 @@ function InstalledPluginCard({
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('tooltips.editCode', { defaultValue: 'Редактировать код' })}</TooltipContent>
+        </Tooltip>
+      )}
+      {isEditable && onPublish && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={compact ? 'ghost' : 'outline'}
+              size={compact ? 'icon' : 'sm'}
+              className={cn(compact ? 'h-8 w-8 rounded-none' : hasUpdateAction ? 'h-9 w-9 shrink-0 rounded-none px-0' : 'h-9 min-w-0 flex-1 rounded-none')}
+              onClick={() => onPublish(plugin)}
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('tooltips.publish', { defaultValue: 'Опубликовать' })}</TooltipContent>
         </Tooltip>
       )}
       {isEditable && onReload && (
@@ -356,6 +374,7 @@ function InstalledPluginCard({
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
+
             <Badge variant="outline" className="h-5 px-2 text-xs">v{plugin.version}</Badge>
             <Badge
               variant={plugin.sourceType === 'LOCAL' || plugin.sourceType === 'LOCAL_IDE' ? 'secondary' : 'outline'}
@@ -657,6 +676,7 @@ export default function InstalledPluginsView({
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('installed-plugins-view-mode') || 'grid');
   const [pluginToDelete, setPluginToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [publishPlugin, setPublishPlugin] = useState(null);
   const updatesFilterContentRef = useRef(null);
   const [updatesFilterWidth, setUpdatesFilterWidth] = useState(0);
   const [skipUpdatesIntroAnimation, setSkipUpdatesIntroAnimation] = useState(true);
@@ -871,6 +891,7 @@ export default function InstalledPluginsView({
                     onOpenSettings={setSelectedPlugin}
                     onFork={onForkPlugin}
                     onReload={onReloadPlugin}
+                    onPublish={onForkPlugin ? setPublishPlugin : null}
                     viewMode="grid"
                   />
                 ))}
@@ -889,6 +910,7 @@ export default function InstalledPluginsView({
                     onOpenSettings={setSelectedPlugin}
                     onFork={onForkPlugin}
                     onReload={onReloadPlugin}
+                    onPublish={onForkPlugin ? setPublishPlugin : null}
                     viewMode="list"
                   />
                 ))}
@@ -927,6 +949,14 @@ export default function InstalledPluginsView({
           />
         )}
       </Dialog>
+
+      <PublishPluginDialog
+        open={Boolean(publishPlugin)}
+        onClose={() => setPublishPlugin(null)}
+        botId={bot?.id}
+        plugin={publishPlugin}
+        onPublished={onSaveSettings}
+      />
 
       {pluginToDelete && (
         <ConfirmationDialog

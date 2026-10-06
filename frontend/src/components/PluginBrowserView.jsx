@@ -7,6 +7,7 @@ import { Dialog } from '@/components/ui/dialog';
 import FadeTransition from '@/components/FadeTransition';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import DependencyDialog from '@/components/DependencyDialog';
 import PluginStoreCard from '@/components/PluginStoreCard';
 import PluginListItem from '@/components/PluginListItem';
@@ -47,6 +48,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
     mainPlugin: null,
     dependencies: [],
   });
+  const [showUnofficial, setShowUnofficial] = useState(() => localStorage.getItem('plugin-browser-show-unofficial') === '1');
 
   const containerRef = useRef(null);
   const gridRef = useRef(null);
@@ -77,6 +79,10 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
   }, [viewMode]);
 
   useEffect(() => {
+    localStorage.setItem('plugin-browser-show-unofficial', showUnofficial ? '1' : '0');
+  }, [showUnofficial]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
@@ -95,7 +101,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
 
     setInstallingPlugins((previous) => new Set(previous).add(pluginToInstall.id));
     try {
-      await installPluginFromRepo(botId, pluginToInstall.repoUrl, pluginToInstall.name);
+      await installPluginFromRepo(botId, pluginToInstall.repoUrl, pluginToInstall.name, pluginToInstall.latestTag || null);
       onInstallSuccess();
       return true;
     } catch {
@@ -222,6 +228,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
     const query = searchQuery.trim().toLowerCase();
 
     const filtered = catalog.filter((plugin) => {
+      if (!showUnofficial && plugin.listing === 'unofficial') return false;
       const matchesCategory = pluginMatchesCategory(plugin.categories || [], selectedCategory);
       const matchesSearch =
         !query ||
@@ -247,7 +254,7 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
     }
 
     return filtered;
-  }, [catalog, searchQuery, selectedCategory, sortBy]);
+  }, [catalog, searchQuery, selectedCategory, showUnofficial, sortBy]);
 
   const isPluginInstalled = useCallback(
     (plugin) => {
@@ -377,6 +384,13 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto">
+            <label className="mr-2 flex shrink-0 items-center gap-2 border border-dashed px-2 py-1 text-sm">
+              <Checkbox
+                checked={showUnofficial}
+                onCheckedChange={(checked) => setShowUnofficial(checked === true)}
+              />
+              <span>{t('browser.showUnofficial', { defaultValue: 'Неофициальные' })}</span>
+            </label>
             {PLUGIN_BROWSER_CATEGORIES.map(({ id, iconName, color, defaultLabel }) => {
               const Icon = Icons[iconName] || Icons.LayoutGrid;
               return (
@@ -398,6 +412,15 @@ export default function PluginBrowserView({ botId, isActive, installedPlugins, o
           </div>
         </div>
       </div>
+
+      {showUnofficial && (
+        <div className="border-y border-amber-700/50 bg-amber-500/10 px-4 py-2 text-sm">
+          <span className="font-medium">{t('browser.unofficialRiskTitle', { defaultValue: 'На свой страх и риск.' })}</span>
+          <span className="ml-2 text-muted-foreground">
+            {t('browser.unofficialRisk', { defaultValue: 'Эти плагины никто из списка не проверял.' })}
+          </span>
+        </div>
+      )}
 
       {dependencyInstall && (
         <div className="border-b border-blue-500/30 bg-blue-500/10 px-6 py-3">
