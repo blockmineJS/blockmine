@@ -197,7 +197,7 @@ sudo apt install -y git
 cd blockmine
 npm i
 npm run build
-pm2 start ecosystem.config.js
+pm2 start
 ```
 
 Можно зайти по адресу `http://IP-хоста:3001`.

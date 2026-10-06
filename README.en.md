@@ -196,7 +196,7 @@ Then go into the folder, build the panel, and start it:
 cd blockmine
 npm i
 npm run build
-pm2 start ecosystem.config.js
+pm2 start
 ```
 
 You can open it at `http://<host-ip>:3001`.
