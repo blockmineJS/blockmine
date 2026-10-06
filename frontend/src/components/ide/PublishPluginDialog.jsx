@@ -194,13 +194,11 @@ export default function PublishPluginDialog({ open, onClose, botId, plugin, onPu
                     ? t('publish.githubReady', { defaultValue: 'GitHub подключён' })
                     : t('publish.github', { defaultValue: 'GitHub' })}
                 </p>
-                <p className="mt-1 max-w-[18rem] text-xs text-muted-foreground">
-                  {device
-                    ? t('publish.waiting', { defaultValue: 'Если GitHub не открылся сам, нажмите кнопку ниже и подтвердите доступ.' })
-                    : token
-                      ? t('publish.githubSaved', { defaultValue: 'Можно публиковать.' })
-                      : t('publish.githubMissing', { defaultValue: 'Одна кнопка. GitHub спросит разрешение, больше ничего вводить не нужно.' })}
-                </p>
+                {device ? (
+                  <p className="mt-1 max-w-[18rem] text-xs text-muted-foreground">
+                    {t('publish.waiting', { defaultValue: 'Если GitHub не открылся сам, нажмите кнопку ниже и подтвердите доступ.' })}
+                  </p>
+                ) : null}
                 {device?.authorizeUrl ? (
                   <a
                     href={device.authorizeUrl}

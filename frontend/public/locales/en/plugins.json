@@ -200,7 +200,7 @@
     "waiting": "If GitHub did not open by itself, press the button below and allow access.",
     "openGithub": "Open GitHub",
     "githubSaved": "You can publish.",
-    "githubMissing": "GitHub opens with one green button. There is no code to type.",
+
     "name": "Name",
     "icon": "Icon",
     "iconSite": "Pick an icon",
