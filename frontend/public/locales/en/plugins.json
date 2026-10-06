@@ -214,8 +214,7 @@
     "updated": "New release {{version}}.",
     "created": "Repository created, release {{version}}.",
     "officialSkip": "The official list version did not move. That pin is manual. If it says latest, this release is picked up.",
-    "openRepo": "Repository",
-    "openPr": "List request"
+    "openRepo": "Repository"
   },
   "labels": {
     "by": "by",

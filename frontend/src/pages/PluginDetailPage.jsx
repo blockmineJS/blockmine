@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/stores/appStore';
-import { apiHelper } from '@/lib/api';
+import UnlistCatalogButton from '@/components/UnlistCatalogButton';
 import PluginDownloadMenu from '@/components/PluginDownloadMenu';
 import PluginSettingsDialog from '@/components/PluginSettingsDialog';
 import { Dialog } from '@/components/ui/dialog';
@@ -88,7 +88,6 @@ export default function PluginDetailPage() {
   const pluginCatalog = useAppStore((state) => state.pluginCatalog);
   const installPluginFromRepo = useAppStore((state) => state.installPluginFromRepo);
   const fetchInstalledPlugins = useAppStore((state) => state.fetchInstalledPlugins);
-  const fetchPluginCatalog = useAppStore((state) => state.fetchPluginCatalog);
   const forkPlugin = useAppStore((state) => state.forkPlugin);
   const togglePlugin = useAppStore((state) => state.togglePlugin);
   const deletePlugin = useAppStore((state) => state.deletePlugin);
@@ -107,8 +106,6 @@ export default function PluginDetailPage() {
   const [changelog, setChangelog] = useState('');
   const [selectedPlugin, setSelectedPlugin] = useState(null);
   const [pluginToDelete, setPluginToDelete] = useState(null);
-  const [unlistOpen, setUnlistOpen] = useState(false);
-  const [unlistBusy, setUnlistBusy] = useState(false);
   const [localEnabled, setLocalEnabled] = useState(false);
   const [isTogglePending, setIsTogglePending] = useState(false);
 
@@ -501,15 +498,7 @@ export default function PluginDetailPage() {
                   </CardContent>
                 </Card>
 
-                {plugin.listing === 'unofficial' && (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-none"
-                    onClick={() => setUnlistOpen(true)}
-                  >
-                    {t('plugins:tooltips.unlist', { defaultValue: 'Убрать из списка' })}
-                  </Button>
-                )}
+                <UnlistCatalogButton plugin={plugin} className="h-9 w-full rounded-none" />
 
                 {plugin.supportedHosts && plugin.supportedHosts.length > 0 && (
                   <Card>
@@ -650,32 +639,6 @@ export default function PluginDetailPage() {
           />
         )}
       </Dialog>
-
-      <ConfirmationDialog
-        open={unlistOpen}
-        onOpenChange={setUnlistOpen}
-        title={t('plugins:unlist.title', { name: plugin?.displayName || plugin?.name, defaultValue: 'Убрать «{{name}}» из списка?' })}
-        onConfirm={async () => {
-          const token = localStorage.getItem('blockmine_github_token');
-          setUnlistBusy(true);
-          try {
-            await apiHelper(`/api/plugins/catalog/${encodeURIComponent(plugin.name)}/unlist`, {
-              method: 'POST',
-              body: JSON.stringify({ token }),
-            });
-            toast({ title: t('plugins:unlist.done', { defaultValue: 'Плагин убран из неофициального списка' }) });
-            fetchPluginCatalog(true);
-            navigate(`/bots/${intBotId}/plugins`);
-          } catch (error) {
-            toast({ variant: 'destructive', title: error.message });
-          } finally {
-            setUnlistBusy(false);
-          }
-        }}
-        confirmText={unlistBusy
-          ? t('plugins:unlist.working', { defaultValue: 'Убираем...' })
-          : t('plugins:unlist.confirm', { defaultValue: 'Убрать' })}
-      />
 
       {pluginToDelete && (
         <ConfirmationDialog

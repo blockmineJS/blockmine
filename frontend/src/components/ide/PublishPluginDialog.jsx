@@ -176,13 +176,6 @@ export default function PublishPluginDialog({ open, onClose, botId, plugin, onPu
                   </a>
                 </Button>
               ) : null}
-              {result.prUrl ? (
-                <Button variant="outline" size="sm" className="rounded-none" asChild>
-                  <a href={result.prUrl} target="_blank" rel="noopener noreferrer">
-                    {t('publish.openPr', { defaultValue: 'Заявка в список' })}
-                  </a>
-                </Button>
-              ) : null}
             </div>
           </div>
         ) : (
