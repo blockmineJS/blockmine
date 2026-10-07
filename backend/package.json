@@ -24,6 +24,7 @@
     "cross-env": "^7.0.3",
     "jest": "^30.2.0",
     "nodemon": "^3.1.2",
+    "supertest": "^7.3.0",
     "ts-jest": "^29.4.5"
   },
   "dependencies": {
