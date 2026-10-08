@@ -1,174 +1,535 @@
-**🇷🇺 Русский** | [🇬🇧 English](./README.en.md)
-
----
+[🇷🇺 Русский](./README.ru.md) | **🇬🇧 English**
 
 <div align="center">
   <img src="./image/logo.png" alt="BlockMine Logo" width="150">
+
   <h1>BlockMine</h1>
+
   <p>
-    <strong>Minecraft-боты без программирования. Веб-панель, визуальный редактор</strong>
+    <strong>Open-source Minecraft Bot Framework and Automation Platform</strong>
   </p>
+
   <p>
-    <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="Stars"></a>
+    Create and run Minecraft bots from a web panel,
+    a visual editor, plugins, and an API. The low-level bot
+    runtime is already there.
+  </p>
+
+  <p>
+    <a href="https://github.com/blockmineJS/blockmine/stargazers"><img src="https://img.shields.io/github/stars/blockmineJS/blockmine?style=for-the-badge&logo=github" alt="GitHub Stars"></a>
     <a href="https://github.com/blockmineJS/blockmine/commits/main"><img src="https://img.shields.io/github/last-commit/blockmineJS/blockmine?style=for-the-badge&logo=git" alt="Last Commit"></a>
-    <a href="http://212.22.78.42:3000/api/stats" target="_blank">
-    </a>
+    <a href="http://212.22.78.42:3000/api/stats" target="_blank"><img src="https://img.shields.io/endpoint?url=https://blockmine-proxy.vercel.app/api/shield&style=for-the-badge&logo=minecraft&logoColor=white" alt="Bots Online"></a>
   </p>
 </div>
 
-**BlockMine** — панель, в которой Minecraft-ботов собирают без программирования. Ставите Node.js, клонируете репозиторий и запускаете панель. В браузере создаёте бота и рисуете поведение в визуальном редакторе. Плагины, консоль и отладка графа уже внутри. Встроенный MCP отдаёт панель ИИ-агенту. Ему можно поручить сразу несколько дел: прочитать, что сервер пишет в чат и в консоль, по этим строкам собрать команды и функции, написать плагин, перезагрузить его на живом боте и проверить ответ. Тем же диалогом он ведёт серверы, прокси, права, группы и задачи по расписанию.
+---
 
+## What is BlockMine?
 
-Больше примеров на - https://t.me/blockmineJs
+**BlockMine** is an open-source **Minecraft bot framework**, a **Minecraft automation platform**, and a web panel for creating and running Minecraft bots.
+
+BlockMine is a ready-made environment for Minecraft automation. Bot management, commands, plugins, permissions, scheduling, debugging, and multi-account control are already in one panel.
+
+BlockMine supports two ways to build behavior:
+
+* **No-code.** Draw Minecraft bot behavior in the visual editor.
+* **Code / low-code.** Write JavaScript plugins and your own nodes.
+
+It fits simple AFK bots and server helpers, and it also fits heavier automation: clan bots, monitoring, server integrations, and AI-controlled Minecraft bots.
+
+### What you can build
+
+* Minecraft clan bots
+* AFK bots
+* Moderation bots
+* Minecraft server monitoring
+* Event logging
+* Economy bots
+* Farming and resource bots
+* Server task automation
+* Multi-account Minecraft automation
+* Minecraft NPCs and assistants
+* PvP and guard bots
+* Integrations with outside services
+* Discord and Telegram integrations
+* Server testing
+* AI-controlled Minecraft bots
+* Custom Minecraft automation scripts
+
+### Why BlockMine?
+
+BlockMine puts these pieces in one system:
+
+* Minecraft bot runtime
+* Web dashboard
+* Multi-bot management
+* No-code visual scripting
+* JavaScript plugins
+* Custom visual nodes
+* Plugin marketplace
+* Permissions and groups
+* Cron scheduler
+* WebSocket API
+* MCP server for AI assistants
+* Live debugger
+* Trace viewer
+* 3D Minecraft world viewer
+* SOCKS5 proxy support
+* Hot reload
+
+More examples: [https://t.me/blockmineJs](https://t.me/blockmineJs)
 
 ---
 
+## BlockMine and Mineflayer
 
-## 🚀 Ключевые возможности
+Mineflayer is the Minecraft bot API. BlockMine is the framework around it: the panel, several bots, plugins, visual scenarios, a debugger, the WebSocket API, and MCP are already included.
 
-### 💻 Современный веб-интерфейс
-- **Адаптивная панель** на React и Tailwind CSS для управления с любого устройства
-- **Темная тема** с современным дизайном
-- **Real-time обновления** через WebSocket
-- **Мультиязычность** — поддержка русского и английского языков
+| Feature | Mineflayer | BlockMine |
+|---|---|---|
+| Minecraft bot API | ✅ | ✅ |
+| Bot management | Manual | Built-in |
+| Multiple bots | Manual | ✅ |
+| Visual scripting | ❌ | ✅ |
+| Plugin system | Via ecosystem | Built-in |
+| Custom nodes | ❌ | ✅ |
+| Web dashboard | Via plugins | Built-in |
+| 3D viewer | Plugin | Built-in |
+| Debugger | Manual | Built-in |
+| Breakpoints | Manual | ✅ |
+| Trace viewer | ❌ | ✅ |
+| Permissions | Manual | Built-in |
+| Cron scheduler | Manual | Built-in |
+| WebSocket API | Manual | Built-in |
+| MCP | ❌ | Built-in |
+| Hot reload | Depends on setup | ✅ |
+
+> **Looking for a Mineflayer alternative or a ready-made framework for building custom Minecraft bots?**
+> BlockMine provides the bot runtime, web panel, plugin system, visual scripting, debugging, multi-bot management, WebSocket API and MCP integration out of the box.
+
+---
+
+## 🚀 Key features
+
+### 🌐 Web panel
+
+* **Responsive web panel** built with React and Tailwind CSS
+* Works on desktop, tablet, and phone
+* **Dark theme**
+* **Real-time updates** over WebSocket
+* **Two languages** — Russian and English
+* Centralized Minecraft bot management
 
 <p align="center">
-  <img src="./screen/language_selector.png" alt="Выбор языка" width="400">
+  <img src="./screen/language_selector.png" alt="BlockMine language selector" width="400">
   <br>
-  <em>Выбор языка интерфейса при первом запуске</em>
+  <em>Interface language selection on first launch</em>
 </p>
 
-### ✨ Визуальный редактор логики (No-Code)
-- **Drag-and-Drop интерфейс** для создания сложной логики без кода
-- **Live Debug режим** с брейкпоинтами и пошаговым выполнением
-- **Трассировка выполнения** с историей и значениями переменных
-- **Совместное редактирование** графов несколькими пользователями
+### 🎨 Visual logic editor — no-code
 
-### 🤖 Комплексное управление ботами
-- **Запуск/остановка/перезапуск** в один клик
-- **Интерактивная консоль** для каждого бота с историей
-- **Мониторинг ресурсов** (CPU/RAM) в реальном времени
-- **3D Viewer** — просмотр мира глазами бота в реальном времени
-- **Поддержка SOCKS5-прокси** индивидуально для каждого бота
-- **Планировщик задач** с cron-расписаниями
+Build complex Minecraft bot logic without writing code.
+
+* **Drag-and-drop** interface
+* Functional blocks (nodes)
+* Chains of actions
+* Commands
+* Minecraft event handling
+* Conditions, loops, and branches
+* **Live debug** with breakpoints
+* Step-by-step execution
+* **Trace viewer**
+* Execution history
+* Variable values
+* Several people can edit the same graph
+
+### 🤖 Multi-bot management
+
+Run several Minecraft bots from one panel.
+
+* **Start, stop, and restart** in one click
+* A separate interactive console for each bot
+* Console history
+* **Live CPU and RAM** monitoring
+* **3D viewer** — see the Minecraft world through the bot's eyes
+* A **SOCKS5 proxy** per bot
+* Task scheduler
+* Centralized bot management
 
 <p align="center">
-  <img src="./screen/3dviewer.png" alt="3D Viewer" width="100%">
+  <img src="./screen/3dviewer.png" alt="Minecraft 3D Viewer" width="100%">
   <br>
-  <em>3D просмотр мира Minecraft глазами бота в реальном времени</em>
+  <em>Real-time 3D view of the Minecraft world through the bot's eyes</em>
 </p>
 
-### 🔌 Мощная система плагинов
-- **Встроенный магазин** с категориями и поиском
-- **Автоматическая установка зависимостей**
-- **Настройка через GUI** без редактирования конфигов
-- **Hot-reload** плагинов без перезапуска бота
+### 🔌 Plugin system
 
-### 🔐 Гибкая система прав
-- **Группы пользователей** (Admin, Member и др.)
-- **Детальные права доступа** для каждой команды
-- **Черный список** пользователей
-- **Кулдауны** и **алиасы** для команд
+Plugins extend BlockMine in code.
 
-### 🔄 Экспорт и импорт
-- **Полные резервные копии** ботов в ZIP-архив
-- **Экспорт/импорт** отдельных команд и графов
-- **Перенос между установками** BlockMine
+A plugin can:
+
+* Add commands
+* Add nodes for the visual editor
+* Run in the background
+* Talk to outside services
+* Add custom Minecraft bot logic
+
+#### Plugin marketplace
+
+BlockMine includes a plugin catalog:
+
+* **Categories** — Core, Clan, Utilities, and others
+* **Search**
+* **Automatic dependency installation**
+* **GUI settings**
+* **Update checks**
+* Update installation
+* Install from the catalog, GitHub, or a local source
+* **Hot reload** without restarting the bot
+
+<p align="center">
+  <img src="./screen/plugin_обзор.png" alt="BlockMine Plugin Marketplace" width="100%">
+  <br>
+  <em>Built-in plugin store with categories, search, and automatic dependency installation</em>
+</p>
+
+### 🔐 Permissions and groups
+
+#### Permissions
+
+* Each action can require its own permission
+* Example: `user.fly`
+* Plugins can declare permissions
+* Permissions can also be created in the panel
+* Fine-grained access control
+
+#### Groups
+
+* A group holds several permissions
+* Built-in groups:
+
+  * `Admin`
+  * `Member`
+* Custom groups
+
+#### Users
+
+* Users are added when they interact with the bot
+* Assign users to groups
+* User blacklist
+
+#### Commands
+
+* **Aliases**
+* **Cooldowns**
+* Allowed chat types
+* Enable or disable a command
+
+### 📦 Export / import
+
+Move bots and their settings between BlockMine installs.
+
+* Full bot backups as a **ZIP archive**
+* Export and import individual commands
+* Export and import graphs
+* Move a setup from one BlockMine install to another
 
 ### 🔌 WebSocket API
-- **Управление ботами** из внешних приложений
-- **Выполнение команд** с полной проверкой прав
-- **Вызов визуальных графов** и получение результатов
-- **Подписка на события** (чат, игроки, здоровье и др.)
-- **SDK** `blockmine-sdk` для Node.js ⚠️ *(альфа-версия, не приоритет)*
+
+The WebSocket API connects BlockMine to other applications.
+
+The API can:
+
+* Control bots
+* Start and stop bots
+* Run commands
+* Call visual graphs
+* Return execution results
+* Subscribe to events
+* Receive chat, player, health, and other events
+
+Node.js SDK:
+
+`blockmine-sdk`
+
+> ⚠️ The SDK is alpha and is not a priority right now.
 
 <p align="center">
-  <img src="./screen/websocket.png" alt="WebSocket API" width="100%">
+  <img src="./screen/websocket.png" alt="BlockMine WebSocket API" width="100%">
   <br>
-  <em>Интерактивная панель для работы с WebSocket API</em>
+  <em>Interactive panel for the WebSocket API</em>
 </p>
-
-### 🤖 MCP Server (для AI-ассистентов)
-- **Встроенный** [Model Context Protocol](https://modelcontextprotocol.io/) endpoint на `POST /api/mcp`
-- **Один диалог, много дел:** вывод сервера, код плагина, проверка в игре, права и расписание
-- **Сам пишет плагин:** файлы, команды и функции по контракту `plugin-author`, перезагрузка без выхода бота
-- **Сам проверяет:** шлёт сообщение в нужный чат, ждёт ответ и сверяет его с логом консоли
-- **65 tools**, авторизация ключом панели `pk_*`, подключение по HTTP из Cursor, Claude и любого MCP-клиента
 
 ---
 
-## Быстрый старт
+# 🤖 MCP server — run Minecraft through an AI
 
-Ставьте панель из git. Кнопка **Обновить** в интерфейсе тогда забирает только новые коммиты, ставит зависимости и пересобирает панель. Это быстрее, чем ставить пакет заново: `npx blockmine` каждый раз качает его целиком, и кнопки обновления у такой установки нет.
+BlockMine ships a built-in **Model Context Protocol (MCP)** server.
 
-Нужны **Git** и **Node.js v22+**. На Windows `start.bat` при необходимости попробует поставить Node.js сам через winget.
+Endpoint:
 
-### Клонировать репозиторий
+```text
+POST /api/mcp
+```
+
+Through MCP, an AI agent works with the BlockMine panel, bots, servers, plugins, files, commands, permissions, the scheduler, and the visual editor.
+
+Clients:
+
+* Claude Desktop
+* Cursor
+* Cline
+* Claude Code
+* any other MCP client
+
+## One AI conversation, many jobs
+
+The agent can run a full development and verification cycle.
+
+For example:
+
+1. **Read Minecraft server output.**
+
+   * Chat
+   * Private messages
+   * Clan chat
+   * Bot console
+
+2. **Read what the server answered.**
+
+3. **Create or edit a plugin.**
+
+   * Commands
+   * Event handlers
+   * Settings
+   * Extra functions
+
+4. **Reload the plugin** without disconnecting the live bot from the Minecraft server.
+
+5. **Check the result.**
+
+   * Send a message in the right chat
+   * Wait for the reply
+   * Compare the reply with the log
+   * Change the code if the reply is wrong
+
+6. **Set up the surroundings.**
+
+   * Permissions
+   * Groups
+   * Command settings
+   * Cron tasks
+   * Plugin installation
+   * Server settings
+   * Proxies
+
+7. **Edit the open visual graph.**
+
+MCP turns the panel into a place where an AI agent can **create, change, run, and check Minecraft automation**.
+
+Edits to the open graph show up in the editor and **are not written to disk until the user saves the canvas**. The plugin guide is the `plugin-author` prompt.
+
+---
+
+# 🔑 Connect MCP
+
+## 1. Create a panel API key
+
+In the BlockMine panel:
+
+**Settings → API keys → Create key**
+
+The key starts with:
+
+```text
+pk_
+```
+
+## 2. Connect an MCP client over HTTP
+
+Example:
+
+```bash
+claude mcp add blockmine --scope user --transport http \
+  http://localhost:3001/api/mcp \
+  --header "Authorization: Bearer pk_your_key"
+```
+
+### Or through `mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "blockmine": {
+      "type": "http",
+      "url": "http://localhost:3001/api/mcp",
+      "headers": {
+        "Authorization": "Bearer pk_your_key"
+      }
+    }
+  }
+}
+```
+
+## Remote connection
+
+The MCP endpoint starts with BlockMine.
+
+If the panel runs on a VPS, replace:
+
+```text
+http://localhost:3001
+```
+
+with the public URL of that server.
+
+Every request is authorized with:
+
+```http
+Authorization: Bearer pk_*
+```
+
+These are the same keys as the WebSocket API.
+
+---
+
+# 🚀 Quick start
+
+## Requirements
+
+A git install needs:
+
+* **Git**
+* **Node.js v22+**
+
+On Windows, `start.bat` can install the Node.js LTS build through `winget` when Node.js is missing.
+
+---
+
+## Windows
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/blockmineJS/blockmine.git
 cd blockmine
 ```
 
-### Windows — `start.bat`
+### 2. Start with `start.bat`
 
-В корне проекта, двойной клик или из командной строки:
+From the project root:
 
 ```bat
 start.bat
 ```
 
-Скрипт сам:
+You can also double-click the file.
 
-1. Проверит Node.js 22+ и при отсутствии поставит LTS через winget
-2. Установит зависимости (`npm install`)
-3. Запустит режим разработки (`npm run dev`): бэкенд и Vite
-4. Когда панель поднимется, откроет http://localhost:5173/
+The script:
 
-Первый запуск может занять несколько минут. Повторный сразу поднимает панель.
+1. Checks for Node.js 22+
+2. Installs the Node.js LTS build through `winget` if needed
+3. Installs dependencies with `npm install`
+4. Starts development mode with `npm run dev`
+5. Starts the backend and Vite
+6. Opens the panel
 
-- Панель (hot reload): http://localhost:5173/
-- API: http://localhost:3001
+After startup:
 
-Чтобы заново поставить зависимости:
+* **Web panel:** [http://localhost:5173/](http://localhost:5173/)
+* **API:** [http://localhost:3001](http://localhost:3001)
+
+The first start can take a few minutes. Later starts are faster.
+
+### Reinstall dependencies
 
 ```bat
 start.bat reinstall
 ```
 
-Ручное обновление, без кнопки в панели:
+### Update by hand
 
 ```bat
 update.bat
 ```
 
-Скрипт останавливает панель, забирает новые коммиты с GitHub, ставит зависимости, собирает проект и снова запускает её. Кнопка **Обновить** вызывает те же шаги.
+The script:
 
-### Linux и macOS
+1. Stops the panel
+2. Fetches new commits from GitHub
+3. Installs dependencies
+4. Builds the project
+5. Starts the panel again
+
+The **Update** button in the interface runs the same steps.
+
+---
+
+# 🐧 Linux and macOS
+
+Install dependencies and start the project:
 
 ```bash
 npm install
 npm run dev
 ```
 
-- Панель (hot reload): http://localhost:5173/
-- API: http://localhost:3001
+After startup:
 
-### Если git поставить нельзя
+* **Web panel:** [http://localhost:5173/](http://localhost:5173/)
+* **API:** [http://localhost:3001](http://localhost:3001)
+
+---
+
+# 📦 Install with npm / npx
+
+If Git cannot be installed:
 
 ```bash
 npx blockmine
 ```
 
-Команда скачает пакет с npm, настроит базу и запустит сервер. В консоли будет адрес `http://localhost:3001`. Обновление из панели недоступно: новую версию получают повторным запуском той же команды, и пакет качается целиком.
+The command:
 
-> **Windows и PowerShell**: если появляется ошибка `Невозможно загрузить файл ... npx.ps1, так как выполнение сценариев отключено`, откройте PowerShell от имени администратора и выполните `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`. Нажмите `Y` для подтверждения. Либо ставьте панель из git и запускайте `start.bat`.
+1. Downloads the package from npm
+2. Sets up the database
+3. Starts the server
+
+The console prints:
+
+```text
+http://localhost:3001
+```
+
+> An `npx` install has no in-panel update button. A newer version means running `npx blockmine` again, and the package downloads in full.
+
+### Windows and PowerShell
+
+If you see:
+
+```text
+Cannot load file ... npx.ps1 because running scripts is disabled
+```
+
+open PowerShell as administrator and run:
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Press `Y` to confirm.
+
+Or install BlockMine from Git and use:
+
+```bat
+start.bat
+```
 
 ---
 
-## Установка на хост
+## Install on a host
 
-Если вы впервые зашли на хост и ничерта не знаете, вводите это. Ubuntu или Debian: команды обновят систему и поставят Node.js 22, npm и PM2.
+If this is your first time on the host and you have no idea what to type, paste this. Ubuntu or Debian: it updates the system and installs Node.js 22, npm, and PM2.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -179,19 +540,19 @@ sudo npm install -g npm@latest
 sudo npm install -g pm2@latest
 ```
 
-Потом клонируйте репозиторий:
+Then clone the repository:
 
 ```bash
 git clone https://github.com/blockmineJS/blockmine.git
 ```
 
-Если написало `-bash: git: command not found`, гита на хосте нет. Поставьте его и снова введите `git clone`:
+If it prints `-bash: git: command not found`, git is not on the host. Install it and run `git clone` again:
 
 ```bash
 sudo apt install -y git
 ```
 
-Дальше зайдите в папку, соберите панель и запустите:
+Then go into the folder, build the panel, and start it:
 
 ```bash
 cd blockmine
@@ -200,13 +561,13 @@ npm run build
 pm2 start
 ```
 
-Можно зайти по адресу `http://IP-хоста:3001`.
+You can open it at `http://<host-ip>:3001`.
 
-### Обновление
+### Updating
 
-На хосте с PM2 панель сама умеет обновляться: в интерфейсе кнопка **Обновить** делает `git pull`, `npm install`, `npm run build` и `pm2 restart`. Git забирает только новые коммиты, поэтому это быстрее повторной установки пакета. Нужен git-клон на `master`/`main` без локальных правок.
+On a PM2 host the panel can update itself: the **Update** button in the UI runs `git pull`, `npm install`, `npm run build`, and `pm2 restart`. Git fetches only new commits, so this is faster than installing the package again. That needs a git clone on `master`/`main` with a clean working tree.
 
-Вручную то же самое:
+The same steps by hand:
 
 ```bash
 cd blockmine
@@ -216,203 +577,249 @@ npm run build
 pm2 restart blockmine
 ```
 
-Локально через `start.bat` / `npm run dev` сборка не нужна: там Vite на порту 5173.
+Locally with `start.bat` / `npm run dev` you do not need a production build: Vite serves port 5173.
 
 ---
 
-## 💡 Основные концепции BlockMine
+# 🧩 Core concepts
 
-### 🎨 Визуальный редактор
+## 🎨 Visual node editor
+
+The visual editor is the no-code side of BlockMine.
 
 <p align="center">
-  <img src="./image/visualcommand.png" alt="Визуальный редактор" width="100%">
+  <img src="./image/visualcommand.png" alt="BlockMine Visual Node Editor" width="100%">
 </p>
 
-Сердце No-Code автоматизации в BlockMine. Редактор позволяет создавать логику, перетаскивая и соединяя функциональные блоки (ноды).
+Logic is built by dragging and connecting functional blocks — **nodes**.
 
-#### Возможности редактора:
-- **Создание команд** с аргументами, проверками прав и сложной логикой
-- **Обработка событий** (вход игрока, сообщения в чате, появление мобов)
-- **Live Debug** - отладка в реальном времени с брейкпоинтами
-- **Trace Viewer** - просмотр истории выполнения с значениями переменных
-- **Совместная работа** - несколько разработчиков могут редактировать одновременно
+### What it can do
 
-### 🔍 Система отладки
+* Create commands
+* Command arguments
+* Permission checks
+* Minecraft events
+* Player join
+* Chat messages
+* Mob spawns
+* Conditions
+* Loops
+* Branches
+* Live debug
+* Breakpoints
+* Trace viewer
+* Several people editing at once
 
-BlockMine предоставляет две мощные системы отладки:
+---
 
-#### Live Debug (Живая отладка)
-- **Брейкпоинты** - остановка выполнения на конкретных нодах
-- **Условные брейкпоинты** - срабатывание при выполнении условия
-- **Пошаговое выполнение** - Step Over для детального анализа
-- **What-If режим** - изменение значений во время паузы
-- **Multi-user синхронизация** - все видят одно состояние отладки
-<td align="center">
-      <p><strong>🎨 Визуальный редактор с Live Debug</strong></p>
-      <img src="./screen/graph_live_debug.png" alt="Live Debug" width="100%">
-      <em>Отладка графов в реальном времени с брейкпоинтами и пошаговым выполнением</em>
-    </td>
+# 🔍 Debugging
 
-#### Trace Viewer (Просмотр трассировки)
-- **История выполнения** - сохранение всех запусков графа
-- **Значения переменных** - просмотр входов/выходов каждой ноды
-- **Воспроизведение** - пошаговый просмотр выполнения
-- **Временная шкала** - визуализация порядка выполнения нод
-<tr>
-    <td align="center">
-      <p><strong>🔍 Трассировка выполнения</strong></p>
-      <img src="./screen/node_debug_trace.png" alt="Trace Debug" width="100%">
-      <em>Пошаговая визуализация выполнения графа с историей и значениями переменных</em>
-    </td>
-  </tr>
+BlockMine has two debugging systems:
 
+* **Live debug**
+* **Trace viewer**
 
-### 🔌 Плагины
+## Live debug
+
+Debug a visual graph while it runs.
+
+* **Breakpoints** — stop on a specific node
+* **Conditional breakpoints** — stop when a condition is true
+* **Step over** — run one step at a time
+* **What-if** — change values while paused
+* **Multi-user sync** — everyone sees the same debug state
 
 <p align="center">
-  <img src="./screen/plugin_обзор.png" alt="Магазин плагинов" width="100%">
+  <strong>🎨 Visual editor with live debug</strong><br>
+  <img src="./screen/graph_live_debug.png" alt="BlockMine Live Debug" width="100%">
   <br>
-  <em>Встроенный магазин плагинов с категориями, поиском и автоматической установкой зависимостей</em>
+  <em>Real-time graph debugging with breakpoints and step-by-step execution</em>
 </p>
 
-Плагины — это способ программного расширения функциональности. Они могут:
-- Добавлять новые команды
-- Создавать новые ноды для визуального редактора
-- Работать в фоновом режиме
-- Интегрироваться с внешними сервисами
+## Trace viewer
 
-#### Возможности магазина плагинов
-- **Категории** - фильтрация по назначению (Ядро, Клан, Утилиты и др.)
-- **Автоматическая установка** - зависимости устанавливаются автоматически
-- **Настройка через GUI** - без редактирования конфигов
-- **Обновления** - проверка и установка обновлений
+The trace viewer stores graph runs.
 
-### ⚙️ Команды
+* **Execution history** — every run of the graph
+* **Variable values** — inputs and outputs of each node
+* **Replay** — step through a past run
+* **Timeline** — the order in which nodes ran
 
-Команды могут быть созданы двумя способами:
+<p align="center">
+  <strong>🔍 Trace viewer</strong><br>
+  <img src="./screen/node_debug_trace.png" alt="BlockMine Trace Viewer" width="100%">
+  <br>
+  <em>Step-by-step graph execution with history and variable values</em>
+</p>
 
-#### Программные команды (через плагины)
+---
+
+# 🔌 Plugins
+
+Plugins are how you extend BlockMine in code.
+
+<p align="center">
+  <img src="./screen/plugin_обзор.png" alt="BlockMine Plugin Store" width="100%">
+  <br>
+  <em>Built-in plugin store with categories, search, and automatic dependency installation</em>
+</p>
+
+Plugins can:
+
+* Add commands
+* Create visual nodes
+* Run in the background
+* Talk to outside services
+* Extend Minecraft bots
+
+## Plugin store
+
+The catalog supports:
+
+* Categories
+* Filtering by purpose
+* Search
+* Automatic dependency installation
+* GUI settings
+* Update checks
+* Installing updates
+
+Example categories:
+
+* Core
+* Clan
+* Utilities
+
+---
+
+# ⚙️ Commands
+
+Commands can be created in two ways:
+
+1. In code, through a plugin
+2. Visually, in the node editor
+
+## Commands in code
+
 ```javascript
 bot.registerCommand({
   name: 'ping',
-  description: 'Проверка связи',
+  description: 'Connection check',
   execute: async (context) => {
-    return `Понг, ${context.user.username}!`;
+    return `Pong, ${context.user.username}!`;
   }
 });
 ```
 
-#### Визуальные команды (через редактор)
-- **Drag-and-Drop** создание логики
-- **Аргументы** - определение типов и значений по умолчанию
-- **Условия** - проверка прав, времени суток и др.
-- **Циклы и ветвления** - сложная логика без кода
+## Visual commands
 
-#### Централизованное управление
-- **Алиасы** - короткие псевдонимы (например, `@p` для `@ping`)
-- **Кулдауны** - задержка между использованиями
-- **Разрешенные чаты** - chat, local, clan, private
-- **Включение/выключение** - временное отключение команд
+The editor can build a command without programming.
 
-### 🔐 Права и Группы (Permissions)
+It supports:
 
-Гибкая система контроля доступа:
+* **Drag and drop**
+* Arguments
+* Argument types
+* Default values
+* Conditions
+* Permission checks
+* Time-of-day checks
+* Loops
+* Branches
 
-#### Права (Permissions)
-- Каждое действие защищено правом (например, `user.fly`)
-- Права создаются плагинами или в панели управления
-- Детальный контроль доступа
+## Command management
 
-#### Группы (Groups)
-- Объединение нескольких прав
-- Предустановленные группы: Admin, Member
-- Создание пользовательских групп
+Commands can have:
 
-#### Пользователи
-- Автоматическое добавление при взаимодействии с ботом
-- Назначение в группы
-- Черный список для блокировки
+* **Aliases** — for example `@p` for `@ping`
+* **Cooldowns**
+* Allowed chat types:
 
-### ⏰ Планировщик задач
+  * `chat`
+  * `local`
+  * `clan`
+  * `private`
 
-Автоматизируйте действия ботов по расписанию:
-- **Cron-выражения** - гибкая настройка времени
-- **Действия** - запуск/перезапуск бота, выполнение команд
-- **История запусков** - просмотр последних выполнений
-- **Включение/выключение** - временная деактивация задач
+  A plugin can add its own type. New message lines from the server arrive there, and the bot can send into it. A command can then be allowed only in that type.
+* An on/off switch
 
 ---
 
-## MCP — агент берёт работу на себя
+# 🔐 Permissions and groups
 
-BlockMine выставляет **встроенный MCP-сервер** (Model Context Protocol) на `POST /api/mcp`. Claude Desktop, Cursor, Cline и Claude Code подключаются к панели и ведут её обычным диалогом.
+BlockMine includes permissions and groups.
 
-Агенту можно отдать пачку дел сразу:
+## Permissions
 
-1. **Смотрит вывод сервера.** Чат, личка, клан и консоль бота. По строкам ответа видно, как сервер называет команду и чего в ней не хватает.
-2. **Собирает функции под этот вывод.** Пишет новый плагин или дописывает уже стоящий: команды, обработчики, настройки. Контракт API лежит в промпте `plugin-author`.
-3. **Проверяет на живом боте.** Перезагружает плагин, не отключая бота от сервера. Пишет в нужный чат, ждёт ответ и сверяет его с логом. Если ответ не тот, правит код и проверяет снова.
-4. **Доделывает обвязку.** Права и группы, параметры команды, задача по расписанию, установка из каталога или GitHub, сервер и прокси.
-5. **Правит открытый граф.** Если в редакторе уже открыт холст, агент добавляет ноды и связи в эту сессию
+Each action can require its own permission:
 
-### Что доступно AI через MCP
-
-- **Боты:** `list_bots`, `get_bot`, `get_bot_states`, `get_bot_live_state`, `create_bot`, `update_bot`, `delete_bot`, `start_bot`, `stop_bot`, `restart_bot`, `send_message_to_bot`, `get_chat_history`, `get_bot_logs`
-- **Серверы и прокси:** `list_servers`, `create_server`, `update_server`, `delete_server`, `list_proxies`, `create_proxy`, `update_proxy`, `delete_proxy`
-- **Плагины:** `get_bot_plugins`, `get_plugin_settings`, `update_plugin_settings`, `enable_disable_plugin`, `list_plugin_catalog`, `get_catalog_plugin`, `install_plugin`, `install_local_plugin`, `uninstall_plugin`, `update_installed_plugin`, `check_plugin_updates`, `get_plugin_store`
-- **Файлы плагина на хосте:** `create_plugin`, `list_plugin_files`, `read_plugin_file`, `write_plugin_file`, `plugin_fs`, `reload_plugin`
-- **Игроки, группы и права:** `get_bot_users`, `get_user_info`, `set_player_blacklist`, `add_player_to_group`, `remove_player_from_group`, `get_bot_groups`, `create_bot_group`, `grant_group_permission`, `revoke_group_permission`, `get_bot_permissions`
-- **Команды:** `get_bot_commands`, `update_bot_command`
-- **Планировщик:** `list_tasks`, `create_task`, `update_task`, `delete_task`
-- **Открытый граф:** `list_open_graphs`, `get_open_graph`, `add_graph_node`, `update_graph_node`, `move_graph_nodes`, `delete_graph_nodes`, `add_graph_connection`, `delete_graph_connections`, `set_graph_variable`, `delete_graph_variable`. Правки видны в редакторе и не пишутся на диск, пока человек не сохранит холст
-- **Промпт `plugin-author`** — полное руководство по разработке плагинов BlockMine, которое AI получает одной командой `prompts/get`
-
-`send_message_to_bot` принимает тип чата (`chat`, `private`, `command` или тип, который зарегистрировал плагин, например клан) и может подождать ответ. Ответ сервера и плагина лежит в `get_chat_history`, служебный вывод процесса — в `get_bot_logs`.
-
-### Подключение
-
-#### 1. Получить Panel API Key
-
-В панели BlockMine: **Настройки → API ключи → Создать ключ**. Ключ начинается с `pk_`.
-
-#### 2. Подключить клиент по HTTP
-
-```bash
-claude mcp add blockmine --scope user --transport http \
-  http://localhost:3001/api/mcp \
-  --header "Authorization: Bearer pk_ваш_ключ"
+```text
+user.fly
 ```
 
-Или в `mcp.json`:
-```json
-{
-  "mcpServers": {
-    "blockmine": {
-      "type": "http",
-      "url": "http://localhost:3001/api/mcp",
-      "headers": { "Authorization": "Bearer pk_ваш_ключ" }
-    }
-  }
-}
+Permissions can be:
+
+* Declared by plugins
+* Created in the panel
+* Granted to groups
+* Used for fine-grained access
+
+## Groups
+
+A group collects permissions.
+
+Built-in groups:
+
+```text
+Admin
+Member
 ```
 
-### Удалённое подключение
+You can create your own groups.
 
-MCP endpoint поднимается вместе с самой панелью. Если BlockMine крутится на VPS — подставь публичный URL вместо `localhost:3001`. Авторизация per-request через `Authorization: Bearer pk_*` — те же ключи, что и для WebSocket API.
+## Users
+
+Users:
+
+* Are added when they interact with the bot
+* Can be placed in groups
+* Can be blacklisted
 
 ---
 
-## 🧑‍💻 Для разработчиков и контрибьюторов
+# ⏰ Task scheduler
 
-> **🤖 Для AI агентов:** Если вы AI агент через MCP, у вас уже есть промпт `plugin-author` (вызовите `prompts/get` с этим именем). Если нет MCP — см. [docs/plugin-author.md](./docs/plugin-author.md).
+BlockMine can run actions on a schedule.
 
-Если вы хотите внести свой вклад в проект или запустить его в режиме разработки.
+Schedules use **cron expressions**.
 
-### Требования
-- **Node.js v22+**
-- **npm** или **yarn**
+A task can:
 
-### 1. Установка
+* Start a bot
+* Restart a bot
+* Run commands
+* Run other available actions
+
+Each task has:
+
+* A cron schedule
+* A run history
+* An on/off switch
+
+---
+
+# 🧑‍💻 For developers
+
+BlockMine is also a platform for your own Minecraft automation plugins.
+
+> **For AI agents:** if you are connected through MCP, load the `plugin-author` prompt with `prompts/get`. Without MCP, the full guide is in [docs/plugin-author.md](./docs/plugin-author.md).
+
+## Requirements
+
+* **Node.js v22+**
+* **npm** or **yarn**
+
+## Install
 
 ```bash
 git clone https://github.com/blockmineJS/blockmine.git
@@ -421,103 +828,195 @@ npm install
 npm run build
 ```
 
-На Windows `start.bat` ставит зависимости и запускает тот же режим разработки, затем открывает `http://localhost:5173/`.
+On Windows:
 
-### 2. Запуск в режиме разработки
+```bat
+start.bat
+```
 
-Эта команда одновременно запустит бэкенд (`nodemon`) и фронтенд (`vite`) с горячей перезагрузкой.
+The script installs dependencies and starts development mode.
+
+## Development mode
 
 ```bash
 npm run dev
 ```
 
-- **Бэкенд** будет доступен на `http://localhost:3001`
-- **Фронтенд** с горячей перезагрузкой будет доступен на `http://localhost:5173`
+This starts:
 
+* The backend with `nodemon`
+* The frontend with `Vite`
+* Hot reload
 
-## Скриншоты
+After startup:
 
-
-<table align="center">
-  <tr>
-    <td align="center">
-      <p><strong>Дашборд</strong></p>
-      <img src="./screen/dashboard.png" alt="Дашборд" width="100%">
-      <em>Статус ботов, CPU и RAM</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>Каталог плагинов</strong></p>
-      <img src="./screen/plugins-store.png" alt="Каталог плагинов" width="100%">
-      <em>Установка из каталога, с GitHub или локально</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>Установленные плагины</strong></p>
-      <img src="./screen/plugins.png" alt="Установленные плагины" width="100%">
-      <em>Включение, настройки и команды плагина</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>Редактор плагина</strong></p>
-      <img src="./screen/ide.png" alt="Редактор плагина" width="100%">
-      <em>Файлы, Monaco и терминал на машине, где крутится панель</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>Команды</strong></p>
-      <img src="./screen/management.png" alt="Команды бота" width="100%">
-      <em>Алиасы, права и источник команды</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>3D-просмотр</strong></p>
-      <img src="./screen/3dviewer.png" alt="3D-просмотр" width="100%">
-      <em>Мир глазами бота</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <p><strong>Отладка графа</strong></p>
-      <img src="./screen/graph_live_debug.png" alt="Отладка графа" width="100%">
-      <em>Брейкпоинт и значения нод</em>
-    </td>
-  </tr>
-</table>
+* **Backend:** [http://localhost:3001](http://localhost:3001)
+* **Frontend:** [http://localhost:5173](http://localhost:5173)
 
 ---
 
+# 🖼️ Screenshots
+
+## Dashboard
+
+<p align="center">
+  <img src="./screen/dashboard.png" alt="BlockMine Dashboard" width="100%">
+  <br>
+  <em>Bot status, CPU, and RAM</em>
+</p>
+
+## Plugin store
+
+<p align="center">
+  <img src="./screen/plugins-store.png" alt="BlockMine Plugin Store" width="100%">
+  <br>
+  <em>Install from the catalog, GitHub, or a local file</em>
+</p>
+
+## Installed plugins
+
+<p align="center">
+  <img src="./screen/plugins.png" alt="BlockMine Installed Plugins" width="100%">
+  <br>
+  <em>Enable a plugin, edit its settings, and see its commands</em>
+</p>
+
+## Plugin editor
+
+<p align="center">
+  <img src="./screen/ide.png" alt="BlockMine Plugin Editor" width="100%">
+  <br>
+  <em>Files, Monaco, and a terminal on the machine that runs the panel</em>
+</p>
+
+## Commands
+
+<p align="center">
+  <img src="./screen/management.png" alt="BlockMine Commands" width="100%">
+  <br>
+  <em>Aliases, permissions, and where a command comes from</em>
+</p>
+
+## 3D viewer
+
+<p align="center">
+  <img src="./screen/3dviewer.png" alt="BlockMine 3D Viewer" width="100%">
+  <br>
+  <em>The Minecraft world through the bot's eyes</em>
+</p>
+
+## Graph debugging
+
+<p align="center">
+  <img src="./screen/graph_live_debug.png" alt="BlockMine Graph Debugger" width="100%">
+  <br>
+  <em>Breakpoints and node values</em>
+</p>
+
 ---
 
-## 🤝 Вклад в проект
+# 🤝 Contributing
 
-Мы приветствуем ваш вклад! Вот как вы можете помочь:
+Contributions are welcome.
 
-1. **Fork** репозитория
-2. Создайте ветку для вашей фичи (`git checkout -b feature/amazing-feature`)
-3. Commit ваши изменения (`git commit -m 'feat: добавлена потрясающая фича'`)
-4. Push в ветку (`git push origin feature/amazing-feature`)
-5. Откройте **Pull Request**
+## How to contribute
 
-### Стиль коммитов
+1. **Fork** the repository
+2. Create a branch:
 
-Мы используем [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` - новая функциональность
-- `fix:` - исправление бага
-- `docs:` - изменения в документации
-- `chore:` - рутинные задачи (обновление зависимостей и т.д.)
+```bash
+git checkout -b feature/amazing-feature
+```
+
+3. Commit:
+
+```bash
+git commit -m "feat: add an amazing feature"
+```
+
+4. Push:
+
+```bash
+git push origin feature/amazing-feature
+```
+
+5. Open a **pull request**
+
+## Commit style
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/).
+
+* `feat:` — a new feature
+* `fix:` — a bug fix
+* `docs:` — documentation
+* `chore:` — routine work, such as dependency updates
 
 ---
 
----
+# ⭐ BlockMine
+
+**BlockMine is an open-source Minecraft bot framework and automation platform for creating, running, debugging, and managing Minecraft bots.**
+
+If you are looking for:
+
+* Minecraft bot framework
+* Minecraft bot manager
+* Minecraft automation framework
+* Mineflayer-based bot platform
+* Minecraft scripting platform
+* No-code Minecraft bot builder
+* Minecraft multi-bot manager
+* Minecraft bot API
+* Minecraft plugin system
+* AI Minecraft bot platform
+* MCP Minecraft automation
+
+BlockMine brings those together in one platform.
 
 <div align="center">
   <p>
-    <a href="https://github.com/blockmineJS/blockmine">⭐ Поставьте звезду на GitHub</a>
+    <a href="https://github.com/blockmineJS/blockmine">⭐ Star BlockMine on GitHub</a>
   </p>
 </div>
+
+---
+
+## Keywords
+
+```text
+Minecraft bot
+Minecraft bot framework
+Minecraft automation
+Minecraft automation framework
+Minecraft bot manager
+Minecraft bot platform
+Minecraft bot API
+Minecraft bot library
+Minecraft scripting
+Minecraft automation tool
+Minecraft plugin system
+Minecraft multi-bot
+Minecraft AI bot
+AI Minecraft bot
+Minecraft MCP
+Minecraft MCP server
+Minecraft bot dashboard
+Minecraft bot manager
+Minecraft no-code
+Minecraft visual scripting
+Minecraft visual node editor
+Mineflayer
+Mineflayer bot
+Mineflayer framework
+Minecraft JavaScript bot
+Minecraft Node.js bot
+Minecraft server automation
+Minecraft server bot
+Minecraft clan bot
+Minecraft AFK bot
+Minecraft monitoring bot
+Minecraft farming bot
+Minecraft economy bot
+Minecraft Discord bot
+Minecraft Telegram bot
+```

@@ -1,7 +1,7 @@
 {
   "name": "blockmine",
   "version": "1.28.0",
-  "description": "Minecraft-боты без программирования. Веб-панель и визуальный редактор. Запуск: npx blockmine",
+  "description": "Open-source Minecraft bot framework and automation platform on Mineflayer. Plugins, visual scripting, multi-bot panel. Start: npx blockmine",
   "author": "merka",
   "license": "MIT",
   "repository": {
@@ -14,10 +14,23 @@
   "keywords": [
     "minecraft",
     "minecraft-bot",
+    "minecraft-bot-framework",
+    "minecraft-automation",
+    "minecraft-automation-framework",
     "mineflayer",
+    "mineflayer-bot",
+    "bot-framework",
+    "bot-automation",
+    "minecraft-ai",
+    "minecraft-scripting",
+    "minecraft-plugin",
+    "minecraft-bot-manager",
+    "multi-bot",
     "bot-panel",
     "visual-programming",
     "no-code",
+    "javascript",
+    "nodejs",
     "npx",
     "dashboard",
     "automation"
