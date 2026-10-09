@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     paths: [index.json]
+  workflow_dispatch:
+    inputs:
+      before:
+        description: Parent commit
+        required: true
+        type: string
+      after:
+        description: Commit with the plugin change
+        required: true
+        type: string
+      pusher:
+        description: Who made the change
+        required: false
+        type: string
 
 permissions:
   contents: read

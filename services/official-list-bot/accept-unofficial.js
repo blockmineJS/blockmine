@@ -117,14 +117,23 @@ async function accept({ github, context, core }) {
         repo,
         pull_number: pr.number,
         event: 'APPROVE',
-        body: 'Неофициальная запись совпадает с автором репозитория. Официальный раздел не изменён.',
+        body: 'Неофициальная запись совпадает с автором репозитория.',
     });
-    await github.rest.pulls.merge({
+    const merged = await github.rest.pulls.merge({
         owner,
         repo,
         pull_number: pr.number,
         merge_method: 'squash',
     });
+    const { postChanges, diffCatalog } = require('./discord-changes');
+    await postChanges(
+        diffCatalog(decodeContent(baseFile.data), decodeContent(headFile.data)),
+        {
+            commitUrl: `https://github.com/${owner}/${repo}/commit/${merged.data.sha}`,
+            pusher: pr.user.login,
+            core,
+        }
+    );
     core.notice(`PR #${pr.number} принят как неофициальный плагин.`);
     return { merged: true };
 }

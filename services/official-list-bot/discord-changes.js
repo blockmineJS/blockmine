@@ -125,35 +125,14 @@ function decodeContent(data) {
     return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
 }
 
-async function notify({ github, context, core }) {
+async function postChanges(changes, { commitUrl, pusher, core }) {
     const webhook = process.env.DISCORD_WEBHOOK_URL;
     if (!webhook) {
         core.notice('Discord webhook не задан.');
         return { sent: false, reason: 'no-webhook' };
     }
-    const before = context.payload.before;
-    if (!before || /^0+$/.test(before)) return { sent: false, reason: 'no-parent' };
-
-    const { owner, repo } = context.repo;
-    const load = async (ref) => {
-        const file = await github.rest.repos.getContent({ owner, repo, path: 'index.json', ref });
-        return decodeContent(file.data);
-    };
-    let previous;
-    try {
-        previous = await load(before);
-    } catch {
-        previous = { official: [], unofficial: [] };
-    }
-    const current = await load(context.sha);
-    const changes = diffCatalog(previous, current);
     if (!changes.length) return { sent: false, reason: 'no-changes' };
-
-    const commitUrl = `https://github.com/${owner}/${repo}/commit/${context.sha}`;
-    const payloads = buildPayloads(changes, {
-        commitUrl,
-        pusher: context.payload.pusher?.name || '',
-    });
+    const payloads = buildPayloads(changes, { commitUrl, pusher });
     for (const payload of payloads) {
         const response = await fetch(webhook, {
             method: 'POST',
@@ -169,8 +148,35 @@ async function notify({ github, context, core }) {
     return { sent: true, count: changes.length };
 }
 
+async function notify({ github, context, core }) {
+    const before = context.payload.inputs?.before || context.payload.before;
+    const sha = context.payload.inputs?.after || context.sha;
+    if (!before || /^0+$/.test(before)) return { sent: false, reason: 'no-parent' };
+
+    const { owner, repo } = context.repo;
+    const load = async (ref) => {
+        const file = await github.rest.repos.getContent({ owner, repo, path: 'index.json', ref });
+        return decodeContent(file.data);
+    };
+    let previous;
+    try {
+        previous = await load(before);
+    } catch {
+        previous = { official: [], unofficial: [] };
+    }
+    const current = await load(sha);
+    const changes = diffCatalog(previous, current);
+    const pusher = context.payload.pusher?.name || context.payload.inputs?.pusher || '';
+    return postChanges(changes, {
+        commitUrl: `https://github.com/${owner}/${repo}/commit/${sha}`,
+        pusher,
+        core,
+    });
+}
+
 module.exports = {
     diffCatalog,
     buildPayloads,
+    postChanges,
     notify,
 };
